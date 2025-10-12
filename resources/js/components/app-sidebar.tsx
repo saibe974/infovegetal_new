@@ -22,12 +22,17 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    {
+        title: 'Products',
+        href: "#",
+        icon: LayoutGrid,
+    },
 ];
 
 const footerNavItems: NavItem[] = [
     {
         title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
+        href: 'https://github.com/saibe974/infovegetal_new',
         icon: Folder,
     },
     {
@@ -44,7 +49,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href="/" prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
