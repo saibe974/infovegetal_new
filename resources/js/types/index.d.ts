@@ -1,8 +1,41 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 
-export interface Auth {
-    user: User;
+export interface PaginatedCollection<T> {
+    data: T[];
+    links: {
+        first: string;
+        last: string;
+        prev: string | null;
+        next: string | null;
+    };
+    meta: {
+        current_page: number;
+        from: number;
+        last_page: number;
+        path: string;
+        per_page: number;
+        to: number;
+        total: number;
+        links: {
+            url: string | null;
+            label: string;
+            active: boolean;
+        }[];
+    };
+}
+
+export interface Product {
+    id: number;
+    name: string;
+    img_link: string;
+    description: string;
+    price: number;
+    active: boolean;
+    attributes: Record<string, unknown> | null;
+    created_at: string;
+    updated_at: string;
+    [key: string]: unknown; // This allows for additional properties...
 }
 
 export interface BreadcrumbItem {

@@ -13,8 +13,9 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import { BookOpen, Flower2Icon, FlowerIcon, Folder, LayoutGrid } from 'lucide-react';
 import AppLogo from './app-logo';
+import products from '@/actions/App/Http/Controllers/ProductController';
 
 const mainNavItems: NavItem[] = [
     {
@@ -24,8 +25,8 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Products',
-        href: "#",
-        icon: LayoutGrid,
+        href: products.index(),
+        icon: Flower2Icon,
     },
 ];
 
@@ -63,7 +64,6 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
             </SidebarFooter>
         </Sidebar>
     );
