@@ -15,6 +15,7 @@ trait HasSortable
         if (empty($this->sortable ?? [])) {
             return;
         }
+
         $validated = $request->validate([
             'dir' => ['nullable', Rule::in(['asc', 'desc'])],
             'sort' => ['nullable', Rule::in($this->sortable)],
@@ -22,7 +23,6 @@ trait HasSortable
 
         if (! ($validated['sort'] ?? null)) {
             $builder->orderByDesc('created_at');
-
             return;
         }
 
