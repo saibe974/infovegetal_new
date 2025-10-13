@@ -29,15 +29,15 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
         <div>
             <BasicSticky stickyClassName='z-100 bg-background'>
                 <div className="flex items-center py-2 p-relative w-full">
-                <Form href={products.index().url} className="flex gap-1 items-center">
-                    <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''}/>
-                    <Button>Rechercher</Button>
-                </Form>
+                    <Form href={products.index().url} className="flex gap-1 items-center">
+                        <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''}/>
+                        <Button>Rechercher</Button>
+                    </Form>
 
-                <div className="mx-4 opacity-50">
-                    {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
-                        collection.meta.total == 0 ? "aucun résultat" : ""}
-                </div>
+                    <div className="mx-4 opacity-50">
+                        {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
+                            collection.meta.total == 0 ? "aucun résultat" : ""}
+                    </div>
                 </div>
             </BasicSticky>
 
