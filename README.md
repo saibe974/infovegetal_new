@@ -1,10 +1,11 @@
 # Infovegetal
 
-Application Laravel pour la gestion de produits végétaux.
+Application Laravel pour Infovégétal.
 
 ## Description
 
-Ce dépôt contient une application Laravel (backend + frontend Vite/React/Tailwind) qui gère des produits. Il inclut une commande Artisan `products:import` pour importer des produits depuis un CSV situé par défaut dans `storage/imports/vegetal_produits_extrait.csv`.
+Ce dépôt contient une application Laravel (backend+ Inertia/Shadcn + frontend Vite/React/Tailwind).
+Tu pourras via une commande Artisan `products:import`, importer des produits tests depuis un CSV situé par défaut dans `storage/imports/`.
 
 ## Pré-requis
 
@@ -17,30 +18,45 @@ Ce dépôt contient une application Laravel (backend + frontend Vite/React/Tailw
 
 1. Clone le dépôt:
 
-    git clone <repo-url> .
+```
+git clone https://github.com/saibe974/infovegetal_new.git
+```
 
 2. Installe les dépendances PHP:
 
-    composer install
+```
+composer install
+```
 
 3. Copie le `.env` et configure la base:
 
-    cp .env.example .env
+```
+cp .env.example .env
+```
 
     # Édite .env (DB, APP_URL, etc.)
 
 4. Génère la clé:
 
-    php artisan key:generate
+```
+php artisan key:generate
+```
 
 5. Installe les dépendances JS et lance Vite:
 
-    npm install
-    npm run dev
+```
+npm install
+```
+
+```
+npm run dev
+```
 
 6. Lance les migrations:
 
-    php artisan migrate
+```
+php artisan migrate
+```
 
 ## Importer le CSV de produits
 
@@ -49,7 +65,7 @@ Par défaut le CSV attendu se trouve dans `storage/imports/vegetal_produits_extr
 La commande fournie :
 
 ```
-php artisan products:import --file=storage/imports/vegetal_produits_extrait.csv --dry-run
+php artisan products:import --dry-run
 ```
 
 Options utiles:
@@ -65,8 +81,6 @@ La commande fait un upsert sur la colonne `sku` et met à jour `name, descriptio
 Le projet utilise Pest/PHPUnit (vérifie `phpunit.xml`/`tests/`). Lance les tests PHP :
 
 ```
-./vendor/bin/pest
-# ou
 php artisan test
 ```
 
