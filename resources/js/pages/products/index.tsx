@@ -8,7 +8,6 @@ import { SortableTableHead } from '@/components/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon } from 'lucide-react';
-import Sticky from 'react-sticky-el';
 import BasicSticky from 'react-sticky-el';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -29,7 +28,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
         <div>
             <BasicSticky stickyClassName='z-100 bg-background'>
                 <div className="flex items-center py-2 p-relative w-full">
-                    <Form href={products.index().url} className="flex gap-1 items-center">
+                    <Form {...products.index.form()} className="flex gap-1 items-center">
                         <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''}/>
                         <Button>Rechercher</Button>
                     </Form>
@@ -58,10 +57,14 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
                                     {item.img_link &&
-                                        <img src={item.img_link} className="w-20"/>
+                                        <img src={item.img_link} className="size-20 object-cover"/>
                                     }
                                 </TableCell>
-                                <TableCell>{item.name}</TableCell>
+                                <TableCell>
+                                    <Link href={products.edit(item.id)} className="hover:underline">
+                                        {item.name}
+                                    </Link>
+                                </TableCell>
                                 <TableCell>{item.price}</TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
