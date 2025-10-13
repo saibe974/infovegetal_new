@@ -38,6 +38,10 @@ export interface Product {
     [key: string]: unknown; // This allows for additional properties...
 }
 
+export interface ProductDetailed extends Product {
+    // Add more detailed fields if necessary
+}
+
 export interface BreadcrumbItem {
     title: string;
     href: string;
@@ -60,6 +64,11 @@ export interface SharedData {
     quote: { message: string; author: string };
     auth: Auth;
     sidebarOpen: boolean;
+    flash: {
+        success?: string;
+        error?: string;
+    };
+    query: Record<string, unknown>;
     [key: string]: unknown;
 }
 

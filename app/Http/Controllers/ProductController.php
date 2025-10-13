@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -18,7 +19,10 @@ class ProductController extends Controller
         $search = $request->get('q');
 
         if ($search) {
-            $query->where('name', 'like', '%'.$search.'%');
+            // $query->where('name', 'like', '%'.$search.'%');
+            $query->where('id', '=', $search)->orWhere(function ($q) use ($search) {
+                $q->where('name', 'like', '%'.$search.'%');
+            });
         }
 
         return Inertia::render('products/index', [
@@ -40,9 +44,12 @@ class ProductController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(FormProductRequest $request)
     {
-        //
+        $product = Product::create($request->validated());
+        $this->handleFormRequest($product, $request);
+
+        return redirect()->route('products.edit', $product)->with('success', 'Produit créé');
     }
 
     /**
@@ -58,15 +65,19 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
-        //
+        return Inertia::render('products/form', [
+            'product' => new ProductResource($product),
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Product $product)
+    public function update(FormProductRequest $request, Product $product)
     {
-        //
+        $product->update($request->validated());
+        $this->handleFormRequest($product, $request);
+        return redirect()->back()->with('success', 'Produit mis à jour');
     }
 
     /**
@@ -74,6 +85,15 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        //
+        $product->delete();
+        return redirect()->back()->with('success', 'Produit supprimé');
+    }
+
+    private function handleFormRequest(Product $product, FormProductRequest $request)
+    {
+        // $image = $request->validated('image');
+        // if ($image && $image instanceof UploadedFile) {
+        //     $product->addMedia($image)->toMediaCollection('image');
+        // }
     }
 }
