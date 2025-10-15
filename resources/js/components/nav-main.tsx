@@ -8,7 +8,7 @@ import {
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 
-export function NavMain({ items = [] }: { items: NavItem[] }) {
+function NavMain({ items = [] }: { items: NavItem[] }) {
     const page = usePage();
     return (
         <SidebarGroup className="px-2 py-0">
@@ -36,3 +36,16 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
         </SidebarGroup>
     );
 }
+
+export function NavMainExtended() {
+    return (
+    <SidebarGroup className="px-2 py-0">
+            <SidebarGroupLabel>NavMainExtended in code</SidebarGroupLabel>
+            <SidebarMenu>
+                <SidebarMenuItem></SidebarMenuItem>
+            </SidebarMenu>
+    </SidebarGroup>);
+
+}
+
+export default NavMain;

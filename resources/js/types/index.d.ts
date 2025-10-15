@@ -59,6 +59,10 @@ export interface NavItem {
     isActive?: boolean;
 }
 
+export interface NavItemExtended extends NavItem {
+    subItems?: NavItem[];
+}
+
 export interface SharedData {
     name: string;
     quote: { message: string; author: string };
