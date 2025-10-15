@@ -33,10 +33,10 @@ class ProductController extends Controller
             // return unique names only (one entry per name). Use MIN(id) as a representative id.
             'search' => Inertia::optional(fn () => ProductResource::collection(
                 $query
-                    // ->selectRaw('MIN(id) as id, name')
-                    // ->groupBy('name')
-                    // ->orderBy('name')
-                    ->select('id', 'name')
+                    ->selectRaw('MIN(id) as id, name')
+                    ->groupBy('name')
+                    ->orderBy('name')
+                    // ->select('id', 'name')
                     ->limit(5)
                     ->get()
             )),
