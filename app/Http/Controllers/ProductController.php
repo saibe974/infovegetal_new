@@ -30,6 +30,16 @@ class ProductController extends Controller
             'collection' => Inertia::scroll(fn () => ProductResource::collection(
                 $query->paginate(10)
             )),
+            // return unique names only (one entry per name). Use MIN(id) as a representative id.
+            'search' => Inertia::optional(fn () => ProductResource::collection(
+                $query
+                    // ->selectRaw('MIN(id) as id, name')
+                    // ->groupBy('name')
+                    // ->orderBy('name')
+                    ->select('id', 'name')
+                    ->limit(5)
+                    ->get()
+            )),
         ]);
     }
 
