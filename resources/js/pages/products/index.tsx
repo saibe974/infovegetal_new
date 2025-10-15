@@ -2,7 +2,7 @@ import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { ReactNode, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
-import { Table, TableBody, TableHead,TableHeader, TableRow, TableCell } from '@/components/ui/table';
+import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Form, Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Input } from '@/components/ui/input';
@@ -11,17 +11,18 @@ import { EditIcon, TrashIcon } from 'lucide-react';
 import Sticky from 'react-sticky-el';
 import BasicSticky from 'react-sticky-el';
 import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandLoading,
-  CommandSeparator,
-  CommandShortcut,
+    Command,
+    CommandDialog,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+    CommandLoading,
+    CommandSeparator,
+    CommandShortcut,
 } from "@/components/ui/command"
+import SearchSoham from '@/components/ui/searchSoham';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -35,10 +36,10 @@ type Props = {
     q: string | null;
 };
 
-export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
+export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection)
-    const page = usePage<{search: Product[]}>();
-    const productsSearch = page.props.search ?? [{data: []}];
+    const page = usePage<{ search: Product[] }>();
+    const productsSearch = page.props.search ?? [{ data: [] }];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [fetching, setFetching] = useState(false);
@@ -46,9 +47,10 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
 
     const handleSearch = (s: string) => {
         setSearch(s);
+        // @ts-ignore
         clearTimeout(timerRef.current);
         router.cancelAll();
-        if(s.length < 2) {
+        if (s.length < 2) {
             return;
         }
         setFetching(true);
@@ -62,6 +64,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
         }, 300)
     }
 
+    // @ts-ignore
     const onSelect = (mysearch) => {
         setSearch('');
         // products.index().url.q = mysearch;
@@ -78,38 +81,16 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
             <BasicSticky stickyClassName='z-100 bg-background'>
                 <div className="flex items-center py-2 p-relative w-full">
                     <Form href={products.index().url} className="flex gap-1 items-center">
-                        <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''}/>
+                        <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''} />
                         <Button>Rechercher</Button>
                     </Form>
 
                     <div className="mx-4 opacity-50">
-                        {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
+                        {collection.meta.total > 1 ? collection.meta.total + " occurences" :
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
-                    <Command shouldFilter={false} className="ml-auto">
-                        <CommandInput 
-                            value={search}
-                            onValueChange={handleSearch} 
-                            placeholder="Rechercher" />
-
-                        {search.length >= 3 && <CommandList>
-                            {fetching ? (<CommandLoading>attend...</CommandLoading>) : <>  
-                            <CommandEmpty>Aucun résultat</CommandEmpty>
-                            <CommandGroup heading="Suggestions">
-                                {productsSearch.data && productsSearch.data.map((item) => (
-                                    <CommandItem 
-                                        key={item.id}
-                                        onSelect={() => onSelect(item.name)}>
-                                            {item.name}
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
-                            </>}
-                        </CommandList>
-                        }
-
-                    </Command>
+                    <SearchSoham search={search} fetching={fetching} handleSearch={handleSearch} productsSearch={productsSearch} onSelect={onSelect} />
                 </div>
             </BasicSticky>
 
@@ -130,7 +111,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
                                     {item.img_link &&
-                                        <img src={item.img_link} className="w-20"/>
+                                        <img src={item.img_link} className="w-20" />
                                     }
                                 </TableCell>
                                 <TableCell>{item.name}</TableCell>
@@ -158,7 +139,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                 </Table>
             </InfiniteScroll>
         </div>
-        
+
     )
 })
 

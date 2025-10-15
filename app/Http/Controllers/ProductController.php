@@ -21,22 +21,25 @@ class ProductController extends Controller
         if ($search) {
             // $query->where('name', 'like', '%'.$search.'%');
             $query->where('id', '=', $search)->orWhere(function ($q) use ($search) {
-                $q->where('name', 'like', '%'.$search.'%');
+                $q->where('name', 'like', '%' . $search . '%');
             });
         }
 
         return Inertia::render('products/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn () => ProductResource::collection(
+            'collection' => Inertia::scroll(fn() => ProductResource::collection(
                 $query->paginate(10)
             )),
             // return unique names only (one entry per name). Use MIN(id) as a representative id.
-            'search' => Inertia::optional(fn () => ProductResource::collection(
+            'search' => Inertia::optional(fn() => ProductResource::collection(
                 $query
-                    ->selectRaw('MIN(id) as id, name')
+                    ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
                     ->groupBy('name')
-                    ->orderBy('name')
-                    // ->select('id', 'name')
+                    ->orderBy('created_at', 'desc')
+                    ->orderBy('name', 'asc')
+
+                    // ->groupBy('name')
+                    // ->orderBy('id')
                     ->limit(5)
                     ->get()
             )),
