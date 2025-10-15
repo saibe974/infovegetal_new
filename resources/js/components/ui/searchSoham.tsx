@@ -18,14 +18,14 @@ const SearchSoham = (
 ) => {
 
     return (
-        <Command shouldFilter={false} className="ml-auto">
+        <Command shouldFilter={false} className="ml-auto w-full">
             <CommandInput
                 value={search}
                 onValueChange={handleSearch}
                 placeholder="Rechercher Soso" />
 
             {search.length >= 3 && <CommandList>
-                {fetching ? (<CommandLoading className="flex items-center justify-center overflow-hidden h-10">
+                {fetching ? (<CommandLoading className="flex items-center justify-center overflow-hidden h-10 z-[1000]">
                     <LoaderCircleIcon className="animate-spin mr-2" />
                 </CommandLoading>) : <>
                     <CommandEmpty>Aucun résultat</CommandEmpty>

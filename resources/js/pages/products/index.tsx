@@ -78,8 +78,9 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
     return (
         <div>
-            <BasicSticky stickyClassName='z-100 bg-background'>
-                <div className="flex items-center py-2 p-relative w-full">
+            {/* @ts-ignore */}
+            <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
+                <div className="flex items-center py-2 relative w-full">
                     <Form href={products.index().url} className="flex gap-1 items-center">
                         <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''} />
                         <Button>Rechercher</Button>
@@ -90,12 +91,20 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
-                    <SearchSoham search={search} fetching={fetching} handleSearch={handleSearch} productsSearch={productsSearch} onSelect={onSelect} />
+                    <div className="absolute w-200 right-20 top-1/5 z-100" >
+                        <SearchSoham
+                            search={search}
+                            fetching={fetching}
+                            handleSearch={handleSearch}
+                            productsSearch={productsSearch}
+                            onSelect={onSelect}
+                        />
+                    </div>
                 </div>
             </BasicSticky>
 
             <InfiniteScroll data="collection">
-                <Table>
+                <Table >
                     <TableHeader>
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
