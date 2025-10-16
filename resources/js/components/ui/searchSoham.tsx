@@ -29,14 +29,21 @@ const SearchSoham = (
                     <LoaderCircleIcon className="animate-spin mr-2" />
                 </CommandLoading>) : <>
                     <CommandEmpty>Aucun résultat</CommandEmpty>
-                    <CommandGroup heading="Suggestions" className="">
-                        {productsSearch.data && productsSearch.data.map((item: any) => (
+                    <CommandGroup heading="Suggestions">
+                        {productsSearch.length > 0 ? (
+                            productsSearch.map((name: string, index: number) => (
                             <CommandItem
-                                key={item.id}
-                                onSelect={() => onSelect(item.name)}>
-                                {item.name}
+                                key={index}
+                                onSelect={() => onSelect(name)}
+                            >
+                                {name}
                             </CommandItem>
-                        ))}
+                            ))
+                        ) : (
+                            <CommandItem disabled>
+                            Aucun résultat
+                            </CommandItem>
+                        )}
                     </CommandGroup>
                 </>}
             </CommandList>
