@@ -47,6 +47,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                             <SortableTableHead field="id">ID</SortableTableHead>
                             <TableHead></TableHead>
                             <SortableTableHead field="name">Name</SortableTableHead>
+                            <TableHead>Desc.</TableHead>
                             <TableHead>Price</TableHead>
                             <TableHead className='text-end'>Actions</TableHead>
                         </TableRow>
@@ -65,6 +66,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                                         {item.name}
                                     </Link>
                                 </TableCell>
+                                <TableCell>{item.description}</TableCell>
                                 <TableCell>{item.price}</TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">

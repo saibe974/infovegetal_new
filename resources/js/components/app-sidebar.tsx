@@ -17,7 +17,7 @@ import {
 import { dashboard } from '@/routes';
 import { NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Flower2Icon, FlowerIcon, Folder, LayoutGrid } from 'lucide-react';
+import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, TagIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import { useState, useEffect } from 'react';
@@ -40,6 +40,16 @@ const mainNavItems: NavItemExtended[] = [
                 title: 'All products',
                 href: products.index(),
                 icon: ListIcon,
+            },
+            {
+                title: 'Categories',
+                href: '#',
+                icon: FolderTreeIcon,
+            },
+            {
+                title: 'Tags',
+                href: '#',
+                icon: TagIcon
             },
             {
                 title: 'Create product',
@@ -90,46 +100,9 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
-                {/* Collapsible Products submenu */}
+                {/* <NavMain items={mainNavItems} /> */}
 
-                <NavMainExtended />
-
-                <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>NavMainExtended</SidebarGroupLabel>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton onClick={() => setProductsOpen((s) => !s)}>
-                            {/* main label */}
-                            <span className="flex items-center gap-2">
-                                <Flower2Icon size={16} />
-                                <span>Products</span>
-                            </span>
-                        </SidebarMenuButton>
-
-                        {/* animated submenu */}
-                        <div
-                            className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out mt-2 ${productsOpen ? 'opacity-100' : 'opacity-0'}`}
-                            style={{ maxHeight: productsOpen ? 200 : 0 }}
-                        >
-                            <SidebarMenuSub>
-                                <SidebarMenuSubItem>
-                                    <Link href={products.index()} className="flex items-center gap-2 px-2 py-1">
-                                        <ListIcon size={16}/>
-                                        <span>All products</span>
-                                    </Link>
-                                </SidebarMenuSubItem>
-                                <SidebarMenuSubItem>
-                                    <Link href={products.create()} className="flex items-center gap-2 px-2 py-1">
-                                        <PlusCircle />
-                                        <span>Create product</span>
-                                    </Link>
-                                </SidebarMenuSubItem>
-                            </SidebarMenuSub>
-                        </div>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-                </SidebarGroup>
+                <NavMainExtended title="Administration" items={mainNavItems}/>
             </SidebarContent>
 
             <SidebarFooter>
