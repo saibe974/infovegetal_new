@@ -24,6 +24,7 @@ type Props = {
 
 export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
     // console.log(collection)
+    
     return (
         <div>
             <BasicSticky stickyClassName='z-100 bg-background'>
@@ -47,7 +48,8 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                             <SortableTableHead field="id">ID</SortableTableHead>
                             <TableHead></TableHead>
                             <SortableTableHead field="name">Name</SortableTableHead>
-                            <TableHead>Desc.</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Description</TableHead>
                             <TableHead>Price</TableHead>
                             <TableHead className='text-end'>Actions</TableHead>
                         </TableRow>
@@ -66,6 +68,8 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                                         {item.name}
                                     </Link>
                                 </TableCell>
+                                
+                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
                                 <TableCell>{item.description}</TableCell>
                                 <TableCell>{item.price}</TableCell>
                                 <TableCell>

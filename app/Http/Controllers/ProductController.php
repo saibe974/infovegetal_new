@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+// use App\Models\ProductCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -15,21 +16,22 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::query()->orderFromRequest($request);
+    //    $product = Product::with('category')->find(1);
+    //    dd($product->category->name);
+        $query = Product::with('category')->orderFromRequest($request);
         $search = $request->get('q');
 
         if ($search) {
-            // $query->where('name', 'like', '%'.$search.'%');
             $query->where('id', '=', $search)->orWhere(function ($q) use ($search) {
-                $q->where('name', 'like', '%'.$search.'%');
+                $q->where('name', 'like', '%' . $search . '%');
             });
         }
 
         return Inertia::render('products/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn () => ProductResource::collection(
+            'collection' => Inertia::scroll(fn() => ProductResource::collection(
                 $query->paginate(10)
-            )),
+            ))
         ]);
     }
 

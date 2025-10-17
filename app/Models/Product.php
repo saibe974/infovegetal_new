@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProductCategory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Product extends Model
 {
+    use HasFactory;
     use Traits\HasSortable;
 
     protected $fillable = [
@@ -36,6 +39,11 @@ class Product extends Model
         'updated_at' => 'immutable_datetime',
         'deleted_at' => 'immutable_datetime',
     ];
+
+    public function category()
+    {
+        return $this->belongsTo(ProductCategory::class, 'product_category_id');
+    }
 
     /**
      * Backwards-compatible accessor expected by API: price_ex_vat

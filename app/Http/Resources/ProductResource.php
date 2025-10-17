@@ -30,6 +30,7 @@ class ProductResource extends JsonResource
             'price' => $this->price,
             'active' => $this->active,
             'attributes' => $this->attributes,
+            'category' => $this->whenLoaded('category', fn () => $this->category),
             'created_at' => $this->created_at?->toDateTimeString(),
             'updated_at' => $this->updated_at?->toDateTimeString(),
         ];

@@ -25,6 +25,11 @@ export interface PaginatedCollection<T> {
     };
 }
 
+export interface ProductCategory {
+  id: number;
+  name: string;
+}
+
 export interface Product {
     id: number;
     name: string;
@@ -32,6 +37,7 @@ export interface Product {
     description: string;
     price: number;
     active: boolean;
+    category?: ProductCategory | null;
     attributes: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
