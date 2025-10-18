@@ -1,7 +1,7 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { ReactNode } from 'react';
-import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
+import { type BreadcrumbItem, Product, PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead,TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Form, Link, InfiniteScroll } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
@@ -9,8 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
-import { useRef, useState } from 'react';
-import { useForm } from '@inertiajs/react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -20,12 +18,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 type Props = {
-    collection: PaginatedCollection<Product>;
+    collection: PaginatedCollection<ProductCategory>;
     q: string | null;
 };
 
 export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
-    // console.log(collection)
+    console.log(collection)
     
     return (
         <div>
@@ -40,12 +38,6 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                         {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
-
-                    {/* CSV actions */}
-                    <div className="ml-auto flex items-center gap-2">
-                        <DownloadCsvButton />
-                        <UploadCsvButton />
-                    </div>
                 </div>
             </BasicSticky>
 
@@ -54,12 +46,8 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                     <TableHeader>
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
-                            <TableHead></TableHead>
                             <SortableTableHead field="name">Name</SortableTableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead className='text-end'>Actions</TableHead>
+                            <TableHead>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -67,19 +55,10 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    {item.img_link &&
-                                        <img src={item.img_link} className="size-20 object-cover"/>
-                                    }
-                                </TableCell>
-                                <TableCell>
                                     <Link href={products.edit(item.id)} className="hover:underline">
                                         {item.name}
                                     </Link>
                                 </TableCell>
-                                
-                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
-                                <TableCell>{item.description}</TableCell>
-                                <TableCell>{item.price}</TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
                                         <Button asChild size="icon" variant="outline">
@@ -106,45 +85,4 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
         
     )
 })
-
-function DownloadCsvButton() {
-    // Downloads CSV via the products index with export param.
-    const url = products.index().url + '?export=csv';
-    return (
-        <a href={url} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
-            Télécharger CSV
-        </a>
-    );
-}
-
-function UploadCsvButton() {
-    const inputRef = useRef<HTMLInputElement | null>(null);
-    const { data, setData, post, processing } = useForm({ file: null });
-
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] ?? null;
-        setData('file', file as any);
-        if (file) {
-            const form = new FormData();
-            form.append('file', file);
-            // post to a backend endpoint; if you have a named route for import, change the URL
-            post('/products/import', {
-                forceFormData: true,
-                onFinish: () => {
-                    // optional: reload page after import
-                    window.location.reload();
-                }
-            });
-        }
-    };
-
-    return (
-        <>
-            <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
-            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={processing}>
-                {processing ? 'Uploading...' : 'Importer CSV'}
-            </button>
-        </>
-    );
-}
 

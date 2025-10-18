@@ -13,6 +13,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     Route::resource('products', \App\Http\Controllers\ProductController::class);
+    // CSV import/export endpoints
+    Route::post('products/import', [\App\Http\Controllers\ProductController::class, 'import'])->name('products.import');
+    Route::get('products/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('products.export');
+
+    Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class);
     
 });
 

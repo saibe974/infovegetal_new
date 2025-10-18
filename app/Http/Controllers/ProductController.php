@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
-// use App\Models\ProductCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
 {
@@ -33,6 +36,69 @@ class ProductController extends Controller
                 $query->paginate(10)
             ))
         ]);
+    }
+
+    /**
+     * Handle CSV upload import. Expects a multipart file named 'file'.
+     */
+    public function import(Request $request)
+    {
+        // Gate::authorize('manage-products');
+
+        dd($request);
+/*
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt'],
+        ]);
+
+        $path = $request->file('file')->store('imports');
+
+        // Call the existing artisan command with the stored file path
+        // The command expects a --file option path relative to project root or absolute
+        $fullPath = storage_path('app/' . $path);
+        dd($fullPath);
+        Artisan::call('products:import', ['--file' => $fullPath]);
+
+        return redirect()->back()->with('success', 'Import lancé');*/
+    }
+
+    /**
+     * Export products as CSV.
+     */
+    public function export(Request $request)
+    {
+    Gate::authorize('manage-products');
+
+        $filename = 'products_export_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () {
+            $handle = fopen('php://output', 'w');
+            // header
+            fputcsv($handle, ['id', 'sku', 'name', 'category', 'description', 'price', 'active']);
+
+            Product::with('category')->chunk(100, function ($products) use ($handle) {
+                foreach ($products as $p) {
+                    fputcsv($handle, [
+                        $p->id,
+                        $p->sku,
+                        $p->name,
+                        $p->category?->name,
+                        $p->description,
+                        $p->price,
+                        $p->active ? 1 : 0,
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        };
+
+        return new StreamedResponse($callback, 200, $headers);
     }
 
     /**

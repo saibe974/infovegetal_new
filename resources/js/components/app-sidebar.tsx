@@ -20,6 +20,7 @@ import { Link } from '@inertiajs/react';
 import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, TagIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
+import productCategories from '@/routes/products-categories';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 
@@ -43,7 +44,7 @@ const mainNavItems: NavItemExtended[] = [
             },
             {
                 title: 'Categories',
-                href: '#',
+                href: productCategories.index(),
                 icon: FolderTreeIcon,
             },
             {

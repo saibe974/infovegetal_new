@@ -143,6 +143,7 @@ class ImportProducts extends Command
         if (!empty($r['id'])) $attributes['external_id'] = (string)$r['id'];
 
         // Resolve product_category_id from several possible CSV fields
+        /*
         $product_category_id = null;
         if (!empty($r['product_category_id'])) {
             $product_category_id = is_numeric($r['product_category_id']) ? (int)$r['product_category_id'] : null;
@@ -189,7 +190,10 @@ class ImportProducts extends Command
                 $this->stats['unresolved']++;
             }
         }
+        */
 
+        $product_category_id = $r['product_category_id'] ?? null;
+        
         return [
             'sku' => $sku,
             'name' => $name,
