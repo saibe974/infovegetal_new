@@ -18,7 +18,7 @@ const SearchSoham = (
 ) => {
 
     return (
-        <Command shouldFilter={false} className="ml-auto w-full">
+        <Command shouldFilter={false}>
             <CommandInput
                 value={search}
                 onValueChange={handleSearch}

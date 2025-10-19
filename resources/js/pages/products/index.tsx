@@ -91,7 +91,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
-                    <div className="absolute w-200 right-20 top-1/5 z-100" >
+                    <div className="w-200 right-20 top-1/5 z-100" >
                         <SearchSoham
                             search={search}
                             fetching={fetching}
