@@ -91,14 +91,6 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
-                    {/* CSV actions */}
-                    <div className="ml-auto flex items-center gap-2">
-                        <DownloadCsvButton />
-                        <UploadCsvButton />
-                        {collection.meta.total > 1 ? collection.meta.total + " occurences" :
-                            collection.meta.total == 0 ? "aucun résultat" : ""}
-                    </div>
-
                     <div className="w-200 right-20 top-1/5 z-100" >
                         <SearchSoham
                             search={search}
@@ -107,6 +99,11 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             productsSearch={productsSearch}
                             onSelect={onSelect}
                         />
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        <DownloadCsvButton />
+                        <UploadCsvButton />
                     </div>
                 </div>
             </BasicSticky>
