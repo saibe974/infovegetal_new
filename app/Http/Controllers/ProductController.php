@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -43,23 +44,45 @@ class ProductController extends Controller
      */
     public function import(Request $request)
     {
-        // Gate::authorize('manage-products');
-
-        dd($request);
-/*
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
         $path = $request->file('file')->store('imports');
-
-        // Call the existing artisan command with the stored file path
-        // The command expects a --file option path relative to project root or absolute
         $fullPath = storage_path('app/' . $path);
-        dd($fullPath);
-        Artisan::call('products:import', ['--file' => $fullPath]);
 
-        return redirect()->back()->with('success', 'Import lancé');*/
+        // On lit le fichier CSV directement
+        $handle = fopen($fullPath, 'r');
+        $header = fgetcsv($handle); // On lit l'en-tête
+
+        DB::beginTransaction();
+        try {
+            while (($data = fgetcsv($handle)) !== false) {
+                $row = array_combine($header, $data);
+                Product::updateOrCreate(
+                    ['sku' => $row['sku']], // Clé unique pour trouver le produit
+                    [
+                        'name' => $row['name'],
+                        'description' => $row['description'] ?? null,
+                        'price' => $row['price'] ?? 0,
+                        'active' => $row['active'] ?? true,
+                        // Ajoutez d'autres champs selon votre structure
+                    ]
+                );
+            }
+            DB::commit();
+            
+            // Nettoyage
+            fclose($handle);
+            Storage::delete($path);
+            
+            return redirect()->back()->with('success', 'Import terminé avec succès');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            fclose($handle);
+            Storage::delete($path);
+            return redirect()->back()->with('error', 'Erreur lors de l\'import : ' . $e->getMessage());
+        }
     }
 
     /**

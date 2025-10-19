@@ -108,10 +108,8 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
 })
 
 function DownloadCsvButton() {
-    // Downloads CSV via the products index with export param.
-    const url = products.index().url + '?export=csv';
     return (
-        <a href={url} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
+        <a href="/products/export" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
             Télécharger CSV
         </a>
     );
