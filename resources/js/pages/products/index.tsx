@@ -83,12 +83,10 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                 <div className="flex items-center py-2 relative w-full">
                     <Form href={products.index().url} className="flex gap-1 items-center">
                         <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''} />
->>>>>>> saibe
                         <Button>Rechercher</Button>
                     </Form>
 
                     <div className="mx-4 opacity-50">
-<<<<<<< HEAD
                         {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
@@ -97,7 +95,6 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                     <div className="ml-auto flex items-center gap-2">
                         <DownloadCsvButton />
                         <UploadCsvButton />
-=======
                         {collection.meta.total > 1 ? collection.meta.total + " occurences" :
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
@@ -110,7 +107,6 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             productsSearch={productsSearch}
                             onSelect={onSelect}
                         />
->>>>>>> saibe
                     </div>
                 </div>
             </BasicSticky>
