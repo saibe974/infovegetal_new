@@ -72,6 +72,9 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
         router.reload({
             data: { q: mysearch },
         })
+
+        console.log("selected:", mysearch);
+        // console.log(router);
     };
 
     // console.log(productsSearch);
@@ -81,17 +84,17 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             {/* @ts-ignore */}
             <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
                 <div className="flex items-center py-2 relative w-full">
-                    <Form href={products.index().url} className="flex gap-1 items-center">
+                    {/* <Form href={products.index().url} className="flex gap-1 items-center">
                         <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''} />
                         <Button>Rechercher</Button>
-                    </Form>
+                    </Form> */}
 
                     <div className="mx-4 opacity-50">
                         {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
                             collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
-                    <div className="w-200 right-20 top-1/5 z-100" >
+                    <div className="w-200 right-70 top-1 z-100 absolute" >
                         <SearchSoham
                             search={search}
                             fetching={fetching}
