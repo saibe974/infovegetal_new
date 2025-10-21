@@ -89,19 +89,28 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         <Button>Rechercher</Button>
                     </Form> */}
 
-                    <div className="mx-4 opacity-50">
-                        {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
-                            collection.meta.total == 0 ? "aucun résultat" : ""}
-                    </div>
 
-                    <div className="w-200 right-70 top-1 z-100 absolute" >
-                        <SearchSoham
+
+                    <div className="w-200 left-0 top-1 z-100" >
+                        {/* <SearchSoham
                             search={search}
                             fetching={fetching}
                             handleSearch={handleSearch}
                             productsSearch={productsSearch}
                             onSelect={onSelect}
+                        /> */}
+                        <SearchSoham
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            suggestions={productsSearch}
+                            loading={fetching}
                         />
+                    </div>
+
+                    <div className="mx-4 opacity-50">
+                        {collection.meta.total > 1 ? collection.meta.total + " occurences" :
+                            collection.meta.total == 0 ? "aucun résultat" : ""}
                     </div>
 
                     <div className="ml-auto flex items-center gap-2">
@@ -138,7 +147,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                         {item.name}
                                     </Link>
                                 </TableCell>
-                                
+
                                 <TableCell>{item.category ? item.category.name : ''}</TableCell>
                                 <TableCell>{item.description}</TableCell>
                                 <TableCell>{item.price}</TableCell>
