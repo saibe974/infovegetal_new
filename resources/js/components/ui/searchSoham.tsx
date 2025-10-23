@@ -170,7 +170,7 @@ export default function SearchSoham({
                         setOpen(true);
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder="Rechercher..."
+                    placeholder="Search..."
                     className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 min-w-[100px] text-sm"
                 />
 
@@ -197,7 +197,7 @@ export default function SearchSoham({
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                        {count > 1 ? `${count} occurences` : count === 0 ? 'aucun résultat' : ''}
+                        {count > 1 ? `${count} results found` : count === 0 ? 'aucun résultat' : ''}
                     </span>
                 )}
             </div>
@@ -207,7 +207,7 @@ export default function SearchSoham({
                 <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
                     {loading ? (
                         <div className="flex justify-center items-center py-2 text-muted-foreground">
-                            <Loader2 className="animate-spin mr-2" size={16} /> Recherche...
+                            <Loader2 className="animate-spin mr-2" size={16} /> Search...
                         </div>
                     ) : list.length > 0 ? (
                         list.map((name: string, i: number) => (

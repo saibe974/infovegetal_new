@@ -26,8 +26,22 @@ class ProductController extends Controller
         $search = $request->get('q');
 
         if ($search) {
-            $query->where('id', '=', $search)->orWhere(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%');
+            $normalized = trim($search);
+            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
+                // Si un seul terme numérique, tenter l'ID exact
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                // Et toujours proposer une recherche sur le nom qui contient tous les termes
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $t) {
+                        $qq->where('name', 'like', '%' . $t . '%');
+                    }
+                });
             });
         }
 
@@ -199,11 +213,11 @@ class ProductController extends Controller
         if (empty($search)) {
             return [];
         }
-
+        
         $lowerSearch = mb_strtolower($search);
 
         // Récupération des noms distincts
-        $suggestions = (clone $query)
+        $propositions = (clone $query)
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
             ->pluck('name');
@@ -221,7 +235,7 @@ class ProductController extends Controller
         };
 
         // Applique le nettoyage
-        $cleaned = $suggestions
+        $cleaned = $propositions
             ->map(fn($name) => $clean($name))
             ->filter(fn($name) => !empty($name))
             ->unique()
