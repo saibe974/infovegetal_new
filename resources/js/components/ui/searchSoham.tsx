@@ -7,8 +7,13 @@ interface SearchBarProps {
     value: string;
     onChange: (val: string) => void;
     onSubmit: (val: string) => void;
-    suggestions?: any;
+    suggestions?: string[];
+    propositions?: string[];
     loading?: boolean;
+    // Optional total count to display next to the search button
+    count?: number;
+    // Current query string (e.g., from URL/props) to display as tags
+    query?: string;
 }
 
 interface Option {
@@ -20,13 +25,19 @@ export default function SearchSoham({
     value,
     onChange,
     onSubmit,
-    suggestions = [],
+    propositions,
     loading = false,
+    count,
+    query,
 }: SearchBarProps) {
     const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState<Option[]>([]);
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const inputRef = useRef<HTMLInputElement>(null);
+    // Resolve list of strings to display as propositions
+    const list: string[] = (propositions ?? []) as string[];
+    // Track last submitted query to avoid duplicate submit loops
+    const lastSubmittedRef = useRef<string | null>(null);
 
     const handleSelect = (name: string) => {
         const option = { value: name, label: name };
@@ -55,7 +66,8 @@ export default function SearchSoham({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (!open && e.key === "ArrowDown" && suggestions.length > 0) {
+
+        if (!open && e.key === "ArrowDown" && list.length > 0) {
             setOpen(true);
             setHighlightedIndex(0);
             return;
@@ -71,17 +83,17 @@ export default function SearchSoham({
         if (e.key === "ArrowDown") {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev < suggestions.length - 1 ? prev + 1 : 0
+                prev < list.length - 1 ? prev + 1 : 0
             );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev > 0 ? prev - 1 : suggestions.length - 1
+                prev > 0 ? prev - 1 : list.length - 1
             );
         } else if (e.key === "Enter") {
             e.preventDefault();
-            if (highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
-                handleSelect(suggestions[highlightedIndex]);
+            if (highlightedIndex >= 0 && highlightedIndex < list.length) {
+                handleSelect(list[highlightedIndex]);
             } else if (value.trim()) {
                 handleSelect(value);
             }
@@ -99,9 +111,27 @@ export default function SearchSoham({
         if (!value) setOpen(false);
     }, [value]);
 
+    // Sync incoming query string into selected tags (as spans)
     useEffect(() => {
-        const query = selected.map((s) => s.value).join(" ");
-        onSubmit(query);
+        if (query === undefined) return;
+        const tokens = query
+            .split(/\s+/)
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+        const uniq = Array.from(new Set(tokens));
+        const opts = uniq.map((t) => ({ value: t, label: t }));
+        setSelected(opts);
+        // Prevent immediate resubmit with the same value
+        lastSubmittedRef.current = uniq.join(" ");
+    }, [query]);
+
+    useEffect(() => {
+        // Ne rien soumettre au montage si aucune sélection, pour ne pas envoyer q=""
+        if (selected.length === 0) return;
+        const next = selected.map((s) => s.value).join(" ");
+        if (lastSubmittedRef.current === next) return;
+        lastSubmittedRef.current = next;
+        onSubmit(next);
     }, [selected]);
 
     return (
@@ -161,17 +191,24 @@ export default function SearchSoham({
                 >
                     <Search size={16} />
                 </button>
+
+                {/* Petit compteur d'occurrences */}
+                {typeof count === 'number' && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                        {count > 1 ? `${count} occurences` : count === 0 ? 'aucun résultat' : ''}
+                    </span>
+                )}
             </div>
 
-            {/* suggestions */}
+            {/* propositions */}
             {open && value.length >= 2 && (
                 <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
                     {loading ? (
                         <div className="flex justify-center items-center py-2 text-muted-foreground">
                             <Loader2 className="animate-spin mr-2" size={16} /> Recherche...
                         </div>
-                    ) : suggestions.length > 0 ? (
-                        suggestions.map((name: string, i: number) => (
+                    ) : list.length > 0 ? (
+                        list.map((name: string, i: number) => (
                             <button
                                 key={i}
                                 onClick={() => handleSelect(name)}

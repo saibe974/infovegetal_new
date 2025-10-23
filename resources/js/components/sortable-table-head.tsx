@@ -14,8 +14,9 @@ export function SortableTableHead({
     className,
     ...props
 }: Props) {
-    const query = usePage<{ query: { sort?: string; dir?: string } }>().props
-        .query;
+    const page = usePage<{ q?: string; query: { sort?: string; dir?: string } }>();
+    const query = page.props.query;
+    const currentQ = page.props.q;
     const isActive = field === query.sort;
     const direction = query.dir ?? 'desc';
 
@@ -26,6 +27,10 @@ export function SortableTableHead({
         } else {
             url.searchParams.set('dir', 'desc');
             url.searchParams.set('sort', field);
+        }
+        // Conserver le paramètre de recherche actuel s'il n'est pas déjà dans l'URL
+        if (currentQ && !url.searchParams.get('q')) {
+            url.searchParams.set('q', currentQ);
         }
         router.visit(url.toString());
     };

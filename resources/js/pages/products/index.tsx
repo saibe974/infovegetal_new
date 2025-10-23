@@ -7,7 +7,7 @@ import { Form, Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { Loader2, UploadIcon, DownloadIcon, EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import { useForm } from '@inertiajs/react';
 import {
@@ -38,8 +38,8 @@ type Props = {
 
 export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection)
-    const page = usePage<{ search: Product[] }>();
-    const productsSearch = page.props.search ?? [{ data: [] }];
+    const page = usePage<{ searchPropositions?: string[] }>();
+    const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [fetching, setFetching] = useState(false);
@@ -56,7 +56,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
         setFetching(true);
         timerRef.current = setTimeout(() => {
             router.reload({
-                only: ['search'],
+                only: ['searchPropositions'],
                 data: { q: s },
                 onSuccess: () => setFetching(false),
                 // preserveState: true,
@@ -66,15 +66,16 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
     // @ts-ignore
     const onSelect = (mysearch) => {
+        // Ignore empty submissions to avoid clearing q unintentionally
+        if (!mysearch || String(mysearch).trim().length === 0) {
+            return;
+        }
         setSearch('');
-        // products.index().url.q = mysearch;
-        // router.visit(products.index().url);
         router.reload({
             data: { q: mysearch },
         })
 
         console.log("selected:", mysearch);
-        // console.log(router);
     };
 
     // console.log(productsSearch);
@@ -84,34 +85,19 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             {/* @ts-ignore */}
             <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
                 <div className="flex items-center py-2 relative w-full">
-                    {/* <Form href={products.index().url} className="flex gap-1 items-center">
-                        <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''} />
-                        <Button>Rechercher</Button>
-                    </Form> */}
-
-
 
                     <div className="w-200 left-0 top-1 z-100" >
-                        {/* <SearchSoham
-                            search={search}
-                            fetching={fetching}
-                            handleSearch={handleSearch}
-                            productsSearch={productsSearch}
-                            onSelect={onSelect}
-                        /> */}
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
                             onSubmit={onSelect}
-                            suggestions={productsSearch}
+                            propositions={searchPropositions}
                             loading={fetching}
+                            count={collection.meta.total}
+                            query={q ?? ''}
                         />
                     </div>
 
-                    <div className="mx-4 opacity-50">
-                        {collection.meta.total > 1 ? collection.meta.total + " occurences" :
-                            collection.meta.total == 0 ? "aucun résultat" : ""}
-                    </div>
 
                     <div className="ml-auto flex items-center gap-2">
                         <DownloadCsvButton />
@@ -181,7 +167,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 function DownloadCsvButton() {
     return (
         <a href="/products/export" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
-            Télécharger CSV
+            <DownloadIcon className="mr-2" />
         </a>
     );
 }
@@ -211,7 +197,7 @@ function UploadCsvButton() {
         <>
             <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
             <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={processing}>
-                {processing ? 'Uploading...' : 'Importer CSV'}
+                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <UploadIcon className="mr-2" />}
             </button>
         </>
     );

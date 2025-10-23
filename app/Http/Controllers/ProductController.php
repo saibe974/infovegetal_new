@@ -36,7 +36,7 @@ class ProductController extends Controller
             'collection' => Inertia::scroll(fn() => ProductResource::collection(
                 $query->paginate(10)
             )),
-            'search' => Inertia::optional(fn() => $this->getSearchSuggestions($query, $search)),
+            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
 
     }
@@ -192,9 +192,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Génère les suggestions triées selon la logique de recherche.
+     * Génère les propositions triées selon la logique de recherche.
      */
-    private function getSearchSuggestions($query, ?string $search)
+    private function getSearchPropositions($query, ?string $search)
     {
         if (empty($search)) {
             return [];
@@ -262,8 +262,8 @@ class ProductController extends Controller
         });
 
         // dd($items);
-        // Prend les 5 premiers
-        return array_slice($items, 0, 10);
+        // Prend les 7 premiers
+        return array_slice($items, 0, 7);
     }
 
 
