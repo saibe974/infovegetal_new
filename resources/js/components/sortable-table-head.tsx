@@ -22,16 +22,25 @@ export function SortableTableHead({
 
     const handleSort = () => {
         const url = new URL(window.location.href);
-        if (isActive) {
-            url.searchParams.set('dir', direction === 'asc' ? 'desc' : 'asc');
-        } else {
-            url.searchParams.set('dir', 'desc');
+
+        if (!isActive) {
+            // 1er clic: activer tri desc
             url.searchParams.set('sort', field);
+            url.searchParams.set('dir', 'desc');
+        } else if (direction === 'desc') {
+            // 2e clic: passer en asc
+            url.searchParams.set('dir', 'asc');
+        } else {
+            // 3e clic: désactiver le tri (enlever les params)
+            url.searchParams.delete('sort');
+            url.searchParams.delete('dir');
         }
-        // Conserver le paramètre de recherche actuel s'il n'est pas déjà dans l'URL
+
+        // Conserver la recherche actuelle si absente de l'URL
         if (currentQ && !url.searchParams.get('q')) {
             url.searchParams.set('q', currentQ);
         }
+
         router.visit(url.toString());
     };
 

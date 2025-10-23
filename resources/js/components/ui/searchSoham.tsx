@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface SearchBarProps {
     value: string;
     onChange: (val: string) => void;
-    onSubmit: (val: string) => void;
+    onSubmit: (val: string, options?: { force?: boolean }) => void;
     suggestions?: string[];
     propositions?: string[];
     loading?: boolean;
@@ -55,14 +55,16 @@ export default function SearchSoham({
     const handleRemove = (name: string) => {
         const newSelected = selected.filter((s) => s.value !== name);
         setSelected(newSelected);
-        // const query = newSelected.map((s) => s.value).join(" ");
-        // onSubmit(query);
+        // Si plus aucun tag, forcer la suppression de la recherche côté URL
+        if (newSelected.length === 0) {
+            onSubmit('', { force: true });
+        }
     };
 
     const handleClear = () => {
         setSelected([]);
         onChange("");
-        onSubmit("");
+        onSubmit("", { force: true });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

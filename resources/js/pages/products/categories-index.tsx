@@ -1,14 +1,15 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection, ProductCategory } from '@/types';
-import { Table, TableBody, TableHead,TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Form, Link, InfiniteScroll } from '@inertiajs/react';
+import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
+import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
+import SearchSoham from '@/components/ui/searchSoham';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,22 +23,81 @@ type Props = {
     q: string | null;
 };
 
-export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
-    console.log(collection)
-    
+export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
+    const page = usePage<{ searchPropositions?: string[] }>();
+    const searchPropositions = page.props.searchPropositions ?? [];
+    // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [fetching, setFetching] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const handleSearch = (s: string) => {
+        setSearch(s);
+        // @ts-ignore
+        clearTimeout(timerRef.current);
+        router.cancelAll();
+        if (s.length < 2) {
+            return;
+        }
+        setFetching(true);
+        timerRef.current = setTimeout(() => {
+            router.reload({
+                only: ['searchPropositions'],
+                data: { q: s },
+                onSuccess: () => setFetching(false),
+                // preserveState: true,
+            })
+        }, 300)
+    };
+
+    // @ts-ignore
+    const onSelect = (mysearch: string, options?: { force?: boolean }) => {
+        const trimmed = (mysearch ?? '').trim();
+        // If explicit clear requested, remove q from URL instead of setting q=""
+        if (options?.force && trimmed.length === 0) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            router.visit(url.toString(), { replace: true });
+            setSearch('');
+            return;
+        }
+
+        // Otherwise ignore empty submissions
+        if (trimmed.length === 0) {
+            return;
+        }
+
+        setSearch('');
+        router.reload({
+            data: { q: trimmed },
+        })
+
+        console.log("selected:", trimmed);
+    };
+
     return (
         <div>
-            <BasicSticky stickyClassName='z-100 bg-background'>
-                <div className="flex items-center py-2 p-relative w-full">
-                    <Form {...products.index.form()} className="flex gap-1 items-center">
-                        <Input autoFocus placeholder='Rechercher un produit' name='q' defaultValue={q ?? ''}/>
-                        <Button>Rechercher</Button>
-                    </Form>
+            {/* @ts-ignore */}
+            <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
+                <div className="flex items-center py-2 relative w-full">
 
-                    <div className="mx-4 opacity-50">
-                        {collection.meta.total > 1 ? collection.meta.total + " occurences" : 
-                            collection.meta.total == 0 ? "aucun résultat" : ""}
+                    <div className="w-200 left-0 top-1 z-100 mr-2" >
+                        <SearchSoham
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            propositions={searchPropositions}
+                            loading={fetching}
+                            count={collection.meta.total}
+                            query={q ?? ''}
+                        />
                     </div>
+
+
+                    {/* <div className="ml-auto flex items-center gap-2">
+                        <DownloadCsvButton />
+                        <UploadCsvButton />
+                    </div> */}
                 </div>
             </BasicSticky>
 
@@ -82,7 +142,7 @@ export default withAppLayout(breadcrumbs, ({collection, q }: Props) => {
                 </Table>
             </InfiniteScroll>
         </div>
-        
+
     )
 })
 

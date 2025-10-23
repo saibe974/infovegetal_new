@@ -65,17 +65,28 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     }
 
     // @ts-ignore
-    const onSelect = (mysearch) => {
-        // Ignore empty submissions to avoid clearing q unintentionally
-        if (!mysearch || String(mysearch).trim().length === 0) {
+    const onSelect = (mysearch: string, options?: { force?: boolean }) => {
+        const trimmed = (mysearch ?? '').trim();
+        // If explicit clear requested, remove q from URL instead of setting q=""
+        if (options?.force && trimmed.length === 0) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('q');
+            router.visit(url.toString(), { replace: true });
+            setSearch('');
             return;
         }
+
+        // Otherwise ignore empty submissions
+        if (trimmed.length === 0) {
+            return;
+        }
+
         setSearch('');
         router.reload({
-            data: { q: mysearch },
+            data: { q: trimmed },
         })
 
-        console.log("selected:", mysearch);
+        console.log("selected:", trimmed);
     };
 
     // console.log(productsSearch);
@@ -86,7 +97,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
                 <div className="flex items-center py-2 relative w-full">
 
-                    <div className="w-200 left-0 top-1 z-100" >
+                    <div className="w-200 left-0 top-1 z-100 mr-2" >
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
@@ -167,7 +178,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 function DownloadCsvButton() {
     return (
         <a href="/products/export" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
-            <DownloadIcon className="mr-2" />
+            <DownloadIcon />
         </a>
     );
 }
@@ -197,7 +208,7 @@ function UploadCsvButton() {
         <>
             <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
             <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={processing}>
-                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <UploadIcon className="mr-2" />}
+                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <UploadIcon />}
             </button>
         </>
     );
