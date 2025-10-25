@@ -111,8 +111,8 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 
                     <div className="ml-auto flex items-center gap-2">
-                        <DownloadCsvButton />
                         <UploadCsvButton />
+                        <DownloadCsvButton />
                     </div>
                 </div>
             </BasicSticky>
@@ -178,7 +178,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 function DownloadCsvButton() {
     return (
         <a href="/products/export" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
-            <DownloadIcon />
+            <UploadIcon />
         </a>
     );
 }
@@ -208,7 +208,7 @@ function UploadCsvButton() {
         <>
             <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
             <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={processing}>
-                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <UploadIcon />}
+                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <DownloadIcon />}
             </button>
         </>
     );

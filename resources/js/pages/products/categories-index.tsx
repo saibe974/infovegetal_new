@@ -107,7 +107,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
                             <SortableTableHead field="name">Name</SortableTableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead className='text-end'>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

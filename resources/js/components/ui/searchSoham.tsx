@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { Loader2, X, Search } from "lucide-react";
+import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
@@ -145,6 +145,16 @@ export default function SearchSoham({
                 )}
                 onClick={() => inputRef.current?.focus()}
             >
+
+                <button
+                    type="button"
+                    onClick={alert.bind(null, 'Filter options coming soon!')}
+                    className="text-muted-foreground hover:text-foreground px-1"
+                >
+                    <SlidersHorizontalIcon size={16} />
+                </button>
+
+
                 {selected.map((opt) => (
                     <span
                         key={opt.value}
@@ -191,13 +201,13 @@ export default function SearchSoham({
                     onClick={handleSearch}
                     className="text-muted-foreground hover:text-foreground px-1"
                 >
-                    <Search size={16} />
+                    <SearchIcon size={16} />
                 </button>
 
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                        {count > 1 ? `${count} results found` : count === 0 ? 'aucun résultat' : ''}
+                        {count > 1 ? `${count} results` : count === 0 ? 'aucun résultat' : ''}
                     </span>
                 )}
             </div>

@@ -1,5 +1,5 @@
 import { NavFooter } from '@/components/nav-footer';
-import  NavMain, { NavMainExtended }  from '@/components/nav-main';
+import NavMain, { NavMainExtended } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
@@ -52,11 +52,11 @@ const mainNavItems: NavItemExtended[] = [
                 href: '#',
                 icon: TagIcon
             },
-            {
-                title: 'Create product',
-                href: products.create(),
-                icon: PlusCircle,
-            },
+            // {
+            //     title: 'Create product',
+            //     href: products.create(),
+            //     icon: PlusCircle,
+            // },
         ]
     },
 ];
@@ -103,7 +103,7 @@ export function AppSidebar() {
             <SidebarContent>
                 {/* <NavMain items={mainNavItems} /> */}
 
-                <NavMainExtended title="Administration" items={mainNavItems}/>
+                <NavMainExtended title="Administration" items={mainNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
