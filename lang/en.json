@@ -10,5 +10,13 @@
     "Your email address is unverified.": "Your email address is unverified.",
     "Click here to resend the verification email.": "Click here to resend the verification email.",
     "A new verification link has been sent to your email address.": "A new verification link has been sent to your email address.",
-    "Choose language": "Choose language"
+    "Choose language": "Choose language",
+    "Dashboard": "Dashboard",
+    "Products": "Products",
+    "All products": "All products",
+    "Categories": "Categories",
+    "Tags": "Tags",
+    "Repository": "Repository",
+    "Documentation": "Documentation",
+    "Administration": "Administration"
 }

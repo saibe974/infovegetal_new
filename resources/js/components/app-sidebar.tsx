@@ -23,63 +23,61 @@ import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
+import { useI18n } from '@/lib/i18n';
 
 import { PlusCircle, List as ListIcon } from 'lucide-react';
 
-const mainNavItems: NavItemExtended[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Products',
-        href: products.index(),
-        icon: Flower2Icon,
-        subItems: [
-            {
-                title: 'All products',
-                href: products.index(),
-                icon: ListIcon,
-            },
-            {
-                title: 'Categories',
-                href: productCategories.index(),
-                icon: FolderTreeIcon,
-            },
-            {
-                title: 'Tags',
-                href: '#',
-                icon: TagIcon
-            },
-            // {
-            //     title: 'Create product',
-            //     href: products.create(),
-            //     icon: PlusCircle,
-            // },
-        ]
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/saibe974/infovegetal_new',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
-];
+// Items are built inside the component to access the t() helper
 
 export function AppSidebar() {
     const page = usePage();
+    const { t } = useI18n();
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
     const isProductsRoute = typeof currentPath === 'string' && currentPath.includes('/products');
     const [productsOpen, setProductsOpen] = useState<boolean>(isProductsRoute);
+    const mainNavItems: NavItemExtended[] = [
+        {
+            title: t('Dashboard'),
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        {
+            title: t('Products'),
+            href: products.index(),
+            icon: Flower2Icon,
+            subItems: [
+                {
+                    title: t('All products'),
+                    href: products.index(),
+                    icon: ListIcon,
+                },
+                {
+                    title: t('Categories'),
+                    href: productCategories.index(),
+                    icon: FolderTreeIcon,
+                },
+                {
+                    title: t('Tags'),
+                    href: '#',
+                    icon: TagIcon,
+                },
+            ],
+        },
+    ];
+
+    const footerNavItems: NavItem[] = [
+        {
+            title: t('Repository'),
+            href: 'https://github.com/saibe974/infovegetal_new',
+            icon: Folder,
+        },
+        {
+            title: t('Documentation'),
+            href: 'https://laravel.com/docs/starter-kits#react',
+            icon: BookOpen,
+        },
+    ];
 
     useEffect(() => {
         if (isProductsRoute) setProductsOpen(true);
@@ -103,7 +101,7 @@ export function AppSidebar() {
             <SidebarContent>
                 {/* <NavMain items={mainNavItems} /> */}
 
-                <NavMainExtended title="Administration" items={mainNavItems} />
+                <NavMainExtended title={t('Administration')} items={mainNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
