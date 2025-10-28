@@ -101,6 +101,7 @@ export default function Profile({
                                         items={[
                                             { label: 'English', value: 'en' },
                                             { label: 'Français', value: 'fr' },
+                                            { label: 'Español', value: 'es' },
                                         ]}
                                         placeholder={t('Choose language')}
                                         id="locale"
