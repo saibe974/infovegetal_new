@@ -1,1 +1,27 @@
-{}
+{
+    "project": "infovegetal_new",
+    "branch": "multilingual",
+    "updatedAt": "2025-10-28",
+    "contributors": [
+        {
+            "id": "saibe",
+            "name": "Saibe"
+        },
+        {
+            "id": "copilot",
+            "name": "Copilot"
+        }
+    ],
+    "todos": [
+        {
+            "id": 1,
+            "task": "Implement multilingual support for the user interface.",
+            "status": "in-progress"
+        },
+        {
+            "id": 2,
+            "task": "Translate existing content into Spanish and French.",
+            "status": "pending"
+        }
+    ]
+}
