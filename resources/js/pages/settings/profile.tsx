@@ -102,6 +102,9 @@ export default function Profile({
                                             { label: 'English', value: 'en' },
                                             { label: 'Français', value: 'fr' },
                                             { label: 'Español', value: 'es' },
+                                            { label: 'Deutsch', value: 'de' },
+                                            { label: 'Italiano', value: 'it' },
+                                            { label: 'Nederlands', value: 'nl' },
                                         ]}
                                         placeholder={t('Choose language')}
                                         id="locale"
