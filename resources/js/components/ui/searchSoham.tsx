@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 interface SearchBarProps {
     value: string;
@@ -30,6 +31,7 @@ export default function SearchSoham({
     count,
     query,
 }: SearchBarProps) {
+    const { t } = useI18n();
     const [open, setOpen] = useState(false);
     const [selected, setSelected] = useState<Option[]>([]);
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
@@ -148,7 +150,7 @@ export default function SearchSoham({
 
                 <button
                     type="button"
-                    onClick={alert.bind(null, 'Filter options coming soon!')}
+                    onClick={() => alert(t('Filter options coming soon!'))}
                     className="text-muted-foreground hover:text-foreground px-1"
                 >
                     <SlidersHorizontalIcon size={16} />
@@ -180,7 +182,7 @@ export default function SearchSoham({
                         setOpen(true);
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder="Search..."
+                    placeholder={t('Search...')}
                     className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 min-w-[100px] text-sm"
                 />
 
@@ -207,7 +209,7 @@ export default function SearchSoham({
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                        {count > 1 ? `${count} results` : count === 0 ? 'aucun résultat' : ''}
+                        {count > 1 ? `${count} ${t('results')}` : count === 0 ? t('No results.') : ''}
                     </span>
                 )}
             </div>
@@ -217,7 +219,7 @@ export default function SearchSoham({
                 <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
                     {loading ? (
                         <div className="flex justify-center items-center py-2 text-muted-foreground">
-                            <Loader2 className="animate-spin mr-2" size={16} /> Search...
+                            <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
                         </div>
                     ) : list.length > 0 ? (
                         list.map((name: string, i: number) => (
@@ -236,7 +238,7 @@ export default function SearchSoham({
                         ))
                     ) : (
                         <div className="px-3 py-2 text-sm text-muted-foreground">
-                            Aucun résultat.
+                            {t('No results.')}
                         </div>
                     )}
                 </div>

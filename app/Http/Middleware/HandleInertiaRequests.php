@@ -38,9 +38,26 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        // Load JSON translations for current locale with fallback
+        $currentLocale = app()->getLocale();
+        $fallbackLocale = config('app.fallback_locale');
+        $i18n = [];
+        foreach ([$currentLocale, $fallbackLocale] as $loc) {
+            $path = base_path("lang/{$loc}.json");
+            if (is_file($path)) {
+                $json = json_decode((string) file_get_contents($path), true);
+                if (is_array($json)) {
+                    // Merge without overwriting existing keys (keep primary locale first)
+                    $i18n = $i18n + $json;
+                }
+            }
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'locale' => app()->getLocale(),
+            'i18n' => $i18n,
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),

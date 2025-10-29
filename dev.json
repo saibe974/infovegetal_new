@@ -1,7 +1,7 @@
 {
     "project": "infovegetal_new",
-    "branch": "multilingual",
-    "updatedAt": "2025-10-28",
+    "branch": "master",
+    "updatedAt": "2025-10-29",
     "contributors": [
         {
             "id": "saibe",
@@ -15,13 +15,116 @@
     "todos": [
         {
             "id": 1,
-            "task": "Implement multilingual support for the user interface.",
-            "status": "in-progress"
+            "title": "i18n: stocker la locale utilisateur",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-28",
+            "completedAt": "2025-10-28",
+            "messages": [
+                {
+                    "author": "saibe",
+                    "date": "2025-10-28",
+                    "text": "Ajouter le champ locale sur users + middleware."
+                },
+                {
+                    "author": "copilot",
+                    "date": "2025-10-28",
+                    "text": "Migration users.locale + SetLocale + partage locale via Inertia."
+                }
+            ]
         },
         {
             "id": 2,
-            "task": "Translate existing content into Spanish and French.",
-            "status": "pending"
+            "title": "i18n: fichiers de traductions JSON (en/fr)",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-28",
+            "completedAt": "2025-10-28",
+            "messages": [
+                {
+                    "author": "copilot",
+                    "date": "2025-10-28",
+                    "text": "Création de lang/en.json et lang/fr.json, chargés dans HandleInertiaRequests."
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "title": "i18n: helper front t() et intégration profil",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-28",
+            "completedAt": "2025-10-28",
+            "messages": [
+                {
+                    "author": "saibe",
+                    "date": "2025-10-28",
+                    "text": "Pourquoi t() plutôt que __()?"
+                },
+                {
+                    "author": "copilot",
+                    "date": "2025-10-28",
+                    "text": "t() côté client, __() côté PHP; on réutilise les mêmes JSON via Inertia."
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "title": "SEO i18n: URLs par langue + hreflang",
+            "status": "backlog",
+            "assignees": [
+                "saibe",
+                "copilot"
+            ],
+            "createdAt": "2025-10-28",
+            "messages": [
+                {
+                    "author": "copilot",
+                    "date": "2025-10-28",
+                    "text": "Proposer préfixe /{locale}, middleware FromRoute et balises hreflang."
+                },
+                {
+                    "author": "saibe",
+                    "date": "2025-10-28",
+                    "text": "À garder en réserve pour plus tard."
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "title": "i18n: ajout espagnol (UI + auth)",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-28",
+            "completedAt": "2025-10-28"
+        },
+        {
+            "id": 6,
+            "title": "i18n: ajout néerlandais (nl.json)",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-29",
+            "completedAt": "2025-10-29"
+        },
+        {
+            "id": 7,
+            "title": "i18n: ajout allemand et italien (de/it.json)",
+            "status": "done",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-29",
+            "completedAt": "2025-10-29"
         }
     ]
 }

@@ -27,6 +27,7 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'locale' => ['nullable', 'string', Rule::in(['en', 'fr', 'es', 'nl', 'de', 'it'])],
         ];
     }
 }

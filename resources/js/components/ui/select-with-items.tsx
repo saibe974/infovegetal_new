@@ -5,7 +5,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import type { ComponentProps } from 'react';
+import React, { type ComponentProps, useEffect, useState } from 'react';
 
 export type SelectOption = {
     label: string;
@@ -26,18 +26,28 @@ export function SelectWithItems({
     defaultValue,
     ...props
 }: Props) {
+    const [value, setValue] = useState<string | undefined>(defaultValue);
+
+    useEffect(() => {
+        // Keep in sync if defaultValue changes externally
+        setValue(defaultValue);
+    }, [defaultValue]);
+
     return (
-        <Select name={name} defaultValue={defaultValue}>
-            <SelectTrigger {...props}>
-                <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-                {items.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
+        <>
+            <input type="hidden" name={name} value={value ?? ''} />
+            <Select value={value} onValueChange={setValue}>
+                <SelectTrigger {...props}>
+                    <SelectValue placeholder={placeholder} />
+                </SelectTrigger>
+                <SelectContent>
+                    {items.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </>
     );
 }
