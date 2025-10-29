@@ -8,10 +8,16 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
+
+use App\Jobs\ImportProductsJob;
+
 
 class ProductController extends Controller
 {
@@ -70,35 +76,107 @@ class ProductController extends Controller
             return redirect()->back()->with('error', "Aucun fichier reçu");
         }
 
-        $path = $request->file('file')->store('imports');
-        $fullPath = storage_path('app/' . $path);
-        
+        $uploaded = $request->file('file');
+
+        // S'assure que le dossier existe puis tente de stocker le fichier
+        Storage::makeDirectory('imports');
+        $path = $uploaded->store('imports');
+
+        // Récupère un chemin absolu fiable (compatible Windows) ou retombe sur le tmp si besoin
+        $fullPath = Storage::exists($path) ? Storage::path($path) : $uploaded->getRealPath();
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return redirect()->back()->with('error', "Impossible d'accéder au fichier importé");
+        }
+
 
         // On lit le fichier CSV directement
         $handle = fopen($fullPath, 'r');
-        $header = fgetcsv($handle); // On lit l'en-tête
+        $header = fgetcsv($handle, 0, ';'); // On lit l'en-tête (séparateur ';')
+        // Retire un éventuel BOM sur la première clé
+        if (is_array($header) && isset($header[0])) {
+            $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
+        }
+        // Normalise les noms de colonnes: trim et lowercase
+        if (is_array($header)) {
+            $header = array_map(function ($h) {
+                if ($h === null) return null;
+                $h = (string) $h;
+                $h = trim($h);
+                $h = mb_strtolower($h);
+                return $h;
+            }, $header);
+        }
 
         DB::beginTransaction();
         try {
-            while (($data = fgetcsv($handle)) !== false) {
-                $row = array_combine($header, $data);
+            while (($data = fgetcsv($handle, 0, ';')) !== false) {
+                // Aligne la longueur des données sur celle de l'entête
+                if (!is_array($data)) $data = [];
+                $hdrCount = is_array($header) ? count($header) : 0;
+                if (count($data) < $hdrCount) {
+                    $data = array_pad($data, $hdrCount, null);
+                } elseif (count($data) > $hdrCount && $hdrCount > 0) {
+                    $data = array_slice($data, 0, $hdrCount);
+                }
+
+                $row = $hdrCount > 0 ? array_combine($header, $data) : [];
+                if (!is_array($row)) $row = [];
+
+                // Trim values and treat whitespace-only as empty
+                foreach ($row as $k => $v) {
+                    if (is_string($v)) {
+                        $v = trim($v);
+                        $row[$k] = $v === '' ? null : $v;
+                    } else {
+                        $row[$k] = $v;
+                    }
+                }
+
+                // Skip empty rows (after trimming)
+                $hasValue = false;
+                foreach ($row as $v) {
+                    if ($v !== null && $v !== '') { $hasValue = true; break; }
+                }
+                if (!$hasValue) continue;
+
+                $sku = trim((string)($row['sku'] ?? ''));
+                if ($sku === '') continue; // ignore rows without SKU
+
                 Product::updateOrCreate(
-                    ['sku' => $row['sku']], // Clé unique pour trouver le produit
+                    ['sku' => $sku], // Clé unique pour trouver le produit
                     [
-                        'name' => $row['name'],
-                        'description' => $row['description'] ?? null,
-                        'price' => $row['price'] ?? 0,
-                        'active' => $row['active'] ?? true,
+                        'name' => trim((string)($row['name'] ?? '')),
+                        'img_link' => isset($row['img_link']) ? trim((string)$row['img_link']) : null,
+                        'description' => isset($row['description']) ? trim((string)$row['description']) : null,
+                        'price' => isset($row['price']) ? $row['price'] : 0,
+                        'active' => isset($row['active']) ? (bool)$row['active'] : true,
                         // Ajoutez d'autres champs selon votre structure
                     ]
                 );
             }
             DB::commit();
-            
+
             // Nettoyage
             fclose($handle);
-            Storage::delete($path);
-            
+
+            // Conserver un historique en local, nettoyer en prod
+            try {
+                if (app()->isLocal()) {
+                    // s'assure que le dossier d'archive existe puis déplace le fichier
+                    Storage::makeDirectory('imports/archive');
+                    if (Storage::exists($path)) {
+                        Storage::move($path, 'imports/archive/' . basename($path));
+                    }
+                } else {
+                    if (Storage::exists($path)) {
+                        Storage::delete($path);
+                    }
+                }
+            } catch (\Throwable $t) {
+                // En cas d'échec d'archivage/suppression, on ignore pour ne pas bloquer
+                Log::warning('Import cleanup error: ' . $t->getMessage());
+            }
+
             return redirect()->back()->with('success', 'Import terminé avec succès');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -106,6 +184,133 @@ class ProductController extends Controller
             Storage::delete($path);
             return redirect()->back()->with('error', 'Erreur lors de l\'import : ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Upload-only endpoint: stocke le fichier CSV et renvoie un id d'import.
+     */
+    public function importUpload(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt'],
+        ]);
+
+        $file = $request->file('file');
+        Storage::makeDirectory('imports');
+        $filename = now()->format('Ymd_His') . '_' . Str::random(8) . '.csv';
+        $path = $file->storeAs('imports', $filename);
+
+        $id = (string) Str::uuid();
+        Cache::put("import:$id", [
+            'status' => 'uploaded',
+            'progress' => 0,
+            'path' => $path,
+            'total' => null,
+            'processed' => 0,
+            'errors' => 0,
+        ], now()->addHour());
+
+        return response()->json([
+            'id' => $id,
+            'path' => $path,
+            'original' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+        ]);
+    }
+
+    /**
+     * Traite le fichier CSV précédemment uploadé (calcul progress côté cache).
+     */
+
+    public function importProcess(Request $request)
+    {
+        $data = $request->validate(['id' => 'required|string']);
+        $id = $data['id'];
+
+        $state = Cache::get("import:$id");
+        if (!$state || empty($state['path'])) {
+            return response()->json(['message' => 'Import inconnu'], 404);
+        }
+
+    // Lancer le job en file d’attente avec un chemin ABSOLU (important pour le worker)
+    $absolutePath = Storage::path($state['path']);
+    ImportProductsJob::dispatch($id, $absolutePath);
+
+        Cache::put("import:$id", [
+            'status' => 'queued',
+            'progress' => 0,
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+        ], now()->addHour());
+
+        return response()->json(['status' => 'queued']);
+    }
+
+
+    /**
+     * Renvoie la progression (upload/processing/done) pour l'id d'import.
+     */
+    public function importProgress(string $id)
+    {
+        $progress = Cache::get("import:$id");
+
+        if (!$progress) {
+            return response()->json(['status' => 'waiting', 'progress' => 0]);
+        }
+
+        return response()->json([
+            'status' => $progress['status'] ?? 'processing',
+            'processed' => $progress['processed'] ?? 0,
+            'total' => $progress['total'] ?? 0,
+            'errors' => $progress['errors'] ?? 0,
+            'current' => $progress['current'] ?? null,
+            'progress' => $progress['progress'] ?? null,
+            'report' => $progress['report'] ?? null,
+        ]);
+    }
+
+    /**
+     * Télécharge le rapport d'erreurs CSV pour un import donné.
+     */
+    public function importReport(string $id)
+    {
+        $reportPath = 'imports/reports/' . $id . '.csv';
+        if (!Storage::exists($reportPath)) {
+            return response()->json(['message' => 'Rapport introuvable'], 404);
+        }
+
+        $full = Storage::path($reportPath);
+        $filename = 'import_report_' . $id . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($full) {
+            $h = fopen($full, 'r');
+            while (!feof($h)) {
+                echo fread($h, 8192);
+            }
+            fclose($h);
+        };
+
+        return new StreamedResponse($callback, 200, $headers);
+    }
+
+    /**
+     * Demande d'annulation de l'import en cours.
+     */
+    public function importCancel(Request $request)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string'],
+        ]);
+        $id = $data['id'];
+        Cache::put("import:$id:cancel", true, now()->addHour());
+        $state = Cache::get("import:$id", []);
+        Cache::put("import:$id", array_merge($state, [ 'status' => 'cancelling' ]), now()->addHour());
+        return response()->json(['status' => 'cancelling']);
     }
 
     /**
@@ -124,8 +329,8 @@ class ProductController extends Controller
 
         $callback = function () {
             $handle = fopen('php://output', 'w');
-            // header
-            fputcsv($handle, ['id', 'sku', 'name', 'category', 'description', 'price', 'active']);
+            // header (séparateur ';')
+            fputcsv($handle, ['id', 'sku', 'name', 'category', 'description', 'price', 'active'], ';');
 
             Product::with('category')->chunk(100, function ($products) use ($handle) {
                 foreach ($products as $p) {
@@ -137,7 +342,7 @@ class ProductController extends Controller
                         $p->description,
                         $p->price,
                         $p->active ? 1 : 0,
-                    ]);
+                    ], ';');
                 }
             });
 
