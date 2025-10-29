@@ -185,21 +185,17 @@ function DownloadCsvButton() {
 
 function UploadCsvButton() {
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const { data, setData, post, processing } = useForm({ file: null });
+    const [uploading, setUploading] = useState(false);
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
-        setData('file', file as any);
         if (file) {
             const form = new FormData();
             form.append('file', file);
-            // post to a backend endpoint; if you have a named route for import, change the URL
-            post('/products/import', {
-                forceFormData: true,
-                onFinish: () => {
-                    // optional: reload page after import
-                    window.location.reload();
-                }
+            router.post('/products/import', form, {
+                onStart: () => setUploading(true),
+                onFinish: () => setUploading(false),
+                onError: () => setUploading(false),
             });
         }
     };
@@ -207,8 +203,8 @@ function UploadCsvButton() {
     return (
         <>
             <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFileChange} />
-            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={processing}>
-                {processing ? <Loader2 className="animate-spin mr-2" size={16} /> : <DownloadIcon />}
+            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={uploading}>
+                {uploading ? <Loader2 className="animate-spin mr-2" size={16} /> : <DownloadIcon />}
             </button>
         </>
     );

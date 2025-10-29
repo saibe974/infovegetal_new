@@ -61,12 +61,18 @@ class ProductController extends Controller
      */
     public function import(Request $request)
     {
+        // Validation stricte du fichier CSV
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
+        if (!$request->hasFile('file')) {
+            return redirect()->back()->with('error', "Aucun fichier reçu");
+        }
+
         $path = $request->file('file')->store('imports');
         $fullPath = storage_path('app/' . $path);
+        
 
         // On lit le fichier CSV directement
         $handle = fopen($fullPath, 'r');
