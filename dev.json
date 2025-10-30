@@ -125,6 +125,27 @@
             ],
             "createdAt": "2025-10-29",
             "completedAt": "2025-10-29"
+        },
+        {
+            "id": 8,
+            "title": "Import: déporter le traitement en Job/Queue",
+            "status": "backlog",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-10-29",
+            "messages": [
+                {
+                    "author": "saibe",
+                    "date": "2025-10-29",
+                    "text": "Demande: déplacer le traitement d'import CSV dans un Job/Queue et conserver le suivi via Cache."
+                },
+                {
+                    "author": "copilot",
+                    "date": "2025-10-29",
+                    "text": "Approche: créer un Job ImportProductsJob (lecture CSV, progress/cancel via Cache, rapport d'erreurs), modifier ProductController@importProcess pour dispatcher le Job (status=queued) et répondre immédiatement; faire tourner un worker (queue:work) avec QUEUE_CONNECTION=database ou redis."
+                }
+            ]
         }
     ]
 }
