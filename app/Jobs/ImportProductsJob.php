@@ -54,7 +54,7 @@ class ImportProductsJob implements ShouldQueue
             }
 
             // 1) Comptage des lignes valides (non vides + SKU non vide)
-            $csv = Reader::createFromPath($fullPath, 'r');
+            $csv = Reader::from($fullPath, 'r');
             $csv->setDelimiter(';');
             $csv->setHeaderOffset(0);
             $origHeader = $csv->getHeader();
@@ -98,7 +98,7 @@ class ImportProductsJob implements ShouldQueue
             ], now()->addHour());
 
             // 2) Traitement effectif (nouveau Reader pour repartir du début)
-            $csv = Reader::createFromPath($fullPath, 'r');
+            $csv = Reader::from($fullPath, 'r');
             $csv->setDelimiter(';');
             $csv->setHeaderOffset(0);
             $origHeader = $csv->getHeader();

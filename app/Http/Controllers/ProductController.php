@@ -232,9 +232,9 @@ class ProductController extends Controller
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
-    // Lancer le job en file d’attente avec un chemin ABSOLU (important pour le worker)
-    $absolutePath = Storage::path($state['path']);
-    ImportProductsJob::dispatch($id, $absolutePath);
+        // Lancer le job en file d’attente avec un chemin ABSOLU (important pour le worker)
+        $absolutePath = Storage::path($state['path']);
+        ImportProductsJob::dispatch($id, $absolutePath);
 
         Cache::put("import:$id", [
             'status' => 'queued',
@@ -416,6 +416,9 @@ class ProductController extends Controller
         // }
     }
 
+
+
+    
     /**
      * Génère les propositions triées selon la logique de recherche.
      */

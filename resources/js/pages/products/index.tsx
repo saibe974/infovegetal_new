@@ -95,10 +95,10 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     return (
         <div>
             {/* @ts-ignore */}
-            <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
+            <BasicSticky stickyClassName="bg-background relative z-20" className="relative z-20">
                 <div className="flex items-center py-2 relative w-full">
 
-                    <div className="w-200 left-0 top-1 z-100 mr-2" >
+                    <div className="w-200 left-0 top-1 mr-2" >
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
@@ -196,48 +196,16 @@ function UploadCsvButton() {
     const [importId, setImportId] = useState<string | null>(null);
     const pollRef = useRef<number | null>(null);
     const xhrRef = useRef<XMLHttpRequest | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [showResult, setShowResult] = useState(false);
+    const [done, setDone] = useState(false);
+    const isLocked = uploading || processing; // verrous UI pendant traitement
 
     const clearPoll = () => {
         if (pollRef.current) {
             window.clearInterval(pollRef.current);
             pollRef.current = null;
         }
-    };
-
-    const startPolling = (id: string) => {
-        clearPoll();
-        pollRef.current = window.setInterval(async () => {
-            try {
-                const res = await fetch(`/products/import/progress/${id}`, { headers: { 'Accept': 'application/json' } });
-                // console.log("Polling import progress for ID:", id, res);
-                if (!res.ok) return;
-                const json = await res.json();
-                // Calcule localement le pourcentage à partir de processed/total quand disponible
-                let pct = 0;
-                if (typeof json.processed === 'number' && typeof json.total === 'number' && json.total > 0) {
-                    pct = Math.floor((json.processed / json.total) * 100);
-                } else if (typeof json.progress === 'number') {
-                    pct = json.progress;
-                }
-                if (pct > 100) pct = 100;
-                setProcessPct(pct);
-                // On peut afficher la ligne/sku/name courants
-                // @ts-ignore
-                if (json.current) {
-                    // pas de setState dédié, mais on affichera via json récupéré si besoin
-                }
-                if (json.status === 'done' || pct >= 100) {
-                    clearPoll();
-                    setProcessing(false);
-                }
-                if (json.status === 'error') {
-                    clearPoll();
-                    setProcessing(false);
-                }
-            } catch (_) {
-                // ignore transient polling errors
-            }
-        }, 500);
     };
 
     const getCsrfToken = () => {
@@ -251,6 +219,7 @@ function UploadCsvButton() {
         if (!file) return;
         setUploadPct(0);
         setProcessPct(0);
+        setDone(false);
         setUploading(true);
         setProcessing(false);
 
@@ -301,6 +270,7 @@ function UploadCsvButton() {
         // 2) Lancer le traitement et démarrer le polling de progression
         // console.log("Starting processing for import ID:", uploaded.id);
         setProcessing(true);
+        setShowResult(true);
         try {
             const csrf2 = getCsrfToken();
             await fetch('/products/import/process', {
@@ -348,50 +318,57 @@ function UploadCsvButton() {
         setImportId(null);
         setProcessPct(0);
         setFile(null);
+        setDone(false);
         setOpen(false);
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(o) => { if (!isLocked) setOpen(o); }}>
             <DialogTrigger asChild>
-                <button type="button" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100" disabled={uploading}>
+                <button
+                    type="button"
+                    className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100"
+                    disabled={uploading}>
                     {uploading ? <Loader2 className="animate-spin mr-2" size={16} /> : <DownloadIcon />}
                 </button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent
+                className="sm:max-w-xl"
+                // Empêche la fermeture pendant traitement (overlay/escape)
+                onEscapeKeyDown={(e) => { if (isLocked) e.preventDefault(); }}
+                onPointerDownOutside={(e) => { if (isLocked) e.preventDefault(); }}
+            >
                 <DialogHeader>
                     <DialogTitle>Import CSV</DialogTitle>
                     <DialogDescription>
-                        Importez un fichier CSV pour créer/mettre à jour vos produits. Le fichier doit contenir une ligne d’en-tête avec au minimum: <code className="font-mono">sku</code>, <code className="font-mono">name</code>.
+                        Importez un fichier CSV pour créer/mettre à jour vos produits (~100/s)
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-3">
-                    <div className="text-sm text-muted-foreground">
-                        Colonnes supportées:
-                        <ul className="list-disc ml-5 mt-1">
-                            <li><b>sku</b> (requis) — identifiant unique du produit</li>
-                            <li><b>name</b> (requis) — nom du produit</li>
-                            <li><b>description</b> (optionnel)</li>
-                            <li><b>price</b> (optionnel, nombre)</li>
-                            <li><b>active</b> (optionnel, 0/1)</li>
-                        </ul>
-                    </div>
-
-                    <div className="rounded-md border p-3 bg-muted/30">
-                        <div className="text-xs text-muted-foreground">Exemple d’en-tête</div>
-                        <pre className="mt-1 overflow-x-auto text-sm"><code>sku;name;description;price;active</code></pre>
-                    </div>
-
                     <div className="flex items-center gap-3">
                         <input
+                            ref={fileInputRef}
                             id="csv-file-input"
                             type="file"
                             accept=".csv,text/csv"
-                            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setDone(false); }}
+                            disabled={isLocked}
+                            className="hidden"
                         />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100 disabled:opacity-50"
+                            disabled={isLocked}
+                            aria-label="Choisir un fichier CSV"
+                        >
+                            Choisir un fichier
+                        </button>
                         {file && (
-                            <span className="text-sm text-muted-foreground truncate max-w-[240px]" title={file.name}>{file.name}</span>
+                            <span className="text-sm text-muted-foreground truncate max-w-[240px]" title={file.name}>
+                                {file.name}
+                            </span>
                         )}
                     </div>
 
@@ -409,37 +386,53 @@ function UploadCsvButton() {
                     )}
 
                     {/* Progress processing */}
-                    {processing && (
+                    {(importId && showResult) ?
                         <ProcessingProgress
                             id={importId}
                             percent={processPct}
                             onDone={() => {
                                 setProcessing(false);
+                                setDone(true);
                             }}
-                        />
-                    )}
+                        /> : null
+                    }
                 </div>
 
                 <DialogFooter>
-                    <button
-                        type="button"
-                        onClick={handleCancel}
-                        className="inline-flex items-center border px-3 py-1 rounded text-sm"
-                        disabled={uploading || processing ? false : false}>
-                        Annuler
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleImport}
-                        className="inline-flex items-center border px-3 py-1 rounded text-sm bg-primary text-primary-foreground disabled:opacity-50"
-                        disabled={!file || uploading || processing}
-                    >
-                        {(uploading || processing) ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-                        Importer
-                    </button>
+
+                    {done ? (
+                        <button
+                            type="button"
+                            onClick={() => router.visit(products.index().url)}
+                            className="inline-flex items-center border px-3 py-1 rounded text-sm bg-primary text-primary-foreground"
+                        >
+                            Fermer
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                className="inline-flex items-center border px-3 py-1 rounded text-sm"
+                                disabled={!uploading && !processing}>
+                                Annuler
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleImport}
+                                className="inline-flex items-center border px-3 py-1 rounded text-sm bg-primary text-primary-foreground disabled:opacity-50"
+                                disabled={!file || isLocked}
+                            >
+                                {(uploading || processing) ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                                Importer
+                            </button>
+                        </>
+                    )}
+
                 </DialogFooter>
+
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }
 
@@ -496,14 +489,14 @@ function ProcessingProgress({ id, percent, onDone }: { id: string | null, percen
                 </div>
             </div>
             <div className="text-xs text-muted-foreground space-y-1">
-                {processed != null && total != null ? (
+                {processed != null && total != null && status !== 'done' ? (
                     <div>Ligne {processed} / {total}{current?.sku ? ` — SKU: ${current.sku}` : ''}{current?.name ? ` — ${current.name}` : ''}</div>
                 ) : null}
                 {errors ? <div className="text-destructive">Erreurs: {errors}</div> : null}
                 {(status === 'done') && (
                     <div className="pt-1 flex items-center justify-between">
                         <div>
-                            Terminé — {processed ?? 0} lignes traitées{errors ? `, ${errors} erreurs` : ''}
+                            Mise à jour terminée — {processed ?? 0} lignes traitées{errors ? `, ${errors} erreurs` : ''}.
                         </div>
                         {errors && id ? (
                             <a
