@@ -165,11 +165,10 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 function DownloadCsvButton() {
     return (
-        <a href="/products/export" className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100">
+        <a href="/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
             <UploadIcon />
         </a>
     );
 }
 
-
-
+ 
