@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# post-receive hook pour déployer une application Laravel après un git push
+# Placez ce fichier comme: /home/<user>/repos/infovegetal.git/hooks/post-receive
+# et rendez-le exécutable: chmod +x post-receive
+# Adaptez les chemins ci-dessous à votre hébergeur.
+
+set -euo pipefail
+
+# --- Config à adapter ---
+APP_USER="$(whoami)"
+APP_BASE="/home/${APP_USER}/apps/infovegetal"      # dossier de travail (non-bare)
+REPO_DIR="/home/${APP_USER}/repos/infovegetal.git"  # dépôt bare
+PHP_BIN="php"
+COMPOSER_BIN="composer"
+NODE_BIN="node"      # optionnel
+NPM_BIN="npm"        # optionnel
+BRANCH="master"      # branche à déployer
+
+# --- Checkout du code ---
+mkdir -p "$APP_BASE"
+GIT_WORK_TREE="$APP_BASE" git --git-dir="$REPO_DIR" checkout -f "$BRANCH"
+
+cd "$APP_BASE"
+
+# --- Dépendances PHP ---
+$COMPOSER_BIN install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+# --- Liens & permissions ---
+$PHP_BIN artisan storage:link || true
+chmod -R ug+rwx storage bootstrap/cache || true
+
+# --- Caches Laravel ---
+$PHP_BIN artisan config:cache || true
+$PHP_BIN artisan route:cache || true
+$PHP_BIN artisan view:cache || true
+
+# --- Migrations en production ---
+$PHP_BIN artisan migrate --force || true
+
+# --- Build front (optionnel, si Node dispo sur le serveur) ---
+if command -v "$NPM_BIN" >/dev/null 2>&1; then
+  $NPM_BIN ci || $NPM_BIN install
+  $NPM_BIN run build
+else
+  echo "[post-receive] NPM non disponible: skip build front. Pensez à uploader public/build depuis votre machine."
+fi
+
+# --- Terminé ---
+echo "[post-receive] Déploiement terminé dans ${APP_BASE}"
