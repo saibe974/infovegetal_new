@@ -8,7 +8,11 @@
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",
-        "types": "tsc --noEmit"
+        "types": "tsc --noEmit",
+        "deploy:prod": "git push production master",
+        "prod:migrate": "ssh infomaniak \"cd ~/sites/new.infovegetal.com && php artisan migrate --force\"",
+        "prod:optimize": "ssh infomaniak \"cd ~/sites/new.infovegetal.com && php artisan config:clear && php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache\"",
+        "prod:log": "ssh infomaniak \"cd ~/sites/new.infovegetal.com && tail -n 120 storage/logs/laravel.log || true\""
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
