@@ -145,7 +145,7 @@ function UploadCsvButton() {
             <DialogTrigger asChild>
                 <button
                     type="button"
-                    className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100"
+                    className="clickable inline-flex items-center border px-3 py-1 rounded text-sm"
                     disabled={uploading}>
                     {uploading ? <Loader2 className="animate-spin mr-2" size={16} /> : <DownloadIcon />}
                 </button>
@@ -177,12 +177,13 @@ function UploadCsvButton() {
                         <button
                             type="button"
                             onClick={() => { resetDialogForNewFile(); fileInputRef.current?.click(); }}
-                            className="inline-flex items-center border px-3 py-1 rounded text-sm hover:bg-gray-100 disabled:opacity-50"
+                            className="clickable inline-flex items-center border px-3 py-1 rounded text-sm"
                             disabled={isLocked}
                             aria-label="Choisir un fichier CSV"
                         >
                             Choisir un fichier
                         </button>
+
                         {file && (
                             <span className="text-sm text-muted-foreground truncate max-w-[240px]" title={file.name}>
                                 {file.name}
