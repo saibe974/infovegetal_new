@@ -7,6 +7,7 @@ import { Form, Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, UploadIcon, DownloadIcon, EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 // import { useForm } from '@inertiajs/react';
@@ -147,7 +148,20 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                 </TableCell>
 
                                 <TableCell>{item.category ? item.category.name : ''}</TableCell>
-                                <TableCell>{item.description}</TableCell>
+                                <TableCell>
+                                    <div className="space-y-2">
+                                        <div>{item.description}</div>
+                                        {item.tags && item.tags.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5 pt-1">
+                                                {item.tags.map((tag) => (
+                                                    <Badge key={tag.id} variant="secondary">
+                                                        {tag.name}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </TableCell>
                                 <TableCell>{item.price}</TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
