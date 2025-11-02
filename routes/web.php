@@ -7,7 +7,7 @@ use App\Models\Product;
 use App\Http\Resources\ProductResource;
 
 Route::get('/', function (Request $request) {
-    $query = Product::with(['category', 'tags'])->orderFromRequest($request);
+    $query = Product::with(['category'])->orderFromRequest($request);
     $search = $request->get('q');
 
     if ($search) {
