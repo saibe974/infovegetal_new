@@ -1,7 +1,7 @@
 {
     "project": "infovegetal_new",
     "branch": "master",
-    "updatedAt": "2025-10-29",
+    "updatedAt": "2025-11-02",
     "contributors": [
         {
             "id": "saibe",
@@ -144,6 +144,11 @@
                     "author": "copilot",
                     "date": "2025-10-29",
                     "text": "Approche: créer un Job ImportProductsJob (lecture CSV, progress/cancel via Cache, rapport d'erreurs), modifier ProductController@importProcess pour dispatcher le Job (status=queued) et répondre immédiatement; faire tourner un worker (queue:work) avec QUEUE_CONNECTION=database ou redis."
+                },
+                {
+                    "author": "saibe",
+                    "date": "2025-11-02",
+                    "text": "Pas maintenant — note ajoutée, on reprend plus tard."
                 }
             ]
         }
