@@ -36,7 +36,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 
-export default withAppLayout<Props>(breadcrumbs, ({product}) => {
+export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
     // console.log(product);
     // console.log(Routing);
     const action = product.id
@@ -50,8 +50,8 @@ export default withAppLayout<Props>(breadcrumbs, ({product}) => {
 
                     <div className="flex items-center py-2 gap-2 justify-between">
                         <div className="flex items-center gap-2">
-                            <Link href="#" 
-                                onClick={(e) => {e.preventDefault(); window.history.back();}}>
+                            <Link href="#"
+                                onClick={(e) => { e.preventDefault(); window.history.back(); }}>
                                 <ArrowLeftCircle size={16} />
                             </Link>
                             <h2>
@@ -62,8 +62,8 @@ export default withAppLayout<Props>(breadcrumbs, ({product}) => {
                             <SaveIcon /> Enregistrer
                         </Button>
                     </div>
-                    
-                        
+
+
                     <div className="grid items-start gap-8 md:grid-cols-[1fr_350px]">
                         <main className="space-y-4">
                             <FormField
@@ -74,11 +74,23 @@ export default withAppLayout<Props>(breadcrumbs, ({product}) => {
                                     id="name"
                                     name="name"
                                     defaultValue={product.name}
-                                    aria-invalid={!!errors['name']}/>
+                                    aria-invalid={!!errors['name']} />
+                            </FormField>
+
+                            <FormField
+                                label="Tags (séparés par des virgules)"
+                                htmlFor="tags"
+                                error={errors['tags']}>
+                                <Input
+                                    id="tags"
+                                    name="tags"
+                                    defaultValue={(Array.isArray((product as any).tags) ? (product as any).tags.map((t: any) => t.name).join(', ') : '')}
+                                    placeholder="ex: vivace, pot, promotion"
+                                />
                             </FormField>
                         </main>
                         <Card>
-                             {/* <ImageInput
+                            {/* <ImageInput
                                 id="img_link"
                                 progress={progress?.progress}
                                 className="aspect-video"
@@ -86,14 +98,14 @@ export default withAppLayout<Props>(breadcrumbs, ({product}) => {
                                 aria-invalid={!!errors['img_link']}
                                 defaultValue={product.img_link}
                             /> */}
-                            <img src={product.img_link} className="object-cover"/>
+                            <img src={product.img_link} className="object-cover" />
                         </Card>
                     </div>
-                
-                </>     
-            )}   
+
+                </>
+            )}
         </Form>
-        
+
     );
 });
 

@@ -45,6 +45,11 @@ class Product extends Model
         return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }
 
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+
     /**
      * Backwards-compatible accessor expected by API: price_ex_vat
      */

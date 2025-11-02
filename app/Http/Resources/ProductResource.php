@@ -31,6 +31,13 @@ class ProductResource extends JsonResource
             'active' => $this->active,
             'attributes' => $this->attributes,
             'category' => $this->whenLoaded('category', fn () => $this->category),
+            'tags' => $this->whenLoaded('tags', fn () => $this->tags->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'slug' => $t->slug,
+                ];
+            })->values()->all()),
             'created_at' => $this->created_at?->toDateTimeString(),
             'updated_at' => $this->updated_at?->toDateTimeString(),
         ];

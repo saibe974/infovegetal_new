@@ -28,7 +28,7 @@ class ProductController extends Controller
     {
     //    $product = Product::with('category')->find(1);
     //    dd($product->category->name);
-        $query = Product::with('category')->orderFromRequest($request);
+    $query = Product::with(['category','tags'])->orderFromRequest($request);
         $search = $request->get('q');
 
         if ($search) {
@@ -384,6 +384,7 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
+        $product->load(['tags']);
         return Inertia::render('products/form', [
             'product' => new ProductResource($product),
         ]);
@@ -410,10 +411,32 @@ class ProductController extends Controller
 
     private function handleFormRequest(Product $product, FormProductRequest $request)
     {
-        // $image = $request->validated('image');
-        // if ($image && $image instanceof UploadedFile) {
-        //     $product->addMedia($image)->toMediaCollection('image');
-        // }
+        // Synchronisation des tags si fournis
+        $raw = $request->input('tags');
+        if ($raw !== null) {
+            $names = [];
+            if (is_array($raw)) {
+                $names = array_filter(array_map(function ($v) {
+                    return trim((string)$v);
+                }, $raw), fn($s) => $s !== '');
+            } else {
+                // support d'un champ texte séparé par virgules
+                $names = array_filter(array_map('trim', preg_split('/[,;\n]+/', (string)$raw) ?: []), fn($s) => $s !== '');
+            }
+
+            if (!empty($names)) {
+                // crée/retourne les tags, puis sync sur le pivot
+                $ids = [];
+                foreach ($names as $name) {
+                    $slug = str($name)->lower()->slug('-');
+                    $tag = \App\Models\Tag::firstOrCreate(['slug' => $slug], ['name' => $name]);
+                    $ids[] = $tag->id;
+                }
+                $product->tags()->sync($ids);
+            } else {
+                $product->tags()->sync([]);
+            }
+        }
     }
 
 
