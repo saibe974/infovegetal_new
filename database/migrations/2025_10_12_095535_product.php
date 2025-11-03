@@ -26,7 +26,7 @@ return new class extends Migration
             $t->json('attributes')->nullable(); // couleur, calibre, etc.
             $t->timestamps();
             $t->softDeletes();
-            $t->index(['name']);
+            // $t->index(['name']);
         });
     }
 
