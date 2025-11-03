@@ -99,8 +99,6 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                {/* <NavMain items={mainNavItems} /> */}
-
                 <NavMainExtended title={t('Administration')} items={mainNavItems} />
             </SidebarContent>
 
