@@ -94,10 +94,10 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     return (
         <div>
             {/* @ts-ignore */}
-            <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
+            <BasicSticky stickyClassName="bg-background relative z-20"
+            >
                 <div className="flex items-center py-2 relative w-full">
-
-                    <div className="w-200 left-0 top-1 z-100 mr-2" >
+                    <div className="w-200 left-0 top-1 mr-2" >
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
