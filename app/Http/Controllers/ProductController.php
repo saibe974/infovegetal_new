@@ -376,7 +376,11 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        //
+        $product->load(['category', 'tags']);
+        
+        return Inertia::render('products/show', [
+            'product' => new ProductResource($product),
+        ]);
     }
 
     /**

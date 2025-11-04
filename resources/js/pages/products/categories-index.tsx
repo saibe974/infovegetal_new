@@ -14,7 +14,7 @@ import SearchSoham from '@/components/ui/searchSoham';
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Products',
-        href: products.index().url,
+        href: products.admin.index().url,
     },
 ];
 

@@ -44,12 +44,12 @@ export function AppSidebar() {
         },
         {
             title: t('Products'),
-            href: products.index(),
+            href: products.admin.index(),
             icon: Flower2Icon,
             subItems: [
                 {
                     title: t('All products'),
-                    href: products.index(),
+                    href: products.admin.index(),
                     icon: ListIcon,
                 },
                 {

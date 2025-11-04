@@ -27,7 +27,7 @@ type Props = {
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Products',
-        href: products.index().url,
+        href: products.admin.index().url,
     },
     {
         title: 'Editer',

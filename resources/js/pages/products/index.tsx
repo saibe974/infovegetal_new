@@ -102,12 +102,12 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             type: 'products',
                             title: 'Import CSV',
                             description: 'Importez un fichier CSV pour créer/mettre à jour vos produits (~100/s)',
-                            uploadUrl: '/products/import/upload',
-                            processUrl: '/products/import/process',
-                            cancelUrl: '/products/import/cancel',
-                            progressUrl: (id) => `/products/import/progress/${id}`,
-                            reportUrl: (id) => `/products/import/report/${id}`,
-                            successRedirectUrl: products.index().url,
+                            uploadUrl: '/products/admin/import/upload',
+                            processUrl: '/products/admin/import/process',
+                            cancelUrl: '/products/admin/import/cancel',
+                            progressUrl: (id) => `/products/admin/import/progress/${id}`,
+                            reportUrl: (id) => `/products/admin/import/report/${id}`,
+                            successRedirectUrl: products.admin.index().url,
                             buttonLabel: 'Importer'
                         }} />
                         <DownloadCsvButton />
@@ -188,7 +188,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 function DownloadCsvButton() {
     return (
-        <a href="/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
+        <a href="/products/admin/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
             <UploadIcon />
         </a>
     );

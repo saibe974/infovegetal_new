@@ -37,15 +37,34 @@ Route::get('/', function (Request $request) {
     ]);
 })->name('home');
 
+// Routes publiques de consultation des produits
+Route::prefix('products')->name('products.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('index');
+    Route::get('/{product}', [\App\Http\Controllers\ProductController::class, 'show'])->name('show');
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    Route::resource('products', \App\Http\Controllers\ProductController::class);
-    // CSV import/export endpoints
-    Route::post('products/import', [\App\Http\Controllers\ProductController::class, 'import'])->name('products.import');
-    Route::get('products/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('products.export');
+    // Routes admin des produits
+    Route::prefix('products/admin')->name('products.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('admin.index');
+        Route::get('/create', [\App\Http\Controllers\ProductController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\ProductController::class, 'store'])->name('store');
+        Route::get('/{product}/edit', [\App\Http\Controllers\ProductController::class, 'edit'])->name('edit');
+        Route::put('/{product}', [\App\Http\Controllers\ProductController::class, 'update'])->name('update');
+        Route::delete('/{product}', [\App\Http\Controllers\ProductController::class, 'destroy'])->name('destroy');
+        
+        // CSV import/export endpoints
+        Route::post('/import/upload', [\App\Http\Controllers\ProductController::class, 'importUpload'])->name('import.upload');
+        Route::post('/import/process', [\App\Http\Controllers\ProductController::class, 'importProcess'])->name('import.process');
+        Route::post('/import/cancel', [\App\Http\Controllers\ProductController::class, 'importCancel'])->name('import.cancel');
+        Route::get('/import/progress/{id}', [\App\Http\Controllers\ProductController::class, 'importProgress'])->name('import.progress');
+        Route::get('/import/report/{id}', [\App\Http\Controllers\ProductController::class, 'importReport'])->name('import.report');
+        Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
+    });
 
     Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class);
     
