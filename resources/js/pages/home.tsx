@@ -11,6 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import SearchSoham from '@/components/ui/searchSoham';
 import { Badge } from '@/components/ui/badge';
 import { CarouselHome } from '@/components/carousel-home';
+import AppLogo from '@/components/app-logo';
+import { useI18n } from '@/lib/i18n';
+import { AppLogoIconMini } from '@/components/app-logo-icon';
+import { AboutSection } from '@/components/about-section';
+import ServicesSection from '@/components/services-section';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/' },
@@ -22,18 +27,27 @@ type Props = {
 };
 
 export default withAppLayout(breadcrumbs, () => {
+    const { t } = useI18n();
+
 
 
     return (
-        <div className='w-full flex items-center flex-col'>
+        <div className='w-full flex items-center flex-col gap-20'>
             <div className='flex flex-col h-screen w-full items-center gap-15'>
                 <CarouselHome />
                 <div className='text-center'>
-                    <h3 className='text-2xl font-bold font-sans'>Votre logistique végétale, simplifiée et performante</h3>
-                    <h4 className='text-lg font-light'>La plateforme pensée par et pour les professionnels de l’horticulture</h4>
+                    <h3 className='text-2xl font-bold font-sans'>
+                        {t('Votre logistique végétale, simplifiée et performante')}
+                    </h3>
+                    <h4 className='text-lg font-light'>
+                        {t('La plateforme pensée par et pour les professionnels de l’horticulture')}
+                    </h4>
                 </div>
 
             </div>
+
+            <AboutSection />
+            <ServicesSection active={true} />
         </div>
     );
 })
