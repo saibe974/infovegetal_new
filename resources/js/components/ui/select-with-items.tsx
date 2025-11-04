@@ -10,6 +10,7 @@ import React, { type ComponentProps, useEffect, useState } from 'react';
 export type SelectOption = {
     label: string;
     value: string;
+    img?: React.ReactNode;
 };
 
 type Props = {
@@ -43,7 +44,7 @@ export function SelectWithItems({
                 <SelectContent>
                     {items.map((item) => (
                         <SelectItem key={item.value} value={item.value}>
-                            {item.label}
+                            {item.img && item.img}{item.label}
                         </SelectItem>
                     ))}
                 </SelectContent>
