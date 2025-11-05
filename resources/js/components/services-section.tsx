@@ -93,26 +93,26 @@ export default function servicesSection({ active }: { active: boolean }) {
 
 
     return (
-        <section ref={sectionRef} className="flex flex-col items-center justify-center w-full h-full mt-11 gap-10">
+        <section ref={sectionRef} className="flex flex-col items-center justify-center w-full h-full gap-10">
             <h3 className='uppercase text-5xl font-sans'>nos services</h3>
             <div className="flex items-center w-full justify-around">
-                <div className="flex flex-col w-1/3">
+                <div className="flex flex-col w-1/4">
                     {services.map((item) => (
                         <button
                             key={item.id}
                             data-id={item.id}
                             onClick={() => setActiveId(item.id)}
-                            className={`cursor-pointer about-btn flex flex-col items-center p-4 transition-all duration-300 h-[12rem] justify-around ${activeId === item.id
+                            className={`cursor-pointer about-btn flex flex-col items-start p-4 transition-all duration-300 h-[12rem] justify-around ${activeId === item.id
                                 ? " bg-sidebar-accent"
                                 : " hover:bg-sidebar-accent"
                                 }`}
                         >
-                            <h3 className="about-title-parent font-inter font-normal items-center justify-center text-lg sm:text-xl md:text-2xl flex gap-8 leading-[100%] tracking-[-0.04em]">
-                                <span className={`about-title ${activeId === item.id ? "" : "text-main-purple"}`}>0{item.id}</span>
+                            <h3 className="about-title-parent font-inter font-normal text-lg sm:text-xl md:text-2xl w-full gap-3 flex ">
+                                <span className={`about-title w-fit ${activeId === item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
                             <p
-                                className="about-text text-left text-lg mt-2 leading-[100%] tracking-[-0.04em] overflow-hidden"
+                                className="about-text text-left text-lg mt-2 overflow-hidden"
                                 style={{ opacity: activeId === item.id ? 1 : 0 }}
                                  dangerouslySetInnerHTML={{ __html: item.text }}
                             />
@@ -120,7 +120,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                     ))}
                 </div>
 
-                <div className="flex items-center justify-center w-1/3">
+                <div className="flex items-center justify-center w-1/3 text-main-purple dark:text-main-green">
                     {<AnimatedSVG svg={activeItem.svg} />}
                 </div>
             </div>

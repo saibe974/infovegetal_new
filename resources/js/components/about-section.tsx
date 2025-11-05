@@ -5,7 +5,7 @@ export function AboutSection() {
     const { t } = useI18n();
 
     return (
-        <section className='flex gap-5 items-center justify-around mb-20'>
+        <section className='flex gap-5 items-center justify-around'>
             <AppLogoIconMini className='size-80' />
 
             <div className='flex flex-col gap-8 w-2/5'>
