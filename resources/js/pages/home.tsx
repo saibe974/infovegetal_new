@@ -18,6 +18,7 @@ import { AboutSection } from '@/components/about-section';
 import ServicesSection from '@/components/services-section';
 import { ProductsCardsList } from '@/components/products-cards-list';
 import { Button } from '@/components/ui/button';
+import { AppFooter } from '@/components/app.footer';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/' },
@@ -70,6 +71,8 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
                 <ProductsCardsList products={popularProducts} />
             </div>
             <ServicesSection active={true} />
+
+            <AppFooter />
         </div>
     );
 })
