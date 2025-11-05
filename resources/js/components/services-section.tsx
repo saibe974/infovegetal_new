@@ -108,7 +108,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                                 }`}
                         >
                             <h3 className="about-title-parent font-inter font-normal items-center justify-center text-lg sm:text-xl md:text-2xl flex gap-8 leading-[100%] tracking-[-0.04em]">
-                                <span className={`about-title ${activeId === item.id ? "" : "text-[#9C0060]"}`}>0{item.id}</span>
+                                <span className={`about-title ${activeId === item.id ? "" : "text-main-purple"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
                             <p
