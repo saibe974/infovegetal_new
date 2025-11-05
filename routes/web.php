@@ -48,9 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    // Routes admin des produits
-    Route::prefix('products/admin')->name('products.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('admin.index');
+    // Routes admin des produits - nécessite le rôle admin
+    Route::middleware(['role:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('index');
         Route::get('/create', [\App\Http\Controllers\ProductController::class, 'create'])->name('create');
         Route::post('/', [\App\Http\Controllers\ProductController::class, 'store'])->name('store');
         Route::get('/{product}/edit', [\App\Http\Controllers\ProductController::class, 'edit'])->name('edit');
@@ -66,7 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
     });
 
-    Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class);
+    Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class)->middleware(['role:admin']);
     
 });
 

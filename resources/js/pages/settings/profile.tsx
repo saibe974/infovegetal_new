@@ -11,10 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectWithItems } from '@/components/ui/select-with-items';
+import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
+import { isAdmin } from '@/lib/roles';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -59,7 +61,7 @@ export default function Profile({
                                     <Input
                                         id="name"
                                         className="mt-1 block w-full"
-                                        defaultValue={auth.user.name}
+                                        defaultValue={auth.user?.name || ''}
                                         name="name"
                                         required
                                         autoComplete="name"
@@ -79,7 +81,7 @@ export default function Profile({
                                         id="email"
                                         type="email"
                                         className="mt-1 block w-full"
-                                        defaultValue={auth.user.email}
+                                        defaultValue={auth.user?.email || ''}
                                         name="email"
                                         required
                                         autoComplete="username"
@@ -116,8 +118,42 @@ export default function Profile({
                                     />
                                 </div>
 
+                                {/* Section Rôles */}
+                                {auth.user?.roles && auth.user.roles.length > 0 && (
+                                    <div className="grid gap-2">
+                                        <Label>{t('Roles')}</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {auth.user.roles.map((role) => (
+                                                <Badge key={role.id} variant="secondary">
+                                                    {role.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('Your current roles in the system')}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Section Permissions (admin uniquement) */}
+                                {isAdmin(auth.user) && auth.user?.permissions && auth.user.permissions.length > 0 && (
+                                    <div className="grid gap-2">
+                                        <Label>{t('Permissions')}</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {auth.user.permissions.map((permission) => (
+                                                <Badge key={permission.id} variant="outline" className="text-xs">
+                                                    {permission.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('Your permissions as administrator')}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {mustVerifyEmail &&
-                                    auth.user.email_verified_at === null && (
+                                    auth.user?.email_verified_at === null && (
                                         <div>
                                             <p className="-mt-4 text-sm text-muted-foreground">
                                                 {t('Your email address is unverified.')}{' '}

@@ -14,9 +14,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Créer les rôles et permissions d'abord
+        $this->call([
+            RoleSeeder::class,
+        ]);
+
         // User::factory(10)->create();
 
-        User::firstOrCreate(
+        $adminUser = User::firstOrCreate(
             ['email' => '69.hugue@gmail.com'],
             [
                 'name' => 'Admin',
@@ -24,5 +29,10 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+
+        // Assigner le rôle admin au premier utilisateur
+        if (!$adminUser->hasRole('admin')) {
+            $adminUser->assignRole('admin');
+        }
     }
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
+use App\Http\Controllers\Settings\UserManagementController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -25,4 +26,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
+
+    // Gestion des utilisateurs (admin uniquement)
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('settings/users', [UserManagementController::class, 'index'])->name('users.index');
+        Route::post('settings/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
+    });
 });

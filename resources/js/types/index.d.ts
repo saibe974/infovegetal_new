@@ -70,6 +70,10 @@ export interface NavItemExtended extends NavItem {
     subItems?: NavItem[];
 }
 
+export interface Auth {
+    user?: User | null;
+}
+
 export interface SharedData {
     name: string;
     quote: { message: string; author: string };
@@ -92,5 +96,7 @@ export interface User {
     two_factor_enabled?: boolean;
     created_at: string;
     updated_at: string;
+    roles?: { id: number; name: string }[];
+    permissions?: { id: number; name: string }[];
     [key: string]: unknown; // This allows for additional properties...
 }

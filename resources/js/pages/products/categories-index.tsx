@@ -115,19 +115,19 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    <Link href={products.edit(item.id)} className="hover:underline">
+                                    <Link href={products.admin.edit(item.id)} className="hover:underline">
                                         {item.name}
                                     </Link>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
                                         <Button asChild size="icon" variant="outline">
-                                            <Link href={products.edit(item.id)}>
+                                            <Link href={products.admin.edit(item.id)}>
                                                 <EditIcon size={16} />
                                             </Link>
                                         </Button>
                                         <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={products.destroy(item.id)}
+                                            <Link href={products.admin.destroy(item.id)}
                                                 onBefore={() => confirm('Are you sure?')}>
                                                 <TrashIcon size={16} />
                                             </Link>

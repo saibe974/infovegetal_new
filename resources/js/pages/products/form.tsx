@@ -40,8 +40,8 @@ export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
     // console.log(product);
     // console.log(Routing);
     const action = product.id
-        ? products.update.form({ product: product.id })
-        : products.store.form();
+        ? products.admin.update.form({ product: product.id })
+        : products.admin.store.form();
 
     return (
         <Form {...action} className="space-y-4">

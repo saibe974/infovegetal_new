@@ -1,7 +1,7 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { useRef, useState } from 'react';
-import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
+import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
@@ -11,6 +11,7 @@ import { UploadIcon, EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
 import { CsvUploadButton } from '@/components/csv-upload-button';
+import { isAdmin, hasPermission } from '@/lib/roles';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -26,6 +27,13 @@ type Props = {
 
 export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection)
+    const { auth, locale } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
+    const canEdit = isAdmin(user) || hasPermission(user, 'edit products');
+    const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
+    const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
@@ -96,22 +104,23 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         />
                     </div>
 
-
-                    <div className="ml-auto flex items-center gap-2">
-                        <CsvUploadButton config={{
-                            type: 'products',
-                            title: 'Import CSV',
-                            description: 'Importez un fichier CSV pour créer/mettre à jour vos produits (~100/s)',
-                            uploadUrl: '/products/admin/import/upload',
-                            processUrl: '/products/admin/import/process',
-                            cancelUrl: '/products/admin/import/cancel',
-                            progressUrl: (id) => `/products/admin/import/progress/${id}`,
-                            reportUrl: (id) => `/products/admin/import/report/${id}`,
-                            successRedirectUrl: products.admin.index().url,
-                            buttonLabel: 'Importer'
-                        }} />
-                        <DownloadCsvButton />
-                    </div>
+                    {canImportExport && (
+                        <div className="ml-auto flex items-center gap-2">
+                            <CsvUploadButton config={{
+                                type: 'products',
+                                title: 'Import CSV',
+                                description: 'Importez un fichier CSV pour créer/mettre à jour vos produits (~100/s)',
+                                uploadUrl: '/admin/products/import/upload',
+                                processUrl: '/admin/products/import/process',
+                                cancelUrl: '/admin/products/import/cancel',
+                                progressUrl: (id) => `/admin/products/import/progress/${id}`,
+                                reportUrl: (id) => `/admin/products/import/report/${id}`,
+                                successRedirectUrl: products.admin.index().url,
+                                buttonLabel: 'Importer'
+                            }} />
+                            <DownloadCsvButton />
+                        </div>
+                    )}
                 </div>
             </BasicSticky>
 
@@ -125,7 +134,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             <TableHead>Category</TableHead>
                             <TableHead>Description</TableHead>
                             <TableHead>Price</TableHead>
-                            <TableHead className='text-end'>Actions</TableHead>
+                            {(canEdit || canDelete) && <TableHead className='text-end'>Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -138,12 +147,13 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                     }
                                 </TableCell>
                                 <TableCell>
-                                    <Link href={products.edit(item.id)} className="hover:underline">
+                                    <Link
+                                        href={canEdit ? products.admin.edit(item.id) : products.show(item.id)}
+                                        className="hover:underline"
+                                    >
                                         {item.name}
                                     </Link>
-                                </TableCell>
-
-                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
+                                </TableCell>                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
                                 <TableCell>
                                     <div className="space-y-2">
                                         <div>{item.description}</div>
@@ -159,22 +169,27 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                     </div>
                                 </TableCell>
                                 <TableCell>{item.price}</TableCell>
-                                <TableCell>
-                                    <div className="flex gap-2 justify-end">
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={products.edit(item.id)}>
-                                                <EditIcon size={16} />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={products.destroy(item.id)}
-                                                onBefore={() => confirm('Are you sure?')}>
-                                                <TrashIcon size={16} />
-                                            </Link>
-                                        </Button>
-                                    </div>
-
-                                </TableCell>
+                                {(canEdit || canDelete) && (
+                                    <TableCell>
+                                        <div className="flex gap-2 justify-end">
+                                            {canEdit && (
+                                                <Button asChild size="icon" variant="outline">
+                                                    <Link href={products.admin.edit(item.id)}>
+                                                        <EditIcon size={16} />
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                            {canDelete && (
+                                                <Button asChild size="icon" variant="destructive-outline">
+                                                    <Link href={products.admin.destroy(item.id)}
+                                                        onBefore={() => confirm('Are you sure?')}>
+                                                        <TrashIcon size={16} />
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                )}
                             </TableRow>
                         ))}
                     </TableBody>
@@ -188,7 +203,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 function DownloadCsvButton() {
     return (
-        <a href="/products/admin/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
+        <a href="/admin/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
             <UploadIcon />
         </a>
     );
