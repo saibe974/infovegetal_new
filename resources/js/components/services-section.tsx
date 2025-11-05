@@ -103,8 +103,8 @@ export default function servicesSection({ active }: { active: boolean }) {
                             data-id={item.id}
                             onClick={() => setActiveId(item.id)}
                             className={`cursor-pointer about-btn flex flex-col items-start p-4 transition-all duration-300 h-[12rem] justify-around ${activeId === item.id
-                                ? " bg-accent"
-                                : " hover:bg-accent"
+                                ? " bg-black/10 dark:bg-accent"
+                                : " hover:bg-black/10 dark:hover:bg-accent"
                                 }`}
                         >
                             <h3 className="about-title-parent font-inter font-normal text-lg sm:text-xl md:text-2xl w-full gap-3 flex ">
