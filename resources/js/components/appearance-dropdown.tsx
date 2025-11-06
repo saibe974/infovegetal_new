@@ -39,6 +39,7 @@ export default function AppearanceToggleDropdown({
                     >
                         {getCurrentIcon()}
                         <span className="sr-only">Toggle theme</span>
+                        <ChevronDownIcon className="size-5 opacity-100 text-muted-foreground md:hidden" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

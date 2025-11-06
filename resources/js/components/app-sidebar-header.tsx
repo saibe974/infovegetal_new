@@ -98,7 +98,7 @@ export function AppSidebarHeader({
                     query={''}
                 />
             </div>
-            <NavigationMenu viewport={isMobile} className=''>
+            <NavigationMenu className=''>
                 <NavigationMenuList className="w-full flex items-center justify-between gap-2">
                     {/* <div className='flex items-center gap-2'> */}
                     {auth.user ? (
@@ -132,7 +132,7 @@ export function AppSidebarHeader({
 
                     <NavigationMenuItem className='md:hidden'>
                         <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger>
-                        <NavigationMenuContent className=''>
+                        <NavigationMenuContent className='flex flex-col items-center gap-2 p-4'>
                             <SelectLang />
                             <AppearanceToggleDropdown />
                         </NavigationMenuContent>
