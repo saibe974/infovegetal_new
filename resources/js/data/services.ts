@@ -1,5 +1,5 @@
 export const support = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="550px" height="550px">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 25" width="430" height="430">
   <path d="M21 10.18a9 9 0 1 0-18 0A3 3 0 0 0 1 13v3a3 3 0 0 0 3 3h1a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2 7 7 0 1 1 14 0 2 2 0 0 0-2 2v5a2 2 0 0 0 1.49 1.93C17.17 21.31 14.9 21 13 21a1 1 0 0 0 0 2h2a6 6 0 0 0 5.67-4.08A3 3 0 0 0 23 16v-3a3 3 0 0 0-2-2.82zM5 17H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1zm16-1a1 1 0 0 1-1 1h-1v-5h1a1 1 0 0 1 1 1z" fill="currentColor"/></svg>
 `;
 

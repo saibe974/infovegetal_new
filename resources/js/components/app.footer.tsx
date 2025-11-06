@@ -47,9 +47,9 @@ export function AppFooter() {
 
     return (
         <footer className="w-full border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
-            <div className="flex w-full justify-center mb-5 px-10">
+            <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-20 md:gap-0 items-center">
 
-                <div className="flex-1 items-start flex justify-center">
+                <div className="md:flex-1 items-start flex justify-center">
                     <a href="/" className="flex items-center gap-3">
                         <AppLogoIconMini className="size-15" />
                         <p className="font-semibold text-lg">Infovegetal</p>
@@ -57,7 +57,7 @@ export function AppFooter() {
 
                 </div>
 
-                <div className="flex flex-col flex-1 items-center">
+                <div className="flex flex-col flex-1 justify-center md:items-center">
                     <div className="flex flex-col items-start">
                         <h4 className="font-semibold text-xl mb-2">{t('Liens')}</h4>
                         {footerLinks.map((link) => (
@@ -69,8 +69,8 @@ export function AppFooter() {
 
                 </div>
 
-                <div className="flex flex-col flex-1 items-center">
-                    <div className="flex flex-col items-start">
+                <div className="flex flex-col flex-1 items-center justify-center w-full">
+                    <div className="flex flex-col items-center md:items-start">
                         <h4 className="font-semibold text-xl mb-2">{t('Infos')}</h4>
                         {infoLinks.map((link) => (
                             <Button key={link.title} variant="link" className="p-0 font-light">
@@ -82,9 +82,9 @@ export function AppFooter() {
                 </div>
 
                 <div className="flex flex-col flex-1  items-center">
-                    <div className="flex flex-col items-start">
+                    <div className="flex flex-col items-center md:items-start">
                         <h4 className="font-semibold text-xl mb-2">{t('Une question ?')}</h4>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2 md:items-start">
                             {contact.map((contact) => (
                                 <div key={contact.id} className="flex flex-col items-start mb-3">
                                     <p className="font-semibold">{contact.type} :</p>

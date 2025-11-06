@@ -12,14 +12,14 @@ export function ProductsCardsList({ limit = 4, products }: Props) {
     const { t } = useI18n();
 
     return (
-        <div className="flex gap-10 flex-wrap">
+        <div className="flex gap-10 flex-wrap items-center justify-center max-w-full">
             {products.slice(0, limit).map((product: any) => (
                 <Card key={product.id} className=" h-4xl w-80 flex flex-col p-4 gap-4">
                     <CardHeader className="p-0">
                         <img src={product.img_link} alt={`Image de ${product.name}`} />
                     </CardHeader>
 
-                    <CardTitle className="text-lg font-bold">
+                    <CardTitle className="text-lg font-semibold">
                         {product.name.charAt(0).toUpperCase() + String(product.name).slice(1)}
                     </CardTitle>
 
@@ -27,9 +27,9 @@ export function ProductsCardsList({ limit = 4, products }: Props) {
                         <p className="font-light text-sm text-nowrap overflow-hidden text-ellipsis">{product.description.charAt(0).toUpperCase() + String(product.description).slice(1)}</p>
                     </CardContent>
 
-                    <div className="w-full h-1 bg-sidebar-accent rounded" />
+                    <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
 
-                    <p className="font-light text-md">{product.price} €</p>
+                    <p className="font-bold text-md">{product.price} €</p>
                     
                     <CardFooter className="w-full flex justify-end p-0">
                         <Button

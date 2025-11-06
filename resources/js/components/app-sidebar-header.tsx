@@ -10,7 +10,9 @@ import { useRef, useState } from 'react';
 import { SelectWithItems } from './ui/select-with-items';
 import { SelectLang } from './ui/selectLang';
 import AppearanceToggleDropdown from './appearance-dropdown';
-import { ShoppingBasket, ShoppingCart } from 'lucide-react';
+import { SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
 
 
 export function AppSidebarHeader({
@@ -20,6 +22,8 @@ export function AppSidebarHeader({
 }) {
     const { auth, locale } = usePage<SharedData>().props;
     const { t } = useI18n();
+
+    const isMobile = useIsMobile()
 
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -75,54 +79,76 @@ export function AppSidebarHeader({
     console.log(auth)
 
     return (
-        <header className="flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0">
-            <div className="w-full flex items-center justify-between gap-2">
-                <div className='flex items-center gap-2'>
-                    <SidebarTrigger className="-ml-1" />
-                    <Breadcrumbs breadcrumbs={breadcrumbs} />
-                </div>
+        <header className="z-20 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0 w-full">
 
-
-                <div className='w-4xl'>
-                    <SearchSoham
-                        value={search}
-                        onChange={handleSearch}
-                        onSubmit={onSelect}
-                        propositions={searchPropositions}
-                        loading={fetching}
-                        count={100}
-                        query={''}
-                    />
-                </div>
-                <div className='flex items-center gap-2'>
-                    {auth.user ? (
-                        <NavUser />
-                    ) : (
-                        <>
-                            <Link
-                                href={login()}
-                                className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
-                            >
-                                {t('Log in')}
-                            </Link>
-                            <Link
-                                href={register()}
-                                className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
-                            >
-                                {t('Register')}
-                            </Link>
-                        </>
-                    )}
-                    <Link
-                        href={'#'}
-                        className="hover:bg-sidebar-accent inline-block rounded-sm p-2"
-                    >
-                        <ShoppingCart size={19} />
-                    </Link>
-                    <SelectLang />
-                    <AppearanceToggleDropdown />
-                </div>
+            <div className='flex items-center gap-2'>
+                <SidebarTrigger className="-ml-1" />
+                <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
+
+
+            <div className='hidden md:block md:w-3xl'>
+                <SearchSoham
+                    value={search}
+                    onChange={handleSearch}
+                    onSubmit={onSelect}
+                    propositions={searchPropositions}
+                    loading={fetching}
+                    count={100}
+                    query={''}
+                />
+            </div>
+            <NavigationMenu viewport={isMobile} className=''>
+                <NavigationMenuList className="w-full flex items-center justify-between gap-2">
+                    {/* <div className='flex items-center gap-2'> */}
+                    {auth.user ? (
+                        <NavigationMenuItem className=''>
+                            <NavUser />
+                        </NavigationMenuItem>
+                    ) : (
+                        <NavigationMenuItem className=''>
+                            <NavigationMenuTrigger className=''><UserIcon /></NavigationMenuTrigger>
+                            <NavigationMenuContent className=''>
+                                <Link
+                                    href={login()}
+                                    className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
+                                >
+                                    {t('Log in')}
+                                </Link>
+                                <Link
+                                    href={register()}
+                                    className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                >
+                                    {t('Register')}
+                                </Link>
+                            </NavigationMenuContent>
+                        </NavigationMenuItem>
+                    )}
+                    <NavigationMenuItem>
+                        <NavigationMenuLink asChild className={''}>
+                            <Link href="/#"><ShoppingCart size={19} /></Link>
+                        </NavigationMenuLink>
+                    </NavigationMenuItem>
+
+                    <NavigationMenuItem className='md:hidden'>
+                        <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger>
+                        <NavigationMenuContent className=''>
+                            <SelectLang />
+                            <AppearanceToggleDropdown />
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+
+                    <NavigationMenuItem className='hidden md:flex'>
+                        {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
+                        {/* <NavigationMenuContent className=''> */}
+                        <SelectLang />
+                        <AppearanceToggleDropdown />
+                        {/* </NavigationMenuContent> */}
+                    </NavigationMenuItem>
+
+                    {/* </div> */}
+                </NavigationMenuList>
+            </NavigationMenu>
         </header>
     );
 }

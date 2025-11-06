@@ -5,11 +5,11 @@ export function AboutSection() {
     const { t } = useI18n();
 
     return (
-        <section className='flex gap-5 items-center justify-around'>
-            <AppLogoIconMini className='size-80' />
+        <section className='flex flex-col lg:flex-row gap-5 items-start md:items-center justify-around px-10 lg:px-0 max-w-full'>
+            <AppLogoIconMini className='size-20 md:size-60 lg:size-80' />
 
-            <div className='flex flex-col gap-8 w-2/5'>
-                <h3 className='uppercase text-5xl font-sans'>
+            <div className='flex flex-col gap-8 w-full lg:w-2/5'>
+                <h3 className='uppercase text-3xl md:text-5xl font-sans'>
                     {t('infovégétal')}
                 </h3>
                 <p className="text-lg">
