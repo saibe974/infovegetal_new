@@ -53,15 +53,16 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
                 </div>
             </div>
 
-            <div className='flex flex-col gap-10 items-center w-full max-w-full px-10 md:px-0'>
-                <div className='w-full flex flex-col gap-3 justify-between md:flex-row md:px-0'>
-                    <h3 className='text-3xl font-sans'>{t('Nos produits saisonniers')}</h3>
-                    <Button className='underline bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover transition-all duration-75'>
-                        {t('Tout afficher')}
-                    </Button>
+            <div className='flex flex-col gap-15 items-center w-fit max-w-full px-10 md:px-0'>
+                <div className='w-full flex flex-col gap-3 md:gap-0 items-center justify-center md:flex-row md:px-0'>
+                    <h3 className='text-3xl font-sans text-center'>{t('Nos produits saisonniers')}</h3>
+
                 </div>
 
                 <ProductsCardsList products={seasonProducts} />
+                <Button className='w-40 underline bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover transition-all duration-75'>
+                    {t('Tout afficher')}
+                </Button>
             </div>
 
             <AboutSection />
