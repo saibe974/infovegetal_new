@@ -51,7 +51,7 @@ export function SelectLang() {
                 defaultValue={(auth?.user as any)?.locale ?? (locale as string) ?? "en"}
                 items={LANGS}
                 id="locale"
-                className="w-16 border-0 hover:bg-sidebar-accent"
+                className="w-10 border-0 hover:bg-sidebar-accent p-0"
             // onChange={handleChange}
             />
         </div>
