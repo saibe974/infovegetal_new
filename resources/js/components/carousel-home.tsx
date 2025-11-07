@@ -24,16 +24,16 @@ export function CarouselHome() {
     return (
         <Carousel
             plugins={[plugin.current]}
-            className="w-full max-w-[95%] "
+            className="w-full max-w-[95%] z-10"
             // onMouseEnter={plugin.current.stop}
             // onMouseLeave={plugin.current.reset}
         >
-            <CarouselContent>
+            <CarouselContent className="z-10">
                 {Array.from({ length: 3 }).map((_, index) => (
                     <CarouselItem key={index}>
                         <div className="">
                             <Card className="py-0">
-                                <CardContent className="h-160 px-0 aspect-square">
+                                <CardContent className="h-160 px-0 aspect-square z-10">
                                     <img src={images[index].src} alt={images[index].alt} className="object-cover w-full h-full rounded-xl" />
                                 </CardContent>
                             </Card>

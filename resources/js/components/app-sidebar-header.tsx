@@ -10,7 +10,10 @@ import { useRef, useState } from 'react';
 import { SelectWithItems } from './ui/select-with-items';
 import { SelectLang } from './ui/selectLang';
 import AppearanceToggleDropdown from './appearance-dropdown';
-import { ShoppingBasket, ShoppingCart } from 'lucide-react';
+import { ChevronDownIcon, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 
 export function AppSidebarHeader({
@@ -20,6 +23,8 @@ export function AppSidebarHeader({
 }) {
     const { auth, locale } = usePage<SharedData>().props;
     const { t } = useI18n();
+
+    const isMobile = useIsMobile()
 
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -75,52 +80,85 @@ export function AppSidebarHeader({
     // console.log(auth)
 
     return (
-        <header className="flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0">
-            <div className="w-full flex items-center justify-between gap-2">
-                <div className='flex items-center gap-2'>
-                    <SidebarTrigger className="-ml-1" />
-                    <Breadcrumbs breadcrumbs={breadcrumbs} />
-                </div>
+        <header className="z-20 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0 w-full">
+
+            <div className='flex items-center gap-2'>
+                <SidebarTrigger className="-ml-1" />
+                <Breadcrumbs breadcrumbs={breadcrumbs} />
+            </div>
 
 
-                <div className='w-4xl'>
-                    <SearchSoham
-                        value={search}
-                        onChange={handleSearch}
-                        onSubmit={onSelect}
-                        propositions={searchPropositions}
-                        loading={fetching}
-                        count={100}
-                        query={''}
-                    />
-                </div>
-                <div className='flex items-center gap-2'>
+            <div className='hidden md:block md:w-3xl'>
+                <SearchSoham
+                    value={search}
+                    onChange={handleSearch}
+                    onSubmit={onSelect}
+                    propositions={searchPropositions}
+                    loading={fetching}
+                    count={100}
+                    query={''}
+                />
+            </div>
+            <div className=''>
+                <div className="w-full flex items-center justify-between gap-6">
+                    {/* <div className='flex items-center gap-2'> */}
                     {auth.user ? (
+                        // <NavigationMenuItem className=''>
                         <NavUser />
+                        // </NavigationMenuItem>
                     ) : (
-                        <>
-                            <Link
-                                href={login()}
-                                className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
-                            >
-                                {t('Log in')}
-                            </Link>
-                            <Link
-                                href={register()}
-                                className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
-                            >
-                                {t('Register')}
-                            </Link>
-                        </>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className='flex items-center'>
+                                <UserIcon />
+                                <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className='flex flex-col items-start gap-2 p-4'>
+                                <Link
+                                    href={login()}
+                                    className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
+                                >
+                                    {t('Log in')}
+                                </Link>
+                                <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
+                                <Link
+                                    href={register()}
+                                    className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                >
+                                    {t('Register')}
+                                </Link>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
-                    <Link
-                        href={'#'}
-                        className="hover:bg-sidebar-accent inline-block rounded-sm p-2"
-                    >
-                        <ShoppingCart size={19} />
-                    </Link>
-                    <SelectLang />
-                    <AppearanceToggleDropdown />
+                    <div>
+                        <div className={''}>
+                            <Link href="/#"><ShoppingCart size={21} /></Link>
+                        </div>
+                    </div>
+
+                    <div className='md:hidden'>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className='flex items-center'>
+                                <Settings2Icon />
+                                <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
+                                <SelectLang />
+                                <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
+                                <AppearanceToggleDropdown />
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+
+
+                    <div className='hidden md:flex'>
+                        {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
+                        {/* <NavigationMenuContent className=''> */}
+                        <SelectLang />
+                        <AppearanceToggleDropdown />
+                        {/* </NavigationMenuContent> */}
+                    </div>
+
+                    {/* </div> */}
                 </div>
             </div>
         </header>

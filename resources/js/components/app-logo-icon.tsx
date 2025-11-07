@@ -16,12 +16,24 @@ function AppLogoIcon(props: SVGAttributes<SVGElement>) {
 
 function AppLogoIconMini(props: SVGAttributes<SVGElement>) {
     return (
+        // <svg {...props} viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
+        //     {/* <rect x="0" y="0" width="140" height="140" fill="red" /> */}
+        //     <circle cx="57" cy="60" r="50" fill="#9C0060" />
+        //     <circle cx="87" cy="80" r="45" fill="#C6E300" />
+        //     <circle cx="116" cy="95" r="13" className="fill-background dark:fill-gray-900" />
+        // </svg>
+
         <svg {...props} viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
-            {/* <rect x="0" y="0" width="140" height="140" fill="red" /> */}
+            <mask id="cutout">
+                <rect width="100%" height="100%" fill="white" />
+                <circle cx="116" cy="95" r="13" fill="black" />
+            </mask>
             <circle cx="57" cy="60" r="50" fill="#9C0060" />
-            <circle cx="87" cy="80" r="45" fill="#C6E300" />
-            <circle cx="116" cy="95" r="13" className="fill-background dark:fill-gray-900" />
+            <circle cx="87" cy="80" r="45" fill="#C6E300" mask="url(#cutout)" />
         </svg>
+
+
+
     );
 }
 

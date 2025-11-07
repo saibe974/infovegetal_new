@@ -220,6 +220,12 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  --color-main-green: #C6E300;
+  --color-main-purple: #9C0060;
+
+  --color-main-green-hover: #A3C700;
+  --color-main-purple-hover: #830452;
 }
 
 @layer base {
