@@ -37,7 +37,7 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
     const seasonProducts = collection.data.slice(1, 5);
     const popularProducts = collection.data.slice(6, 10);
 
-    console.log(seasonProducts)
+    // console.log(seasonProducts)
 
     return (
         <div className='w-full flex items-center flex-col gap-40'>
