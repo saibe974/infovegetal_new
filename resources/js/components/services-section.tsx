@@ -5,6 +5,7 @@ import AnimatedSVG from "./animatedSVG";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { services } from '../data/services'
 import { SplitText } from "gsap/SplitText";
+import { MousePointer, ChevronDown, MoreHorizontal } from "lucide-react";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(DrawSVGPlugin);
@@ -93,32 +94,55 @@ export default function servicesSection({ active }: { active: boolean }) {
     return (
         <section ref={sectionRef} className="flex flex-col items-center justify-center w-full h-full gap-5 lg:gap-10 px-10 lg:px-10">
             <h3 className='uppercase text-3xl md:text-5xl font-sans'>nos services</h3>
-            <div className="flex flex-col-reverse lg:flex-row items-center w-full justify-around gap-5 lg:gap-0">
-                <div className="flex flex-col md:flex-row lg:flex-col lg:gap-10 xl:gap-0  items-center xl:w-1/4">
+            <div className="flex flex-col-reverse md:flex-col items-center w-full justify-around gap-5 lg:gap-5">
+                <div className="flex flex-col lg:flex-row items-center">
                     {services.map((item) => (
                         <button
                             key={item.id}
                             data-id={item.id}
                             onClick={() => setActiveId(item.id)}
-                            className={`w-fit lg:w-full cursor-pointer about-btn flex flex-col items-start p-4 transition-all duration-300 h-[18rem] justify-around ${activeId === item.id
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setActiveId(item.id);
+                                }
+                            }}
+                            aria-expanded={activeId === item.id}
+                            className={`overflow-hidden border border-black/10 dark:border-accent relative w-full lg:w-full cursor-pointer about-btn flex flex-col items-start p-4 transition-all duration-300 h-[18rem] justify-around ${activeId === item.id
                                 ? " bg-black/10 dark:bg-accent"
                                 : " hover:bg-black/10 dark:hover:bg-accent"
-                                }`}
+                                } focus:outline-none focus:ring-2 focus:ring-ring`}
                         >
-                            <h3 className="about-title-parent font-inter font-normal text-lg sm:text-xl w-full gap-3 flex ">
+                            {/* top-right affordance */}
+                            <div className="absolute top-3 right-3 flex items-center gap-2">
+                                <MoreHorizontal
+                                    aria-hidden="true"
+                                    className={`w-5 h-5 transition-opacity ${activeId === item.id ? "opacity-0" : "opacity-100"}`}
+                                />
+                                <ChevronDown
+                                    className={`w-5 h-5 transition-transform duration-200 ${activeId === item.id ? "rotate-180" : "rotate-0"}`}
+                                    aria-hidden="true"
+                                />
+                            </div>
+
+                            <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex ">
                                 <span className={`about-title w-fit ${activeId === item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
+
                             <p
                                 className="about-text text-left text-md lg:text-lg mt-2 overflow-hidden"
                                 style={{ opacity: activeId === item.id ? 1 : 0 }}
-                                 dangerouslySetInnerHTML={{ __html: item.text }}
+                                dangerouslySetInnerHTML={{ __html: item.text }}
                             />
+                            {/* <span className="sr-only">
+                                {activeId === item.id ? "Réduire" : "Afficher le détail — survol ou clic"}
+                            </span> */}
                         </button>
                     ))}
                 </div>
 
-                <div className="flex items-center justify-center w-11/12 xl:w-1/3 text-main-purple dark:text-main-green">
+                <div className="flex items-center justify-center w-11/12 text-main-purple dark:text-main-green">
                     {<AnimatedSVG svg={activeItem.svg} />}
                 </div>
             </div>

@@ -2,6 +2,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
+import { Link } from "@inertiajs/react";
 
 type Props = {
     limit?: number;
@@ -14,31 +15,45 @@ export function ProductsCardsList({ limit = 4, products }: Props) {
     return (
         <div className="flex gap-10 flex-wrap items-center justify-center max-w-full">
             {products.slice(0, limit).map((product: any) => (
-                <Card key={product.id} className=" h-4xl w-80 flex flex-col p-4 gap-4">
-                    <CardHeader className="p-0">
-                        <img src={product.img_link} alt={`Image de ${product.name}`} />
-                    </CardHeader>
+                <Link
+                    key={product.id}
+                    href={'/products/' + product.id}
+                    className="no-underline group hover:scale-102 transition-all duration-300"
+                    aria-label={`Voir ${product.name}`}
+                >
+                    <Card key={product.id} className=" h-4xl w-80 flex flex-col p-4 gap-4">
+                        <CardHeader className="p-0">
+                            <img src={product.img_link} alt={`Image de ${product.name}`} className="w-full h-70 object-cover rounded" />
+                        </CardHeader>
 
-                    <CardTitle className="text-lg font-semibold">
-                        {product.name.charAt(0).toUpperCase() + String(product.name).slice(1)}
-                    </CardTitle>
+                        <CardTitle className="text-lg font-semibold group-hover:underline underline-offset-3 transition-all duration-300">
+                            {product.name.charAt(0).toUpperCase() + String(product.name).slice(1)}
+                        </CardTitle>
 
-                    <CardContent className="p-0 max-w-40 overflow-ellipsis">
-                        <p className="font-light text-sm text-nowrap overflow-hidden text-ellipsis">{product.description.charAt(0).toUpperCase() + String(product.description).slice(1)}</p>
-                    </CardContent>
+                        <CardContent className="p-0 max-w-40 overflow-ellipsis">
+                            <p className="font-light text-sm text-nowrap overflow-hidden text-ellipsis ">
+                                {product.description.charAt(0).toUpperCase() + String(product.description).slice(1)}
+                            </p>
+                        </CardContent>
 
-                    <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
+                        <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
 
-                    <p className="font-bold text-md">{product.price} €</p>
-                    
-                    <CardFooter className="w-full flex justify-end p-0">
-                        <Button
-                            className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-all duration-300"
-                        >
-                            {t('Ajouter au panier')}
-                        </Button>
-                    </CardFooter>
-                </Card>
+                        <p className="font-bold text-md">{product.price} €</p>
+
+                        <CardFooter className="w-full flex justify-end p-0">
+                            <Button
+                                onClick={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    // TODO: action d'ajout au panier
+                                }}
+                                className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-all duration-300"
+                            >
+                                {t('Ajouter au panier')}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </Link>
             ))}
         </div>
     );
