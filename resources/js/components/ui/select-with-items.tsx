@@ -18,6 +18,7 @@ type Props = {
     placeholder?: string;
     name: string;
     defaultValue?: string;
+    onValueChange?: (value: string) => void;
 } & ComponentProps<typeof SelectTrigger>;
 
 export function SelectWithItems({
@@ -25,6 +26,7 @@ export function SelectWithItems({
     placeholder,
     name,
     defaultValue,
+    onValueChange,
     ...props
 }: Props) {
     const [value, setValue] = useState<string | undefined>(defaultValue);
@@ -34,10 +36,17 @@ export function SelectWithItems({
         setValue(defaultValue);
     }, [defaultValue]);
 
+    const handleValueChange = (newValue: string) => {
+        setValue(newValue);
+        if (onValueChange) {
+            onValueChange(newValue);
+        }
+    };
+
     return (
         <>
             <input type="hidden" name={name} value={value ?? ''} />
-            <Select value={value} onValueChange={setValue}>
+            <Select value={value} onValueChange={handleValueChange}>
                 <SelectTrigger {...props}>
                     <SelectValue placeholder={placeholder} />
                 </SelectTrigger>

@@ -15,14 +15,35 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-    $allowed = ['en', 'fr', 'es', 'nl', 'de', 'it'];
+        $allowed = ['en', 'fr', 'es', 'nl', 'de', 'it'];
 
         $locale = null;
+        
+        // 1. Priorité à l'utilisateur connecté
         if ($request->user() && $request->user()->locale) {
             $locale = $request->user()->locale;
         }
+        
+        // 2. Si pas d'utilisateur connecté, vérifier le cookie
+        if (!$locale && $request->hasCookie('locale')) {
+            $locale = $request->cookie('locale');
+        }
+        
+        // 3. Sinon, vérifier la session
+        if (!$locale && $request->session()->has('locale')) {
+            $locale = $request->session()->get('locale');
+        }
+        
+        // 4. Sinon, utiliser la locale du navigateur
+        if (!$locale) {
+            $browserLocale = $request->getPreferredLanguage($allowed);
+            if ($browserLocale) {
+                $locale = $browserLocale;
+            }
+        }
 
-        if (! in_array($locale, $allowed, true)) {
+        // 5. Vérifier que la locale est autorisée, sinon utiliser celle par défaut
+        if (!in_array($locale, $allowed, true)) {
             $locale = config('app.locale');
         }
 

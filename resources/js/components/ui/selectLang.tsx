@@ -18,8 +18,14 @@ export function SelectLang() {
 
     const [locale, setLocale] = useState<string>(() => {
         if (typeof window === "undefined") return (serverLocale as string) ?? "en";
+        // Si l'utilisateur est connecté, utiliser sa préférence
+        if (auth?.user && (auth.user as any).locale) {
+            return (auth.user as any).locale;
+        }
+        // Sinon vérifier le localStorage
         const stored = localStorage.getItem("locale");
         if (stored) return stored;
+        // Ou utiliser la locale du serveur ou du système
         const sys = (navigator.language || (navigator as any).userLanguage || "en").split("-")[0];
         return (serverLocale as string) ?? sys ?? "en";
     });
@@ -28,31 +34,52 @@ export function SelectLang() {
         try {
             document.documentElement.lang = locale;
         } catch (e) { }
-        // sauvegarde côté client
-        if (typeof window !== "undefined") {
+        // Sauvegarde côté client pour les utilisateurs non connectés
+        if (typeof window !== "undefined" && !auth?.user) {
             localStorage.setItem("locale", locale);
         }
-    }, [locale, serverLocale]);
+    }, [locale, auth?.user]);
 
-    const handleChange = (e: any) => {
-        const v = e.target.value;
-        setLocale(v);
-        document.cookie = `locale=${v}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
-        router.reload();
+    const handleChange = (newLocale: string) => {
+        setLocale(newLocale);
+
+        // Sauvegarder dans un cookie pour la session
+        document.cookie = `locale=${newLocale}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+
+        // Sauvegarder dans localStorage pour les utilisateurs non connectés
+        if (typeof window !== "undefined" && !auth?.user) {
+            localStorage.setItem("locale", newLocale);
+        }
+
+        // Si l'utilisateur est connecté, sauvegarder dans la base de données
+        if (auth?.user) {
+            router.put(
+                '/user/locale',
+                { locale: newLocale },
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: () => {
+                        // Recharger la page pour appliquer la nouvelle langue
+                        router.reload({ only: ['locale'] });
+                    },
+                }
+            );
+        } else {
+            // Pour les utilisateurs non connectés, simplement recharger
+            router.reload();
+        }
     };
-
-
-    const current = LANGS.find((l) => l.value === locale) ?? LANGS[0];
 
     return (
         <div>
             <SelectWithItems
                 name="locale"
-                defaultValue={(auth?.user as any)?.locale ?? (locale as string) ?? "en"}
+                defaultValue={locale}
                 items={LANGS}
                 id="locale"
                 className="w-10 border-0 hover:bg-sidebar-accent p-0"
-            // onChange={handleChange}
+                onValueChange={handleChange}
             />
         </div>
     );

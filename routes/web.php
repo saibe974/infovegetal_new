@@ -48,6 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
+    // Route pour mettre à jour les préférences de langue de l'utilisateur
+    Route::put('/user/locale', [\App\Http\Controllers\UserLocaleController::class, 'update'])->name('user.locale.update');
+
     // Routes admin des produits - nécessite le rôle admin
     Route::middleware(['role:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
         Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('index');
