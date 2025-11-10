@@ -17,13 +17,6 @@ import { edit } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
 import { isAdmin } from '@/lib/roles';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: edit().url,
-    },
-];
-
 export default function Profile({
     mustVerifyEmail,
     status,
@@ -33,6 +26,13 @@ export default function Profile({
 }) {
     const { auth, locale } = usePage<SharedData>().props as SharedData & { locale?: string };
     const { t } = useI18n();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: t('Profile settings'),
+            href: edit().url,
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -65,7 +65,7 @@ export default function Profile({
                                         name="name"
                                         required
                                         autoComplete="name"
-                                        placeholder="Full name"
+                                        placeholder={t('Full name')}
                                     />
 
                                     <InputError
@@ -85,7 +85,7 @@ export default function Profile({
                                         name="email"
                                         required
                                         autoComplete="username"
-                                        placeholder="Email address"
+                                        placeholder={t('Email address')}
                                     />
 
                                     <InputError

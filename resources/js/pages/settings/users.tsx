@@ -31,17 +31,17 @@ interface UsersPageProps {
     roles: Array<{ id: number; name: string }>;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Users management',
-        href: '/settings/users',
-    },
-];
-
 export default function Users({ users, roles }: UsersPageProps) {
     const { auth } = usePage<SharedData>().props;
     const { t } = useI18n();
     const [updating, setUpdating] = useState<number | null>(null);
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: t('Users management'),
+            href: '/settings/users',
+        },
+    ];
 
     // Vérifier que l'utilisateur est admin
     if (!isAdmin(auth.user)) {
