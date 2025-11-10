@@ -94,30 +94,6 @@ export default function Profile({
                                     />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="locale">{t('Language')}</Label>
-
-                                    <SelectWithItems
-                                        name="locale"
-                                        defaultValue={(auth.user as any).locale ?? (locale as string) ?? 'en'}
-                                        items={[
-                                            { label: 'English', value: 'en' },
-                                            { label: 'Français', value: 'fr' },
-                                            { label: 'Español', value: 'es' },
-                                            { label: 'Deutsch', value: 'de' },
-                                            { label: 'Italiano', value: 'it' },
-                                            { label: 'Nederlands', value: 'nl' },
-                                        ]}
-                                        placeholder={t('Choose language')}
-                                        id="locale"
-                                    />
-
-                                    <InputError
-                                        className="mt-2"
-                                        message={(errors as any).locale}
-                                    />
-                                </div>
-
                                 {/* Section Rôles */}
                                 {auth.user?.roles && auth.user.roles.length > 0 && (
                                     <div className="grid gap-2">

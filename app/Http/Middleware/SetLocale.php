@@ -19,22 +19,17 @@ class SetLocale
 
         $locale = null;
         
-        // 1. Priorité à l'utilisateur connecté
-        if ($request->user() && $request->user()->locale) {
-            $locale = $request->user()->locale;
-        }
-        
-        // 2. Si pas d'utilisateur connecté, vérifier le cookie
-        if (!$locale && $request->hasCookie('locale')) {
+        // 1. Vérifier le cookie
+        if ($request->hasCookie('locale')) {
             $locale = $request->cookie('locale');
         }
         
-        // 3. Sinon, vérifier la session
+        // 2. Sinon, vérifier la session
         if (!$locale && $request->session()->has('locale')) {
             $locale = $request->session()->get('locale');
         }
         
-        // 4. Sinon, utiliser la locale du navigateur
+        // 3. Sinon, utiliser la locale du navigateur
         if (!$locale) {
             $browserLocale = $request->getPreferredLanguage($allowed);
             if ($browserLocale) {
@@ -42,7 +37,7 @@ class SetLocale
             }
         }
 
-        // 5. Vérifier que la locale est autorisée, sinon utiliser celle par défaut
+        // 4. Vérifier que la locale est autorisée, sinon utiliser celle par défaut
         if (!in_array($locale, $allowed, true)) {
             $locale = config('app.locale');
         }

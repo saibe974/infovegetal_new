@@ -14,15 +14,11 @@ const LANGS: { value: string; label: string; img: any }[] = [
 ];
 
 export function SelectLang() {
-    const { auth, locale: serverLocale } = usePage<SharedData>().props;
+    const { locale: serverLocale } = usePage<SharedData>().props;
 
     const [locale, setLocale] = useState<string>(() => {
         if (typeof window === "undefined") return (serverLocale as string) ?? "en";
-        // Si l'utilisateur est connecté, utiliser sa préférence
-        if (auth?.user && (auth.user as any).locale) {
-            return (auth.user as any).locale;
-        }
-        // Sinon vérifier le localStorage
+        // Vérifier le localStorage
         const stored = localStorage.getItem("locale");
         if (stored) return stored;
         // Ou utiliser la locale du serveur ou du système
@@ -34,11 +30,11 @@ export function SelectLang() {
         try {
             document.documentElement.lang = locale;
         } catch (e) { }
-        // Sauvegarde côté client pour les utilisateurs non connectés
-        if (typeof window !== "undefined" && !auth?.user) {
+        // Sauvegarde côté client
+        if (typeof window !== "undefined") {
             localStorage.setItem("locale", locale);
         }
-    }, [locale, auth?.user]);
+    }, [locale]);
 
     const handleChange = (newLocale: string) => {
         setLocale(newLocale);
@@ -46,29 +42,13 @@ export function SelectLang() {
         // Sauvegarder dans un cookie pour la session
         document.cookie = `locale=${newLocale}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
-        // Sauvegarder dans localStorage pour les utilisateurs non connectés
-        if (typeof window !== "undefined" && !auth?.user) {
+        // Sauvegarder dans localStorage
+        if (typeof window !== "undefined") {
             localStorage.setItem("locale", newLocale);
         }
 
-        // Si l'utilisateur est connecté, sauvegarder dans la base de données
-        if (auth?.user) {
-            router.put(
-                '/user/locale',
-                { locale: newLocale },
-                {
-                    preserveScroll: true,
-                    preserveState: true,
-                    onSuccess: () => {
-                        // Recharger la page pour appliquer la nouvelle langue
-                        router.reload({ only: ['locale'] });
-                    },
-                }
-            );
-        } else {
-            // Pour les utilisateurs non connectés, simplement recharger
-            router.reload();
-        }
+        // Recharger la page pour appliquer la nouvelle langue
+        router.reload();
     };
 
     return (
