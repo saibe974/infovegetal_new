@@ -1,6 +1,7 @@
 import * as React from "react"
 import Autoplay from "embla-carousel-autoplay"
 import { Link } from "@inertiajs/react"
+import { useI18n } from '@/lib/i18n';
 
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -20,13 +21,14 @@ const images = [
 ]
 
 export function CarouselHome() {
+    const { t } = useI18n();
     const plugin = React.useRef(
         Autoplay({ delay: 10000, stopOnInteraction: false })
     )
 
     const overlays = [
         {
-            title: "Une grande variété de produits",
+            title: t("$carrousel_01"),
             subtitle: "+100 000 produits",
             button: [
                 { label: "Voir le catalogue", href: "/products", primary: true },
@@ -84,7 +86,7 @@ export function CarouselHome() {
                                                         >
                                                             <Button className="bg-main-green text-black hover:bg-main-green-hover hover:scale-105 transition-all duration-300">
                                                                 {overlays[index].button[0].label}
-                                                                <ChevronRight className="size-4"/>
+                                                                <ChevronRight className="size-4" />
                                                             </Button>
 
                                                         </Link>
