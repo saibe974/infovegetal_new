@@ -115,7 +115,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                 cancelUrl: '/admin/products/import/cancel',
                                 progressUrl: (id) => `/admin/products/import/progress/${id}`,
                                 reportUrl: (id) => `/admin/products/import/report/${id}`,
-                                successRedirectUrl: products.admin.index().url,
+                                successRedirectUrl: products.index().url,
                                 buttonLabel: 'Importer'
                             }} />
                             <DownloadCsvButton />
