@@ -56,5 +56,22 @@
     "Please verify your email address by clicking on the link we just emailed to you.": "Bitte verifiziere deine E-Mail-Adresse, indem du auf den Link klickst, den wir dir soeben gesendet haben.",
     "Email verification": "E-Mail-Verifizierung",
     "Resend verification email": "Verifizierungs-E-Mail erneut senden",
-    "Log out": "Abmelden"
+    "Log out": "Abmelden",
+    "Home": "Startseite",
+    "Roles": "Rollen",
+    "Your current roles in the system": "Deine aktuellen Rollen im System",
+    "Permissions": "Berechtigungen",
+    "Your permissions as administrator": "Deine Berechtigungen als Administrator",
+    "Users management": "Benutzerverwaltung",
+    "Manage user roles and permissions": "Benutzerrollen und Berechtigungen verwalten",
+    "Access denied": "Zugriff verweigert",
+    "You do not have permission to access this page": "Du hast keine Berechtigung, auf diese Seite zuzugreifen",
+    "All users": "Alle Benutzer",
+    "View and modify user roles": "Benutzerrollen anzeigen und ändern",
+    "Current roles": "Aktuelle Rollen",
+    "Change role": "Rolle ändern",
+    "Joined": "Beigetreten am",
+    "No role": "Keine Rolle",
+    "Select role": "Rolle auswählen",
+    "Cannot modify your own role": "Du kannst deine eigene Rolle nicht ändern"
 }

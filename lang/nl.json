@@ -56,5 +56,22 @@
     "Please verify your email address by clicking on the link we just emailed to you.": "Verifieer je e-mailadres door op de link te klikken die we je zojuist hebben gemaild.",
     "Email verification": "E-mailverificatie",
     "Resend verification email": "Verificatie-e-mail opnieuw verzenden",
-    "Log out": "Uitloggen"
+    "Log out": "Uitloggen",
+    "Home": "Home",
+    "Roles": "Rollen",
+    "Your current roles in the system": "Je huidige rollen in het systeem",
+    "Permissions": "Rechten",
+    "Your permissions as administrator": "Je rechten als beheerder",
+    "Users management": "Gebruikersbeheer",
+    "Manage user roles and permissions": "Beheer gebruikersrollen en rechten",
+    "Access denied": "Toegang geweigerd",
+    "You do not have permission to access this page": "Je hebt geen toestemming om deze pagina te bekijken",
+    "All users": "Alle gebruikers",
+    "View and modify user roles": "Bekijk en wijzig gebruikersrollen",
+    "Current roles": "Huidige rollen",
+    "Change role": "Rol wijzigen",
+    "Joined": "Lid sinds",
+    "No role": "Geen rol",
+    "Select role": "Selecteer rol",
+    "Cannot modify your own role": "Je kunt je eigen rol niet wijzigen"
 }

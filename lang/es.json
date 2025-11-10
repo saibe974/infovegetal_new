@@ -56,5 +56,22 @@
     "Please verify your email address by clicking on the link we just emailed to you.": "Verifica tu dirección de correo haciendo clic en el enlace que te acabamos de enviar.",
     "Email verification": "Verificación de correo",
     "Resend verification email": "Reenviar correo de verificación",
-    "Log out": "Cerrar sesión"
+    "Log out": "Cerrar sesión",
+    "Home": "Inicio",
+    "Roles": "Roles",
+    "Your current roles in the system": "Tus roles actuales en el sistema",
+    "Permissions": "Permisos",
+    "Your permissions as administrator": "Tus permisos como administrador",
+    "Users management": "Gestión de usuarios",
+    "Manage user roles and permissions": "Gestionar roles y permisos de usuarios",
+    "Access denied": "Acceso denegado",
+    "You do not have permission to access this page": "No tienes permiso para acceder a esta página",
+    "All users": "Todos los usuarios",
+    "View and modify user roles": "Ver y modificar roles de usuarios",
+    "Current roles": "Roles actuales",
+    "Change role": "Cambiar rol",
+    "Joined": "Unido el",
+    "No role": "Sin rol",
+    "Select role": "Seleccionar rol",
+    "Cannot modify your own role": "No puedes modificar tu propio rol"
 }

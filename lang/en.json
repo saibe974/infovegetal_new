@@ -56,5 +56,22 @@
     "Please verify your email address by clicking on the link we just emailed to you.": "Please verify your email address by clicking on the link we just emailed to you.",
     "Email verification": "Email verification",
     "Resend verification email": "Resend verification email",
-    "Log out": "Log out"
+    "Log out": "Log out",
+    "Home": "Home",
+    "Roles": "Roles",
+    "Your current roles in the system": "Your current roles in the system",
+    "Permissions": "Permissions",
+    "Your permissions as administrator": "Your permissions as administrator",
+    "Users management": "Users management",
+    "Manage user roles and permissions": "Manage user roles and permissions",
+    "Access denied": "Access denied",
+    "You do not have permission to access this page": "You do not have permission to access this page",
+    "All users": "All users",
+    "View and modify user roles": "View and modify user roles",
+    "Current roles": "Current roles",
+    "Change role": "Change role",
+    "Joined": "Joined",
+    "No role": "No role",
+    "Select role": "Select role",
+    "Cannot modify your own role": "Cannot modify your own role"
 }
