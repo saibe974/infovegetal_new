@@ -1,5 +1,6 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
+import productCategories from '@/routes/products-categories';
 import { useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
@@ -14,7 +15,7 @@ import SearchSoham from '@/components/ui/searchSoham';
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Products',
-        href: products.admin.index().url,
+        href: products.index().url,
     },
 ];
 
@@ -115,19 +116,19 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    <Link href={products.admin.edit(item.id)} className="hover:underline">
+                                    <Link href={productCategories.edit(item.id)} className="hover:underline">
                                         {item.name}
                                     </Link>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
                                         <Button asChild size="icon" variant="outline">
-                                            <Link href={products.admin.edit(item.id)}>
+                                            <Link href={productCategories.edit(item.id)}>
                                                 <EditIcon size={16} />
                                             </Link>
                                         </Button>
                                         <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={products.admin.destroy(item.id)}
+                                            <Link href={productCategories.destroy(item.id)}
                                                 onBefore={() => confirm('Are you sure?')}>
                                                 <TrashIcon size={16} />
                                             </Link>

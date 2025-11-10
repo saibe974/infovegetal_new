@@ -32,7 +32,7 @@ export function NavUser() {
                             className="group text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent"
                             data-test="sidebar-menu-button"
                         >
-                            <UserInfo user={auth.user} />
+                            <UserInfo user={auth.user!} />
                             <ChevronDown className="ml-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
@@ -44,10 +44,10 @@ export function NavUser() {
                                 ? 'bottom'
                                 // : state === 'collapsed'
                                 //   ? 'left'
-                                  : 'bottom'
+                                : 'bottom'
                         }
                     >
-                        <UserMenuContent user={auth.user} />
+                        <UserMenuContent user={auth.user!} />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
