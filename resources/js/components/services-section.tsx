@@ -142,7 +142,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                     ))}
                 </div>
 
-                <div className="flex items-center justify-center w-11/12 text-main-purple dark:text-main-green">
+                <div className="flex items-center justify-center w-1/4 text-main-purple dark:text-main-green">
                     {<AnimatedSVG svg={activeItem.svg} />}
                 </div>
             </div>

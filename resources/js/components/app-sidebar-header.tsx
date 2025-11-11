@@ -10,7 +10,7 @@ import { useRef, useState } from 'react';
 import { SelectWithItems } from './ui/select-with-items';
 import { SelectLang } from './ui/selectLang';
 import AppearanceToggleDropdown from './appearance-dropdown';
-import { ChevronDownIcon, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import { ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -140,11 +140,11 @@ export function AppSidebarHeader({
                                 </div>
                             </div>
 
-                            <div className='md:hidden'>
+                            <div className='lg:hidden'>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger className='flex items-center'>
-                                        <Settings2Icon />
-                                        <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
+                                        <EllipsisVertical />
+                                        {/* <ChevronDownIcon className="size-5 opacity-100 md:hidden" /> */}
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
                                         <SelectLang />
@@ -155,7 +155,7 @@ export function AppSidebarHeader({
                             </div>
 
 
-                            <div className='hidden md:flex'>
+                            <div className='hidden lg:flex'>
                                 {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
                                 {/* <NavigationMenuContent className=''> */}
                                 <SelectLang />

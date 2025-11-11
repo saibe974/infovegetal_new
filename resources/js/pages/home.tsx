@@ -60,7 +60,7 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
                 </div>
 
                 <ProductsCardsList products={seasonProducts} />
-                <Button className='w-40 underline bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover transition-all duration-75'>
+                <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
                     {t('Tout afficher')}
                 </Button>
             </div>
