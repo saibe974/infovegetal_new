@@ -119,9 +119,13 @@ export function CsvUploadButton({ config }: CsvUploadButtonProps) {
         if (!uploaded || !uploaded.id) return;
         setImportId(uploaded.id);
 
-        // 2) Lancer le traitement
-        setProcessing(true);
-        setShowResult(true);
+        // Délai court avant de lancer le traitement pour laisser le temps à l'upload de se terminer visuellement
+        setTimeout(() => {
+            setProcessing(true);
+            setShowResult(true);
+        }, 500);
+
+        // 2) Lancer le traitement serveur
         try {
             const csrf2 = getCsrfToken();
             await fetch(config.processUrl, {

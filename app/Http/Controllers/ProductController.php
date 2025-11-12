@@ -191,10 +191,6 @@ class ProductController extends Controller
      */
     public function importUpload(Request $request)
     {
-        $validated = $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt'],
-        ]);
-
         $file = $request->file('file');
         Storage::makeDirectory('imports');
         $filename = now()->format('Ymd_His') . '_' . Str::random(8) . '.csv';
@@ -209,6 +205,7 @@ class ProductController extends Controller
             'processed' => 0,
             'errors' => 0,
         ], now()->addHour());
+
 
         return response()->json([
             'id' => $id,
@@ -232,20 +229,22 @@ class ProductController extends Controller
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
-        // Lancer le job en file d’attente avec un chemin ABSOLU (important pour le worker)
-        $absolutePath = Storage::path($state['path']);
-        ImportProductsJob::dispatch($id, $absolutePath);
+        $path = $state['path'];
+        $fullPath = Storage::path($path);
+        
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
+        }
 
-        Cache::put("import:$id", [
+        // Dispatch le job en queue
+        \App\Jobs\ImportProductsJob::dispatch($id, $fullPath);
+
+        return response()->json([
             'status' => 'queued',
-            'progress' => 0,
-            'processed' => 0,
-            'total' => 0,
-            'errors' => 0,
-        ], now()->addHour());
-
-        return response()->json(['status' => 'queued']);
+            'message' => 'Import lancé',
+        ]);
     }
+
 
 
     /**
