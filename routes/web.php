@@ -48,6 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
+    // Route d'upload générique (gère POST pour l'envoi, PATCH pour les chunks, DELETE pour revert)
+    Route::match(['post', 'patch', 'delete'], 'upload', \App\Http\Controllers\UploadController::class)->name('upload');
+
     // Routes admin des produits - nécessite le rôle admin
     Route::middleware(['role:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
         Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('index');
@@ -58,7 +61,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{product}', [\App\Http\Controllers\ProductController::class, 'destroy'])->name('destroy');
         
         // CSV import/export endpoints
-        Route::post('/import/upload', [\App\Http\Controllers\ProductController::class, 'importUpload'])->name('import.upload');
         Route::post('/import/process', [\App\Http\Controllers\ProductController::class, 'importProcess'])->name('import.process');
         Route::post('/import/cancel', [\App\Http\Controllers\ProductController::class, 'importCancel'])->name('import.cancel');
         Route::get('/import/progress/{id}', [\App\Http\Controllers\ProductController::class, 'importProgress'])->name('import.progress');

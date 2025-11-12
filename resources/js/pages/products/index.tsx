@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { UploadIcon, EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
-import { CsvUploadButton } from '@/components/csv-upload-button';
+import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, hasPermission } from '@/lib/roles';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -106,17 +106,12 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
-                            <CsvUploadButton config={{
-                                type: 'products',
-                                title: 'Import CSV',
-                                description: 'Importez un fichier CSV pour créer/mettre à jour vos produits (~100/s)',
-                                uploadUrl: '/admin/products/import/upload',
-                                processUrl: '/admin/products/import/process',
-                                cancelUrl: '/admin/products/import/cancel',
-                                progressUrl: (id) => `/admin/products/import/progress/${id}`,
-                                reportUrl: (id) => `/admin/products/import/report/${id}`,
+                            <CsvUploadFilePond config={{
+                                title: 'Upload CSV',
+                                description: 'Uploadez un fichier CSV',
+                                uploadUrl: '/upload',
                                 successRedirectUrl: products.index().url,
-                                buttonLabel: 'Importer'
+                                buttonLabel: ''
                             }} />
                             <DownloadCsvButton />
                         </div>
@@ -153,7 +148,8 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                     >
                                         {item.name}
                                     </Link>
-                                </TableCell>                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
+                                </TableCell>
+                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
                                 <TableCell>
                                     <div className="space-y-2">
                                         <div>{item.description}</div>
