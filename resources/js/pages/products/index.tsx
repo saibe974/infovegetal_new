@@ -136,7 +136,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                 wrapperClassName="relative z-20"
             >
                 <div className="flex items-center py-2 relative w-full">
-                    <div className="flex gap-2 ml-5">
+                    <div className="flex gap-2 mr-2">
                         <button
                             type="button"
                             aria-pressed={viewMode === 'table'}

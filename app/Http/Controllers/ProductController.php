@@ -54,7 +54,7 @@ class ProductController extends Controller
        return Inertia::render('products/index', [
             'q' => $search,
             'collection' => Inertia::scroll(fn() => ProductResource::collection(
-                $query->paginate(10)
+                $query->paginate(12)
             )),
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
