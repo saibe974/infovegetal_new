@@ -10,15 +10,11 @@ Application Laravel 12 + Inertia + React/TypeScript + Vite.
 
 Prérequis: PHP >= 8.2, Composer, Node.js >= 18, une base de données configurée dans `.env`.
 
-0) Cloner le dépôt et entrer dans le dossier
-
-```cmd
-git clone https://github.com/saibe974/infovegetal_new.git
+0) Cloner le dépôt et configurer .env
+```env
+APP_NAME=Infovegetal
 ```
-
-```cmd
-cd infovegetal_new
-```
+...
 
 1) Dépendances et clé d’application
 
@@ -27,60 +23,41 @@ composer install
 ```
 
 ```cmd
-copy .env.example .env
-```
-
-```cmd
 php artisan key:generate
 ```
 
-2) Configurer `.env` (DB, MAIL, etc.). Pour l’import CSV, activez une file:
-
-```env
-QUEUE_CONNECTION=database
-```
-
-3) Migrations et (si queue database) table de file
-
-```cmd
-php artisan queue:table
-```
+2) Migrations et seeders
 
 ```cmd
 php artisan migrate
 ```
 
-4) Frontend
+```cmd
+php artisan db:seed
+```
+
+3) Frontend
+
+```cmd
+php artisan wayfinder:generate --with-form
+```
 
 ```cmd
 npm install
+```
+
+5) Lancer l’application
+
+```cmd
+php artisan serve
 ```
 
 ```cmd
 npm run dev
 ```
 
-5) Lancer l’application et la file
-
+Commandes utiles :
+- pour lier le storage :
 ```cmd
-php artisan serve
-```
-
-Pour les import assurez-vous que le worker de queue tourne.
-```cmd
-php artisan queue:work
-```
-
-
-
-Build de prod:
-
-```cmd
-npm run build
-```
-
-Tests (optionnel):
-
-```cmd
-php artisan test
+php artisan storage:link
 ```

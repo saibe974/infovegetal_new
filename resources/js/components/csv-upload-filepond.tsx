@@ -68,7 +68,7 @@ export function CsvUploadFilePond({ config }: CsvUploadFilePondProps) {
 
         try {
             const json = JSON.parse(rawResponse);
-            console.log('Upload response:', json);
+            // console.log('Upload response:', json);
 
             if (json.id || json.file) {
                 setUploadComplete(true);
@@ -140,7 +140,7 @@ export function CsvUploadFilePond({ config }: CsvUploadFilePondProps) {
                             }}
                             name="file"
                             labelIdle='Glissez-déposez votre fichier ou <span class="filepond--label-action">Parcourir</span>'
-                            acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
+                            // acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
                             credits={false}
                         />
                     ) : (

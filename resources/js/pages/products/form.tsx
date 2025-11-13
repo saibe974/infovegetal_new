@@ -52,7 +52,7 @@ export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
                         <div className="flex items-center gap-2">
                             <Link href="#"
                                 onClick={(e) => { e.preventDefault(); window.history.back(); }}>
-                                <ArrowLeftCircle size={16} />
+                                <ArrowLeftCircle />
                             </Link>
                             <h2>
                                 Editer un produit

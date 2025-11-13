@@ -4,7 +4,7 @@ import { SharedData, type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import { NavUser } from './nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { dashboard, login, register } from '@/routes';
+import { dashboard, home, login, register } from '@/routes';
 import SearchSoham from './ui/searchSoham';
 import { useRef, useState } from 'react';
 import { SelectWithItems } from './ui/select-with-items';
@@ -33,6 +33,8 @@ export function AppSidebarHeader({
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
+
+    const isHomePage = page.url === home.definition.url;
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -92,18 +94,20 @@ export function AppSidebarHeader({
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>
 
+                    {isHomePage && (
+                        <div className='hidden md:block md:w-3xl'>
+                            <SearchSoham
+                                value={search}
+                                onChange={handleSearch}
+                                onSubmit={onSelect}
+                                propositions={searchPropositions}
+                                loading={fetching}
+                                count={100}
+                                query={''}
+                            />
+                        </div>
+                    )}
 
-                    <div className='hidden md:block md:w-3xl'>
-                        <SearchSoham
-                            value={search}
-                            onChange={handleSearch}
-                            onSubmit={onSelect}
-                            propositions={searchPropositions}
-                            loading={fetching}
-                            count={100}
-                            query={''}
-                        />
-                    </div>
                     <div className=''>
                         <div className="w-full flex items-center justify-between gap-6">
                             {/* <div className='flex items-center gap-2'> */}

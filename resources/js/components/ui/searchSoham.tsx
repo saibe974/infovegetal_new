@@ -8,7 +8,6 @@ interface SearchBarProps {
     value: string;
     onChange: (val: string) => void;
     onSubmit: (val: string, options?: { force?: boolean }) => void;
-    suggestions?: string[];
     propositions?: string[];
     loading?: boolean;
     // Optional total count to display next to the search button
@@ -215,7 +214,7 @@ export default function SearchSoham({
             </div>
 
             {/* propositions */}
-            {open && value.length >= 2 && (
+            {open && value.length >= 3 && (
                 <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
                     {loading ? (
                         <div className="flex justify-center items-center py-2 text-muted-foreground">
