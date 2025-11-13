@@ -17,6 +17,9 @@ import type { BreadcrumbItem, ProductDetailed } from '@/types';
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, LinkIcon, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import Select from 'react-select';
+import SearchSoham from '@/components/ui/searchSoham';
+import { useState } from 'react';
 // import { StepsField } from '@/components/forms/steps-field';
 // import { useState } from 'react';
 
@@ -39,9 +42,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
     // console.log(product);
     // console.log(Routing);
+    
+    const [tag, setTag] = useState('')
+    const [tags, setTags] = useState((product as any).tags.map((t: any) => t.name) || [])
+
+    const writeTags = (t: string) => {
+        setTag(t)
+    }
+
+
     const action = product.id
         ? products.admin.update.form({ product: product.id })
         : products.admin.store.form();
+
+    console.log(product)
 
     return (
         <Form {...action} className="space-y-4">
@@ -78,15 +92,24 @@ export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
                             </FormField>
 
                             <FormField
-                                label="Tags (séparés par des virgules)"
+                                label="Tags"
                                 htmlFor="tags"
                                 error={errors['tags']}>
-                                <Input
+                                {/* <Input
                                     id="tags"
                                     name="tags"
                                     defaultValue={(Array.isArray((product as any).tags) ? (product as any).tags.map((t: any) => t.name).join(', ') : '')}
                                     placeholder="ex: vivace, pot, promotion"
+                                /> */}
+                                <SearchSoham 
+                                    value={tag}
+                                    onChange={writeTags}
+                                    onSubmit={() => {}}
+                                    placeholder=''
+                                    selection={tags}
                                 />
+
+                            
                             </FormField>
                         </main>
                         <Card>
