@@ -1,17 +1,19 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { UploadIcon, EditIcon, TrashIcon } from 'lucide-react';
+import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, hasPermission } from '@/lib/roles';
+import ProductsTable from '@/components/products-table';
+import { ProductsCardsList } from '@/components/products-cards-list';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -40,6 +42,44 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
+
+    const [topOffset, setTopOffset] = useState<number>(0);
+
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+        if (typeof window === 'undefined') return 'table';
+        const stored = localStorage.getItem('products_view_mode');
+        return stored === 'grid' ? 'grid' : 'table';
+    });
+
+    // sauvegarde à chaque changement (safe)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.setItem('products_view_mode', viewMode);
+        } catch (e) {
+            // ignore (ex: stockage bloqué)
+        }
+    }, [viewMode]);
+
+    useEffect(() => {
+        const selector = '.top-sticky'; // classe à ajouter sur le sticky du dessus
+        const getHeight = () => {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+        };
+
+        const update = () => setTopOffset(getHeight());
+        update();
+        window.addEventListener('resize', update);
+        // si ton layout change dynamiquement (menu mobile), tu peux aussi observer le DOM :
+        const obs = new MutationObserver(update);
+        const parent = document.body;
+        obs.observe(parent, { childList: true, subtree: true });
+        return () => {
+            window.removeEventListener('resize', update);
+            obs.disconnect();
+        };
+    }, []);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -85,13 +125,48 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
         console.log("selected:", trimmed);
     };
 
-    // console.log(productsSearch);
+    // console.log(collection);
 
     return (
         <div>
-            {/* @ts-ignore */}
-            <BasicSticky stickyClassName="bg-background" className="relative z-20">
+            <BasicSticky
+                topOffset={topOffset}
+                stickyStyle={{ top: topOffset }}
+                stickyClassName="bg-background"
+                wrapperClassName="relative z-20"
+            >
                 <div className="flex items-center py-2 relative w-full">
+                    <div className="flex gap-2 ml-5">
+                        <button
+                            type="button"
+                            aria-pressed={viewMode === 'table'}
+                            onClick={() => setViewMode('table')}
+                            className={`
+                                p-2 rounded-md transition border ${viewMode === 'table' ?
+                                    'bg-accent' :
+                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
+                            `}
+                            title="Afficher en tableau"
+                        >
+                            <List />
+                        </button>
+
+                        <button
+                            type="button"
+                            aria-pressed={viewMode === 'grid'}
+                            onClick={() => setViewMode('grid')}
+                            className={`
+                                p-2 rounded-md transition border ${viewMode === 'grid' ?
+                                    'bg-accent' :
+                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
+                            `}
+                            title="Afficher en grille"
+                        >
+                            <LayoutGrid />
+                        </button>
+                    </div>
+
+
                     <div className="w-200 left-0 top-1 mr-2" >
                         <SearchSoham
                             value={search}
@@ -103,6 +178,8 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             query={q ?? ''}
                         />
                     </div>
+
+
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
@@ -120,77 +197,11 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             </BasicSticky>
 
             <InfiniteScroll data="collection">
-                <Table >
-                    <TableHeader>
-                        <TableRow>
-                            <SortableTableHead field="id">ID</SortableTableHead>
-                            <TableHead></TableHead>
-                            <SortableTableHead field="name">Name</SortableTableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Price</TableHead>
-                            {(canEdit || canDelete) && <TableHead className='text-end'>Actions</TableHead>}
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {collection.data.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell>{item.id}</TableCell>
-                                <TableCell>
-                                    {item.img_link &&
-                                        <img src={item.img_link} className="w-20 object-cover" />
-                                    }
-                                </TableCell>
-                                <TableCell>
-                                    <Link
-                                        href={canEdit ? products.admin.edit(item.id) : products.show(item.id)}
-                                        className="hover:underline"
-                                    >
-                                        {item.name}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>{item.category ? item.category.name : ''}</TableCell>
-                                <TableCell>
-                                    <div className="space-y-2">
-                                        <div>{item.description}</div>
-                                        {item.tags && item.tags.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5 pt-1">
-                                                {item.tags.map((tag) => (
-                                                    <Badge key={tag.id} variant="secondary">
-                                                        {tag.name}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </TableCell>
-                                <TableCell>{item.price}</TableCell>
-                                {(canEdit || canDelete) && (
-                                    <TableCell>
-                                        <div className="flex gap-2 justify-end">
-                                            {canEdit && (
-                                                <Button asChild size="icon" variant="outline">
-                                                    <Link href={products.admin.edit(item.id)}>
-                                                        <EditIcon size={16} />
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                            {canDelete && (
-                                                <Button asChild size="icon" variant="destructive-outline">
-                                                    <Link href={products.admin.destroy(item.id)}
-                                                        onBefore={() => confirm('Are you sure?')}>
-                                                        <TrashIcon size={16} />
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                )}
-                            </TableRow>
-                        ))}
-                    </TableBody>
-
-                </Table>
+                {viewMode === 'table' ? (
+                    <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
+                ) : (
+                    <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
+                )}
             </InfiniteScroll>
         </div>
 

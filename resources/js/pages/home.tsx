@@ -59,7 +59,7 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
 
                 </div>
 
-                <ProductsCardsList products={seasonProducts} />
+                <ProductsCardsList limit={4} products={seasonProducts} />
                 <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
                     {t('Tout afficher')}
                 </Button>
@@ -69,7 +69,7 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
 
             <div className='flex flex-col gap-10 items-center w-full max-w-full px-10 md:px-0'>
                 <h3 className='text-3xl font-sans'>{t('Meilleures ventes')}</h3>
-                <ProductsCardsList products={popularProducts} />
+                <ProductsCardsList limit={4} products={popularProducts} />
             </div>
             <ServicesSection active={true} />
 
