@@ -2,7 +2,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { type Product } from '@/types';
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { Check, CircleCheckBig, CircleOff, CircleX, EditIcon, TrashIcon, X } from "lucide-react";
 
 type Props = {
@@ -16,6 +16,18 @@ export function ProductsCardsList({ limit = null, products, canEdit = false, can
     const { t } = useI18n();
 
     const productsToShow = limit ? products.slice(0, limit) : products;
+
+    const editProduct = (productId: number) => {
+        router.visit(`/admin/products/${productId}/edit`);
+    }
+
+    const deleteProduct = (productId: number) => {
+        if (confirm(t('Êtes-vous sûr de vouloir supprimer ce produit ?'))) {
+            router.visit(`/admin/products/${productId}/destroy`, {
+                method: 'delete',
+            });
+        }
+    }
 
     return (
         <div className="flex gap-10 flex-wrap items-center justify-center max-w-full">
@@ -67,17 +79,31 @@ export function ProductsCardsList({ limit = null, products, canEdit = false, can
                             <CardFooter className="w-full flex justify-between p-0">
                                 <div className="flex gap-2">
                                     {canEdit && (
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={`/admin/products/${product.id}/edit`}>
-                                                <EditIcon size={16} />
-                                            </Link>
+                                        <Button asChild size="icon" variant="outline"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                editProduct(product.id)
+                                            }}
+                                        >
+                                            {/* <Link href={`/admin/products/${product.id}/edit`}> */}
+                                            <span><EditIcon size={16} /></span>
+
+                                            {/* </Link> */}
                                         </Button>
                                     )}
                                     {canDelete && (
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={`/admin/products/${product.id}/destroy`} onBefore={() => confirm('Are you sure?')}>
-                                                <TrashIcon size={16} />
-                                            </Link>
+                                        <Button asChild size="icon" variant="destructive-outline"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                deleteProduct(product.id)
+                                            }}
+                                        >
+                                            {/* <Link href={`/admin/products/${product.id}/destroy`} onBefore={() => confirm('Are you sure?')}> */}
+                                            <span><TrashIcon size={16} /></span>
+
+                                            {/* </Link> */}
                                         </Button>
                                     )}
                                 </div>
