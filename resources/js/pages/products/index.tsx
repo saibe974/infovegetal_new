@@ -136,18 +136,6 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                 wrapperClassName="relative z-20"
             >
                 <div className="flex items-center py-2 relative w-full">
-                    <div className="w-200 left-0 top-1 mr-2" >
-                        <SearchSoham
-                            value={search}
-                            onChange={handleSearch}
-                            onSubmit={onSelect}
-                            propositions={searchPropositions}
-                            loading={fetching}
-                            count={collection.meta.total}
-                            query={q ?? ''}
-                        />
-                    </div>
-
                     <div className="flex gap-2 ml-5">
                         <button
                             type="button"
@@ -177,6 +165,21 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             <LayoutGrid />
                         </button>
                     </div>
+
+
+                    <div className="w-200 left-0 top-1 mr-2" >
+                        <SearchSoham
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            propositions={searchPropositions}
+                            loading={fetching}
+                            count={collection.meta.total}
+                            query={q ?? ''}
+                        />
+                    </div>
+
+
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
