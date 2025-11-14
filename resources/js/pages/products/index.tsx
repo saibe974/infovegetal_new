@@ -181,7 +181,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 
 
-                    {(isClient(user) || isAdmin(user)) && (
+                    {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
                             <CsvUploadFilePond config={{
                                 title: 'Upload CSV',
