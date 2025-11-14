@@ -99,8 +99,9 @@ export function AppSidebarHeader({
                             onSubmit={onSelect}
                             propositions={searchPropositions}
                             loading={fetching}
-                            count={100}
+                            // count={100}
                             query={''}
+                            search
                         />
                     </div>
                     <div className=''>

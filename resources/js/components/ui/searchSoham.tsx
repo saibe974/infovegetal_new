@@ -15,6 +15,10 @@ interface SearchBarProps {
     count?: number;
     // Current query string (e.g., from URL/props) to display as tags
     query?: string;
+    placeholder?: string,
+    filters?: boolean,
+    search?: boolean,
+    selection?: (string | Option)[]
 }
 
 interface Option {
@@ -30,10 +34,19 @@ export default function SearchSoham({
     loading = false,
     count,
     query,
+    placeholder,
+    filters = false,
+    search = false,
+    selection = undefined
 }: SearchBarProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
-    const [selected, setSelected] = useState<Option[]>([]);
+
+    const toOptions = (arr?: (string | Option)[]) =>
+        (arr ?? []).map((s) => (typeof s === "string" ? { value: s, label: s } : s));
+
+
+    const [selected, setSelected] = useState<Option[]>(toOptions(selection) || []);
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const inputRef = useRef<HTMLInputElement>(null);
     // Resolve list of strings to display as propositions
@@ -140,6 +153,7 @@ export default function SearchSoham({
 
     return (
         <div className="relative w-full">
+
             <div
                 className={cn(
                     "flex items-center flex-wrap gap-1 border rounded-md px-2 py-1 min-h-10 bg-background",
@@ -147,15 +161,15 @@ export default function SearchSoham({
                 )}
                 onClick={() => inputRef.current?.focus()}
             >
-
-                <button
-                    type="button"
-                    onClick={() => alert(t('Filter options coming soon!'))}
-                    className="text-muted-foreground hover:text-foreground px-1"
-                >
-                    <SlidersHorizontalIcon size={16} />
-                </button>
-
+                {filters &&
+                    <button
+                        type="button"
+                        onClick={() => alert(t('Filter options coming soon!'))}
+                        className="text-muted-foreground hover:text-foreground px-1"
+                    >
+                        <SlidersHorizontalIcon size={16} />
+                    </button>
+                }
 
                 {selected.map((opt) => (
                     <span
@@ -182,7 +196,7 @@ export default function SearchSoham({
                         setOpen(true);
                     }}
                     onKeyDown={handleKeyDown}
-                    placeholder={t('Search...')}
+                    placeholder={placeholder ?? t('Search...')}
                     className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 min-w-[100px] text-sm"
                 />
 
@@ -198,13 +212,15 @@ export default function SearchSoham({
                 )}
 
                 {/* Bouton recherche */}
-                <button
-                    type="button"
-                    onClick={handleSearch}
-                    className="text-muted-foreground hover:text-foreground px-1"
-                >
-                    <SearchIcon size={16} />
-                </button>
+                {search &&
+                    <button
+                        type="button"
+                        onClick={handleSearch}
+                        className="text-muted-foreground hover:text-foreground px-1"
+                    >
+                        <SearchIcon size={16} />
+                    </button>
+                }
 
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
