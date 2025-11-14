@@ -54,6 +54,25 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
+        $user = $request->user();
+        $userArray = null;
+
+        if ($user) {
+            $user->loadMissing(['roles', 'permissions']);
+
+            // Fusionner les permissions directes et celles héritées des rôles
+            $allPermissions = $user->getAllPermissions()
+                ->map(fn ($permission) => $permission->only(['id', 'name']))
+                ->unique('id')
+                ->values();
+
+            $userArray = $user->toArray();
+            $userArray['roles'] = $user->roles
+                ->map(fn ($role) => $role->only(['id', 'name']))
+                ->values();
+            $userArray['permissions'] = $allPermissions;
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -61,7 +80,7 @@ class HandleInertiaRequests extends Middleware
             'i18n' => $i18n,
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user() ? $request->user()->load(['roles', 'permissions']) : null,
+                'user' => $user ? $userArray : null,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),

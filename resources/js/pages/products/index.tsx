@@ -11,7 +11,7 @@ import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react'
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
-import { isAdmin, hasPermission } from '@/lib/roles';
+import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
 
@@ -181,7 +181,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
 
 
-                    {canImportExport && (
+                    {(isClient(user) || isAdmin(user)) && (
                         <div className="ml-auto flex items-center gap-2">
                             <CsvUploadFilePond config={{
                                 title: 'Upload CSV',
