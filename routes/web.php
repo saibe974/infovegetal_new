@@ -49,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['role:admin'])->group(function () {
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
     Route::post('users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
+    Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
 });
 
 require __DIR__.'/settings.php';

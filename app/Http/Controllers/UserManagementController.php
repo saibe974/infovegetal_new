@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Auth\Access\Gate;
+use Illuminate\Support\Facades\Gate as FacadesGate;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserManagementController extends Controller
 {
@@ -30,13 +33,13 @@ class UserManagementController extends Controller
             'roles' => $roles,
         ]);
 
-         return Inertia::render('products/index', [
-            'q' => $search,
-            'collection' => Inertia::scroll(fn() => ProductResource::collection(
-                $query->paginate(12)
-            )),
-            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
-        ]);
+        //  return Inertia::render('products/index', [
+        //     'q' => $search,
+        //     'collection' => Inertia::scroll(fn() => ProductResource::collection(
+        //         $query->paginate(12)
+        //     )),
+        //     'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
+        // ]);
     }
 
     /**
@@ -62,5 +65,41 @@ class UserManagementController extends Controller
         $user->syncRoles([$request->role]);
 
         return back()->with('success', 'User role updated successfully');
+    }
+
+     /**
+     * Export users as CSV.
+     */
+    public function export(Request $request)
+    {
+    // FacadesGate::authorize('manage-users');
+        $filename = 'users_export_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () {
+            $handle = fopen('php://output', 'w');
+            // header (séparateur ';')
+            fputcsv($handle, ['id', 'email', 'name', 'roles', 'permissions'], ';');
+
+            User::with(['roles:id,name', 'permissions:id,name'])->chunk(100, function ($users) use ($handle) {
+                foreach ($users as $u) {
+                    fputcsv($handle, [
+                        $u->id,
+                        $u->email,
+                        $u->name,
+                        $u->roles->pluck('name')->implode('|'),
+                        $u->permissions->pluck('name')->implode('|'),
+                    ], ';');
+                }
+            });
+
+            fclose($handle);
+        };
+
+        return new StreamedResponse($callback, 200, $headers);
     }
 }
