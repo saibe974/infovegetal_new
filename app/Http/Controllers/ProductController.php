@@ -26,9 +26,7 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-    //    $product = Product::with('category')->find(1);
-    //    dd($product->category->name);
-    $query = Product::with(['category','tags'])->orderFromRequest($request);
+        $query = Product::with(['category','tags'])->orderFromRequest($request);
         $search = $request->get('q');
 
         if ($search) {
@@ -51,7 +49,7 @@ class ProductController extends Controller
             });
         }
 
-       return Inertia::render('products/index', [
+        return Inertia::render('products/index', [
             'q' => $search,
             'collection' => Inertia::scroll(fn() => ProductResource::collection(
                 $query->paginate(12)
@@ -294,7 +292,7 @@ class ProductController extends Controller
     /**
      * Génère les propositions triées selon la logique de recherche.
      */
-    private function getSearchPropositions($query, ?string $search)
+    public static function getSearchPropositions($query, ?string $search)
     {
         if (empty($search)) {
             return [];
