@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Product;
 use App\Http\Resources\ProductResource;
+use App\Http\Controllers\UserManagementController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 
@@ -42,6 +43,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class)->middleware(['role:admin']);
     
+});
+
+// Gestion des utilisateurs (admin uniquement)
+Route::middleware(['role:admin'])->group(function () {
+    Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
+    Route::post('users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
 });
 
 require __DIR__.'/settings.php';

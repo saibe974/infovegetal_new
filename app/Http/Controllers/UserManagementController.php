@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Settings;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -25,9 +25,17 @@ class UserManagementController extends Controller
         $users = User::with(['roles', 'permissions'])->get();
         $roles = Role::all(['id', 'name']);
 
-        return Inertia::render('settings/users', [
+        return Inertia::render('users/users', [
             'users' => $users,
             'roles' => $roles,
+        ]);
+
+         return Inertia::render('products/index', [
+            'q' => $search,
+            'collection' => Inertia::scroll(fn() => ProductResource::collection(
+                $query->paginate(12)
+            )),
+            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
     }
 

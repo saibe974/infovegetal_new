@@ -124,7 +124,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
 
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>{title}</SidebarGroupLabel>
+            {title && <SidebarGroupLabel>{title}</SidebarGroupLabel>}
             <SidebarMenu>
                 {items.map((item) => {
                     const isActive = page.url.startsWith(

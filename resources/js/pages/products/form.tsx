@@ -106,6 +106,8 @@ export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
                                     onSubmit={() => { }}
                                     placeholder=''
                                     selection={tags}
+                                    filters={false}
+                                    search={false}
                                 />
 
 

@@ -15,69 +15,124 @@ import {
     SidebarGroupLabel
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { NavItemExtended, type NavItem } from '@/types';
+import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, TagIcon } from 'lucide-react';
+import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, TagIcon, User2Icon } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
+import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 
 import { PlusCircle, List as ListIcon } from 'lucide-react';
+import users from '@/routes/users';
 
 // Items are built inside the component to access the t() helper
 
 export function AppSidebar() {
     const page = usePage();
+    console.log(page.props);
     const { t } = useI18n();
+
+    const { auth, locale } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
+    const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
+    const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
+    const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+    const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
+
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
     const isProductsRoute = typeof currentPath === 'string' && currentPath.includes('/products');
     const [productsOpen, setProductsOpen] = useState<boolean>(isProductsRoute);
-    const mainNavItems: NavItemExtended[] = [
-        {
-            title: t('Dashboard'),
-            href: dashboard(),
-            icon: LayoutGrid,
-        },
-        {
-            title: t('Products'),
-            href: products.index(),
-            icon: Flower2Icon,
-            subItems: [
-                {
-                    title: t('All products'),
-                    href: products.index(),
-                    icon: ListIcon,
-                },
-                {
-                    title: t('Categories'),
-                    href: productCategories.index(),
-                    icon: FolderTreeIcon,
-                },
-                {
-                    title: t('Tags'),
-                    href: '#',
-                    icon: TagIcon,
-                },
-            ],
-        },
-    ];
 
-    const footerNavItems: NavItem[] = [
-        {
-            title: t('Repository'),
-            href: 'https://github.com/saibe974/infovegetal_new',
-            icon: Folder,
-        },
-        {
-            title: t('Documentation'),
-            href: 'https://laravel.com/docs/starter-kits#react',
-            icon: BookOpen,
-        },
-    ];
+    let title: string = '';
+    let mainNavItems: NavItemExtended[] = [];
+    let footerNavItems: NavItem[] = [];
+
+    if (isAuthenticated) {
+        // title = t('Administration');
+        mainNavItems = [
+            {
+                title: t('Dashboard'),
+                href: dashboard(),
+                icon: LayoutGrid,
+            },
+            {
+                title: t('Products'),
+                href: products.index(),
+                icon: Flower2Icon,
+                subItems: [
+                    {
+                        title: t('All products'),
+                        href: products.index(),
+                        icon: ListIcon,
+                    },
+                    {
+                        title: t('Categories'),
+                        href: productCategories.index(),
+                        icon: FolderTreeIcon,
+                    },
+                    {
+                        title: t('Tags'),
+                        href: '#',
+                        icon: TagIcon,
+                    },
+                ],
+            },
+        ];
+
+        if (canManageUsers) {
+            mainNavItems.push({
+                title: t('Users'),
+                href: users.index(),
+                icon: User2Icon,
+            });
+        }
+
+        footerNavItems = [
+            {
+                title: t('Contact'),
+                href: '#',
+                icon: MailIcon,
+            },
+            {
+                title: t('Documentation'),
+                href: 'https://laravel.com/docs/starter-kits#react',
+                icon: BookOpen,
+            },
+            {
+                title: t('Repository'),
+                href: 'https://github.com/saibe974/infovegetal_new',
+                icon: Folder,
+            },
+        ];
+    } else {
+        mainNavItems = [
+            {
+                title: t('Products'),
+                href: products.index(),
+                icon: FlowerIcon,
+            },
+            {
+                title: t('Contact'),
+                href: '#',
+                icon: MailIcon,
+            }
+        ];
+
+        footerNavItems = [
+            {
+                title: t('Documentation'),
+                href: '#',
+                icon: BookOpen,
+            },
+        ];
+    }
+
 
     useEffect(() => {
         if (isProductsRoute) setProductsOpen(true);
@@ -99,7 +154,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMainExtended title={t('Administration')} items={mainNavItems} />
+                <NavMainExtended title={title} items={mainNavItems} />
             </SidebarContent>
 
             <SidebarFooter>

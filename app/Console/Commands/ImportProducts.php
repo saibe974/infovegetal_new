@@ -30,7 +30,7 @@ class ImportProducts extends Command
 
     public function handle()
     {
-        $fileOpt = $this->option('file') ?? storage_path('imports/vegetal_produits_tot.csv');
+        $fileOpt = $this->option('file') ?? storage_path('imports/vegetal_produits_50K.csv');
         $dryRun = $this->option('dry-run');
         $batchSize = (int) $this->option('batch');
         $this->createMissingCategories = (bool) $this->option('create-categories');
