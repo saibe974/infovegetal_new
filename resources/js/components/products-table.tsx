@@ -31,7 +31,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <TableRow key={item.id}>
                         <TableCell>{item.id}</TableCell>
                         <TableCell>
-                            {item.img_link && <img src={item.img_link} className="w-20 object-cover" alt={item.name} />}
+                            {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
                         </TableCell>
                         <TableCell>
                             <Link

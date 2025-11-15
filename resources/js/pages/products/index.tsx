@@ -122,7 +122,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             data: { q: trimmed },
         })
 
-        console.log("selected:", trimmed);
+        // console.log("selected:", trimmed);
     };
 
     // console.log(collection);

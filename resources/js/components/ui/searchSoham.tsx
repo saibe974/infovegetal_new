@@ -34,8 +34,8 @@ export default function SearchSoham({
     count,
     query,
     placeholder,
-    filters = false,
-    search = false,
+    filters = true,
+    search = true,
     selection = undefined
 }: SearchBarProps) {
     const { t } = useI18n();
@@ -161,13 +161,16 @@ export default function SearchSoham({
                 onClick={() => inputRef.current?.focus()}
             >
 
-                <button
-                    type="button"
-                    onClick={() => alert(t('Filter options coming soon!'))}
-                    className="text-muted-foreground hover:text-foreground px-1"
-                >
-                    <SlidersHorizontalIcon size={16} />
-                </button>
+
+                {filters && (
+                    <button
+                        type="button"
+                        onClick={() => alert(t('Filter options coming soon!'))}
+                        className="text-muted-foreground hover:text-foreground px-1"
+                    >
+                        <SlidersHorizontalIcon size={16} />
+                    </button>
+                )}
 
                 {selected.map((opt) => (
                     <span
@@ -210,7 +213,7 @@ export default function SearchSoham({
                 )}
 
                 {/* Bouton recherche */}
-                {search &&
+                {search && (
                     <button
                         type="button"
                         onClick={handleSearch}
@@ -218,7 +221,7 @@ export default function SearchSoham({
                     >
                         <SearchIcon size={16} />
                     </button>
-                }
+                )}
 
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
@@ -229,34 +232,36 @@ export default function SearchSoham({
             </div>
 
             {/* propositions */}
-            {open && value.length >= 3 && (
-                <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
-                    {loading ? (
-                        <div className="flex justify-center items-center py-2 text-muted-foreground">
-                            <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
-                        </div>
-                    ) : list.length > 0 ? (
-                        list.map((name: string, i: number) => (
-                            <button
-                                key={i}
-                                onClick={() => handleSelect(name)}
-                                className={cn(
-                                    "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
-                                    highlightedIndex === i
-                                        ? "bg-accent text-accent-foreground"
-                                        : "hover:bg-accent/60 hover:text-accent-foreground"
-                                )}
-                            >
-                                {name}
-                            </button>
-                        ))
-                    ) : (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                            {t('No results.')}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+            {
+                open && value.length >= 3 && (
+                    <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
+                        {loading ? (
+                            <div className="flex justify-center items-center py-2 text-muted-foreground">
+                                <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
+                            </div>
+                        ) : list.length > 0 ? (
+                            list.map((name: string, i: number) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSelect(name)}
+                                    className={cn(
+                                        "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
+                                        highlightedIndex === i
+                                            ? "bg-accent text-accent-foreground"
+                                            : "hover:bg-accent/60 hover:text-accent-foreground"
+                                    )}
+                                >
+                                    {name}
+                                </button>
+                            ))
+                        ) : (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                                {t('No results.')}
+                            </div>
+                        )}
+                    </div>
+                )
+            }
+        </div >
     );
 }

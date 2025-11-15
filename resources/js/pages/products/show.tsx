@@ -21,8 +21,9 @@ export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <Link href={products.index()} className="hover:opacity-70">
-                    <ArrowLeftCircle size={24} />
+                <Link href="#"
+                    onClick={(e) => { e.preventDefault(); window.history.back(); }}>
+                    <ArrowLeftCircle />
                 </Link>
                 <h1 className="text-3xl font-bold">{product.name}</h1>
             </div>

@@ -3,7 +3,8 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { type Product } from '@/types';
 import { Link, router } from "@inertiajs/react";
-import { Check, CircleCheckBig, CircleOff, CircleX, EditIcon, TrashIcon, X } from "lucide-react";
+import { CameraIcon, Check, CircleCheckBig, CircleOff, CircleX, EditIcon, TrashIcon, X } from "lucide-react";
+import storage from "@/routes/storage";
 
 type Props = {
     limit?: number | null; // undefined/null = afficher tout
@@ -59,7 +60,7 @@ export function ProductsCardsList({ limit = null, products, canEdit = false, can
                             </div>
 
                             <CardHeader className="p-0">
-                                <img src={img} alt={name} className="w-full h-70 object-cover rounded" />
+                                <img src={img} alt={name} className="w-full h-70 object-cover rounded bg-background" />
                             </CardHeader>
 
                             <CardTitle className="text-lg font-semibold group-hover:underline underline-offset-3 transition-all duration-300">

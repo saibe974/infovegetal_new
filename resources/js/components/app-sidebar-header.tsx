@@ -124,6 +124,8 @@ export function AppSidebarHeader({
                                 //@ts-ignore
                                 count={collection?.meta.total ?? 0}
                                 query={''}
+                                filters={false}
+                                search={false}
                             />
                         </div>
                     )}
