@@ -160,15 +160,14 @@ export default function SearchSoham({
                 )}
                 onClick={() => inputRef.current?.focus()}
             >
-                {filters &&
-                    <button
-                        type="button"
-                        onClick={() => alert(t('Filter options coming soon!'))}
-                        className="text-muted-foreground hover:text-foreground px-1"
-                    >
-                        <SlidersHorizontalIcon size={16} />
-                    </button>
-                }
+
+                <button
+                    type="button"
+                    onClick={() => alert(t('Filter options coming soon!'))}
+                    className="text-muted-foreground hover:text-foreground px-1"
+                >
+                    <SlidersHorizontalIcon size={16} />
+                </button>
 
                 {selected.map((opt) => (
                     <span

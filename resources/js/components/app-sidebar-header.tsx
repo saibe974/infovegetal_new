@@ -1,10 +1,11 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { SharedData, type BreadcrumbItem as BreadcrumbItemType } from '@/types';
+import { SharedData, type BreadcrumbItem as BreadcrumbItemType, Product, PaginatedCollection } from '@/types';
 import { NavUser } from './nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
 import { dashboard, home, login, register } from '@/routes';
+import products from '@/routes/products';
 import SearchSoham from './ui/searchSoham';
 import { useRef, useState } from 'react';
 import { SelectWithItems } from './ui/select-with-items';
@@ -21,6 +22,8 @@ export function AppSidebarHeader({
     breadcrumbs = [],
 }: {
     breadcrumbs?: BreadcrumbItemType[];
+    collection?: PaginatedCollection<Product>;
+    // q: string | null;
 }) {
     const { auth, locale } = usePage<SharedData>().props;
     const { t } = useI18n();
@@ -28,60 +31,77 @@ export function AppSidebarHeader({
     const isMobile = useIsMobile()
 
     const page = usePage<{ searchPropositions?: string[] }>();
+
+    // console.log(page.props)
     const searchPropositions = page.props.searchPropositions ?? [];
+
+    const collection = page.props.collection ?? { meta: { total: 0 } };
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const timerRef = useRef<number | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
-    const isHomePage = page.url === home.definition.url;
+    const isHomePage = usePage().component === 'home';
 
     const handleSearch = (s: string) => {
         setSearch(s);
-        // @ts-ignore
-        clearTimeout(timerRef.current);
+
+        if (timerRef.current !== null) {
+            window.clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+
         router.cancelAll();
+
         if (s.length < 2) {
+            setFetching(false);
             return;
         }
+
         setFetching(true);
-        timerRef.current = setTimeout(() => {
+
+        timerRef.current = window.setTimeout(() => {
             router.reload({
                 only: ['searchPropositions'],
                 data: { q: s },
                 onSuccess: () => setFetching(false),
-                // preserveState: true,
-            })
-        }, 300)
-    }
+            });
+        }, 300);
+    };
 
-    // @ts-ignore
-    const onSelect = (mysearch: string, options?: { force?: boolean }) => {
+    const onSelect = (mysearch: string) => {
         const trimmed = (mysearch ?? '').trim();
-        // If explicit clear requested, remove q from URL instead of setting q=""
-        if (options?.force && trimmed.length === 0) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('q');
-            router.visit(url.toString(), { replace: true });
-            setSearch('');
-            return;
+
+        if (timerRef.current !== null) {
+            window.clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
 
-        // Otherwise ignore empty submissions
+        router.cancelAll();
+
+        // if (options?.force && trimmed.length === 0) {
+        //     setSearch('');
+        //     setFetching(false);
+        //     router.visit(products.index().url, {
+        //         method: 'get',
+        //         replace: true,
+        //         preserveScroll: false,
+        //     });
+        //     return;
+        // }
+
         if (trimmed.length === 0) {
             return;
         }
 
-        setSearch('');
-        router.reload({
+        setFetching(false);
+        router.visit(products.index().url, {
+            method: 'get',
             data: { q: trimmed },
-        })
+            preserveScroll: false,
+        });
 
-        console.log("selected:", trimmed);
     };
-
-    // console.log(auth)
-
 
     return (
         <>
@@ -101,7 +121,8 @@ export function AppSidebarHeader({
                                 onSubmit={onSelect}
                                 propositions={searchPropositions}
                                 loading={fetching}
-                                count={100}
+                                //@ts-ignore
+                                count={collection?.meta.total ?? 0}
                                 query={''}
                             />
                         </div>
