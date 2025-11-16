@@ -84,9 +84,9 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
         );
     }
 
-    const canEdit = isAdmin(user) || hasPermission(user, 'edit products');
-    const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
-    const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+    const canEdit = isAdmin(user) || hasPermission(user, 'edit users');
+    const canDelete = isAdmin(user) || hasPermission(user, 'delete users');
+    const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users');
 
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -269,7 +269,8 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                 <TableHead>{t('Email')}</TableHead>
                                 <TableHead>{t('Current roles')}</TableHead>
                                 <TableHead>{t('Change role')}</TableHead>
-                                <TableHead className="text-right">{t('Joined')}</TableHead>
+                                <TableHead>{t('Joined')}</TableHead>
+                                {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -335,17 +336,39 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                             </p>
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-right text-sm text-muted-foreground">
+                                    <TableCell className="text-sm text-muted-foreground">
                                         {new Date(
                                             user.created_at
                                         ).toLocaleDateString()}
                                     </TableCell>
+                                    {(canEdit || canDelete) && (
+                                        <TableCell>
+                                            <div className="flex gap-2 justify-end">
+                                                {canEdit && (
+                                                    <Button asChild size="icon" variant="outline">
+                                                        <Link href={`/admin/users/${user.id}/edit`}>
+                                                            <EditIcon size={16} />
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                                {canDelete && (
+                                                    <Button asChild size="icon" variant="destructive-outline">
+                                                        <Link href={`/admin/users/${user.id}/destroy`} onBefore={() => confirm('Are you sure?')}>
+                                                            <TrashIcon size={16} />
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 ) : (
-                    <></>
+                    <Card className="relative h-4xl w-80 flex flex-col p-4 gap-4">
+                        <h2 className='bg-info'>vue card à faire</h2>
+                    </Card>
                     // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
                 )}
                 {/* </InfiniteScroll> */}

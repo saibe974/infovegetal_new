@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\File;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -238,7 +239,13 @@ class ChunkUploadService
 
     private function createFileRecord(string $fileName, string $filePath, int $fileSize): File
     {
-        return Auth::user()->files()->create([
+        $user = Auth::user();
+
+        if (!$user instanceof User) {
+            throw new \RuntimeException('Unable to save file record without an authenticated user.');
+        }
+
+        return $user->files()->create([
             'file_name' => $fileName,
             'file_path' => $filePath,
             'file_size' => $fileSize,
