@@ -15,8 +15,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
-
-use App\Jobs\ImportProductsJob;
+use League\Csv\Reader;
 
 
 class ProductController extends Controller
@@ -80,18 +79,259 @@ class ProductController extends Controller
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
-        // Dispatch le job en queue
-        \App\Jobs\ImportProductsJob::dispatch($id, $fullPath);
+        $relativePath = $path;
 
+        // Configuration initiale du cache
+        $this->updateImportState($id, [
+            'status' => 'processing',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 0,
+            'current' => null,
+            'report' => null,
+            'path' => $relativePath,
+        ]);
+
+        Log::info("Import started for ID: $id");
+
+        // Lancer le traitement en arrière-plan via un processus PHP indépendant
+        $artisanPath = base_path('artisan');
+        $phpBinary = PHP_BINARY;
+        
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            // Windows - utiliser escapeshellarg pour chaque argument
+            $cmd = sprintf(
+                'start /B "" %s %s products:import-process %s %s %s > NUL 2>&1',
+                escapeshellarg($phpBinary),
+                escapeshellarg($artisanPath),
+                escapeshellarg($id),
+                escapeshellarg($fullPath),
+                escapeshellarg($relativePath)
+            );
+            Log::info("Executing command: $cmd");
+            pclose(popen($cmd, 'r'));
+        } else {
+            // Unix/Linux/Mac
+            $cmd = sprintf(
+                '%s %s products:import-process %s %s %s > /dev/null 2>&1 &',
+                escapeshellarg($phpBinary),
+                escapeshellarg($artisanPath),
+                escapeshellarg($id),
+                escapeshellarg($fullPath),
+                escapeshellarg($relativePath)
+            );
+            Log::info("Executing command: $cmd");
+            exec($cmd);
+        }
+
+        // Retourner immédiatement la réponse
         return response()->json([
-            'status' => 'queued',
-            'message' => 'Import lancé',
+            'success' => true,
+            'status' => 'processing',
+            'uploadId' => $id
         ]);
     }
 
+    public function processImport(string $id, string $fullPath, string $relativePath): void
+    {
+        try {
 
+            $normalizeKey = function ($value): string {
+                $string = (string) $value;
+                $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
+                return mb_strtolower(trim($string));
+            };
 
-    /**
+            $total = $this->countValidLines($fullPath, $normalizeKey);
+
+            Log::info("Import counting done: $total valid lines for ID: $id");
+
+            $this->updateImportState($id, [
+                'total' => $total,
+            ]);
+
+            $processed = 0;
+            $errors = 0;
+
+            Storage::makeDirectory('imports/reports');
+            $reportPath = Storage::path('imports/reports/' . $id . '.csv');
+            $reportHandle = fopen($reportPath, 'w');
+            if ($reportHandle) {
+                fputcsv($reportHandle, ['line', 'error', 'sku', 'name', 'raw'], ';');
+            }
+
+            $reader = Reader::createFromPath($fullPath, 'r');
+            $reader->setDelimiter(';');
+            $reader->setHeaderOffset(0);
+            $originalHeaders = $reader->getHeader();
+
+            $keyMap = [];
+            foreach ($originalHeaders as $header) {
+                $keyMap[$header] = $normalizeKey($header);
+            }
+
+            $cancelled = false;
+
+            $updateProgress = function (?array $current) use (&$processed, &$errors, &$total, $id, $relativePath) {
+                if ($total <= 0) {
+                    return;
+                }
+
+                $completed = $processed + $errors;
+
+                if ($completed === 0) {
+                    return;
+                }
+
+                if ($completed % 50 !== 0 && $completed !== $total) {
+                    return;
+                }
+
+                Log::info("Import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
+
+                $this->updateImportState($id, [
+                    'status' => 'processing',
+                    'processed' => $processed,
+                    'total' => $total,
+                    'errors' => $errors,
+                    'progress' => (int) floor(($completed / max(1, $total)) * 100),
+                    'current' => $current,
+                    'path' => $relativePath,
+                ]);
+            };
+
+            foreach ($reader->getRecords() as $row) {
+                if (Cache::get("import:$id:cancel", false)) {
+                    $cancelled = true;
+                    break;
+                }
+
+                $mapped = [];
+
+                try {
+                    $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
+
+                    if (!$this->rowHasContent($mapped)) {
+                        continue;
+                    }
+
+                    $sku = trim((string) ($mapped['sku'] ?? ''));
+                    $name = trim((string) ($mapped['name'] ?? ''));
+                    $currentSnapshot = [
+                        'line' => $processed + $errors + 1,
+                        'sku' => $sku !== '' ? $sku : null,
+                        'name' => $name !== '' ? $name : null,
+                    ];
+
+                    if ($sku === '' || $name === '') {
+                        $errors++;
+                        $this->writeReportLine($reportHandle, $processed + $errors, 'Missing sku or name', $row, $mapped);
+                        $updateProgress($currentSnapshot);
+                        continue;
+                    }
+
+                    $description = isset($mapped['description']) ? trim((string) $mapped['description']) : null;
+                    $imgLink = isset($mapped['img_link']) ? trim((string) $mapped['img_link']) : null;
+                    $price = isset($mapped['price']) && is_numeric($mapped['price']) ? (float) $mapped['price'] : 0;
+                    $active = isset($mapped['active']) ? (int) $mapped['active'] : 1;
+                    $productCategoryId = isset($mapped['product_category_id']) && is_numeric($mapped['product_category_id']) ? (int) $mapped['product_category_id'] : 51;
+
+                    Product::updateOrCreate(
+                        ['sku' => $sku],
+                        [
+                            'name' => $name,
+                            'description' => $description,
+                            'img_link' => $imgLink !== null ? 'https://www.infovegetal.com/files/' . $imgLink : null,
+                            'price' => $price,
+                            'active' => $active,
+                            'product_category_id' => $productCategoryId,
+                        ]
+                    );
+
+                    $processed++;
+                    $currentSnapshot['line'] = $processed + $errors;
+                    $updateProgress($currentSnapshot);
+                } catch (\Throwable $e) {
+                    Log::error('Erreur import: ' . $e->getMessage());
+                    $errors++;
+                    $this->writeReportLine($reportHandle, $processed + $errors, $e->getMessage(), $row, $mapped ?? []);
+                    $currentSnapshot = [
+                        'line' => $processed + $errors,
+                        'sku' => $mapped['sku'] ?? null,
+                        'name' => $mapped['name'] ?? null,
+                    ];
+                    $updateProgress($currentSnapshot);
+                }
+            }
+
+            if (isset($reportHandle) && $reportHandle) {
+                fclose($reportHandle);
+                if ($errors === 0 && file_exists($reportPath)) {
+                    @unlink($reportPath);
+                }
+            }
+
+            try {
+                $archiveDir = Storage::path('imports/archive');
+                if (!is_dir($archiveDir)) {
+                    @mkdir($archiveDir, 0777, true);
+                }
+                $destination = $archiveDir . DIRECTORY_SEPARATOR . basename($fullPath);
+                if (app()->isLocal()) {
+                    @rename($fullPath, $destination);
+                } else {
+                    @unlink($fullPath);
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Import cleanup error (controller): ' . $exception->getMessage());
+            }
+
+            Cache::forget("import:$id:cancel");
+
+            $finalState = [
+                'processed' => $processed,
+                'total' => $total,
+                'errors' => $errors,
+                'report' => ($errors > 0 && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
+                'path' => $relativePath,
+            ];
+
+            if ($cancelled) {
+                $this->updateImportState($id, array_merge($finalState, [
+                    'status' => 'cancelled',
+                    'progress' => (int) floor(((($processed + $errors)) / max(1, $total)) * 100),
+                ]));
+
+                Log::info("Import cancelled for ID $id");
+                return;
+            }
+
+            $this->updateImportState($id, array_merge($finalState, [
+                'status' => 'done',
+                'progress' => 100,
+            ]));
+
+            Log::info("Import completed for ID $id: processed=$processed, errors=$errors");
+
+            $this->updateImportState($id, [
+                'status' => 'done',
+                'processed' => $processed,
+                'total' => $total,
+                'errors' => $errors,
+                'progress' => 100,
+                'report' => ($errors > 0 && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Import process failed: ' . $e->getMessage());
+
+            $this->updateImportState($id, [
+                'status' => 'error',
+                'message' => $e->getMessage(),
+                'path' => $relativePath,
+            ]);
+        }
+    }    /**
      * Renvoie la progression (upload/processing/done) pour l'id d'import.
      */
     public function importProgress(string $id)
@@ -362,6 +602,87 @@ class ProductController extends Controller
         // dd($items);
         // Prend les 7 premiers
         return array_slice($items, 0, 7);
+    }
+    private function updateImportState(string $id, array $payload): void
+    {
+        $existing = Cache::get("import:$id", []);
+        $state = array_merge($existing, $payload);
+        Cache::put("import:$id", $state, now()->addHour());
+    }
+
+    private function countValidLines(string $fullPath, callable $normalizeKey): int
+    {
+        $reader = Reader::createFromPath($fullPath, 'r');
+        $reader->setDelimiter(';');
+        $reader->setHeaderOffset(0);
+        $headers = $reader->getHeader();
+
+        $keyMap = [];
+        foreach ($headers as $header) {
+            $keyMap[$header] = $normalizeKey($header);
+        }
+
+        $total = 0;
+
+        foreach ($reader->getRecords() as $row) {
+            $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
+            if (!$this->rowHasContent($mapped)) {
+                continue;
+            }
+
+            $sku = trim((string) ($mapped['sku'] ?? ''));
+            if ($sku === '') {
+                continue;
+            }
+
+            $total++;
+        }
+
+        return $total;
+    }
+
+    private function mapRow(array $row, array $keyMap, callable $normalizeKey): array
+    {
+        $mapped = [];
+        foreach ($row as $key => $value) {
+            $normalizedKey = $keyMap[$key] ?? $normalizeKey($key);
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                $mapped[$normalizedKey] = $trimmed === '' ? null : $trimmed;
+            } else {
+                $mapped[$normalizedKey] = $value;
+            }
+        }
+
+        return $mapped;
+    }
+
+    private function rowHasContent(array $row): bool
+    {
+        foreach ($row as $value) {
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function writeReportLine($handle, int $line, string $message, array $rawRow, array $mapped): void
+    {
+        if (!$handle) {
+            return;
+        }
+
+        $rawValues = is_array($rawRow) ? implode('|', array_values($rawRow)) : '';
+
+        fputcsv($handle, [
+            $line,
+            $message,
+            $mapped['sku'] ?? null,
+            $mapped['name'] ?? null,
+            $rawValues,
+        ], ';');
     }
 
 
