@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -79,7 +80,6 @@ class ChunkUploadService
                 }
             }
         }
-
         return $totalSize;
     }
 
@@ -129,7 +129,9 @@ class ChunkUploadService
         $this->cleanupTempChunks($tempPath);
 
         // Return success response
-        return $this->createSuccessResponse($file);
+        return $this->createSuccessResponse($file, [
+            'uploadId' => (string) $file->id,
+        ]);
 
         /*
         // Use streaming to combine chunks efficiently without loading everything into memory
@@ -245,11 +247,24 @@ class ChunkUploadService
             throw new \RuntimeException('Unable to save file record without an authenticated user.');
         }
 
-        return $user->files()->create([
+        $file = $user->files()->create([
             'file_name' => $fileName,
             'file_path' => $filePath,
             'file_size' => $fileSize,
         ]);
+
+        Cache::put(
+            "import:{$file->id}",
+            [
+                'status' => 'uploaded',
+                'path' => $file->file_path,
+                'original_name' => $file->file_name,
+                'size' => $file->file_size,
+            ],
+            now()->addHour(),
+        );
+
+        return $file;
     }
 
     private function createSuccessResponse(File $file, array $extra = []): JsonResponse

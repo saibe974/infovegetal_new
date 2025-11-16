@@ -37,6 +37,11 @@ class ImportProductsJob implements ShouldQueue
         $id = $this->importId;
         $path = $this->path;
 
+        $state = Cache::get("import:$id");
+        $relativePath = is_array($state) && isset($state['path']) && is_string($state['path'])
+            ? $state['path']
+            : null;
+
         try {
             // Initialisation du cache
             Cache::put("import:$id", [
@@ -45,6 +50,7 @@ class ImportProductsJob implements ShouldQueue
                 'total' => 0,
                 'errors' => 0,
                 'current' => null,
+                'path' => $relativePath ?? $path,
             ], now()->addHour());
 
             // Lecture via League CSV avec séparateur ';'
@@ -95,6 +101,7 @@ class ImportProductsJob implements ShouldQueue
                 'processed' => 0,
                 'total' => $total,
                 'errors' => 0,
+                'path' => $relativePath ?? $path,
             ], now()->addHour());
 
             // 2) Traitement effectif (nouveau Reader pour repartir du début)
@@ -200,6 +207,7 @@ class ImportProductsJob implements ShouldQueue
                             'sku' => $map['sku'] ?? null,
                             'name' => $map['name'] ?? null,
                         ],
+                        'path' => $relativePath ?? $path,
                     ], now()->addHour());
                 }
             }
@@ -235,6 +243,7 @@ class ImportProductsJob implements ShouldQueue
                     'errors' => $errors,
                     'progress' => (int) floor(($processed / max(1, $total)) * 100),
                     'report' => (isset($reportPath) && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
+                    'path' => $relativePath ?? $path,
                 ], now()->addHour());
             } else {
                 Cache::put("import:$id", [
@@ -244,6 +253,7 @@ class ImportProductsJob implements ShouldQueue
                     'errors' => $errors,
                     'progress' => 100,
                     'report' => ($errors > 0 && isset($reportPath) && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
+                    'path' => $relativePath ?? $path,
                 ], now()->addHour());
             }
 
@@ -252,6 +262,7 @@ class ImportProductsJob implements ShouldQueue
             Cache::put("import:$id", [
                 'status' => 'error',
                 'message' => $e->getMessage(),
+                'path' => $relativePath ?? $path,
             ], now()->addHour());
         }
     }

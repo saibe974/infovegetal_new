@@ -183,13 +183,16 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
-                            <CsvUploadFilePond config={{
-                                title: 'Upload CSV',
-                                description: 'Uploadez un fichier CSV',
-                                uploadUrl: '/upload',
-                                successRedirectUrl: products.index().url,
-                                buttonLabel: ''
-                            }} />
+                            <CsvUploadFilePond
+                                config={{
+                                    title: 'Upload CSV',
+                                    description: 'Uploadez un fichier CSV',
+                                    uploadUrl: '/upload',
+                                    importProcessUrl: products.admin.import.process.url(),
+                                    importProgressUrl: (id) => products.admin.import.progress.url({ id }),
+                                    buttonLabel: '',
+                                }}
+                            />
                             <DownloadCsvButton />
                         </div>
                     )}

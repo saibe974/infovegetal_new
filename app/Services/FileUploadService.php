@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Contracts\Filesystem\Filesystem;
 
@@ -81,11 +82,24 @@ class FileUploadService
             throw new \RuntimeException('Unable to save file record without an authenticated user.');
         }
 
-        return $user->files()->create([
+        $file = $user->files()->create([
             'file_name' => $fileName,
             'file_path' => $filePath,
             'file_size' => $fileSize,
         ]);
+
+        Cache::put(
+            "import:{$file->id}",
+            [
+                'status' => 'uploaded',
+                'path' => $file->file_path,
+                'original_name' => $file->file_name,
+                'size' => $file->file_size,
+            ],
+            now()->addHour(),
+        );
+
+        return $file;
     }
 
     private function createSuccessResponse(File $file, array $extra = []): JsonResponse
