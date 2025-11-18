@@ -232,11 +232,16 @@ class ProductController extends Controller
                     }
 
                     $description = isset($mapped['description']) ? trim((string) $mapped['description']) : null;
-                    $imgLink = isset($mapped['img_link']) ? trim((string) $mapped['img_link']) : null;
+                    $imgLink = isset($mapped['img']) ? trim((string) $mapped['img']) : null;
                     $price = isset($mapped['price']) && is_numeric($mapped['price']) ? (float) $mapped['price'] : 0;
                     $active = isset($mapped['active']) ? (int) $mapped['active'] : 1;
                     $productCategoryId = isset($mapped['product_category_id']) && is_numeric($mapped['product_category_id']) ? (int) $mapped['product_category_id'] : 51;
-
+                    
+                    // Vérifier si la catégorie existe, sinon utiliser 51 par défaut
+                    if (!\App\Models\ProductCategory::where('id', $productCategoryId)->exists()) {
+                        $productCategoryId = 51;
+                    }
+                    
                     Product::updateOrCreate(
                         ['sku' => $sku],
                         [
