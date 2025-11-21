@@ -30,7 +30,7 @@ import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react'
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
-import { isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
 import users from '@/routes/users';
@@ -51,12 +51,18 @@ interface UsersPageProps {
 
 export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => {
 
-    console.log(users)
+    // console.log(users)
+    const { t } = useI18n();
 
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
     const isAuthenticated = !!user;
-    const { t } = useI18n();
+    const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
+    const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
+    const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+    const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
+    const canPreview = isDev(user) || hasPermission(user, 'preview');
+
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -246,13 +252,14 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
-                            <CsvUploadFilePond config={{
+                            {canPreview && <CsvUploadFilePond config={{
                                 title: 'Upload CSV',
                                 description: 'Uploadez un fichier CSV',
                                 uploadUrl: '/upload',
                                 successRedirectUrl: products.index().url,
                                 buttonLabel: ''
                             }} />
+                            }
                             <DownloadCsvButton />
                         </div>
                     )}
@@ -268,7 +275,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                 <TableHead>{t('Name')}</TableHead>
                                 <TableHead>{t('Email')}</TableHead>
                                 <TableHead>{t('Current roles')}</TableHead>
-                                <TableHead>{t('Change role')}</TableHead>
+                                {canPreview && <TableHead>{t('Change role')}</TableHead>}
                                 <TableHead>{t('Joined')}</TableHead>
                                 {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
                             </TableRow>
@@ -287,11 +294,13 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                                     <Badge
                                                         key={role.id}
                                                         variant={
-                                                            role.name === 'admin'
-                                                                ? 'default'
-                                                                : role.name === 'client'
-                                                                    ? 'secondary'
-                                                                    : 'outline'
+                                                            role.name === 'dev'
+                                                                ? 'destructive'
+                                                                : role.name === 'admin'
+                                                                    ? 'default'
+                                                                    : role.name === 'client'
+                                                                        ? 'secondary'
+                                                                        : 'outline'
                                                         }
                                                     >
                                                         {role.name}
@@ -304,7 +313,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    {canPreview && <TableCell>
                                         <Select
                                             onValueChange={(value) =>
                                                 handleRoleChange(user.id, value)
@@ -336,6 +345,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                             </p>
                                         )}
                                     </TableCell>
+                                    }
                                     <TableCell className="text-sm text-muted-foreground">
                                         {new Date(
                                             user.created_at

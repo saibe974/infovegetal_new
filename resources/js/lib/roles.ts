@@ -40,23 +40,11 @@ export function hasAnyPermission(user: User | null | undefined, permissions: str
     return user.permissions.some(p => permissions.includes(p.name));
 }
 
-/**
- * Vérifie si l'utilisateur est admin
- */
-export function isAdmin(user: User | null | undefined): boolean {
-    return hasRole(user, 'admin');
-}
 
 /**
- * Vérifie si l'utilisateur est client
+ * Vérifie si l'utilisateur a un rôle spécifique (Raccourci pour 'dev')
  */
-export function isClient(user: User | null | undefined): boolean {
-    return hasRole(user, 'client');
-}
-
-/**
- * Vérifie si l'utilisateur est guest
- */
-export function isGuest(user: User | null | undefined): boolean {
-    return hasRole(user, 'guest');
-}
+export function isDev(user: User | null | undefined): boolean { return hasRole(user, 'dev'); }
+export function isAdmin(user: User | null | undefined): boolean { return hasRole(user, 'admin'); }
+export function isClient(user: User | null | undefined): boolean { return hasRole(user, 'client'); }
+export function isGuest(user: User | null | undefined): boolean { return hasRole(user, 'guest'); }
