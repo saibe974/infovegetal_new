@@ -98,6 +98,10 @@ export function CsvUploadFilePond({
     const shouldPollRef = useRef<boolean>(false);
     const hasImportFlow = Boolean(importProcessUrl);
     const isProcessingLocked = hasImportFlow && uploadComplete && (importStatus === 'idle' || importStatus === 'processing' || importStatus === 'cancelling');
+    const [displayProgress, setDisplayProgress] = useState<number>(0);
+    const lastRealProgressRef = useRef<number>(0);
+    const [displayProcessed, setDisplayProcessed] = useState<number>(0);
+    const lastRealProcessedRef = useRef<number>(0);
 
     const stopProgressPolling = useCallback(() => {
         shouldPollRef.current = false;
@@ -117,6 +121,10 @@ export function CsvUploadFilePond({
         setProgressInfo(null);
         setIsCancellingImport(false);
         shouldPollRef.current = false;
+        setDisplayProgress(0);
+        lastRealProgressRef.current = 0;
+        setDisplayProcessed(0);
+        lastRealProcessedRef.current = 0;
     }, [stopProgressPolling]);
 
     const handleOpenChange = (nextOpen: boolean) => {
@@ -162,6 +170,10 @@ export function CsvUploadFilePond({
             console.log('[Import] Starting import for ID:', id);
             setImportError(null);
             setProgressInfo(null);
+            setDisplayProgress(0);
+            lastRealProgressRef.current = 0;
+            setDisplayProcessed(0);
+            lastRealProcessedRef.current = 0;
 
             // 🔹 Activer le polling tout de suite
             shouldPollRef.current = true;
@@ -361,19 +373,21 @@ export function CsvUploadFilePond({
 
                 // console.log('[Import][Progress][RAW]', data);
 
+                const realProgress = typeof data.progress === 'number'
+                    ? Math.max(0, Math.min(100, data.progress))
+                    : 0;
+
+                const realProcessed = typeof data.processed === 'number'
+                    ? Math.max(0, data.processed)
+                    : 0;
+
+                // mémorise les valeurs réelles
+                lastRealProgressRef.current = realProgress;
+                lastRealProcessedRef.current = realProcessed;
+
                 setProgressInfo(data);
+
                 const status = String(data.status ?? '').toLowerCase();
-                // console.log(
-                //     '[Import][Progress]',
-                //     'status=', status,
-                //     'processed=', data.processed,
-                //     'errors=', data.errors,
-                //     'total=', data.total,
-                //     'progress=', data.progress,
-                //     'next_offset=', data.next_offset,
-                //     'has_more=', data.has_more,
-                //     'chunks_count=', (data as any).chunks_count,
-                // );
 
                 // Clé simple pour savoir si ça progresse encore
                 // const key = `${data.processed ?? 0}:${data.errors ?? 0}`;
@@ -455,6 +469,81 @@ export function CsvUploadFilePond({
             stopProgressPolling();
         };
     }, [importProgressUrl, importStatus, stopProgressPolling, uploadId]);
+
+    useEffect(() => {
+        if (importStatus !== 'processing') {
+            // Quand on n’est plus en processing, on colle à la vraie valeur
+            setDisplayProgress(lastRealProgressRef.current);
+            return;
+        }
+
+        const increment = 0.3;  // progression par tick (en %)
+        const interval = 150; // ms
+
+        const id = window.setInterval(() => {
+            setDisplayProgress((current) => {
+                const target = lastRealProgressRef.current;
+                if (current >= target) {
+                    return current;
+                }
+                const next = current + increment;
+                return next > target ? target : next;
+            });
+        }, interval);
+
+        return () => window.clearInterval(id);
+    }, [importStatus]);
+
+    useEffect(() => {
+        if (importStatus !== 'processing') {
+            // Quand on n'est plus en processing, on colle aux vraies valeurs
+            setDisplayProgress(lastRealProgressRef.current);
+            setDisplayProcessed(lastRealProcessedRef.current);
+            return;
+        }
+
+        const interval = 150; // ms
+
+        const id = window.setInterval(() => {
+            // Mettre à jour displayProcessed en fonction du ratio progress/100
+            setDisplayProcessed((current) => {
+                const processedTarget = lastRealProcessedRef.current;
+                const totalLines = progressInfo?.total ?? 0;
+
+                if (totalLines === 0 || current >= processedTarget) {
+                    return current;
+                }
+
+                // Calculer l'incrément basé sur la vitesse de progression
+                const incrementPerTick = Math.max(1, Math.ceil(totalLines / 2000));
+                const next = current + incrementPerTick;
+                return next > processedTarget ? processedTarget : next;
+            });
+
+            // Synchroniser displayProgress avec displayProcessed
+            setDisplayProgress((current) => {
+                const totalLines = progressInfo?.total ?? 0;
+                const processedTarget = lastRealProcessedRef.current;
+
+                if (totalLines === 0) {
+                    return current;
+                }
+
+                // Calculer la progress basée sur les lignes traitées
+                const calculatedProgress = (processedTarget / totalLines) * 100;
+                const effectiveTarget = Math.min(calculatedProgress, 100);
+
+                if (current >= effectiveTarget) {
+                    return current;
+                }
+                const increment = 0.3;
+                const next = current + increment;
+                return next > effectiveTarget ? effectiveTarget : next;
+            });
+        }, interval);
+
+        return () => window.clearInterval(id);
+    }, [importStatus, progressInfo?.total]);
 
     const handleServerResponse = (response: any) => {
         const rawResponse = typeof response === 'string'
@@ -579,17 +668,13 @@ export function CsvUploadFilePond({
                                             <div className="w-full h-2 rounded bg-muted">
                                                 <div
                                                     className="h-2 rounded bg-primary transition-all"
-                                                    style={{ width: `${Math.min(progressInfo?.progress ?? 0, 100)}%` }}
+                                                    style={{ width: `${Math.min(displayProgress, 100)}%` }}
                                                 />
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                {(progressInfo?.processed ?? 0)} / {(progressInfo?.total ?? 0)} lignes traitées – {(progressInfo?.errors ?? 0)} erreurs
+                                                {(progressInfo?.errors ?? 0)} erreurs
                                             </p>
-                                            {progressInfo?.current && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    Ligne {progressInfo.current.line ?? progressInfo.processed ?? ''} · SKU {progressInfo.current.sku ?? '—'} · {progressInfo.current.name ?? ''}
-                                                </p>
-                                            )}
+
                                             {importError && (
                                                 <p className="text-xs text-destructive">
                                                     {importError}
