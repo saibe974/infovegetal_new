@@ -361,6 +361,10 @@ export function CsvUploadFilePond({
         const progressUrl = importProgressUrl!;
 
         const fetchProgress = async () => {
+            if (progressPollRef.current !== null) {
+                window.clearInterval(progressPollRef.current);
+                progressPollRef.current = null;
+            }
             console.log('[Polling][Fetch] fetching progress for', uploadId);
             try {
                 const response = await fetch(progressUrl(uploadId), {
@@ -454,6 +458,10 @@ export function CsvUploadFilePond({
                     stopProgressPolling();
                 } else if (status === 'cancelling') {
                     setImportStatus('cancelling');
+                    progressPollRef.current = window.setInterval(fetchProgress, 1000);
+                } else {
+                    // Status is 'processing', continue polling
+                    progressPollRef.current = window.setInterval(fetchProgress, 1000);
                 }
             } catch (error) {
                 if (cancelled) return;
@@ -470,29 +478,6 @@ export function CsvUploadFilePond({
         };
     }, [importProgressUrl, importStatus, stopProgressPolling, uploadId]);
 
-    useEffect(() => {
-        if (importStatus !== 'processing') {
-            // Quand on n’est plus en processing, on colle à la vraie valeur
-            setDisplayProgress(lastRealProgressRef.current);
-            return;
-        }
-
-        const increment = 0.3;  // progression par tick (en %)
-        const interval = 150; // ms
-
-        const id = window.setInterval(() => {
-            setDisplayProgress((current) => {
-                const target = lastRealProgressRef.current;
-                if (current >= target) {
-                    return current;
-                }
-                const next = current + increment;
-                return next > target ? target : next;
-            });
-        }, interval);
-
-        return () => window.clearInterval(id);
-    }, [importStatus]);
 
     useEffect(() => {
         if (importStatus !== 'processing') {
