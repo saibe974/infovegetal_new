@@ -5,14 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Services\ProductImportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
 use League\Csv\Reader;
@@ -62,7 +61,7 @@ class ProductController extends Controller
      * Traite le fichier CSV précédemment uploadé (calcul progress côté cache).
      */
 
-    public function importProcess(Request $request)
+    public function importProcess(Request $request, ProductImportService $importService)
     {
         $data = $request->validate(['id' => 'required|string']);
         $id = $data['id'];
@@ -74,14 +73,13 @@ class ProductController extends Controller
 
         $path = $state['path'];
         $fullPath = Storage::path($path);
-        
+
         if (!is_string($fullPath) || !is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
         $relativePath = $path;
 
-        // Configuration initiale du cache
         $this->updateImportState($id, [
             'status' => 'processing',
             'processed' => 0,
@@ -91,252 +89,67 @@ class ProductController extends Controller
             'current' => null,
             'report' => null,
             'path' => $relativePath,
+            'next_offset' => 0,
+            'has_more' => true,
         ]);
 
-        Log::info("Import started for ID: $id");
+        Log::info("Import started synchronously for ID: $id");
 
-        // Lancer le traitement en arrière-plan via un processus PHP indépendant
-        $artisanPath = base_path('artisan');
-        $phpBinary = PHP_BINARY;
-        
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // Windows - utiliser escapeshellarg pour chaque argument
-            $cmd = sprintf(
-                'start /B "" %s %s products:import-process %s %s %s > NUL 2>&1',
-                escapeshellarg($phpBinary),
-                escapeshellarg($artisanPath),
-                escapeshellarg($id),
-                escapeshellarg($fullPath),
-                escapeshellarg($relativePath)
-            );
-            Log::info("Executing command: $cmd");
-            pclose(popen($cmd, 'r'));
-        } else {
-            // Unix/Linux/Mac
-            $cmd = sprintf(
-                '%s %s products:import-process %s %s %s > /dev/null 2>&1 &',
-                escapeshellarg($phpBinary),
-                escapeshellarg($artisanPath),
-                escapeshellarg($id),
-                escapeshellarg($fullPath),
-                escapeshellarg($relativePath)
-            );
-            Log::info("Executing command: $cmd");
-            exec($cmd);
-        }
+        // Premier chunk synchronisé via le service (chunk index 0)
+        $importService->run($id, $fullPath, $relativePath);
 
-        // Retourner immédiatement la réponse
-        return response()->json([
-            'success' => true,
-            'status' => 'processing',
-            'uploadId' => $id
-        ]);
+        // on renvoie l'état final du cache
+        $final = Cache::get("import:$id") ?? [
+            'status' => 'done',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 100,
+        ];
+
+        return response()->json($final);
     }
 
-    public function processImport(string $id, string $fullPath, string $relativePath): void
+    public function importProcessChunk(Request $request, ProductImportService $importService)
     {
-        try {
+        $data = $request->validate([
+            'id' => 'required|string',
+        ]);
 
-            $normalizeKey = function ($value): string {
-                $string = (string) $value;
-                $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
-                return mb_strtolower(trim($string));
-            };
+        $id = $data['id'];
 
-            $total = $this->countValidLines($fullPath, $normalizeKey);
-
-            Log::info("Import counting done: $total valid lines for ID: $id");
-
-            $this->updateImportState($id, [
-                'total' => $total,
-            ]);
-
-            $processed = 0;
-            $errors = 0;
-
-            Storage::makeDirectory('imports/reports');
-            $reportPath = Storage::path('imports/reports/' . $id . '.csv');
-            $reportHandle = fopen($reportPath, 'w');
-            if ($reportHandle) {
-                fputcsv($reportHandle, ['line', 'error', 'sku', 'name', 'raw'], ';');
-            }
-
-            $reader = Reader::createFromPath($fullPath, 'r');
-            $reader->setDelimiter(';');
-            $reader->setHeaderOffset(0);
-            $originalHeaders = $reader->getHeader();
-
-            $keyMap = [];
-            foreach ($originalHeaders as $header) {
-                $keyMap[$header] = $normalizeKey($header);
-            }
-
-            $cancelled = false;
-
-            $updateProgress = function (?array $current) use (&$processed, &$errors, &$total, $id, $relativePath) {
-                if ($total <= 0) {
-                    return;
-                }
-
-                $completed = $processed + $errors;
-
-                if ($completed === 0) {
-                    return;
-                }
-
-                if ($completed % 50 !== 0 && $completed !== $total) {
-                    return;
-                }
-
-                Log::info("Import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
-
-                $this->updateImportState($id, [
-                    'status' => 'processing',
-                    'processed' => $processed,
-                    'total' => $total,
-                    'errors' => $errors,
-                    'progress' => (int) floor(($completed / max(1, $total)) * 100),
-                    'current' => $current,
-                    'path' => $relativePath,
-                ]);
-            };
-
-            foreach ($reader->getRecords() as $row) {
-                if (Cache::get("import:$id:cancel", false)) {
-                    $cancelled = true;
-                    break;
-                }
-
-                $mapped = [];
-
-                try {
-                    $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
-
-                    if (!$this->rowHasContent($mapped)) {
-                        continue;
-                    }
-
-                    $sku = trim((string) ($mapped['sku'] ?? ''));
-                    $name = trim((string) ($mapped['name'] ?? ''));
-                    $currentSnapshot = [
-                        'line' => $processed + $errors + 1,
-                        'sku' => $sku !== '' ? $sku : null,
-                        'name' => $name !== '' ? $name : null,
-                    ];
-
-                    if ($sku === '' || $name === '') {
-                        $errors++;
-                        $this->writeReportLine($reportHandle, $processed + $errors, 'Missing sku or name', $row, $mapped);
-                        $updateProgress($currentSnapshot);
-                        continue;
-                    }
-
-                    $description = isset($mapped['description']) ? trim((string) $mapped['description']) : null;
-                    $imgLink = isset($mapped['img']) ? trim((string) $mapped['img']) : null;
-                    $price = isset($mapped['price']) && is_numeric($mapped['price']) ? (float) $mapped['price'] : 0;
-                    $active = isset($mapped['active']) ? (int) $mapped['active'] : 1;
-                    $productCategoryId = isset($mapped['product_category_id']) && is_numeric($mapped['product_category_id']) ? (int) $mapped['product_category_id'] : 51;
-                    
-                    // Vérifier si la catégorie existe, sinon utiliser 51 par défaut
-                    if (!\App\Models\ProductCategory::where('id', $productCategoryId)->exists()) {
-                        $productCategoryId = 51;
-                    }
-                    
-                    Product::updateOrCreate(
-                        ['sku' => $sku],
-                        [
-                            'name' => $name,
-                            'description' => $description,
-                            'img_link' => $imgLink !== null ? 'https://www.infovegetal.com/files/' . $imgLink : null,
-                            'price' => $price,
-                            'active' => $active,
-                            'product_category_id' => $productCategoryId,
-                        ]
-                    );
-
-                    $processed++;
-                    $currentSnapshot['line'] = $processed + $errors;
-                    $updateProgress($currentSnapshot);
-                } catch (\Throwable $e) {
-                    Log::error('Erreur import: ' . $e->getMessage());
-                    $errors++;
-                    $this->writeReportLine($reportHandle, $processed + $errors, $e->getMessage(), $row, $mapped ?? []);
-                    $currentSnapshot = [
-                        'line' => $processed + $errors,
-                        'sku' => $mapped['sku'] ?? null,
-                        'name' => $mapped['name'] ?? null,
-                    ];
-                    $updateProgress($currentSnapshot);
-                }
-            }
-
-            if (isset($reportHandle) && $reportHandle) {
-                fclose($reportHandle);
-                if ($errors === 0 && file_exists($reportPath)) {
-                    @unlink($reportPath);
-                }
-            }
-
-            try {
-                $archiveDir = Storage::path('imports/archive');
-                if (!is_dir($archiveDir)) {
-                    @mkdir($archiveDir, 0777, true);
-                }
-                $destination = $archiveDir . DIRECTORY_SEPARATOR . basename($fullPath);
-                if (app()->isLocal()) {
-                    @rename($fullPath, $destination);
-                } else {
-                    @unlink($fullPath);
-                }
-            } catch (\Throwable $exception) {
-                Log::warning('Import cleanup error (controller): ' . $exception->getMessage());
-            }
-
-            Cache::forget("import:$id:cancel");
-
-            $finalState = [
-                'processed' => $processed,
-                'total' => $total,
-                'errors' => $errors,
-                'report' => ($errors > 0 && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
-                'path' => $relativePath,
-            ];
-
-            if ($cancelled) {
-                $this->updateImportState($id, array_merge($finalState, [
-                    'status' => 'cancelled',
-                    'progress' => (int) floor(((($processed + $errors)) / max(1, $total)) * 100),
-                ]));
-
-                Log::info("Import cancelled for ID $id");
-                return;
-            }
-
-            $this->updateImportState($id, array_merge($finalState, [
-                'status' => 'done',
-                'progress' => 100,
-            ]));
-
-            Log::info("Import completed for ID $id: processed=$processed, errors=$errors");
-
-            $this->updateImportState($id, [
-                'status' => 'done',
-                'processed' => $processed,
-                'total' => $total,
-                'errors' => $errors,
-                'progress' => 100,
-                'report' => ($errors > 0 && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('Import process failed: ' . $e->getMessage());
-
-            $this->updateImportState($id, [
-                'status' => 'error',
-                'message' => $e->getMessage(),
-                'path' => $relativePath,
-            ]);
+        $state = Cache::get("import:$id");
+        if (!$state || empty($state['path'])) {
+            return response()->json(['message' => 'Import inconnu'], 404);
         }
-    }    /**
+
+        $path = $state['path'];
+        $fullPath = Storage::path($path);
+
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
+        }
+
+        $relativePath = $path;
+        $chunkIndex = isset($state['next_offset']) ? (int) $state['next_offset'] : 0;
+
+        Log::info("Import chunk requested for ID: $id at chunk index $chunkIndex");
+
+        $importService->runChunk($id, $relativePath, $chunkIndex);
+
+        $final = Cache::get("import:$id") ?? [
+            'status' => 'done',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 100,
+        ];
+
+        return response()->json($final);
+    }
+
+    
+    /**
      * Renvoie la progression (upload/processing/done) pour l'id d'import.
      */
     public function importProgress(string $id)
@@ -355,6 +168,8 @@ class ProductController extends Controller
             'current' => $progress['current'] ?? null,
             'progress' => $progress['progress'] ?? null,
             'report' => $progress['report'] ?? null,
+            'next_offset' => $progress['next_offset'] ?? null,
+            'has_more' => $progress['has_more'] ?? false,
         ]);
     }
 
@@ -617,7 +432,7 @@ class ProductController extends Controller
 
     private function countValidLines(string $fullPath, callable $normalizeKey): int
     {
-        $reader = Reader::createFromPath($fullPath, 'r');
+        $reader = Reader::from($fullPath, 'r');
         $reader->setDelimiter(';');
         $reader->setHeaderOffset(0);
         $headers = $reader->getHeader();
