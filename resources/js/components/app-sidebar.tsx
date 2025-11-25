@@ -17,16 +17,15 @@ import {
 import { dashboard } from '@/routes';
 import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, TagIcon, User2Icon } from 'lucide-react';
+import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 
-import { PlusCircle, List as ListIcon } from 'lucide-react';
 import users from '@/routes/users';
 
 // Items are built inside the component to access the t() helper
@@ -43,6 +42,7 @@ export function AppSidebar() {
     const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
     const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
     const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
+    const canPreview = isDev(user) || hasPermission(user, 'preview');
 
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
@@ -76,14 +76,24 @@ export function AppSidebar() {
                         href: productCategories.index(),
                         icon: FolderTreeIcon,
                     },
-                    {
-                        title: t('Tags'),
-                        href: '#',
-                        icon: TagIcon,
-                    },
                 ],
             },
         ];
+
+        if (canPreview) {
+            //@ts-ignore
+            mainNavItems[1].subItems.push({
+                title: t('Tags'),
+                href: '#',
+                icon: TagIcon,
+            });
+            //@ts-ignore
+            mainNavItems[1].subItems.push({
+                title: t('Database'),
+                href: '#',
+                icon: ServerIcon,
+            });
+        }
 
         if (canManageUsers) {
             mainNavItems.push({
@@ -92,6 +102,7 @@ export function AppSidebar() {
                 icon: User2Icon,
             });
         }
+
 
         footerNavItems = [
             {
