@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { DownloadIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 
 // FilePond imports
 import { FilePond } from 'react-filepond';
+import type { FilePondProps } from 'react-filepond';
 import 'filepond/dist/filepond.min.css';
 
 type CsvUploadConfig = {
@@ -50,7 +59,13 @@ type CsvUploadFilePondProps = {
     buttonClassName?: string;
 };
 
-type ImportStatus = 'idle' | 'processing' | 'cancelling' | 'finished' | 'cancelled' | 'error';
+type ImportStatus =
+    | 'idle'
+    | 'processing'
+    | 'cancelling'
+    | 'finished'
+    | 'cancelled'
+    | 'error';
 
 type ImportProgressPayload = {
     status?: string;
@@ -90,14 +105,23 @@ export function CsvUploadFilePond({
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
     const [importError, setImportError] = useState<string | null>(null);
-    const [progressInfo, setProgressInfo] = useState<ImportProgressPayload | null>(null);
+    const [progressInfo, setProgressInfo] =
+        useState<ImportProgressPayload | null>(null);
     const [isCancellingImport, setIsCancellingImport] = useState(false);
+
     const isRequestingChunkRef = useRef(false);
-    const pondRef = useRef<FilePond>(null);
+    const pondRef = useRef<any>(null); // any pour accéder à setOptions sans friction TS
     const progressPollRef = useRef<number | null>(null);
     const shouldPollRef = useRef<boolean>(false);
+
     const hasImportFlow = Boolean(importProcessUrl);
-    const isProcessingLocked = hasImportFlow && uploadComplete && (importStatus === 'idle' || importStatus === 'processing' || importStatus === 'cancelling');
+    const isProcessingLocked =
+        hasImportFlow &&
+        uploadComplete &&
+        (importStatus === 'idle' ||
+            importStatus === 'processing' ||
+            importStatus === 'cancelling');
+
     const [displayProgress, setDisplayProgress] = useState<number>(0);
     const lastRealProgressRef = useRef<number>(0);
     const [displayProcessed, setDisplayProcessed] = useState<number>(0);
@@ -138,11 +162,24 @@ export function CsvUploadFilePond({
     };
 
     const getCsrfToken = () => {
-        const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+        const meta = document.querySelector(
+            'meta[name="csrf-token"]',
+        ) as HTMLMetaElement | null;
         if (meta?.content) return meta.content;
-        const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+        const match = document.cookie.match(
+            /(?:^|; )XSRF-TOKEN=([^;]*)/,
+        );
         return match ? decodeURIComponent(match[1]) : null;
     };
+
+    const ensureCsrfCookie = async () => {
+        await fetch('/csrf-refresh', {
+            method: 'GET',
+            credentials: 'include',
+            headers: { Accept: 'application/json' },
+        });
+    };
+
 
     const handleCancel = () => {
         resetState();
@@ -160,6 +197,11 @@ export function CsvUploadFilePond({
     };
 
     const csrfToken = getCsrfToken() || '';
+    const getFreshCsrfToken = () => getCsrfToken() || '';
+    const csrfHeaders = () => ({
+        'X-CSRF-TOKEN': getFreshCsrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+    });
 
     const startImport = useCallback(
         async (id: string) => {
@@ -185,8 +227,7 @@ export function CsvUploadFilePond({
                     headers: {
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
+                        ...csrfHeaders(),
                     },
                     body: JSON.stringify({
                         [importPayloadKey ?? 'id']: id,
@@ -196,13 +237,12 @@ export function CsvUploadFilePond({
                 console.log('[Import] Response :', response);
 
                 if (!response.ok) {
-                    throw new Error(`Import failed with status ${response.status}`);
+                    throw new Error(
+                        `Import failed with status ${response.status}`,
+                    );
                 }
 
-                // Response may be empty or JSON; we ignore the body if parsing fails
-                const payload = await response
-                    .json()
-                    .catch(() => null);
+                const payload = await response.json().catch(() => null);
 
                 console.log('[Import] Response payload:', payload);
 
@@ -218,7 +258,11 @@ export function CsvUploadFilePond({
                         console.log('[Import] Error in response');
                         stopProgressPolling();
                         setImportStatus('error');
-                        setImportError(typeof payload.message === 'string' ? payload.message : 'Import process failed');
+                        setImportError(
+                            typeof payload.message === 'string'
+                                ? payload.message
+                                : 'Import process failed',
+                        );
                     } else if (status === 'cancelled') {
                         console.log('[Import] Cancelled in response');
                         stopProgressPolling();
@@ -228,13 +272,16 @@ export function CsvUploadFilePond({
                         shouldPollRef.current = true;
                         setImportStatus('cancelling');
                     } else {
-                        console.log('[Import] Still processing, polling will continue');
+                        console.log(
+                            '[Import] Still processing, polling will continue',
+                        );
                         shouldPollRef.current = true;
-                        // Déclencher le useEffect du polling
                         setImportStatus('processing');
                     }
                 } else {
-                    console.log('[Import] Empty response, assuming processing');
+                    console.log(
+                        '[Import] Empty response, assuming processing',
+                    );
                     shouldPollRef.current = true;
                     setImportStatus('processing');
                 }
@@ -244,7 +291,9 @@ export function CsvUploadFilePond({
                 console.error('Failed to start import:', error);
                 setImportStatus('error');
                 setImportError(
-                    error instanceof Error ? error.message : 'Import process failed',
+                    error instanceof Error
+                        ? error.message
+                        : 'Import process failed',
                 );
                 setProgressInfo(null);
                 onImportError?.(error);
@@ -283,8 +332,7 @@ export function CsvUploadFilePond({
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
+                    ...csrfHeaders(),
                 },
                 body: JSON.stringify({
                     [importPayloadKey ?? 'id']: uploadId,
@@ -292,7 +340,9 @@ export function CsvUploadFilePond({
             });
 
             if (!response.ok) {
-                throw new Error(`Cancellation failed with status ${response.status}`);
+                throw new Error(
+                    `Cancellation failed with status ${response.status}`,
+                );
             }
 
             const payload = await response.json().catch(() => null);
@@ -301,7 +351,10 @@ export function CsvUploadFilePond({
             setImportError(null);
             setProgressInfo((prev) => ({
                 ...(prev ?? {}),
-                status: typeof payload?.status === 'string' ? payload.status : 'cancelling',
+                status:
+                    typeof payload?.status === 'string'
+                        ? payload.status
+                        : 'cancelling',
             }));
         } catch (error) {
             console.error('Failed to cancel import:', error);
@@ -309,7 +362,13 @@ export function CsvUploadFilePond({
         } finally {
             setIsCancellingImport(false);
         }
-    }, [importCancelUrl, importPayloadKey, csrfToken, isCancellingImport, uploadId]);
+    }, [
+        importCancelUrl,
+        importPayloadKey,
+        csrfToken,
+        isCancellingImport,
+        uploadId,
+    ]);
 
     useEffect(() => {
         if (!importProcessUrl) {
@@ -325,7 +384,13 @@ export function CsvUploadFilePond({
         }
 
         void startImport(uploadId);
-    }, [importProcessUrl, importStatus, startImport, uploadComplete, uploadId]);
+    }, [
+        importProcessUrl,
+        importStatus,
+        startImport,
+        uploadComplete,
+        uploadId,
+    ]);
 
     useEffect(() => {
         console.log('[Polling][Effect] Triggered', {
@@ -336,12 +401,16 @@ export function CsvUploadFilePond({
         });
 
         if (!importProgressUrl || !uploadId) {
-            console.log('[Polling] Stopped: no URL or ID', { hasUrl: !!importProgressUrl, uploadId });
+            console.log('[Polling] Stopped: no URL or ID', {
+                hasUrl: !!importProgressUrl,
+                uploadId,
+            });
             stopProgressPolling();
             return;
         }
 
-        const shouldPoll = importStatus === 'processing' || importStatus === 'cancelling';
+        const shouldPoll =
+            importStatus === 'processing' || importStatus === 'cancelling';
         if (!shouldPoll) {
             console.log('[Polling] Stopped: status is', importStatus);
             stopProgressPolling();
@@ -349,15 +418,16 @@ export function CsvUploadFilePond({
         }
 
         if (!shouldPollRef.current) {
-            console.log('[Polling] Waiting for import response before starting, shouldPollRef=', shouldPollRef.current);
+            console.log(
+                '[Polling] Waiting for import response before starting, shouldPollRef=',
+                shouldPollRef.current,
+            );
             // return;
         }
 
         console.log('[Polling] Starting for upload ID:', uploadId);
 
         let cancelled = false;
-        let stagnantCount = 0;
-        let lastKey = '';
         const progressUrl = importProgressUrl!;
 
         const fetchProgress = async () => {
@@ -375,17 +445,16 @@ export function CsvUploadFilePond({
                 const data: ImportProgressPayload = await response.json();
                 if (cancelled) return;
 
-                // console.log('[Import][Progress][RAW]', data);
+                const realProgress =
+                    typeof data.progress === 'number'
+                        ? Math.max(0, Math.min(100, data.progress))
+                        : 0;
 
-                const realProgress = typeof data.progress === 'number'
-                    ? Math.max(0, Math.min(100, data.progress))
-                    : 0;
+                const realProcessed =
+                    typeof data.processed === 'number'
+                        ? Math.max(0, data.processed)
+                        : 0;
 
-                const realProcessed = typeof data.processed === 'number'
-                    ? Math.max(0, data.processed)
-                    : 0;
-
-                // mémorise les valeurs réelles
                 lastRealProgressRef.current = realProgress;
                 lastRealProcessedRef.current = realProcessed;
 
@@ -393,57 +462,36 @@ export function CsvUploadFilePond({
 
                 const status = String(data.status ?? '').toLowerCase();
 
-                // Clé simple pour savoir si ça progresse encore
-                // const key = `${data.processed ?? 0}:${data.errors ?? 0}`;
-                // if (status === 'processing' || status === 'cancelling' || status === '' || status === 'waiting') {
-                //     if (key === lastKey) {
-                //         stagnantCount++;
-                //     } else {
-                //         stagnantCount = 0;
-                //         lastKey = key;
-                //     }
-
-                //     // Si ça ne bouge plus depuis un moment, on arrête proprement
-                //     if (stagnantCount > 5) {
-                //         setImportStatus('finished');
-                //         stopProgressPolling();
-                //         return;
-                //     }
-                // }
-
                 // Si le backend indique qu'il reste des chunks, on en déclenche un nouveau
-                if (status === 'processing' && data.has_more && importProcessChunkUrl && !isRequestingChunkRef.current) {
+                if (
+                    status === 'processing' &&
+                    data.has_more &&
+                    importProcessChunkUrl &&
+                    !isRequestingChunkRef.current
+                ) {
                     try {
-                        // console.log(
-                        //     '[Import][Chunk] requesting next chunk',
-                        //     'current_next_offset=', data.next_offset,
-                        //     'uploadId=', uploadId,
-                        // );
                         isRequestingChunkRef.current = true;
                         const resp = await fetch(importProcessChunkUrl, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 Accept: 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                                'X-Requested-With': 'XMLHttpRequest',
+                                ...csrfHeaders(),
                             },
                             body: JSON.stringify({ id: uploadId }),
                         });
-                        console.log('[Import][Chunk] response status=', resp.status);
+                        console.log(
+                            '[Import][Chunk] response status=',
+                            resp.status,
+                        );
                     } catch (e) {
-                        console.error('[Import][Chunk] Failed to request next import chunk:', e);
+                        console.error(
+                            '[Import][Chunk] Failed to request next import chunk:',
+                            e,
+                        );
                     } finally {
                         isRequestingChunkRef.current = false;
                     }
-                } else {
-                    // console.log(
-                    //     '[Import][Chunk] not requesting chunk',
-                    //     'status=', status,
-                    //     'has_more=', data.has_more,
-                    //     'importProcessChunkUrl=', !!importProcessChunkUrl,
-                    //     'isRequestingChunk=', isRequestingChunkRef.current,
-                    // );
                 }
 
                 if (status === 'done') {
@@ -451,17 +499,26 @@ export function CsvUploadFilePond({
                     stopProgressPolling();
                 } else if (status === 'error') {
                     setImportStatus('error');
-                    setImportError(typeof data.message === 'string' ? data.message : 'Import process failed');
+                    setImportError(
+                        typeof data.message === 'string'
+                            ? data.message
+                            : 'Import process failed',
+                    );
                     stopProgressPolling();
                 } else if (status === 'cancelled') {
                     setImportStatus('cancelled');
                     stopProgressPolling();
                 } else if (status === 'cancelling') {
                     setImportStatus('cancelling');
-                    progressPollRef.current = window.setInterval(fetchProgress, 1000);
+                    progressPollRef.current = window.setInterval(
+                        fetchProgress,
+                        1000,
+                    );
                 } else {
-                    // Status is 'processing', continue polling
-                    progressPollRef.current = window.setInterval(fetchProgress, 1000);
+                    progressPollRef.current = window.setInterval(
+                        fetchProgress,
+                        1000,
+                    );
                 }
             } catch (error) {
                 if (cancelled) return;
@@ -476,12 +533,17 @@ export function CsvUploadFilePond({
             cancelled = true;
             stopProgressPolling();
         };
-    }, [importProgressUrl, importStatus, stopProgressPolling, uploadId]);
-
+    }, [
+        importProgressUrl,
+        importStatus,
+        stopProgressPolling,
+        uploadId,
+        importProcessChunkUrl,
+        csrfToken,
+    ]);
 
     useEffect(() => {
         if (importStatus !== 'processing') {
-            // Quand on n'est plus en processing, on colle aux vraies valeurs
             setDisplayProgress(lastRealProgressRef.current);
             setDisplayProcessed(lastRealProcessedRef.current);
             return;
@@ -490,7 +552,6 @@ export function CsvUploadFilePond({
         const interval = 150; // ms
 
         const id = window.setInterval(() => {
-            // Mettre à jour displayProcessed en fonction du ratio progress/100
             setDisplayProcessed((current) => {
                 const processedTarget = lastRealProcessedRef.current;
                 const totalLines = progressInfo?.total ?? 0;
@@ -499,13 +560,14 @@ export function CsvUploadFilePond({
                     return current;
                 }
 
-                // Calculer l'incrément basé sur la vitesse de progression
-                const incrementPerTick = Math.max(1, Math.ceil(totalLines / 2000));
-                const next = current + incrementPerTick;
+                const increment = Math.max(
+                    1,
+                    Math.ceil((processedTarget - current) / 10),
+                );
+                const next = current + increment;
                 return next > processedTarget ? processedTarget : next;
             });
 
-            // Synchroniser displayProgress avec displayProcessed
             setDisplayProgress((current) => {
                 const totalLines = progressInfo?.total ?? 0;
                 const processedTarget = lastRealProcessedRef.current;
@@ -514,8 +576,8 @@ export function CsvUploadFilePond({
                     return current;
                 }
 
-                // Calculer la progress basée sur les lignes traitées
-                const calculatedProgress = (processedTarget / totalLines) * 100;
+                const calculatedProgress =
+                    (processedTarget / totalLines) * 100;
                 const effectiveTarget = Math.min(calculatedProgress, 100);
 
                 if (current >= effectiveTarget) {
@@ -531,9 +593,10 @@ export function CsvUploadFilePond({
     }, [importStatus, progressInfo?.total]);
 
     const handleServerResponse = (response: any) => {
-        const rawResponse = typeof response === 'string'
-            ? response
-            : response?.responseText ?? '';
+        const rawResponse =
+            typeof response === 'string'
+                ? response
+                : response?.responseText ?? '';
 
         if (!rawResponse) {
             return response;
@@ -541,7 +604,6 @@ export function CsvUploadFilePond({
 
         try {
             const json = JSON.parse(rawResponse);
-            // console.log('Upload response:', json);
 
             const nextId = json.uploadId ?? json.id ?? null;
 
@@ -554,34 +616,91 @@ export function CsvUploadFilePond({
                 }
             }
 
-            return nextId !== null ? String(nextId) : json.file ?? rawResponse;
+            return nextId !== null
+                ? String(nextId)
+                : json.file ?? rawResponse;
         } catch (error) {
-            console.warn('Server response is not valid JSON:', rawResponse, error);
+            console.warn(
+                'Server response is not valid JSON:',
+                rawResponse,
+                error,
+            );
             return rawResponse || response;
         }
     };
 
     const handleServerError = (response: any) => {
-        const rawResponse = typeof response === 'string'
-            ? response
-            : response?.responseText ?? '';
+        const rawResponse =
+            typeof response === 'string'
+                ? response
+                : response?.responseText ?? '';
         console.error('Upload error:', rawResponse || response);
         setImportStatus('error');
         setImportError('Échec du téléversement.');
         return rawResponse || response;
     };
+    // ✅ Centralise la config FilePond avec un token donné
+    const buildPondServer = useCallback(
+        (token: string): FilePondProps['server'] => ({
+            url: uploadUrl,
+            process: {
+                url: '',
+                method: 'POST',
+                withCredentials: true, // ✅ cookies de session
+                headers: { 'X-CSRF-TOKEN': token },
+                onload: handleServerResponse,
+                onerror: handleServerError,
+            },
+            // NOTE: FilePond ne définit pas de propriété 'patch' dans le type server.
+            // Les requêtes PATCH de chunk upload réutilisent la config 'process' automatiquement.
+            revert: null,
+        }),
+        [uploadUrl],
+    );
+
+
+    // ✅ Option C: met à jour FilePond via la ref
+    const refreshPondCsrf = useCallback(() => {
+        const token = getFreshCsrfToken();
+        const pond = pondRef.current?.pond; // <-- instance FilePond native
+
+        if (pond && typeof pond.setOptions === 'function') {
+            pond.setOptions({
+                server: buildPondServer(token),
+            });
+        }
+    }, [buildPondServer]);
+
+
+    // ✅ à chaque ouverture, on rafraîchit les headers CSRF de FilePond
+    useEffect(() => {
+        if (!open || uploadComplete) return;
+
+        (async () => {
+            try {
+                await ensureCsrfCookie();          // ✅ pose/rafraîchit les cookies
+            } finally {
+                refreshPondCsrf();                // ✅ relit token APRES cookies
+            }
+        })();
+    }, [open, uploadComplete, refreshPondCsrf]);
+
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <button
                     type="button"
-                    className={buttonClassName ?? "clickable inline-flex items-center border px-3 py-1 rounded text-sm"}
+                    className={
+                        buttonClassName ??
+                        'clickable inline-flex items-center border px-3 py-1 rounded text-sm'
+                    }
                 >
                     <DownloadIcon />
                     {buttonLabel ?? ''}
                 </button>
             </DialogTrigger>
+
             <DialogContent
                 className="sm:max-w-xl"
                 onEscapeKeyDown={(event) => {
@@ -611,27 +730,7 @@ export function CsvUploadFilePond({
                             chunkUploads={true}
                             chunkSize={1000000}
                             chunkRetryDelays={[500, 1000, 3000]}
-                            server={{
-                                url: uploadUrl,
-                                process: {
-                                    url: '',
-                                    method: 'POST',
-                                    headers: {
-                                        'X-CSRF-TOKEN': csrfToken,
-                                    },
-                                    onload: handleServerResponse,
-                                    onerror: handleServerError,
-                                },
-                                patch: {
-                                    url: '?patch=',
-                                    headers: {
-                                        'X-CSRF-TOKEN': csrfToken,
-                                    },
-                                    onload: handleServerResponse,
-                                    onerror: handleServerError,
-                                },
-                                revert: null,
-                            }}
+                            server={buildPondServer(csrfToken)}
                             name="file"
                             labelIdle='Glissez-déposez votre fichier ou <span class="filepond--label-action">Parcourir</span>'
                             // acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
@@ -639,34 +738,46 @@ export function CsvUploadFilePond({
                         />
                     ) : (
                         <div className="text-center py-8 space-y-3">
-                            <p className="text-green-600 font-medium">✓ Fichier uploadé avec succès</p>
+                            <p className="text-green-600 font-medium">
+                                ✓ Fichier uploadé avec succès
+                            </p>
 
                             {importProcessUrl && (
                                 <>
-                                    {(importStatus === 'processing' || importStatus === 'cancelling') && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-muted-foreground">
-                                                {(importStatus === 'cancelling' || progressInfo?.status === 'cancelling')
-                                                    ? 'Annulation en cours…'
-                                                    : 'Import en cours…'}
-                                            </p>
-                                            <div className="w-full h-2 rounded bg-muted">
-                                                <div
-                                                    className="h-2 rounded bg-primary transition-all"
-                                                    style={{ width: `${Math.min(displayProgress, 100)}%` }}
-                                                />
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                {(progressInfo?.errors ?? 0)} erreurs
-                                            </p>
-
-                                            {importError && (
-                                                <p className="text-xs text-destructive">
-                                                    {importError}
+                                    {(importStatus === 'processing' ||
+                                        importStatus === 'cancelling') && (
+                                            <div className="space-y-2">
+                                                <p className="text-sm text-muted-foreground">
+                                                    {(importStatus ===
+                                                        'cancelling' ||
+                                                        progressInfo?.status ===
+                                                        'cancelling')
+                                                        ? 'Annulation en cours…'
+                                                        : 'Import en cours…'}
                                                 </p>
-                                            )}
-                                        </div>
-                                    )}
+                                                <div className="w-full h-2 rounded bg-muted">
+                                                    <div
+                                                        className="h-2 rounded bg-primary transition-all"
+                                                        style={{
+                                                            width: `${Math.min(
+                                                                displayProgress,
+                                                                100,
+                                                            )}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {progressInfo?.errors ?? 0}{' '}
+                                                    erreurs
+                                                </p>
+
+                                                {importError && (
+                                                    <p className="text-xs text-destructive">
+                                                        {importError}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
 
                                     {importStatus === 'finished' && (
                                         <div className="space-y-2">
@@ -674,15 +785,20 @@ export function CsvUploadFilePond({
                                                 Import terminé.
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {(progressInfo?.processed ?? 0)} lignes traitées
-                                                {typeof progressInfo?.errors === 'number' ? ` · ${progressInfo.errors} erreurs` : ''}
+                                                {progressInfo?.processed ?? 0}{' '}
+                                                lignes traitées
+                                                {typeof progressInfo?.errors ===
+                                                    'number'
+                                                    ? ` · ${progressInfo.errors} erreurs`
+                                                    : ''}
                                             </p>
                                             {progressInfo?.report && (
                                                 <a
                                                     href={progressInfo.report}
                                                     className="text-sm text-primary underline"
                                                 >
-                                                    Télécharger le rapport d'erreurs
+                                                    Télécharger le rapport
+                                                    d'erreurs
                                                 </a>
                                             )}
                                         </div>
@@ -694,7 +810,9 @@ export function CsvUploadFilePond({
                                                 Import annulé.
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                Vous pouvez fermer cette fenêtre ou relancer un nouvel import si nécessaire.
+                                                Vous pouvez fermer cette fenêtre
+                                                ou relancer un nouvel import si
+                                                nécessaire.
                                             </p>
                                         </div>
                                     )}
@@ -702,7 +820,8 @@ export function CsvUploadFilePond({
                                     {importStatus === 'error' && (
                                         <div className="space-y-2">
                                             <p className="text-sm text-destructive">
-                                                {importError ?? "Impossible de traiter l'import."}
+                                                {importError ??
+                                                    "Impossible de traiter l'import."}
                                             </p>
                                             <div className="flex items-center justify-center gap-2">
                                                 <button
@@ -725,21 +844,30 @@ export function CsvUploadFilePond({
                 <DialogFooter className="flex items-center justify-between gap-2">
                     {uploadComplete ? (
                         <>
-                            {importProcessUrl && importCancelUrl && (importStatus === 'processing' || importStatus === 'cancelling') && (
-                                <button
-                                    type="button"
-                                    onClick={handleCancelImport}
-                                    className="inline-flex items-center border px-3 py-1 rounded text-sm"
-                                    disabled={isCancellingImport}
-                                >
-                                    {isCancellingImport ? 'Annulation…' : "Annuler l'import"}
-                                </button>
-                            )}
+                            {importProcessUrl &&
+                                importCancelUrl &&
+                                (importStatus === 'processing' ||
+                                    importStatus === 'cancelling') && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelImport}
+                                        className="inline-flex items-center border px-3 py-1 rounded text-sm"
+                                        disabled={isCancellingImport}
+                                    >
+                                        {isCancellingImport
+                                            ? 'Annulation…'
+                                            : "Annuler l'import"}
+                                    </button>
+                                )}
                             <button
                                 type="button"
                                 onClick={handleClose}
                                 className="inline-flex items-center border px-3 py-1 rounded text-sm bg-primary text-primary-foreground disabled:opacity-70"
-                                disabled={Boolean(importProcessUrl && (importStatus === 'processing' || importStatus === 'cancelling'))}
+                                disabled={Boolean(
+                                    importProcessUrl &&
+                                    (importStatus === 'processing' ||
+                                        importStatus === 'cancelling'),
+                                )}
                             >
                                 Fermer
                             </button>
@@ -758,4 +886,3 @@ export function CsvUploadFilePond({
         </Dialog>
     );
 }
-

@@ -248,20 +248,9 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                         />
                     </div>
 
-
-
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
-<<<<<<< HEAD
-                            {canPreview && <CsvUploadFilePond config={{
-                                title: 'Upload CSV',
-                                description: 'Uploadez un fichier CSV',
-                                uploadUrl: '/upload',
-                                successRedirectUrl: products.index().url,
-                                buttonLabel: ''
-                            }} />
-                            }
-=======
+
                             <CsvUploadFilePond
                                 title="Upload CSV"
                                 description="Uploadez un fichier CSV"
@@ -269,7 +258,6 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                                 successRedirectUrl={products.index().url}
                                 buttonLabel=""
                             />
->>>>>>> importProducts
                             <DownloadCsvButton />
                         </div>
                     )}
