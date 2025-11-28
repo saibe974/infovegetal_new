@@ -172,14 +172,6 @@ export function CsvUploadFilePond({
         return match ? decodeURIComponent(match[1]) : null;
     };
 
-    const ensureCsrfCookie = async () => {
-        await fetch('/csrf-refresh', {
-            method: 'GET',
-            credentials: 'include',
-            headers: { Accept: 'application/json' },
-        });
-    };
-
 
     const handleCancel = () => {
         resetState();
@@ -197,11 +189,6 @@ export function CsvUploadFilePond({
     };
 
     const csrfToken = getCsrfToken() || '';
-    const getFreshCsrfToken = () => getCsrfToken() || '';
-    const csrfHeaders = () => ({
-        'X-CSRF-TOKEN': getFreshCsrfToken(),
-        'X-Requested-With': 'XMLHttpRequest',
-    });
 
     const startImport = useCallback(
         async (id: string) => {
@@ -227,7 +214,8 @@ export function CsvUploadFilePond({
                     headers: {
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
-                        ...csrfHeaders(),
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
                     body: JSON.stringify({
                         [importPayloadKey ?? 'id']: id,
@@ -332,7 +320,8 @@ export function CsvUploadFilePond({
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
-                    ...csrfHeaders(),
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
                 },
                 body: JSON.stringify({
                     [importPayloadKey ?? 'id']: uploadId,
@@ -476,7 +465,8 @@ export function CsvUploadFilePond({
                             headers: {
                                 'Content-Type': 'application/json',
                                 Accept: 'application/json',
-                                ...csrfHeaders(),
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
                             },
                             body: JSON.stringify({ id: uploadId }),
                         });
@@ -538,8 +528,6 @@ export function CsvUploadFilePond({
         importStatus,
         stopProgressPolling,
         uploadId,
-        importProcessChunkUrl,
-        csrfToken,
     ]);
 
     useEffect(() => {
@@ -639,51 +627,6 @@ export function CsvUploadFilePond({
         setImportError('Échec du téléversement.');
         return rawResponse || response;
     };
-    // ✅ Centralise la config FilePond avec un token donné
-    const buildPondServer = useCallback(
-        (token: string): FilePondProps['server'] => ({
-            url: uploadUrl,
-            process: {
-                url: '',
-                method: 'POST',
-                withCredentials: true, // ✅ cookies de session
-                headers: { 'X-CSRF-TOKEN': token },
-                onload: handleServerResponse,
-                onerror: handleServerError,
-            },
-            // NOTE: FilePond ne définit pas de propriété 'patch' dans le type server.
-            // Les requêtes PATCH de chunk upload réutilisent la config 'process' automatiquement.
-            revert: null,
-        }),
-        [uploadUrl],
-    );
-
-
-    // ✅ Option C: met à jour FilePond via la ref
-    const refreshPondCsrf = useCallback(() => {
-        const token = getFreshCsrfToken();
-        const pond = pondRef.current?.pond; // <-- instance FilePond native
-
-        if (pond && typeof pond.setOptions === 'function') {
-            pond.setOptions({
-                server: buildPondServer(token),
-            });
-        }
-    }, [buildPondServer]);
-
-
-    // ✅ à chaque ouverture, on rafraîchit les headers CSRF de FilePond
-    useEffect(() => {
-        if (!open || uploadComplete) return;
-
-        (async () => {
-            try {
-                await ensureCsrfCookie();          // ✅ pose/rafraîchit les cookies
-            } finally {
-                refreshPondCsrf();                // ✅ relit token APRES cookies
-            }
-        })();
-    }, [open, uploadComplete, refreshPondCsrf]);
 
 
     return (
@@ -730,7 +673,27 @@ export function CsvUploadFilePond({
                             chunkUploads={true}
                             chunkSize={1000000}
                             chunkRetryDelays={[500, 1000, 3000]}
-                            server={buildPondServer(csrfToken)}
+                            server={{
+                                url: uploadUrl,
+                                process: {
+                                    url: '',
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRF-TOKEN': csrfToken,
+                                    },
+                                    onload: handleServerResponse,
+                                    onerror: handleServerError,
+                                },
+                                patch: {
+                                    url: '?patch=',
+                                    headers: {
+                                        'X-CSRF-TOKEN': csrfToken,
+                                    },
+                                    onload: handleServerResponse,
+                                    onerror: handleServerError,
+                                },
+                                revert: null,
+                            }}
                             name="file"
                             labelIdle='Glissez-déposez votre fichier ou <span class="filepond--label-action">Parcourir</span>'
                             // acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
