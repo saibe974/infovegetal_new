@@ -142,5 +142,6 @@ class RoleSeeder extends Seeder
 
         // log output
         // $this->command->info('Roles and permissions created successfully!');
+        // tu peux y aller avec php artisan db:seed --class=RoleSeeder
     }
 }
