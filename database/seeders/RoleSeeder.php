@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
@@ -15,7 +14,7 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         // Créer les rôles
-        $devRole = Role::firstOrCreate(['name' => 'developer']);
+        $devRole = Role::firstOrCreate(['name' => 'dev']);
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $commercialRole = Role::firstOrCreate(['name' => 'commercial']);
         $supplierRole = Role::firstOrCreate(['name' => 'supplier']);
@@ -55,6 +54,7 @@ class RoleSeeder extends Seeder
             'create guests',
             'link commercials suppliers',
             'link commercials clients',
+            'preview',
         ];
 
         foreach ($permissions as $permission) {
@@ -64,8 +64,8 @@ class RoleSeeder extends Seeder
         // Assigner toutes les permissions à developer
         $devRole->syncPermissions(Permission::all());
 
-        // Assigner toutes les permissions à admin
-        $adminRole->syncPermissions(Permission::all());
+        // Assigner toutes les permissions à admin sauf preview
+        $adminRole->syncPermissions(Permission::all()->except('preview'));
 
         // Client peut seulement voir et créer des produits, voir ses propres prix, enregistrer une commande
         $clientRole->syncPermissions([

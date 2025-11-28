@@ -44,7 +44,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Assigner le rôle admin au premier utilisateur
+        // Assigner le rôle client
         if (!$clientUser->hasRole('client')) {
             $clientUser->assignRole('client');
         }
@@ -58,7 +58,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Assigner le rôle admin au premier utilisateur
+        // Assigner le rôle guest
         if (!$guest->hasRole('guest')) {
             $guest->assignRole('guest');
         }
