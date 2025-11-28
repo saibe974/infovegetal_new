@@ -21,7 +21,7 @@ class RoleSeeder extends Seeder
         $clientRole = Role::firstOrCreate(['name' => 'client']);
         $guestRole = Role::firstOrCreate(['name' => 'guest']);
 
-        // Créer des permissions (optionnel, pour plus tard)
+        // Créer des permissions (optionnel)
         $permissions = [
             'view products',
             'create products',
@@ -64,8 +64,10 @@ class RoleSeeder extends Seeder
         // Assigner toutes les permissions à developer
         $devRole->syncPermissions(Permission::all());
 
-        // Assigner toutes les permissions à admin sauf preview
-        $adminRole->syncPermissions(Permission::all()->except('preview'));
+        // Assigner toutes les permissions à admin sauf preview...
+        $adminRole->syncPermissions(Permission::all()->reject(fn($p) => in_array($p->name, [
+            'preview'
+        ])));
 
         // Client peut seulement voir et créer des produits, voir ses propres prix, enregistrer une commande
         $clientRole->syncPermissions([
@@ -138,6 +140,7 @@ class RoleSeeder extends Seeder
             'create guests',
         ]);
 
-        $this->command->info('Roles and permissions created successfully!');
+        // log output
+        // $this->command->info('Roles and permissions created successfully!');
     }
 }
