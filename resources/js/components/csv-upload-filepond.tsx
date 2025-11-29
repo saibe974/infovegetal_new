@@ -57,6 +57,7 @@ type CsvUploadFilePondProps = {
     onImportError?: (error: unknown) => void;
     buttonLabel?: string;
     buttonClassName?: string;
+
 };
 
 type ImportStatus =
@@ -160,6 +161,8 @@ export function CsvUploadFilePond({
             resetState();
         }
     };
+
+
 
     const getCsrfToken = () => {
         const meta = document.querySelector(

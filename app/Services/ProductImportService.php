@@ -43,6 +43,7 @@ class ProductImportService
                 return;
             }
 
+            // Préparer le fichier de rapport d'erreurs
             Storage::makeDirectory('imports/reports');
             $reportPath = Storage::path('imports/reports/' . $id . '.csv');
             $reportHandle = fopen($reportPath, file_exists($reportPath) ? 'a' : 'w');
@@ -60,6 +61,7 @@ class ProductImportService
             foreach ($originalHeaders as $header) {
                 $keyMap[$header] = $normalizeKey($header);
             }
+
 
             $cancelled = false;
 
