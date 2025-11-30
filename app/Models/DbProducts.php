@@ -17,4 +17,6 @@ class DbProducts extends Model
         'defaults' => 'array',
         'mergins' => 'array',
     ];
+
+    
 }

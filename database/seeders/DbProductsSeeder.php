@@ -16,12 +16,8 @@ class DbProductsSeeder extends Seeder
         DbProducts::firstOrCreate(
             ['name' => 'Infovegetal'],
             [
-                'description' => 'Description of Infovegetal',
-                'defaults' => [
-                    'barcode' => 'barcode',
-                    'ref' => 'ref',
-                    'name' => 'name',
-                ],
+                'description' => 'Bases Infovegetal',
+                'defaults' => [],
                 'mergins' => [],
             ]
         );
@@ -29,11 +25,14 @@ class DbProductsSeeder extends Seeder
         DbProducts::firstOrCreate(
             ['name' => 'Infovegetal_old'],
             [
-                'description' => 'Ancienne bases Infovegetal',
+                'description' => 'Anciennes bases Infovegetal',
                 'defaults' => [
-                    'barcode' => 'barcode',
-                    'ref' => 'ref',
-                    'name' => 'name',
+                    'sku' => 'bc_ref',
+                    'name' => 'latin',
+                    'description' => 'rem',
+                    'price' => 'prix',
+                    'img_link' => 'img',
+                    'product_category_id' => 'fam'
                 ],
                 'mergins' => [],
             ]

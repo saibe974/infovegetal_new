@@ -102,6 +102,41 @@ class ProductImportService
                 $validCategoryIds = \App\Models\ProductCategory::pluck('id')->all();
             }
 
+            // Charger un éventuel mapping personnalisé (db_products_id)
+            $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
+                ? (int) $state['db_products_id']
+                : null;
+            $defaultsMap = null;
+            Log::info("[Import][$id] db_products_id from state=", ['db_products_id' => $dbProductsId]);
+            if ($dbProductsId) {
+                try {
+                    /** @var \App\Models\DbProducts|null $dbp */
+                    $dbp = \App\Models\DbProducts::find($dbProductsId);
+                    Log::info("[Import][$id] DbProducts loaded", [
+                        'id' => $dbProductsId,
+                        'has_defaults' => $dbp && is_array($dbp->defaults),
+                    ]);
+                    if ($dbp && is_array($dbp->defaults) && !empty($dbp->defaults)) {
+                        $defaultsMap = $dbp->defaults; // ex: ['sku' => 'ref', 'name' => 'libelle', ...]
+                        Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Unable to load DbProducts defaults: ' . $e->getMessage());
+                }
+            }
+
+            $resolve = function (array $mapped, ?array $defaultsMap, string $targetKey) {
+                // Si un mapping existe et pointe vers une clé source, on la lit
+                if (is_array($defaultsMap) && isset($defaultsMap[$targetKey])) {
+                    $source = (string) $defaultsMap[$targetKey];
+                    if ($source !== '') {
+                        return $mapped[$source] ?? null;
+                    }
+                }
+                // Sinon fallback: lire directement la clé target
+                return $mapped[$targetKey] ?? null;
+            };
+
             foreach ($reader->getRecords() as $row) {
                 if (Cache::get("import:$id:cancel", false)) {
                     $cancelled = true;
@@ -118,8 +153,8 @@ class ProductImportService
                         continue;
                     }
 
-                    $sku = trim((string) ($mapped['sku'] ?? ''));
-                    $name = trim((string) ($mapped['name'] ?? ''));
+                    $sku = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
+                    $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
                     $currentSnapshot = [
                         'line' => $processed + $errors + 1,
                         'sku' => $sku !== '' ? $sku : null,
@@ -134,11 +169,21 @@ class ProductImportService
                         continue;
                     }
 
-                    $description = isset($mapped['description']) ? trim((string) $mapped['description']) : null;
-                    $imgLink = isset($mapped['img']) ? trim((string) $mapped['img']) : null;
-                    $price = isset($mapped['price']) && is_numeric($mapped['price']) ? (float) $mapped['price'] : 0;
-                    $active = isset($mapped['active']) ? (int) $mapped['active'] : 1;
-                    $productCategoryId = isset($mapped['product_category_id']) && is_numeric($mapped['product_category_id']) ? (int) $mapped['product_category_id'] : 51;
+                    $description = $resolve($mapped, $defaultsMap, 'description');
+                    $description = $description !== null ? trim((string) $description) : null;
+
+                    // Certains defaults utilisent 'img_link' comme clé cible
+                    $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
+                    $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
+
+                    $priceVal = $resolve($mapped, $defaultsMap, 'price');
+                    $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
+
+                    $activeVal = $resolve($mapped, $defaultsMap, 'active');
+                    $active = isset($activeVal) ? (int) $activeVal : 1;
+
+                    $catVal = $resolve($mapped, $defaultsMap, 'product_category_id');
+                    $productCategoryId = (isset($catVal) && is_numeric($catVal)) ? (int) $catVal : 51;
 
                     if (!in_array($productCategoryId, $validCategoryIds, true)) {
                         $productCategoryId = 51;
@@ -276,6 +321,35 @@ class ProductImportService
             $writer->insertOne($headers);
         };
 
+        // Charger le mapping defaults si disponible pour déterminer la clé SKU
+        $state = Cache::get("import:$id", []);
+        $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
+            ? (int) $state['db_products_id']
+            : null;
+
+        $defaultsMap = null;
+        if ($dbProductsId) {
+            try {
+                /** @var \App\Models\DbProducts|null $dbp */
+                $dbp = \App\Models\DbProducts::find($dbProductsId);
+                if ($dbp && is_array($dbp->defaults) && !empty($dbp->defaults)) {
+                    $defaultsMap = $dbp->defaults;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Unable to load DbProducts defaults in split: ' . $e->getMessage());
+            }
+        }
+
+        $resolve = function (array $mapped, ?array $defaultsMap, string $targetKey) {
+            if (is_array($defaultsMap) && isset($defaultsMap[$targetKey])) {
+                $source = (string) $defaultsMap[$targetKey];
+                if ($source !== '') {
+                    return $mapped[$source] ?? null;
+                }
+            }
+            return $mapped[$targetKey] ?? null;
+        };
+
         foreach ($reader->getRecords() as $row) {
             $mapped = [];
             foreach ($row as $key => $value) {
@@ -287,7 +361,9 @@ class ProductImportService
                 continue;
             }
 
-            $sku = trim((string) ($mapped['sku'] ?? ''));
+            // Utiliser le mapping pour déterminer la présence d'un SKU
+            $skuSource = $resolve($mapped, $defaultsMap, 'sku');
+            $sku = trim((string) ($skuSource ?? ''));
             if ($sku === '') {
                 continue;
             }

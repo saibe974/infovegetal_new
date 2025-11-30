@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { DownloadIcon } from 'lucide-react';
 import {
@@ -57,6 +57,7 @@ type CsvUploadFilePondProps = {
     onImportError?: (error: unknown) => void;
     buttonLabel?: string;
     buttonClassName?: string;
+    postTreatmentComponent?: React.ComponentType<any>;
 
 };
 
@@ -99,6 +100,7 @@ export function CsvUploadFilePond({
     onImportError,
     buttonLabel,
     buttonClassName,
+    postTreatmentComponent,
 }: CsvUploadFilePondProps) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<any[]>([]);
@@ -194,7 +196,7 @@ export function CsvUploadFilePond({
     const csrfToken = getCsrfToken() || '';
 
     const startImport = useCallback(
-        async (id: string) => {
+        async (id: string, settings?: { dbProductsId?: number }) => {
             if (!importProcessUrl) {
                 return;
             }
@@ -212,6 +214,15 @@ export function CsvUploadFilePond({
             setImportStatus('processing');
 
             try {
+                const body: any = {
+                    [importPayloadKey ?? 'id']: id,
+                };
+
+                // Ajouter les paramètres supplémentaires si fournis
+                if (settings?.dbProductsId) {
+                    body.db_products_id = settings.dbProductsId;
+                }
+
                 const response = await fetch(importProcessUrl, {
                     method: 'POST',
                     headers: {
@@ -220,9 +231,7 @@ export function CsvUploadFilePond({
                         'X-CSRF-TOKEN': csrfToken,
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify({
-                        [importPayloadKey ?? 'id']: id,
-                    }),
+                    body: JSON.stringify(body),
                 });
 
                 console.log('[Import] Response :', response);
@@ -371,6 +380,12 @@ export function CsvUploadFilePond({
             return;
         }
 
+        // Ne pas auto-démarrer si on a un composant de post-traitement
+        // (il gérera le démarrage via son formulaire)
+        if (postTreatmentComponent) {
+            return;
+        }
+
         if (importStatus !== 'idle') {
             return;
         }
@@ -382,6 +397,7 @@ export function CsvUploadFilePond({
         startImport,
         uploadComplete,
         uploadId,
+        postTreatmentComponent,
     ]);
 
     useEffect(() => {
@@ -708,100 +724,21 @@ export function CsvUploadFilePond({
                                 ✓ Fichier uploadé avec succès
                             </p>
 
-                            {importProcessUrl && (
-                                <>
-                                    {(importStatus === 'processing' ||
-                                        importStatus === 'cancelling') && (
-                                            <div className="space-y-2">
-                                                <p className="text-sm text-muted-foreground">
-                                                    {(importStatus ===
-                                                        'cancelling' ||
-                                                        progressInfo?.status ===
-                                                        'cancelling')
-                                                        ? 'Annulation en cours…'
-                                                        : 'Import en cours…'}
-                                                </p>
-                                                <div className="w-full h-2 rounded bg-muted">
-                                                    <div
-                                                        className="h-2 rounded bg-primary transition-all"
-                                                        style={{
-                                                            width: `${Math.min(
-                                                                displayProgress,
-                                                                100,
-                                                            )}%`,
-                                                        }}
-                                                    />
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {progressInfo?.errors ?? 0}{' '}
-                                                    erreurs
-                                                </p>
-
-                                                {importError && (
-                                                    <p className="text-xs text-destructive">
-                                                        {importError}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-
-                                    {importStatus === 'finished' && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-muted-foreground">
-                                                Import terminé.
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {progressInfo?.processed ?? 0}{' '}
-                                                lignes traitées
-                                                {typeof progressInfo?.errors ===
-                                                    'number'
-                                                    ? ` · ${progressInfo.errors} erreurs`
-                                                    : ''}
-                                            </p>
-                                            {progressInfo?.report && (
-                                                <a
-                                                    href={progressInfo.report}
-                                                    className="text-sm text-primary underline"
-                                                >
-                                                    Télécharger le rapport
-                                                    d'erreurs
-                                                </a>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {importStatus === 'cancelled' && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-muted-foreground">
-                                                Import annulé.
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Vous pouvez fermer cette fenêtre
-                                                ou relancer un nouvel import si
-                                                nécessaire.
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {importStatus === 'error' && (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-destructive">
-                                                {importError ??
-                                                    "Impossible de traiter l'import."}
-                                            </p>
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleRetryImport}
-                                                    className="inline-flex items-center border px-2 py-1 rounded text-sm"
-                                                    disabled={!uploadId}
-                                                >
-                                                    Réessayer
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
+                            {importProcessUrl && postTreatmentComponent && (
+                                React.createElement(postTreatmentComponent, {
+                                    importStatus,
+                                    importError,
+                                    progressInfo,
+                                    displayProgress,
+                                    handleRetryImport,
+                                    uploadId,
+                                    onStartImport: (settings: any) => {
+                                        // Déclencher l'import avec les paramètres choisis
+                                        if (uploadId) {
+                                            void startImport(uploadId, settings);
+                                        }
+                                    },
+                                })
                             )}
                         </div>
                     )}

@@ -14,6 +14,7 @@ import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
+import ProductsImportTreatment from '@/components/products/import';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -191,6 +192,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                 importProcessChunkUrl={products.admin.import.process_chunk.url()}
                                 importCancelUrl={products.admin.import.cancel.url()}
                                 importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                                postTreatmentComponent={ProductsImportTreatment}
                                 buttonLabel=''
                             />
                             <DownloadCsvButton />

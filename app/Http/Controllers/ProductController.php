@@ -65,8 +65,15 @@ class ProductController extends Controller
     {
         $data = $request->validate(['id' => 'required|string']);
         $id = $data['id'];
+        $dbProductsId = $request->integer('db_products_id'); // optionnel
 
-        $state = Cache::get("import:$id");
+        // Mettez/mergez l'état dans le cache pour cet import
+        $state = Cache::get("import:$id", []);
+        Cache::put("import:$id", array_merge($state, [
+            'status' => 'processing',
+            'db_products_id' => $dbProductsId, // peut être null si non fourni
+        ]), now()->addHour());
+
         if (!$state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
