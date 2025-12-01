@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +17,6 @@ class ProductImportService
         // Première étape : découper le fichier CSV source en fichiers temporaires de données
         $this->splitIntoTempFiles($id, $fullPath, $limit);
 
-        // ❌ Ne pas lancer le traitement d'import pour l'instant
         $this->runChunk($id, $relativePath, 0);
     }
 
@@ -62,7 +62,6 @@ class ProductImportService
                 $keyMap[$header] = $normalizeKey($header);
             }
 
-
             $cancelled = false;
 
             $updateProgress = function (?array $current) use (&$processed, &$errors, &$total, $id, $relativePath) {
@@ -96,29 +95,52 @@ class ProductImportService
             $currentIndex = 0;
             $upsertRows = [];
 
-            // Précharger les catégories valides une seule fois
+            // Précharger les IDs valides de category_products (ancienne erreur : utilisait ProductCategory)
             static $validCategoryIds = null;
             if ($validCategoryIds === null) {
-                $validCategoryIds = \App\Models\ProductCategory::pluck('id')->all();
+                try {
+                    $validCategoryIds = \App\Models\CategoryProducts::pluck('id')->all();
+                } catch (\Throwable $e) {
+                    Log::warning('[Import]['.$id.'] Impossible de charger category_products ids: '.$e->getMessage());
+                    $validCategoryIds = [];
+                }
             }
-
+            
             // Charger un éventuel mapping personnalisé (db_products_id)
             $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
                 ? (int) $state['db_products_id']
                 : null;
             $defaultsMap = null;
-            Log::info("[Import][$id] db_products_id from state=", ['db_products_id' => $dbProductsId]);
+            $defaultsMapCategories = [];
+            $traitement = null;
+            // Log::info("[Import][$id] db_products_id from state=", ['db_products_id' => $dbProductsId]);
             if ($dbProductsId) {
                 try {
                     /** @var \App\Models\DbProducts|null $dbp */
                     $dbp = \App\Models\DbProducts::find($dbProductsId);
-                    Log::info("[Import][$id] DbProducts loaded", [
-                        'id' => $dbProductsId,
-                        'has_defaults' => $dbp && is_array($dbp->defaults),
-                    ]);
-                    if ($dbp && is_array($dbp->defaults) && !empty($dbp->defaults)) {
-                        $defaultsMap = $dbp->defaults; // ex: ['sku' => 'ref', 'name' => 'libelle', ...]
-                        Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
+                    // Log::info("[Import][$id] DbProducts loaded", [
+                    //     'id' => $dbProductsId,
+                    //     'has_defaults' => $dbp && is_array($dbp->defaults),
+                    // ]);
+                    if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
+                        $defaultsMap = $dbp->champs;
+                        // Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
+                    }
+
+                    if ($dbp && is_array($dbp->categories) && !empty($dbp->categories)) {
+                        $defaultsMapCategories = $dbp->categories;
+                        // Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
+                    }
+
+                    if ($dbp && $dbp->traitement) {
+                        $traitementPath = __DIR__ . '/ProductImportTraitement/' . $dbp->traitement . '.php';
+                        if (file_exists($traitementPath)) {
+                            $traitement = $dbp->traitement;
+                            require_once $traitementPath;
+                            Log::info("[Import][$id] Traitement loaded: {$dbp->traitement}");
+                        } else {
+                            Log::warning("[Import][$id] Traitement file not found: {$traitementPath}");
+                        }
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Unable to load DbProducts defaults: ' . $e->getMessage());
@@ -153,51 +175,84 @@ class ProductImportService
                         continue;
                     }
 
-                    $sku = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
-                    $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
-                    $currentSnapshot = [
-                        'line' => $processed + $errors + 1,
-                        'sku' => $sku !== '' ? $sku : null,
-                        'name' => $name !== '' ? $name : null,
-                    ];
+                    $f = null;
+                    if($traitement)
+                        $f = 'importProducts_'.$traitement;
+                    if(function_exists($f)):
+                        $newRow = $f(array(
+                            'mapped' => $mapped, 
+                            'defaultsMap' => $defaultsMap,
+                            'processed' => $processed,
+                            'errors' => $errors,
+                            'reportHandle' => $reportHandle,
+                            'updateProgress' => $updateProgress,
+                            'currentIndex' => $currentIndex,
+                            'validCategoryIds' => $validCategoryIds,
+                            'defaultsMapCategories' => $defaultsMapCategories,
+                        ), $resolve);
 
-                    if ($sku === '' || $name === '') {
-                        $errors++;
-                        $this->writeReportLine($reportHandle, $processed + $errors, 'Missing sku or name', $row, $mapped);
-                        $updateProgress($currentSnapshot);
-                        $currentIndex++;
-                        continue;
-                    }
+                        if(isset($newRow['error'])):
+                            $errors++;
+                            $this->writeReportLine($reportHandle, $processed + $errors, $newRow['error'], $row, $mapped);
+                            $currentSnapshot = [
+                                'line' => $processed + $errors,
+                                'sku' => $mapped['sku'] ?? null,
+                                'name' => $mapped['name'] ?? null,
+                            ];
+                            $updateProgress($currentSnapshot);
+                            $currentIndex++;
+                            continue;
+                        endif;
+                    else:
+                        $sku = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
+                        $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
+                        $currentSnapshot = [
+                            'line' => $processed + $errors + 1,
+                            'sku' => $sku !== '' ? $sku : null,
+                            'name' => $name !== '' ? $name : null,
+                        ];
 
-                    $description = $resolve($mapped, $defaultsMap, 'description');
-                    $description = $description !== null ? trim((string) $description) : null;
+                        if ($sku === '' || $name === '') {
+                            $errors++;
+                            $this->writeReportLine($reportHandle, $processed + $errors, 'Missing sku or name', $row, $mapped);
+                            $updateProgress($currentSnapshot);
+                            $currentIndex++;
+                            continue;
+                        }
 
-                    // Certains defaults utilisent 'img_link' comme clé cible
-                    $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
-                    $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
+                        $description = $resolve($mapped, $defaultsMap, 'description');
+                        $description = $description !== null ? trim((string) $description) : null;
 
-                    $priceVal = $resolve($mapped, $defaultsMap, 'price');
-                    $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
+                        $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
+                        $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
 
-                    $activeVal = $resolve($mapped, $defaultsMap, 'active');
-                    $active = isset($activeVal) ? (int) $activeVal : 1;
+                        $priceVal = $resolve($mapped, $defaultsMap, 'price');
+                        $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
 
-                    $catVal = $resolve($mapped, $defaultsMap, 'product_category_id');
-                    $productCategoryId = (isset($catVal) && is_numeric($catVal)) ? (int) $catVal : 51;
+                        $activeVal = $resolve($mapped, $defaultsMap, 'active');
+                        $active = isset($activeVal) ? (int) $activeVal : 1;
 
-                    if (!in_array($productCategoryId, $validCategoryIds, true)) {
-                        $productCategoryId = 51;
-                    }
+                        $catVal = $resolve($mapped, $defaultsMap, 'category_products_id');
+                        $productCategoryId = (isset($catVal) && is_numeric($catVal)) ? (int) $catVal : 51;
 
-                    $upsertRows[] = [
-                        'sku' => $sku,
-                        'name' => $name,
-                        'description' => $description,
-                        'img_link' => $imgLink !== null ? 'https://www.infovegetal.com/files/' . $imgLink : null,
-                        'price' => $price,
-                        'active' => $active,
-                        'product_category_id' => $productCategoryId,
-                    ];
+                        if (!in_array($productCategoryId, $validCategoryIds, true)) {
+                            $productCategoryId = 51;
+                        }
+
+                        $newRow = [
+                            'sku' => $sku,
+                            'name' => $name,
+                            'description' => $description,
+                            'img_link' => $imgLink,
+                            'price' => $price,
+                            'active' => $active,
+                            'category_products_id' => $productCategoryId,
+                            
+                        ];
+                    endif;
+
+                    $upsertRows[] = $newRow;
+               
 
                     $processed++;
                     $currentSnapshot['line'] = $processed + $errors;
@@ -218,14 +273,38 @@ class ProductImportService
             }
 
             // Une fois toutes les lignes du chunk parcourues, exécuter un upsert global
+            // Diagnostic FK avant l'upsert massif
             if (!empty($upsertRows)) {
-                Product::withoutEvents(function () use ($upsertRows) {
-                    Product::upsert(
-                        $upsertRows,
-                        ['sku'],
-                        ['name', 'description', 'img_link', 'price', 'active', 'product_category_id']
-                    );
-                });
+                $idsToCheck = array_values(array_unique(array_filter(array_map(function ($r) {
+                    return $r['category_products_id'] ?? null;
+                }, $upsertRows), function ($v) { return $v !== null; })));
+                try {
+                    $existingIds = DB::table('category_products')->whereIn('id', $idsToCheck)->pluck('id')->all();
+                } catch (\Throwable $e) {
+                    $existingIds = [];
+                    Log::warning('[Import]['.$id.'] Impossible de récupérer les IDs catégories: '.$e->getMessage());
+                }
+                $missing = array_values(array_diff($idsToCheck, $existingIds));
+                // Log::debug('[Import]['.$id.'] Category FK diagnostic', [
+                //     'ids_to_check' => $idsToCheck,
+                //     'existing' => $existingIds,
+                //     'missing' => $missing,
+                //     'rows' => count($upsertRows)
+                // ]);
+            }
+
+            // Upsert par lots de 100 pour éviter les problèmes de contraintes
+            if (!empty($upsertRows)) {
+                $chunks = array_chunk($upsertRows, 100);
+                foreach ($chunks as $chunk) {
+                    Product::withoutEvents(function () use ($chunk, $id) {
+                        Product::upsert(
+                            $chunk,
+                            ['sku'],
+                            ['name', 'description', 'img_link', 'price', 'active', 'category_products_id']
+                        );
+                    });
+                }
             }
 
             if (isset($reportHandle) && $reportHandle) {
@@ -327,13 +406,16 @@ class ProductImportService
             ? (int) $state['db_products_id']
             : null;
 
+        Log::info("[Import][Split][$id] db_products_id from cache: $dbProductsId");
+
         $defaultsMap = null;
         if ($dbProductsId) {
             try {
                 /** @var \App\Models\DbProducts|null $dbp */
                 $dbp = \App\Models\DbProducts::find($dbProductsId);
-                if ($dbp && is_array($dbp->defaults) && !empty($dbp->defaults)) {
-                    $defaultsMap = $dbp->defaults;
+                if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
+                    $defaultsMap = $dbp->champs;
+                    Log::info("[Import][Split][$id] Loaded defaultsMap", ['map' => $defaultsMap]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('Unable to load DbProducts defaults in split: ' . $e->getMessage());
@@ -350,7 +432,9 @@ class ProductImportService
             return $mapped[$targetKey] ?? null;
         };
 
+        $lineCount = 0;
         foreach ($reader->getRecords() as $row) {
+            $lineCount++;
             $mapped = [];
             foreach ($row as $key => $value) {
                 $normalizedKey = $normalizeKey($key);
@@ -358,13 +442,24 @@ class ProductImportService
             }
 
             if (!$this->rowHasContent($mapped)) {
+                Log::info("[Import][Split][$id] Line $lineCount: empty row, skipped");
                 continue;
             }
 
             // Utiliser le mapping pour déterminer la présence d'un SKU
             $skuSource = $resolve($mapped, $defaultsMap, 'sku');
             $sku = trim((string) ($skuSource ?? ''));
+            
+            if ($lineCount <= 3) {
+                Log::info("[Import][Split][$id] Line $lineCount: sku resolved", [
+                    'sku_source' => $skuSource,
+                    'sku' => $sku,
+                    'mapped_keys' => array_keys($mapped)
+                ]);
+            }
+            
             if ($sku === '') {
+                Log::info("[Import][Split][$id] Line $lineCount: empty SKU, skipped");
                 continue;
             }
 

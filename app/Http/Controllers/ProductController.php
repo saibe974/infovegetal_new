@@ -67,13 +67,8 @@ class ProductController extends Controller
         $id = $data['id'];
         $dbProductsId = $request->integer('db_products_id'); // optionnel
 
-        // Mettez/mergez l'état dans le cache pour cet import
         $state = Cache::get("import:$id", []);
-        Cache::put("import:$id", array_merge($state, [
-            'status' => 'processing',
-            'db_products_id' => $dbProductsId, // peut être null si non fourni
-        ]), now()->addHour());
-
+        
         if (!$state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
@@ -87,6 +82,7 @@ class ProductController extends Controller
 
         $relativePath = $path;
 
+        // IMPORTANT: Mettre db_products_id dans le cache AVANT splitIntoTempFiles
         $this->updateImportState($id, [
             'status' => 'processing',
             'processed' => 0,
@@ -98,9 +94,10 @@ class ProductController extends Controller
             'path' => $relativePath,
             'next_offset' => 0,
             'has_more' => true,
+            'db_products_id' => $dbProductsId, // Crucial pour le mapping dans splitIntoTempFiles
         ]);
 
-        Log::info("Import started synchronously for ID: $id");
+        Log::info("Import started synchronously for ID: $id with db_products_id: $dbProductsId");
 
         // Premier chunk synchronisé via le service (chunk index 0)
         $importService->run($id, $fullPath, $relativePath);
@@ -240,14 +237,14 @@ class ProductController extends Controller
         $callback = function () {
             $handle = fopen('php://output', 'w');
             // header (séparateur ';')
-            fputcsv($handle, ['id', 'sku', 'name', 'category', 'description', 'price', 'active'], ';');
+            fputcsv($handle, ['sku', 'name', 'img_link', 'category', 'description', 'price', 'active'], ';');
 
             Product::with('category')->chunk(100, function ($products) use ($handle) {
                 foreach ($products as $p) {
                     fputcsv($handle, [
-                        $p->id,
                         $p->sku,
                         $p->name,
+                        $p->img_link,
                         $p->category?->name,
                         $p->description,
                         $p->price,

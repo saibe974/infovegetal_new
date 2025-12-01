@@ -10,11 +10,16 @@ class DbProducts extends Model
         'name',
         'description',
         'defaults',
+        'champs',
+        'categories',
+        'traitement',
         'mergins',
     ];
 
     protected $casts = [
         'defaults' => 'array',
+        'champs' => 'array',
+        'categories' => 'array',
         'mergins' => 'array',
     ];
 

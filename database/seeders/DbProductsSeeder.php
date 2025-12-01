@@ -17,8 +17,8 @@ class DbProductsSeeder extends Seeder
             ['name' => 'Infovegetal'],
             [
                 'description' => 'Bases Infovegetal',
-                'defaults' => [],
-                'mergins' => [],
+                'champs' => [],
+                'categories' => [],
             ]
         );
 
@@ -26,15 +26,34 @@ class DbProductsSeeder extends Seeder
             ['name' => 'Infovegetal_old'],
             [
                 'description' => 'Anciennes bases Infovegetal',
-                'defaults' => [
+                'champs' => [
                     'sku' => 'bc_ref',
                     'name' => 'latin',
                     'description' => 'rem',
                     'price' => 'prix',
                     'img_link' => 'img',
-                    'product_category_id' => 'fam'
+                    'category_products_id' => 'fam'
                 ],
-                'mergins' => [],
+                'categories' => [],
+                'traitement' => 'infovegetal_old',
+            ]
+        );
+
+
+        DbProducts::firstOrCreate(
+            ['name' => 'Eurofleurs'],
+            [
+                'description' => 'Bases Eurofleurs',
+                'champs' => [
+                    'sku' => 'ean',
+                    'name' => 'article',
+                    'description' => 'rem',
+                    'price' => 'prix_plaque',
+                    'img_link' => 'image',
+                    'category_products_name' => 'groupe'
+                ],
+                'categories' => [],
+                'traitement' => 'eurofleurs',
             ]
         );
     }

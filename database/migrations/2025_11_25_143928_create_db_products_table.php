@@ -16,8 +16,8 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->tinyText('description')->nullable();
-            $table->json('defaults')->nullable();
-            $table->json('mergins')->nullable();
+            $table->json('champs')->nullable();
+            $table->json('categories')->nullable();
             $table->timestamps();
         });
 

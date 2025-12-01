@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\ProductCategory;
+use App\Models\CategoryProducts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Product extends Model
@@ -19,7 +19,8 @@ class Product extends Model
         'price',
         'active',
         'attributes',
-        'product_category_id',
+        'category_products_id',
+        
     ];
 
     protected $sortable = [
@@ -30,7 +31,7 @@ class Product extends Model
         'active',
         'created_at',
         'updated_at',
-        'product_category_id',
+        'category_products_id',
     ];
 
     protected $casts = [
@@ -44,7 +45,7 @@ class Product extends Model
 
     public function category()
     {
-        return $this->belongsTo(ProductCategory::class, 'product_category_id');
+        return $this->belongsTo(CategoryProducts::class, 'category_products_id');
     }
 
     public function tags()

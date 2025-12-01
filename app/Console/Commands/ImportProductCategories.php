@@ -119,11 +119,15 @@ class ImportProductCategories extends Command
 
     protected function mapRow(array $r): array
     {
+        $id = $r['id'] ?? null;
+        $id = is_numeric($id) ? (int)$id : null;
+        
         $name = $r['name'] ?? null;
         $name = is_string($name) ? trim($name) : null;
         if ($name === '') $name = null;
 
         return [
+            'id' => $id,
             'name' => $name,
         ];
     }
@@ -141,9 +145,9 @@ class ImportProductCategories extends Command
             $r['updated_at'] = $now;
         }
 
-        // upsert by name (unique)
+        // upsert by id (primary key)
         try {
-            DB::table('product_categories')->upsert($rows, ['name'], ['updated_at']);
+            DB::table('category_products')->upsert($rows, ['id'], ['name', 'updated_at']);
             $this->info("Persisté batch de " . count($rows) . " catégories");
         } catch (\Throwable $e) {
             $this->error('Erreur lors de l\'import des catégories: ' . $e->getMessage());
