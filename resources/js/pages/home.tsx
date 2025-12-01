@@ -22,6 +22,7 @@ import { AppFooter } from '@/components/app.footer';
 import { Carousel, CarouselContent } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay"
 import { ProductsCarousel } from '@/components/products-carousel';
+import { Link } from "@inertiajs/react"
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/' },
@@ -68,10 +69,12 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
                 {/* <ProductsCardsList limit={4} products={seasonProducts} /> */}
 
                 <ProductsCarousel products={seasonProducts} />
-         
-                <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
-                    {t('Tout afficher')}
-                </Button>
+
+                <Link href='/products'>
+                    <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
+                        {t('Tout afficher')}
+                    </Button>
+                </Link>
             </div>
 
             <AboutSection />

@@ -131,7 +131,7 @@ export function AppSidebarHeader({
                     )}
 
                     <div className=''>
-                        <div className="w-full flex items-center justify-between gap-6">
+                        <div className="w-full flex items-center justify-between gap-4">
                             {/* <div className='flex items-center gap-2'> */}
                             {auth.user ? (
                                 // <NavigationMenuItem className=''>
@@ -139,21 +139,21 @@ export function AppSidebarHeader({
                                 // </NavigationMenuItem>
                             ) : (
                                 <DropdownMenu>
-                                    <DropdownMenuTrigger className='flex items-center'>
+                                    <DropdownMenuTrigger className='flex items-center hover:bg-sidebar-accent p-2 rounded-md transition-colors'>
                                         <UserIcon />
                                         <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className='flex flex-col items-start gap-2 p-4'>
                                         <Link
                                             href={login()}
-                                            className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
+                                            className="w-full text-center inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b] hover:bg-accent"
                                         >
                                             {t('Log in')}
                                         </Link>
                                         <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
                                         <Link
                                             href={register()}
-                                            className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                            className="w-full text-center inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b] hover:bg-accent"
                                         >
                                             {t('Register')}
                                         </Link>
@@ -161,7 +161,7 @@ export function AppSidebarHeader({
                                 </DropdownMenu>
                             )}
                             <div>
-                                <div className={''}>
+                                <div className={'hover:bg-sidebar-accent p-2 rounded-md transition-colors'}>
                                     <Link href="/#"><ShoppingCart size={21} /></Link>
                                 </div>
                             </div>
@@ -181,7 +181,7 @@ export function AppSidebarHeader({
                             </div>
 
 
-                            <div className='hidden lg:flex'>
+                            <div className='hidden lg:flex gap-2 pl-2'>
                                 {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
                                 {/* <NavigationMenuContent className=''> */}
                                 <SelectLang />
