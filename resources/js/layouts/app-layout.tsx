@@ -1,3 +1,4 @@
+import ScrollToTopButton from '@/components/ui/scroll-to-top-btn';
 import { Toaster } from '@/components/ui/sonner';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import type { SharedData, BreadcrumbItem } from '@/types';
@@ -36,6 +37,7 @@ export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], component: FC<T>
         <div className="p-2 lg:p-4">
             {page}
         </div>
+        <ScrollToTopButton />
     </AppLayout>;
     return component;
 }
