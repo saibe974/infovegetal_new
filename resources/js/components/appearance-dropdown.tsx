@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useI18n } from '@/lib/i18n';
-import { ChevronDownIcon, Monitor, Moon, Sun } from 'lucide-react';
+import { ChevronDownIcon, EllipsisVertical, Monitor, Moon, Sun } from 'lucide-react';
 import { HTMLAttributes } from 'react';
 
 export default function AppearanceToggleDropdown({
@@ -37,9 +37,10 @@ export default function AppearanceToggleDropdown({
                         size="icon"
                         className="h-9 w-9 rounded-md"
                     >
-                        {getCurrentIcon()}
+                        <span className='lg:hidden'>{getCurrentIcon()}</span>
                         <span className="sr-only">Toggle theme</span>
-                        <ChevronDownIcon className="size-5 opacity-100 text-muted-foreground md:hidden" />
+                        <EllipsisVertical className='hidden lg:block size-6' />
+                        <ChevronDownIcon className="size-5 opacity-100 text-muted-foreground lg:hidden" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
