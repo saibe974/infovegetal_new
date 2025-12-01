@@ -113,8 +113,20 @@ export default function servicesSection({ active }: { active: boolean }) {
                                 : " hover:bg-black/10 dark:hover:bg-accent"
                                 } focus:outline-none focus:ring-2 focus:ring-ring`}
                         >
+                            {/* overlay gradient pour améliorer le contraste */}
+                            {activeId === item.id && (
+                                <div className="absolute inset-0 pointer-events-none">
+                                    {/* SVG de fond avec opacité réduite */}
+                                    <div className="w-full h-full opacity-30 text-main-purple dark:text-main-green">
+                                        <AnimatedSVG svg={activeItem.svg} />
+                                    </div>
+                                    {/* calque de gradient entre le SVG et le texte (clair en light, sombre en dark) */}
+                                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white/50 via-white/10 to-transparent dark:from-black/60 dark:via-black/20" />
+                                </div>
+                            )}
+
                             {/* top-right affordance */}
-                            <div className="absolute top-3 right-3 flex items-center gap-2">
+                            <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
                                 <MoreHorizontal
                                     aria-hidden="true"
                                     className={`w-5 h-5 transition-opacity ${activeId === item.id ? "opacity-0" : "opacity-100"}`}
@@ -125,13 +137,13 @@ export default function servicesSection({ active }: { active: boolean }) {
                                 />
                             </div>
 
-                            <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex ">
+                            <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex relative z-30">
                                 <span className={`about-title w-fit ${activeId !== item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
 
                             <p
-                                className="about-text text-left text-md lg:text-lg mt-2 overflow-hidden"
+                                className="about-text text-left text-md lg:text-lg mt-2 overflow-hidden relative z-30"
                                 style={{ opacity: activeId === item.id ? 1 : 0 }}
                                 dangerouslySetInnerHTML={{ __html: item.text }}
                             />
@@ -142,9 +154,9 @@ export default function servicesSection({ active }: { active: boolean }) {
                     ))}
                 </div>
 
-                <div className="flex items-center justify-center w-1/4 text-main-purple dark:text-main-green">
+                {/* <div className="flex items-center justify-center w-1/4 text-main-purple dark:text-main-green">
                     {<AnimatedSVG svg={activeItem.svg} />}
-                </div>
+                </div> */}
             </div>
         </section>
     );

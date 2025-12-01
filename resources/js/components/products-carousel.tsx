@@ -24,7 +24,7 @@ export function ProductsCarousel({ products }: Props) {
     return (
         <Carousel
             // plugins={[plugin.current]}
-            className="w-[80%] md:w-[90%] xl:w-full mx-auto"
+            className="w-full md:w-[90%] xl:w-full mx-auto"
         // onMouseEnter={plugin.current.stop}
         // onMouseLeave={plugin.current.reset}
         >

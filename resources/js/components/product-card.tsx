@@ -58,7 +58,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                 </div>
 
                 <CardHeader className="p-0">
-                    <img src={img} alt={name} className="w-full h-70 object-cover rounded bg-background" />
+                    <img src={img} alt={name} className="w-full max-w-100 h-70 object-cover rounded bg-background" />
                 </CardHeader>
 
                 <CardTitle className="text-lg font-semibold  whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
