@@ -3,7 +3,7 @@ import gsap from "gsap";
 import DrawSVGPlugin from "gsap/DrawSVGPlugin";
 import AnimatedSVG from "./animatedSVG";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { services } from '../data/services'
+import { services } from '../lib/services'
 import { SplitText } from "gsap/SplitText";
 import { MousePointer, ChevronDown, MoreHorizontal } from "lucide-react";
 
@@ -126,7 +126,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                             </div>
 
                             <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex ">
-                                <span className={`about-title w-fit ${activeId === item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
+                                <span className={`about-title w-fit ${activeId !== item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
 
