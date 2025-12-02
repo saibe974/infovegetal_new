@@ -73,8 +73,8 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '20%' }} />
                 <col style={{ width: '15%' }} />
-                <col style={{ width: '25%' }} />
-                <col style={{ width: '10%' }} />
+                <col style={{ width: (canEdit || canDelete) ? '25%' : '40%' }} />
+                <col style={{ width: (canEdit || canDelete) ? '10%' : '20%' }} />
                 <col style={{ width: 'auto' }} />
             </colgroup>
 
@@ -83,23 +83,23 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 className=""
             >
                 <TableRow
-                    className="w-full"
+                    className="w-full flex "
                 >
 
-                    <TableHead className="w-1/5">ID</TableHead>
-                    <TableHead className=""></TableHead>
-                    <TableHead className="w-1/5">Name</TableHead>
-                    <TableHead className="w-1/5">Category</TableHead>
-                    <TableHead className="w-1/5">Description</TableHead>
-                    <TableHead className="w-1/6">Price (€)</TableHead>
-                    {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
+                    <TableHead className="w-[10%] pt-2.5">ID</TableHead>
+                    <TableHead className="w-[10%] pt-2.5"></TableHead>
+                    <TableHead className="w-[20%] pt-2.5">Name</TableHead>
+                    <TableHead className="w-[15%] pt-2.5">Category</TableHead>
+                    <TableHead className="w-[25%] pt-2.5">Description</TableHead>
+                    <TableHead className={`${(canEdit || canDelete) ? 'w-[10%]' : 'w-[20%] text-end pr-4'} pt-2.5`}>Price (€)</TableHead>
+                    {(canEdit || canDelete) && <TableHead className="text-end w-[10%] pt-2.5">Actions</TableHead>}
 
                 </TableRow>
             </TableHeader>
             {/* </BasicSticky> */}
             <TableBody>
                 {collection.data.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="">
                         <TableCell>{item.id}</TableCell>
                         <TableCell>
                             {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
