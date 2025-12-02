@@ -11,7 +11,7 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { edit } from '@/routes/password';
+import { edit, update } from '@/routes/password';
 
 export default function Password() {
     const { t } = useI18n();
@@ -37,8 +37,7 @@ export default function Password() {
                     />
 
                     <Form
-                        action="/password"
-                        method="patch"
+                        {...update.form()}
                         options={{
                             preserveScroll: true,
                         }}

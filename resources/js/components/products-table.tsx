@@ -1,5 +1,6 @@
 import React from "react";
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
+import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/sortable-table-head';
 import { Link } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +18,10 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>ID</TableHead>
+                    <SortableTableHead field='id'>ID</SortableTableHead>
                     <TableHead></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
+                    <SortableTableHead field='name'>Name</SortableTableHead>
+                    <SortableTableHead field='category_products_id'>Category</SortableTableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Price</TableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}

@@ -364,12 +364,14 @@ class ProductController extends Controller
         
         $lowerSearch = mb_strtolower($search);
 
-        // Récupération des noms distincts
-        $propositions = (clone $query)
+        // Récupération des noms distincts - réinitialiser le ORDER BY pour éviter les conflits
+        $clonedQuery = clone $query;
+        $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
+        
+        $propositions = $clonedQuery
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
             ->pluck('name');
-            // ->get();
 
 
         // --- 🧹 Nettoyage et déduplication ---

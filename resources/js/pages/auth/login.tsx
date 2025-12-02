@@ -41,7 +41,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     type="email"
                                     name="email"
                                     required
-                                    autoFocus
+                                    // autoFocus
                                     tabIndex={1}
                                     autoComplete="email"
                                     placeholder={t('email@example.com')}

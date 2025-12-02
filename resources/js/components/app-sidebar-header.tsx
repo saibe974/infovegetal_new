@@ -143,7 +143,7 @@ export function AppSidebarHeader({
                                         <UserIcon />
                                         <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent className='flex flex-col items-start gap-2 p-4'>
+                                    <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
                                         <Link
                                             href={login()}
                                             className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
@@ -153,7 +153,7 @@ export function AppSidebarHeader({
                                         <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
                                         <Link
                                             href={register()}
-                                            className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                            className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
                                         >
                                             {t('Register')}
                                         </Link>

@@ -13,7 +13,7 @@ import { SelectWithItems } from '@/components/ui/select-with-items';
 import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit } from '@/routes/profile';
+import { edit, update } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
 import { isAdmin } from '@/lib/roles';
 
@@ -46,8 +46,7 @@ export default function Profile({
                     />
 
                     <Form
-                        action="/profile"
-                        method="patch"
+                        {...update.form()}
                         options={{
                             preserveScroll: true,
                         }}
