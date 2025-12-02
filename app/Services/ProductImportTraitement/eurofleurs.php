@@ -23,21 +23,39 @@ function importProducts_eurofleurs($params = array(), $resolve)
 
     extract($params);
 
-    // Concaténer ean et identifiant mappé (sku) pour le SKU
-    // Remarque: le CSV Eurofleurs a une colonne "id" (pas "ref").
-    // On utilise d'abord la clé logique 'sku' (qui doit être mappée vers 'id' ou 'ref' dans DbProducts->champs),
-    // puis on retombe sur 'ref' ou 'id' si nécessaire.
+    // Récupérer EAN depuis le CSV (s'il existe dans le mapping)
     $ean = trim((string) ($resolve($mapped, $defaultsMap, 'ean') ?? ''));
-    $base = trim((string) (
-        $resolve($mapped, $defaultsMap, 'sku')
-        ?? $resolve($mapped, $defaultsMap, 'ref')
-        ?? $resolve($mapped, $defaultsMap, 'id')
-        ?? ''
-    ));
-    $sku = ($ean !== '' && $ean !== '-')
-        ? ($base !== '' ? ($ean . '_' . $base) : $ean)
-        : $base;
-    
+
+    // Si l'EAN est absent ou égal à '-', on le génère à partir de l'id
+    if ($ean === '' || $ean === '-') {
+        $idVal = $resolve($mapped, $defaultsMap, 'id');
+        if ($idVal !== null) {
+            $generatedEan = generateEAN13FromId($idVal);
+            if ($generatedEan !== null) {
+                $ean = $generatedEan;
+            }
+        }
+    }
+
+    // Récupérer la "ref" logique (dans ton defaultsMap: "ref" => "id")
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
+
+    // Construire le SKU au format : ean_ref_21000
+    // - si pas d'EAN ou pas de ref, on évite de mettre des "__"
+    $skuParts = [];
+
+    if ($ean !== '' && $ean !== '-') {
+        $skuParts[] = $ean;
+    }
+
+    if ($ref !== '') {
+        $skuParts[] = $ref;
+    }
+
+    $skuParts[] = '21000';
+
+    $sku = implode('_', $skuParts);
+
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
 
     if ($sku === '' || $name === '') {
@@ -78,3 +96,39 @@ function importProducts_eurofleurs($params = array(), $resolve)
     return $newRow;
 }
 
+/**
+ * Génère un EAN-13 basé sur l'ID produit.
+ * Format : 40 00627 + ID (complété à 5 chiffres) + clé de contrôle
+ *
+ * @param string|int $id
+ * @return string|null  EAN complet ou null si ID invalide
+ */
+function generateEAN13FromId($id): ?string
+{
+    // Convertir en string et nettoyer
+    $id = trim((string) $id);
+
+    // ID doit être numérique
+    if ($id === '' || !ctype_digit($id)) {
+        return null;
+    }
+
+    // Compléter à 5 chiffres (zéros à gauche)
+    $idPadded = str_pad($id, 5, '0', STR_PAD_LEFT);
+
+    // 12 premiers chiffres
+    $ean12 = '40' . '00627' . $idPadded; // 40 00627 XXXXX
+
+    // Calcul de la clé de contrôle EAN-13
+    $sum = 0;
+    for ($i = 0; $i < 12; $i++) {
+        $digit = (int) $ean12[$i];
+        // positions impaires (index 0,2,4,...) poids 1
+        // positions paires (index 1,3,5,...) poids 3
+        $sum += ($i % 2 === 0) ? $digit : $digit * 3;
+    }
+
+    $check = (10 - ($sum % 10)) % 10;
+
+    return $ean12 . $check;
+}
