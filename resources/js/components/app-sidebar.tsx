@@ -32,7 +32,7 @@ import users from '@/routes/users';
 
 export function AppSidebar() {
     const page = usePage();
-    console.log(page.props);
+    // console.log(page.props);
     const { t } = useI18n();
 
     const { auth, locale } = usePage<SharedData>().props;

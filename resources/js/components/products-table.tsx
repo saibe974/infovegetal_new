@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EditIcon, TrashIcon } from 'lucide-react';
 import { type Product, PaginatedCollection } from '@/types';
+import BasicSticky from "react-sticky-el";
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -13,19 +14,89 @@ type Props = {
 };
 
 export default function ProductsTable({ collection, canEdit = false, canDelete = false }: Props) {
+    const [topOffset, setTopOffset] = useState<number>(0);
+    const [width, setWidth] = useState<number>(0);
+
+    useEffect(() => {
+        const selector = '.search-sticky'; // classe à ajouter sur le sticky du dessus
+        const selector2 = '.top-sticky'; // classe à ajouter sur le sticky du dessus
+        const getHeight = () => {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            const el2 = document.querySelector(selector2) as HTMLElement | null;
+            // console.log('heights:', el?.getBoundingClientRect().height, el2?.getBoundingClientRect().height);
+            return el && el2 ? Math.ceil(el.getBoundingClientRect().height + el2.getBoundingClientRect().height) : 0;
+        };
+
+        const getWidth = () => {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            return el ? Math.ceil(el.getBoundingClientRect().width - 12) : 0;
+        }
+
+        const update = () => { setTopOffset(getHeight()), setWidth(getWidth()) };
+        update();
+        // console.log(topOffset)
+        window.addEventListener('resize', update);
+
+        // ResizeObserver pour réagir aux changements de layout (sidebar resize)
+        let ro: ResizeObserver | null = null;
+        const headerEl = document.querySelector(selector) as HTMLElement | null;
+        if (headerEl && typeof ResizeObserver !== 'undefined') {
+            ro = new ResizeObserver(update);
+            ro.observe(headerEl);
+        }
+
+        // MutationObserver pour changements structurels (optionnel)
+        // const obs = new MutationObserver(update);
+        // const parent = document.body;
+        // obs.observe(parent, { childList: true, subtree: true });
+
+        return () => {
+            window.removeEventListener('resize', update);
+            // obs.disconnect();
+            if (ro) ro.disconnect();
+        };
+    }, []);
+
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Price</TableHead>
+        <Table
+        // style={{ tableLayout: 'fixed', width: '100%', top: topOffset }}
+        >
+            {/* <BasicSticky
+                topOffset={topOffset}
+                stickyStyle={{ top: topOffset, width: '100%' }}
+                stickyClassName="bg-background"
+                wrapperClassName="w-full"
+            > */}
+
+            <colgroup>
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: 'auto' }} />
+            </colgroup>
+
+            <TableHeader
+                style={{ position: 'fixed', top: topOffset, width: '100%', maxWidth: width, }}
+                className=""
+            >
+                <TableRow
+                    className="w-full"
+                >
+
+                    <TableHead className="w-1/5">ID</TableHead>
+                    <TableHead className=""></TableHead>
+                    <TableHead className="w-1/5">Name</TableHead>
+                    <TableHead className="w-1/5">Category</TableHead>
+                    <TableHead className="w-1/5">Description</TableHead>
+                    <TableHead className="w-1/6">Price (€)</TableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
+
                 </TableRow>
             </TableHeader>
+            {/* </BasicSticky> */}
             <TableBody>
                 {collection.data.map((item) => (
                     <TableRow key={item.id}>
@@ -38,7 +109,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 href={canEdit ? `/admin/products/${item.id}/edit` : `/products/${item.id}`}
                                 className="hover:underline"
                             >
-                                {item.name}
+                                {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
                             </Link>
                         </TableCell>
                         <TableCell>{item.category ? item.category.name : ''}</TableCell>
@@ -56,7 +127,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 )}
                             </div>
                         </TableCell>
-                        <TableCell>{item.price}</TableCell>
+                        <TableCell>{item.price} €</TableCell>
                         {(canEdit || canDelete) && (
                             <TableCell>
                                 <div className="flex gap-2 justify-end">

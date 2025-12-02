@@ -105,8 +105,9 @@ export function AppSidebarHeader({
 
     return (
         <>
-            <BasicSticky stickyClassName="bg-sidebar " wrapperClassName="top-sticky relative z-21 bg-sidebar" >
-                <header className="z-21 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0 w-full" >
+            <BasicSticky stickyClassName="" wrapperClassName="top-sticky relative z-21 bg-sidebar" >
+                {/* <div className="bg-sidebar w-full top-sticky z-21 sticky top-0" > */}
+                <header className="z-21 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear md:px-4 sticky top-0 w-full" >
 
                     <div className='flex items-center gap-2'>
                         <SidebarTrigger className="-ml-1" />
@@ -193,6 +194,7 @@ export function AppSidebarHeader({
                         </div>
                     </div>
                 </header >
+                {/* </div > */}
             </BasicSticky >
         </>
     );

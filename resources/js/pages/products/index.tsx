@@ -14,6 +14,7 @@ import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
+import Sticky from 'react-sticky-el/lib/basic-version';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -44,6 +45,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     const [search, setSearch] = useState('');
 
     const [topOffset, setTopOffset] = useState<number>(0);
+    const [width, setWidth] = useState<number>(0);
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
@@ -68,16 +70,32 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
         };
 
-        const update = () => setTopOffset(getHeight());
+        const getWidth = () => {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            return el ? Math.ceil(el.getBoundingClientRect().width) : 0;
+        }
+
+        const update = () => { setTopOffset(getHeight()), setWidth(getWidth()) };
         update();
         window.addEventListener('resize', update);
-        // si ton layout change dynamiquement (menu mobile), tu peux aussi observer le DOM :
-        const obs = new MutationObserver(update);
-        const parent = document.body;
-        obs.observe(parent, { childList: true, subtree: true });
+
+        // ResizeObserver pour réagir aux changements de layout (sidebar resize)
+        let ro: ResizeObserver | null = null;
+        const headerEl = document.querySelector(selector) as HTMLElement | null;
+        if (headerEl && typeof ResizeObserver !== 'undefined') {
+            ro = new ResizeObserver(update);
+            ro.observe(headerEl);
+        }
+
+        // MutationObserver pour changements structurels (optionnel)
+        // const obs = new MutationObserver(update);
+        // const parent = document.body;
+        // obs.observe(parent, { childList: true, subtree: true });
+
         return () => {
             window.removeEventListener('resize', update);
-            obs.disconnect();
+            // obs.disconnect();
+            if (ro) ro.disconnect();
         };
     }, []);
 
@@ -128,12 +146,17 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection);
 
     return (
-        <div>
-            <BasicSticky
+        <div style={{marginTop: topOffset + 27}}>
+            {/* <Sticky
                 topOffset={topOffset}
                 stickyStyle={{ top: topOffset }}
                 stickyClassName="bg-background"
-                wrapperClassName="relative z-20"
+                wrapperClassName="search-sticky relative z-20"
+                // scrollElement={'.main'}
+            > */}
+            <div
+                className="search-sticky z-20 w-full bg-background border-b border-border/50 px-4 py-2 "
+                style={{ position: 'fixed', top: topOffset,  maxWidth: width - 20, }}
             >
                 <div className="flex items-center py-2 relative w-full">
 
@@ -197,7 +220,8 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         </div>
                     )}
                 </div>
-            </BasicSticky>
+            </div>
+            {/* </Sticky> */}
 
             <InfiniteScroll data="collection">
                 {viewMode === 'table' ? (

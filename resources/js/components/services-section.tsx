@@ -137,7 +137,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                                 />
                             </div>
 
-                            <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex relative z-30">
+                            <h3 className="about-title-parent font-inter font-normal text-lg lg:text-xl w-full gap-3 flex relative">
                                 <span className={`about-title w-fit ${activeId !== item.id ? "" : "text-main-purple dark:text-main-green"}`}>0{item.id}</span>
                                 <span className="about-title transition-all duration-200">{item.title}</span>
                             </h3>
