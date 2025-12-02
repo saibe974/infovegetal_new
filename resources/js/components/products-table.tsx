@@ -60,6 +60,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
     return (
         <Table
         // style={{ tableLayout: 'fixed', width: '100%', top: topOffset }}
+        className="rounded-t-none"
         >
             {/* <BasicSticky
                 topOffset={topOffset}
@@ -79,8 +80,8 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
             </colgroup>
 
             <TableHeader
-                style={{ position: 'fixed', top: topOffset, width: '100%', maxWidth: width, }}
-                className=""
+                style={{ position: 'fixed', top: topOffset, width: width, }}
+                // className="border"
             >
                 <TableRow
                     className="w-full flex "
@@ -97,7 +98,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 </TableRow>
             </TableHeader>
             {/* </BasicSticky> */}
-            <TableBody>
+            <TableBody className="">
                 {collection.data.map((item) => (
                     <TableRow key={item.id} className="">
                         <TableCell>{item.id}</TableCell>
