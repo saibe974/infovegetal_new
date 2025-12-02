@@ -69,6 +69,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
     $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
 
     $priceVal = $resolve($mapped, $defaultsMap, 'price');
+    $priceVal = str_replace(',', '.', (string) $priceVal);
     $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
