@@ -47,7 +47,7 @@ export function AppFooter() {
     ]
 
     return (
-        <footer className="w-full border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
+        <footer className="w-full mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
             <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-20 md:gap-0 items-center">
 
                 <div className="md:flex-1 items-start flex justify-center">

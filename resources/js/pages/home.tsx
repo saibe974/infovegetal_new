@@ -86,7 +86,6 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
             </div>
             <ServicesSection active={true} />
 
-            <AppFooter />
         </div>
     );
 })

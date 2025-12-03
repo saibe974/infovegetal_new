@@ -138,7 +138,6 @@ export default withAppLayout(breadcrumbs, () => {
                 </div>
             </Form>
 
-            <AppFooter />
         </div>
 
     );

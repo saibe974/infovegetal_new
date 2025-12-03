@@ -39,7 +39,6 @@ export default withAppLayout(breadcrumbs, () => {
 
 
 
-            <AppFooter />
 
         </div>
 

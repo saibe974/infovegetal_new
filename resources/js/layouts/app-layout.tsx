@@ -1,3 +1,4 @@
+import { AppFooter } from '@/components/app.footer';
 import ScrollToTopButton from '@/components/ui/scroll-to-top-btn';
 import { Toaster } from '@/components/ui/sonner';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
@@ -36,6 +37,7 @@ export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], component: FC<T>
     component.layout = (page: ReactNode) => <AppLayout breadcrumbs={breadcrumbs}>
         <div className="p-2 lg:p-4">
             {page}
+            <AppFooter />
         </div>
         <ScrollToTopButton />
     </AppLayout>;

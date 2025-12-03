@@ -22,7 +22,6 @@ export default withAppLayout(breadcrumbs, () => {
                 <h2 className='text-4xl'>Conditions de vente</h2>
             </div>
 
-            <AppFooter />
 
         </div>
 
