@@ -1,13 +1,13 @@
 <?php
 /*----------------------------------*\
 
-	traitement spécifique DB eurofleurs
+	traitement spécifique DB peplant
 
 \*----------------------------------*/
 
 use Symfony\Component\String\Slugger\SluggerInterface;
 
-function importProducts_eurofleurs($params = array(), $resolve)
+function importProducts_peplant($params = array(), $resolve)
 {
    $params = array_merge([
        'mapped' => [],
@@ -23,40 +23,32 @@ function importProducts_eurofleurs($params = array(), $resolve)
 
     extract($params);
 
-    // Récupérer EAN depuis le CSV (s'il existe dans le mapping)
-    $ean = trim((string) ($resolve($mapped, $defaultsMap, 'ean') ?? ''));
+    // Récupérer barcode, ref et leverancier depuis le CSV
+    // Note: barcode est mappé vers 'sku' pour le split, donc on accède directement à $mapped['barcode']
+    $barcode = trim((string) ($mapped['barcode'] ?? ''));
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref_peplant') ?? ''));
+    $leverancier = trim((string) ($resolve($mapped, $defaultsMap, 'leverancier_peplant') ?? '1000'));
 
-    // Si l'EAN est absent ou égal à '-', on le génère à partir de l'id
-    if ($ean === '' || $ean === '-') {
-        $idVal = $resolve($mapped, $defaultsMap, 'id');
-        if ($idVal !== null) {
-            $generatedEan = generateEAN13FromId($idVal);
-            if ($generatedEan !== null) {
-                $ean = $generatedEan;
-            }
-        }
-    }
-
-    // Récupérer la "ref" logique (dans ton defaultsMap: "ref" => "id")
-    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
-
-    // Construire le SKU au format : ean_ref_21000
-    // - si pas d'EAN ou pas de ref, on évite de mettre des "__"
+    // Construire le SKU au format : barcode_ref_leverancier
     $skuParts = [];
 
-    if ($ean !== '' && $ean !== '-') {
-        $skuParts[] = $ean;
+    if ($barcode !== '') {
+        $skuParts[] = $barcode;
     }
 
     if ($ref !== '') {
         $skuParts[] = $ref;
     }
 
-    $skuParts[] = '21000';
+    if ($leverancier !== '') {
+        $skuParts[] = $leverancier;
+    }
 
     $sku = implode('_', $skuParts);
 
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
+    $name = mb_strtolower($name); // Convertir en minuscules
+    $name = preg_replace('/\s+/', ' ', $name); // Nettoyer les espaces multiples
 
     if ($sku === '' || $name === '') {
         return ['error' => 'Missing sku or name', 'row' => $mapped];
@@ -71,14 +63,13 @@ function importProducts_eurofleurs($params = array(), $resolve)
     $priceVal = $resolve($mapped, $defaultsMap, 'price');
     $search = array(',', ' ', '€', "\xc2\xa0");
     $replace = array('.', '', '', '');
-    $priceVal = str_replace($search, $replace, (floatval($priceVal)));
+    $priceVal = str_replace($search, $replace, (string) $priceVal);
     $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;
 
     // Résoudre la catégorie via slug dans defaultsMapCategories
-    // Utiliser la clé alignée avec les seeders: 'category_products_name'
     $catVal = $resolve($mapped, $defaultsMap, 'category_products_name');
     $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger();
     $catSlug = $slugger->slug((string)$catVal)->lower()->toString();
@@ -98,41 +89,4 @@ function importProducts_eurofleurs($params = array(), $resolve)
         'category_products_id' => $productCategoryId,
     ];
     return $newRow;
-}
-
-/**
- * Génère un EAN-13 basé sur l'ID produit.
- * Format : 40 00627 + ID (complété à 5 chiffres) + clé de contrôle
- *
- * @param string|int $id
- * @return string|null  EAN complet ou null si ID invalide
- */
-function generateEAN13FromId($id): ?string
-{
-    // Convertir en string et nettoyer
-    $id = trim((string) $id);
-
-    // ID doit être numérique
-    if ($id === '' || !ctype_digit($id)) {
-        return null;
-    }
-
-    // Compléter à 5 chiffres (zéros à gauche)
-    $idPadded = str_pad($id, 5, '0', STR_PAD_LEFT);
-
-    // 12 premiers chiffres
-    $ean12 = '40' . '00627' . $idPadded; // 40 00627 XXXXX
-
-    // Calcul de la clé de contrôle EAN-13
-    $sum = 0;
-    for ($i = 0; $i < 12; $i++) {
-        $digit = (int) $ean12[$i];
-        // positions impaires (index 0,2,4,...) poids 1
-        // positions paires (index 1,3,5,...) poids 3
-        $sum += ($i % 2 === 0) ? $digit : $digit * 3;
-    }
-
-    $check = (10 - ($sum % 10)) % 10;
-
-    return $ean12 . $check;
 }

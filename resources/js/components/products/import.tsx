@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Loader2 } from 'lucide-react';
 
 type ImportProgressPayload = {
     status?: string;
@@ -114,7 +115,7 @@ export function ProductsImportTreatment({
                     <p className="text-sm text-muted-foreground">
                         {importStatus === 'cancelling' || progressInfo?.status === 'cancelling'
                             ? 'Annulation en cours…'
-                            : 'Import en cours…'}
+                            : <>Import en cours <Loader2 className="inline-block ml-2 animate-spin" size={16} /></>}
                     </p>
                     <div className="w-full h-2 rounded bg-muted">
                         <div

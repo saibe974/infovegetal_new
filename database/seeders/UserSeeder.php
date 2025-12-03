@@ -21,8 +21,27 @@ class UserSeeder extends Seeder
 
         // User::factory(10)->create();
 
+
+        /* Créer un utilisateur développeur */
+        // $dev = User::firstOrCreate(
+        //     ['email' => 'dev@dev.com'],
+        //     [
+        //         'name' => 'Developer',
+        //         'password' => Hash::make('dev1234'),
+        //         'email_verified_at' => now(),
+        //     ]
+        // );
+
+        // // Assigner le rôle de dev
+        // if (!$dev->hasRole('dev')) {
+        //     $dev->assignRole('dev');
+        // }
+        
+
+
+        // Créer un utilisateur admin       
         $adminUser = User::firstOrCreate(
-            ['email' => 'contact@devali.fr'],
+            ['email' => 'admin@admin.com'],
             [
                 'name' => 'Admin',
                 'password' => Hash::make('admin1234'),
@@ -30,11 +49,12 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // Assigner le rôle admin au premier utilisateur
         if (!$adminUser->hasRole('admin')) {
             $adminUser->assignRole('admin');
         }
         
+
+
         $clientUser = User::firstOrCreate(
             ['email' => 'client@client.com'],
             [
@@ -49,6 +69,8 @@ class UserSeeder extends Seeder
             $clientUser->assignRole('client');
         }
 
+
+        
         $guest = User::firstOrCreate(
             ['email' => 'guest@guest.com'],
             [

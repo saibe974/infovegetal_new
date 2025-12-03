@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 use League\Csv\Writer;
+use Symfony\Component\String\Slugger\AsciiSlugger;
 
 class ProductImportService
 {
@@ -26,7 +27,10 @@ class ProductImportService
             $normalizeKey = function ($value): string {
                 $string = (string) $value;
                 $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
-                return mb_strtolower(trim($string));
+                $string = trim($string);
+                $slugger = new AsciiSlugger();
+                // Slug hyphen-case afin de rendre les en-têtes stables: ex "prix plaque" => "prix-plaque"
+                return $slugger->slug($string)->lower()->toString();
             };
 
             $state = Cache::get("import:$id", []);
@@ -95,7 +99,7 @@ class ProductImportService
             $currentIndex = 0;
             $upsertRows = [];
 
-            // Précharger les IDs valides de category_products (ancienne erreur : utilisait ProductCategory)
+            // Précharger les IDs valides de category_products
             static $validCategoryIds = null;
             if ($validCategoryIds === null) {
                 try {
@@ -146,16 +150,17 @@ class ProductImportService
                     Log::warning('Unable to load DbProducts defaults: ' . $e->getMessage());
                 }
             }
-
             $resolve = function (array $mapped, ?array $defaultsMap, string $targetKey) {
-                // Si un mapping existe et pointe vers une clé source, on la lit
-                if (is_array($defaultsMap) && isset($defaultsMap[$targetKey])) {
-                    $source = (string) $defaultsMap[$targetKey];
-                    if ($source !== '') {
-                        return $mapped[$source] ?? null;
+                if (is_array($defaultsMap)) {
+                    // Mapping : source -> cible
+                    $sourceKey = array_search($targetKey, $defaultsMap, true);
+                    if ($sourceKey !== false) {
+                        $sourceKey = (string) $sourceKey;
+                        if ($sourceKey !== '') {
+                            return $mapped[$sourceKey] ?? null;
+                        }
                     }
                 }
-                // Sinon fallback: lire directement la clé target
                 return $mapped[$targetKey] ?? null;
             };
 
@@ -371,7 +376,9 @@ class ProductImportService
         $normalizeKey = function ($value): string {
             $string = (string) $value;
             $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
-            return mb_strtolower(trim($string));
+            $string = trim($string);
+            $slugger = new AsciiSlugger();
+            return $slugger->slug($string)->lower()->toString();
         };
 
         $reader = Reader::from($fullPath, 'r');
@@ -423,10 +430,14 @@ class ProductImportService
         }
 
         $resolve = function (array $mapped, ?array $defaultsMap, string $targetKey) {
-            if (is_array($defaultsMap) && isset($defaultsMap[$targetKey])) {
-                $source = (string) $defaultsMap[$targetKey];
-                if ($source !== '') {
-                    return $mapped[$source] ?? null;
+            if (is_array($defaultsMap)) {
+                // Mapping inversé: source -> cible
+                $sourceKey = array_search($targetKey, $defaultsMap, true);
+                if ($sourceKey !== false) {
+                    $sourceKey = (string) $sourceKey;
+                    if ($sourceKey !== '') {
+                        return $mapped[$sourceKey] ?? null;
+                    }
                 }
             }
             return $mapped[$targetKey] ?? null;
