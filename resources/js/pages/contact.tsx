@@ -44,98 +44,102 @@ export default withAppLayout(breadcrumbs, () => {
 
 
     return (
-        <Form className="space-y-4 w-full">
-            <Head title="Contact" />
+        <div className='min-h-screen flex flex-col gap-30'>
+            <Form className="space-y-4 w-full">
+                <Head title="Contact" />
 
 
-            <div className="flex items-center py-2 gap-2 justify-between">
-                <div className="flex items-center gap-2">
-                    <Link href="#"
-                        onClick={(e) => { e.preventDefault(); window.history.back(); }}>
-                        <ArrowLeftCircle size={35}/>
-                    </Link>
+                <div className="flex items-center py-2 gap-2 justify-between">
+                    <div className="flex items-center gap-2">
+                        <Link href="#"
+                            onClick={(e) => { e.preventDefault(); window.history.back(); }}>
+                            <ArrowLeftCircle size={35} />
+                        </Link>
+                    </div>
                 </div>
-            </div>
 
 
-            <div className="w-full max-w-lg mx-auto">
-                <h2 className='text-3xl py-5 text-center'>Nous Contacter</h2>
-                <main className="space-y-4 relative">
-                    <FormField
-                        label="Nom"
-                        htmlFor="name"
-                    >
-                        <Input
-                            id="name"
-                            name="name"
-                            type='text'
-                            placeholder='Votre nom'
-                            className='border border-gray-300 rounded-md px-3 py-2 w-full'
-                        />
-                    </FormField>
+                <div className="w-full max-w-lg mx-auto">
+                    <h2 className='text-3xl py-5 text-center'>Nous Contacter</h2>
+                    <main className="space-y-4 relative">
+                        <FormField
+                            label="Nom"
+                            htmlFor="name"
+                        >
+                            <Input
+                                id="name"
+                                name="name"
+                                type='text'
+                                placeholder='Votre nom'
+                                className='border border-gray-300 rounded-md px-3 py-2 w-full'
+                            />
+                        </FormField>
 
-                    <FormField
-                        label="Email"
-                        htmlFor="email"
-                    >
-                        <Input
-                            id="email"
-                            name="email"
-                            type='email'
-                            placeholder='Votre email'
-                            className='border border-gray-300 rounded-md px-3 py-2 w-full'
-                        />
-                    </FormField>
+                        <FormField
+                            label="Email"
+                            htmlFor="email"
+                        >
+                            <Input
+                                id="email"
+                                name="email"
+                                type='email'
+                                placeholder='Votre email'
+                                className='border border-gray-300 rounded-md px-3 py-2 w-full'
+                            />
+                        </FormField>
 
-                    <FormField
-                        label="Destinataire"
-                        htmlFor="recipient"
-                    >
-                        <SelectWithItems
-                            id="recipient"
-                            name="recipient"
-                            items={RECIPIENT}
-                            placeholder='Destinataire'
-                            className='border border-gray-300 rounded-md px-3 py-2 w-full h-10'
-                        />
-                    </FormField>
+                        <FormField
+                            label="Destinataire"
+                            htmlFor="recipient"
+                        >
+                            <SelectWithItems
+                                id="recipient"
+                                name="recipient"
+                                items={RECIPIENT}
+                                placeholder='Destinataire'
+                                className='border border-gray-300 rounded-md px-3 py-2 w-full h-10'
+                            />
+                        </FormField>
 
-                    <FormField
-                        label="Objet"
-                        htmlFor="subject"
-                    >
-                        <Input
-                            id="subject"
-                            name="subject"
-                            type='text'
-                            placeholder='Objet de votre message'
-                            className='border border-gray-300 rounded-md px-3 py-2 w-full'
-                        />
-                    </FormField>
+                        <FormField
+                            label="Objet"
+                            htmlFor="subject"
+                        >
+                            <Input
+                                id="subject"
+                                name="subject"
+                                type='text'
+                                placeholder='Objet de votre message'
+                                className='border border-gray-300 rounded-md px-3 py-2 w-full'
+                            />
+                        </FormField>
 
-                    <FormField
-                        label="Message"
-                        htmlFor="message"
-                    >
-                        <Textarea
-                            id="message"
-                            name="message"
-                            placeholder='Votre message...'
-                            className='border border-gray-300 rounded-md px-3 py-2 w-full min-h-30'
-                        />
-                    </FormField>
+                        <FormField
+                            label="Message"
+                            htmlFor="message"
+                        >
+                            <Textarea
+                                id="message"
+                                name="message"
+                                placeholder='Votre message...'
+                                className='border border-gray-300 rounded-md px-3 py-2 w-full min-h-30'
+                            />
+                        </FormField>
 
 
 
-                    <Button
-                        className='border border-gray-300 rounded-xl px-3 py-2 w-1/2 h-12 absolute right-0 bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover cursor-pointer'
-                    >
-                        Envoyer
-                    </Button>
+                        <Button
+                            className='border border-gray-300 rounded-xl px-3 py-2 w-1/2 h-12 absolute right-0 bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover cursor-pointer'
+                        >
+                            Envoyer
+                        </Button>
 
-                </main>
-            </div>
-        </Form>
+                    </main>
+                </div>
+            </Form>
+
+            <AppFooter />
+        </div>
 
     );
 })
