@@ -38,7 +38,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
     }
 
     // Récupérer la "ref" logique (dans ton defaultsMap: "ref" => "id")
-    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
 
     // Construire le SKU au format : ean_ref_21000
     // - si pas d'EAN ou pas de ref, on évite de mettre des "__"

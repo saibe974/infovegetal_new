@@ -27,7 +27,7 @@ class DbProductsSeeder extends Seeder
             [
                 'description' => 'Anciennes bases Infovegetal',
                 'champs' => [
-                    'bc_ref' => 'sku',
+                    'bc-ref' => 'sku',
                     'latin' => 'name',
                     'rem' => 'description',
                     'prix' => 'price',
@@ -45,7 +45,7 @@ class DbProductsSeeder extends Seeder
             [
                 'description' => 'Bases Eurofleurs',
                 'champs' => [
-                    'id' => 'ref',
+                    'id' => 'sku',
                     'article' => 'name',
                     'remarque' => 'description',
                     'prix-plaque' => 'price',

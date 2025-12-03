@@ -193,6 +193,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                                 importCancelUrl={products.admin.import.cancel.url()}
                                 importProgressUrl={(id) => products.admin.import.progress.url({ id })}
                                 postTreatmentComponent={ProductsImportTreatment}
+                                successRedirectUrl={products.index().url}
                                 buttonLabel=''
                             />
                             <DownloadCsvButton />
