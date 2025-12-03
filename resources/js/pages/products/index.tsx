@@ -3,7 +3,7 @@ import products from '@/routes/products';
 import { useEffect, useRef, useState } from 'react';
 import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
+import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -147,6 +147,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
     return (
         <div style={{marginTop: topOffset + 27}}>
+            <Head title="Products" />
             {/* <Sticky
                 topOffset={topOffset}
                 stickyStyle={{ top: topOffset }}

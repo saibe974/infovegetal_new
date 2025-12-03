@@ -15,7 +15,7 @@ class homeController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category','tags'])->orderFromRequest($request);
+        $query = Product::with(['category', 'tags'])->orderFromRequest($request);
         $search = $request->get('q');
 
         // if ($search) {
@@ -40,11 +40,34 @@ class homeController extends Controller
 
         return inertia('home', [
             'q' => $search,
-            'collection' => inertia()->scroll(fn () => ProductResource::collection(
+            'collection' => inertia()->scroll(fn() => ProductResource::collection(
                 (clone $query)->paginate(10)
             )),
-            'searchPropositions' => inertia()->optional(fn () => ProductController::getSearchPropositions(clone $query, $search)),
+            'searchPropositions' => inertia()->optional(fn() => ProductController::getSearchPropositions(clone $query, $search)),
         ]);
     }
 
+    public function documentation(Request $request)
+    {
+        
+        return inertia('documentation', []);
+    }
+
+    public function legalNotices(Request $request)
+    {
+        
+        return inertia('legals/legal-notices', []);
+    }
+
+    public function saleConditions(Request $request)
+    {
+        
+        return inertia('legals/sale-conditions', []);
+    }
+
+    public function ourPolicy(Request $request)
+    {
+        
+        return inertia('legals/our-policy', []);
+    }
 }

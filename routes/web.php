@@ -10,6 +10,10 @@ use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ContactController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
+Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
+Route::get('/legals/legal-notices', [homeController::class, 'legalNotices'])->name('legal.notices');
+Route::get('/legals/sale-conditions', [homeController::class, 'saleConditions'])->name('legal.sale_conditions');
+Route::get('/legals/our-policy', [homeController::class, 'ourPolicy'])->name('legal.our_policy');
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 
 // Routes publiques de consultation des produits

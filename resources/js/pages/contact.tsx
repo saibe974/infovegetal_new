@@ -48,14 +48,14 @@ export default withAppLayout(breadcrumbs, () => {
             <Head title="Contact" />
 
 
-            {/* <div className="flex items-center py-2 gap-2 justify-between">
+            <div className="flex items-center py-2 gap-2 justify-between">
                 <div className="flex items-center gap-2">
                     <Link href="#"
                         onClick={(e) => { e.preventDefault(); window.history.back(); }}>
                         <ArrowLeftCircle size={35}/>
                     </Link>
                 </div>
-            </div> */}
+            </div>
 
 
             <div className="w-full max-w-lg mx-auto">
@@ -129,7 +129,9 @@ export default withAppLayout(breadcrumbs, () => {
 
                     <Button
                         className='border border-gray-300 rounded-xl px-3 py-2 w-1/2 h-12 absolute right-0 bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover cursor-pointer'
-                    >Envoyer</Button>
+                    >
+                        Envoyer
+                    </Button>
 
                 </main>
             </div>

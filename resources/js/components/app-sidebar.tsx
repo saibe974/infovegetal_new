@@ -1,4 +1,4 @@
-import { NavFooter } from '@/components/nav-footer';
+import NavFooterExtended, { NavFooter } from '@/components/nav-footer';
 import NavMain, { NavMainExtended } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -14,10 +14,10 @@ import {
     SidebarGroup,
     SidebarGroupLabel
 } from '@/components/ui/sidebar';
-import { contact, dashboard } from '@/routes';
+import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon } from 'lucide-react';
+import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
@@ -27,6 +27,7 @@ import { useI18n } from '@/lib/i18n';
 import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 
 import users from '@/routes/users';
+import legal from '@/routes/legal';
 
 // Items are built inside the component to access the t() helper
 
@@ -51,7 +52,7 @@ export function AppSidebar() {
 
     let title: string = '';
     let mainNavItems: NavItemExtended[] = [];
-    let footerNavItems: NavItem[] = [];
+    let footerNavItems: NavItemExtended[] = [];
 
     if (isAuthenticated) {
         // title = t('Administration');
@@ -112,14 +113,41 @@ export function AppSidebar() {
             },
             {
                 title: t('Documentation'),
-                href: 'https://laravel.com/docs/starter-kits#react',
+                href: documentation(),
                 icon: BookOpen,
+                target: '_blank',
             },
             {
                 title: t('Repository'),
                 href: 'https://github.com/saibe974/infovegetal_new',
                 icon: Folder,
+                target: '_blank',
             },
+            {
+                title: t('Infos'),
+                href: '',
+                icon: Info,
+                subItems: [
+                    {
+                        title: t('Mentions legales'),
+                        href: legal.notices(),
+                        icon: BookCheck,
+                        target: '_blank',
+                    },
+                    {
+                        title: t('Conditions de vente'),
+                        href: legal.sale_conditions(),
+                        icon: BadgeEuro,
+                        target: '_blank',
+                    },
+                    {
+                        title: t('Notre politique'),
+                        href: legal.our_policy(),
+                        icon: GlobeLock,
+                        target: '_blank',
+                    },
+                ],
+            }
         ];
     } else {
         mainNavItems = [
@@ -138,9 +166,34 @@ export function AppSidebar() {
         footerNavItems = [
             {
                 title: t('Documentation'),
-                href: '#',
+                href: documentation(),
                 icon: BookOpen,
             },
+            {
+                title: t('Infos'),
+                href: '',
+                icon: Info,
+                subItems: [
+                    {
+                        title: t('Mentions legales'),
+                        href: legal.notices(),
+                        icon: BookCheck,
+                        target: '_blank',
+                    },
+                    {
+                        title: t('Conditions de vente'),
+                        href: legal.sale_conditions(),
+                        icon: BadgeEuro,
+                        target: '_blank',
+                    },
+                    {
+                        title: t('Notre politique'),
+                        href: legal.our_policy(),
+                        icon: GlobeLock,
+                        target: '_blank',
+                    },
+                ],
+            }
         ];
     }
 
@@ -169,7 +222,7 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavFooterExtended items={footerNavItems} className="mt-auto" />
             </SidebarFooter>
         </Sidebar>
     );

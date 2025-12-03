@@ -198,6 +198,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
 
     return (
         <div>
+            <Head title="Users" />
             <BasicSticky
                 topOffset={topOffset}
                 stickyStyle={{ top: topOffset }}
