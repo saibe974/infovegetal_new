@@ -42,6 +42,14 @@ class UserManagementController extends Controller
         // ]);
     }
 
+    public function edit(User $user)
+    {
+        // $user->load(['tags']);
+        return Inertia::render('users/form', [
+            'user' => $user,
+        ]);
+    }
+
     /**
      * Update a user's role.
      */
@@ -67,12 +75,12 @@ class UserManagementController extends Controller
         return back()->with('success', 'User role updated successfully');
     }
 
-     /**
+    /**
      * Export users as CSV.
      */
     public function export(Request $request)
     {
-    // FacadesGate::authorize('manage-users');
+        // FacadesGate::authorize('manage-users');
         $filename = 'users_export_' . date('Ymd_His') . '.csv';
 
         $headers = [

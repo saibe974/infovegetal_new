@@ -14,7 +14,7 @@ import {
     SidebarGroup,
     SidebarGroupLabel
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { contact, dashboard } from '@/routes';
 import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon } from 'lucide-react';
@@ -107,7 +107,7 @@ export function AppSidebar() {
         footerNavItems = [
             {
                 title: t('Contact'),
-                href: '#',
+                href: contact(),
                 icon: MailIcon,
             },
             {
@@ -130,7 +130,7 @@ export function AppSidebar() {
             },
             {
                 title: t('Contact'),
-                href: '#',
+                href: contact(),
                 icon: MailIcon,
             }
         ];
