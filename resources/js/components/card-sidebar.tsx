@@ -65,7 +65,7 @@ export function CardSidebar() {
     return (
         <Sidebar variant="inset" side='right' id='card' className=''>
 
-            <SidebarHeader className='mt-14'>
+            <SidebarHeader className='lg:mt-14'>
                 <SidebarMenu className="flex flex-row w-full justify-between gap-2">
                     {/* Vider le panier */}
                     <SidebarMenuItem className='w-fit'>

@@ -3,7 +3,7 @@ import { ReactNode, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { InfiniteScroll, usePage, router, Form, Head } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { AppFooter } from '@/components/app.footer';
+import { AppFooter } from '@/components/app-footer';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Notre politique', href: '/legals/our-policy' },

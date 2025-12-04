@@ -146,7 +146,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection);
 
     return (
-        <div style={{marginTop: topOffset + 27}}>
+        <div style={{}}>
             <Head title="Products" />
             {/* <Sticky
                 topOffset={topOffset}
@@ -157,7 +157,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             > */}
             <div
                 className="search-sticky z-20 w-full bg-background border-b border-border/50 px-4 py-2 "
-                style={{ position: 'fixed', top: topOffset,  maxWidth: width - 20, }}
+                // style={{ position: 'sticky', top: topOffset,  maxWidth: '100%', }}
             >
                 <div className="flex items-center py-2 relative w-full">
 
@@ -224,7 +224,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             </div>
             {/* </Sticky> */}
 
-            <InfiniteScroll data="collection">
+            <InfiniteScroll data="collection" className=''>
                 {viewMode === 'table' ? (
                     <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
                 ) : (

@@ -22,9 +22,10 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
         const selector2 = '.top-sticky'; // classe à ajouter sur le sticky du dessus
         const getHeight = () => {
             const el = document.querySelector(selector) as HTMLElement | null;
-            const el2 = document.querySelector(selector2) as HTMLElement | null;
+            // const el2 = document.querySelector(selector2) as HTMLElement | null;
             // console.log('heights:', el?.getBoundingClientRect().height, el2?.getBoundingClientRect().height);
-            return el && el2 ? Math.ceil(el.getBoundingClientRect().height + el2.getBoundingClientRect().height) : 0;
+            // return el && el2 ? Math.ceil(el.getBoundingClientRect().height + el2.getBoundingClientRect().height) : 0;
+            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
         };
 
         const getWidth = () => {
@@ -59,8 +60,8 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
 
     return (
         <Table
-        // style={{ tableLayout: 'fixed', width: '100%', top: topOffset }}
-        className="rounded-t-none"
+        // style={{ position: 'relative' }}
+        // className="sticky top-0"
         >
             {/* <BasicSticky
                 topOffset={topOffset}
@@ -69,7 +70,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 wrapperClassName="w-full"
             > */}
 
-            <colgroup>
+            {/* <colgroup>
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '20%' }} />
@@ -77,23 +78,23 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 <col style={{ width: (canEdit || canDelete) ? '25%' : '40%' }} />
                 <col style={{ width: (canEdit || canDelete) ? '10%' : '20%' }} />
                 <col style={{ width: 'auto' }} />
-            </colgroup>
+            </colgroup> */}
 
             <TableHeader
-                style={{ position: 'fixed', top: topOffset, width: width, }}
-                // className="border"
+            // style={{ position: 'sticky', top: topOffset, }}
+            // className="sticky"
             >
                 <TableRow
-                    className="w-full flex "
+                    className="w-full "
                 >
 
-                    <TableHead className="w-[10%] pt-2.5">ID</TableHead>
-                    <TableHead className="w-[10%] pt-2.5"></TableHead>
-                    <TableHead className="w-[20%] pt-2.5">Name</TableHead>
-                    <TableHead className="w-[15%] pt-2.5">Category</TableHead>
-                    <TableHead className="w-[25%] pt-2.5">Description</TableHead>
-                    <TableHead className={`${(canEdit || canDelete) ? 'w-[10%]' : 'w-[20%] text-end pr-4'} pt-2.5`}>Price (€)</TableHead>
-                    {(canEdit || canDelete) && <TableHead className="text-end w-[10%] pt-2.5">Actions</TableHead>}
+                    <TableHead className="">ID</TableHead>
+                    <TableHead className=""></TableHead>
+                    <TableHead className="">Name</TableHead>
+                    <TableHead className="">Category</TableHead>
+                    <TableHead className="">Description</TableHead>
+                    <TableHead className={``}>Price (€)</TableHead>
+                    {(canEdit || canDelete) && <TableHead className="text-end ">Actions</TableHead>}
 
                 </TableRow>
             </TableHeader>

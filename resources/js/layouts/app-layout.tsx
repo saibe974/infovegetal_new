@@ -1,4 +1,4 @@
-import { AppFooter } from '@/components/app.footer';
+import { AppFooter } from '@/components/app-footer';
 import ScrollToTopButton from '@/components/ui/scroll-to-top-btn';
 import { Toaster } from '@/components/ui/sonner';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
@@ -14,7 +14,9 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
     const page = usePage<SharedData>();
-    
+
+    const isHomePage = usePage().component === 'home';
+
     useEffect(() => {
         if (page.props.flash.success) {
             toast.success(page.props.flash.success);
@@ -22,22 +24,28 @@ const AppLayout = ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
         if (page.props.flash.error) {
             toast.error(page.props.flash.error);
         }
-    }, [page.props.flash]);
+        console.log(page)
+    }, [page.props]);
 
     return (
-    <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
-        {children}
-        <Toaster position="top-center" richColors />
-    </AppLayoutTemplate>
+        <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
+            {children}
+            {/* {page.props.collection.meta.current_page === page.props.collection.meta.last_page || isHomePage ? */}
+            <AppFooter /> 
+           
+            <Toaster position="top-center" richColors />
+        </AppLayoutTemplate>
     );
 };
 
 export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], component: FC<T>) {
+
+
     // @ts-expect-error layout exists for inertia
     component.layout = (page: ReactNode) => <AppLayout breadcrumbs={breadcrumbs}>
         <div className="p-2 lg:p-4">
             {page}
-            <AppFooter />
+
         </div>
         <ScrollToTopButton />
     </AppLayout>;

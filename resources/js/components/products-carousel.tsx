@@ -30,7 +30,7 @@ export function ProductsCarousel({ products }: Props) {
         >
             <CarouselContent className="xl:py-5 xl:px-2">
                 {products.map((product) => (
-                    <CarouselItem key={product.id} className="flex items-center justify-center basis-1/1 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                    <CarouselItem key={product.id} className=" items-center justify-center basis-1/1 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
                         <ProductCard product={product} />
                     </CarouselItem>
                 ))}

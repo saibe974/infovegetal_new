@@ -18,7 +18,7 @@ import { AboutSection } from '@/components/about-section';
 import ServicesSection from '@/components/services-section';
 import { ProductsCardsList } from '@/components/products-cards-list';
 import { Button } from '@/components/ui/button';
-import { AppFooter } from '@/components/app.footer';
+import { AppFooter } from '@/components/app-footer';
 import { Carousel, CarouselContent } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay"
 import { ProductsCarousel } from '@/components/products-carousel';

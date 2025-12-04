@@ -109,7 +109,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                             }}
                             aria-expanded={activeId === item.id}
                             className={`overflow-hidden border border-black/10 dark:border-accent relative w-full lg:w-full cursor-pointer about-btn flex flex-col items-start p-4 transition-all duration-300 h-[18rem] justify-around ${activeId === item.id
-                                ? " bg-black/10 dark:bg-accent"
+                                ? " bg-black/10 dark:bg-gray-600/20"
                                 : " hover:bg-black/10 dark:hover:bg-accent"
                                 } focus:outline-none focus:ring-2 focus:ring-ring`}
                         >
@@ -121,7 +121,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                                         <AnimatedSVG svg={activeItem.svg} />
                                     </div>
                                     {/* calque de gradient entre le SVG et le texte (clair en light, sombre en dark) */}
-                                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-white/50 via-white/10 to-transparent dark:from-black/60 dark:via-black/20" />
+                                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t " />
                                 </div>
                             )}
 
