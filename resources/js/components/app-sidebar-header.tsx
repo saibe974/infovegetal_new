@@ -12,6 +12,7 @@ import { SelectWithItems } from './ui/select-with-items';
 import { SelectLang } from './ui/selectLang';
 import AppearanceToggleDropdown from './appearance-dropdown';
 import { ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import { AlignJustify } from 'lucide-react'; // optionnel : icône pour le trigger
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -110,7 +111,7 @@ export function AppSidebarHeader({
                 <header className="z-21 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear md:px-4 sticky top-0 w-full" >
 
                     <div className='flex items-center gap-2'>
-                        <SidebarTrigger className="-ml-1" />
+                        <SidebarTrigger className="-ml-1" targetId='main' />
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>
 
@@ -162,8 +163,8 @@ export function AppSidebarHeader({
                                 </DropdownMenu>
                             )}
                             <div>
-                                <div className={'hover:bg-sidebar-accent p-2 rounded-md transition-colors'}>
-                                    <Link href="/#"><ShoppingCart size={21} /></Link>
+                                <div className="w-full flex items-center justify-between gap-4">
+                                    <SidebarTrigger className="" targetId='card' icon={ShoppingCart} />
                                 </div>
                             </div>
 

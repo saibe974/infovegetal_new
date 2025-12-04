@@ -58,7 +58,7 @@ export function SelectLang() {
                 defaultValue={locale}
                 items={LANGS}
                 id="locale"
-                className="w-11 border-0 hover:bg-sidebar-accent p-0 rounded-md transition-colors"
+                className="w-11 border-0 bg-sidebar shadow-none hover:bg-sidebar-accent p-0 rounded-md transition-colors"
                 onValueChange={handleChange}
             />
         </div>

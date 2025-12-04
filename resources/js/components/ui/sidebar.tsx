@@ -30,14 +30,20 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
+type SidebarId = string;
+
 type SidebarContext = {
+  // legacy values refer to the "default" sidebar id
   state: "expanded" | "collapsed"
   open: boolean
   setOpen: (open: boolean) => void
-  openMobile: boolean
-  setOpenMobile: (open: boolean) => void
+  // mobile open map per sidebar id
+  openMobileMap: Record<SidebarId, boolean>
+  setOpenMobileForId: (id: SidebarId, open: boolean) => void
   isMobile: boolean
-  toggleSidebar: () => void
+  // multi-sidebar helpers
+  isOpenId: (id?: SidebarId) => boolean
+  toggleSidebar: (id?: SidebarId) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -65,7 +71,8 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
-  const [openMobile, setOpenMobile] = React.useState(false)
+  // mobile open state per sidebar id
+  const [openMobileMap, setOpenMobileMap] = React.useState<Record<SidebarId, boolean>>({})
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -79,17 +86,41 @@ function SidebarProvider({
       } else {
         _setOpen(openState)
       }
-
-      // This sets the cookie to keep the sidebar state.
+      // keep cookie for legacy default
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
     },
     [setOpenProp, open]
   )
 
+  // map to store other sidebars' open state (keyed by id)
+  const [openMap, setOpenMap] = React.useState<Record<SidebarId, boolean>>({})
+
   // Helper to toggle the sidebar.
-  const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+  const toggleSidebar = React.useCallback(
+    (id: SidebarId = "default") => {
+      if (isMobile) {
+        // mobile behaviour: toggle mobile state for the requested id
+        setOpenMobileMap((m) => ({ ...m, [id]: !m[id] }))
+        return
+      }
+      if (id === "default") {
+        setOpen((open) => !open)
+        return
+      }
+      setOpenMap((m) => ({ ...m, [id]: !m[id] }))
+    },
+    [isMobile, setOpen]
+  )
+
+  const isOpenId = React.useCallback(
+    (id: SidebarId = "default") => {
+      if (id === "default") {
+        return isMobile ? !!openMobileMap[id] && open : open
+      }
+      return isMobile ? !!openMobileMap[id] : !!openMap[id]
+    },
+    [open, openMap, openMobileMap, isMobile]
+  )
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -117,11 +148,13 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
-      openMobile,
-      setOpenMobile,
+      openMobileMap,
+      setOpenMobileForId: (id: SidebarId, v: boolean) =>
+        setOpenMobileMap((m) => ({ ...m, [id]: v })),
+      isOpenId,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobileMap, isOpenId, toggleSidebar]
   )
 
   return (
@@ -150,6 +183,7 @@ function SidebarProvider({
 }
 
 function Sidebar({
+  id = "default",
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
@@ -157,11 +191,12 @@ function Sidebar({
   children,
   ...props
 }: React.ComponentProps<"div"> & {
+  id?: SidebarId
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, isOpenId, setOpenMobileForId } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -179,8 +214,9 @@ function Sidebar({
   }
 
   if (isMobile) {
+    // mobile: use per-id mobile open state and updater
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet open={isOpenId(id)} onOpenChange={(v) => setOpenMobileForId(id, v)} {...props}>
         <SheetHeader className="sr-only">
           <SheetTitle>Sidebar</SheetTitle>
           <SheetDescription>Displays the mobile sidebar.</SheetDescription>
@@ -203,11 +239,15 @@ function Sidebar({
     )
   }
 
+  // compute open/state for this specific sidebar id
+  const openForId = isOpenId(id)
+  const stateForId = openForId ? "expanded" : "collapsed"
+
   return (
     <div
       className="group peer text-sidebar-foreground hidden md:block"
-      data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
+      data-state={stateForId}
+      data-collapsible={stateForId === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
@@ -249,10 +289,12 @@ function Sidebar({
 }
 
 function SidebarTrigger({
+  targetId = "default",
   className,
   onClick,
+  icon = MenuIcon,
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: { targetId?: SidebarId, icon?: React.ComponentType<React.SVGProps<SVGSVGElement>> } & React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useSidebar()
 
   return (
@@ -264,11 +306,11 @@ function SidebarTrigger({
       className={cn("h-7 w-7", className)}
       onClick={(event) => {
         onClick?.(event)
-        toggleSidebar()
+        toggleSidebar(targetId)
       }}
       {...props}
     >
-      <MenuIcon className="size-6" />
+      {icon && React.createElement(icon, { className: "size-5" })}
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
@@ -283,7 +325,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
       data-slot="sidebar-rail"
       aria-label="Toggle Sidebar"
       tabIndex={-1}
-      onClick={toggleSidebar}
+      onClick={() => toggleSidebar()}
       title="Toggle Sidebar"
       className={cn(
         "hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex",

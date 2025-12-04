@@ -26,7 +26,7 @@ const ScrollToTopButton = () => {
     return (
         <>
             {showToTop &&
-                <Button className='fixed bottom-6 right-6 w-10 h-10 rounded-4xl' onClick={scrollToTop}>
+                <Button className='fixed bottom-6 right-6 w-10 h-10 rounded-4xl z-50' onClick={scrollToTop}>
                     <ChevronUp className='size-6' />
                 </Button>
             }
