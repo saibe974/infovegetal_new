@@ -245,12 +245,12 @@ function Sidebar({
 
   return (
     <div
-      className="group peer text-sidebar-foreground hidden md:block"
+      className={`group peer text-sidebar-foreground hidden md:block ${id ? 'group/sidebar-' + id : ''}` }
       data-state={stateForId}
       data-collapsible={stateForId === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
-      data-slot="sidebar"
+      data-slot={"sidebar" + "-" + id}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
