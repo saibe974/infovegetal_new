@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from "react";
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EditIcon, TrashIcon } from 'lucide-react';
 import { type Product, PaginatedCollection } from '@/types';
-import BasicSticky from "react-sticky-el";
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -14,80 +11,28 @@ type Props = {
 };
 
 export default function ProductsTable({ collection, canEdit = false, canDelete = false }: Props) {
-    const [topOffset, setTopOffset] = useState<number>(0);
-    const [width, setWidth] = useState<number>(0);
 
-    useEffect(() => {
-        const selector = '.search-sticky'; // classe à ajouter sur le sticky du dessus
-        const selector2 = '.top-sticky'; // classe à ajouter sur le sticky du dessus
-        const getHeight = () => {
-            const el = document.querySelector(selector) as HTMLElement | null;
-            // const el2 = document.querySelector(selector2) as HTMLElement | null;
-            // console.log('heights:', el?.getBoundingClientRect().height, el2?.getBoundingClientRect().height);
-            // return el && el2 ? Math.ceil(el.getBoundingClientRect().height + el2.getBoundingClientRect().height) : 0;
-            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
-        };
+    const goToProductPage = (id: number) => {
+        canEdit ? window.location.href = `/admin/products/${id}/edit` :
+            window.location.href = `/products/${id}`;
+    }
 
-        const getWidth = () => {
-            const el = document.querySelector(selector) as HTMLElement | null;
-            return el ? Math.ceil(el.getBoundingClientRect().width - 12) : 0;
+    const handleEditClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        window.location.href = `/admin/products/${id}/edit`;
+    }
+
+    const handleDeleteClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        if (confirm('Are you sure?')) {
+            window.location.href = `/admin/products/${id}/destroy`;
         }
-
-        const update = () => { setTopOffset(getHeight()), setWidth(getWidth()) };
-        update();
-        // console.log(topOffset)
-        window.addEventListener('resize', update);
-
-        // ResizeObserver pour réagir aux changements de layout (sidebar resize)
-        let ro: ResizeObserver | null = null;
-        const headerEl = document.querySelector(selector) as HTMLElement | null;
-        if (headerEl && typeof ResizeObserver !== 'undefined') {
-            ro = new ResizeObserver(update);
-            ro.observe(headerEl);
-        }
-
-        // MutationObserver pour changements structurels (optionnel)
-        // const obs = new MutationObserver(update);
-        // const parent = document.body;
-        // obs.observe(parent, { childList: true, subtree: true });
-
-        return () => {
-            window.removeEventListener('resize', update);
-            // obs.disconnect();
-            if (ro) ro.disconnect();
-        };
-    }, []);
+    }
 
     return (
-        <Table
-        // style={{ position: 'relative' }}
-        // className="sticky top-0"
-        >
-            {/* <BasicSticky
-                topOffset={topOffset}
-                stickyStyle={{ top: topOffset, width: '100%' }}
-                stickyClassName="bg-background"
-                wrapperClassName="w-full"
-            > */}
-
-            {/* <colgroup>
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '20%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: (canEdit || canDelete) ? '25%' : '40%' }} />
-                <col style={{ width: (canEdit || canDelete) ? '10%' : '20%' }} />
-                <col style={{ width: 'auto' }} />
-            </colgroup> */}
-
-            <TableHeader
-            // style={{ position: 'sticky', top: topOffset, }}
-            // className="sticky"
-            >
-                <TableRow
-                    className="w-full "
-                >
-
+        <Table>
+            <TableHeader>
+                <TableRow className="w-full">
                     <TableHead className="">ID</TableHead>
                     <TableHead className=""></TableHead>
                     <TableHead className="">Name</TableHead>
@@ -95,24 +40,17 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <TableHead className="">Description</TableHead>
                     <TableHead className={``}>Price (€)</TableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end ">Actions</TableHead>}
-
                 </TableRow>
             </TableHeader>
-            {/* </BasicSticky> */}
             <TableBody className="">
                 {collection.data.map((item) => (
-                    <TableRow key={item.id} className="">
+                    <TableRow key={item.id} className="group hover:cursor-pointer" onClick={() => goToProductPage(item.id)}>
                         <TableCell>{item.id}</TableCell>
                         <TableCell>
                             {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
                         </TableCell>
-                        <TableCell>
-                            <Link
-                                href={canEdit ? `/admin/products/${item.id}/edit` : `/products/${item.id}`}
-                                className="hover:underline"
-                            >
-                                {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                            </Link>
+                        <TableCell className='group group-hover:underline underline-offset-2'>
+                            {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
                         </TableCell>
                         <TableCell>{item.category ? item.category.name : ''}</TableCell>
                         <TableCell>
@@ -132,19 +70,23 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                         <TableCell>{item.price} €</TableCell>
                         {(canEdit || canDelete) && (
                             <TableCell>
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex gap-2 justify-end" onClick={e => e.stopPropagation()}>
                                     {canEdit && (
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={`/admin/products/${item.id}/edit`}>
-                                                <EditIcon size={16} />
-                                            </Link>
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            onClick={(e) => handleEditClick(e, item.id)}
+                                        >
+                                            <EditIcon size={16} />
                                         </Button>
                                     )}
                                     {canDelete && (
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={`/admin/products/${item.id}/destroy`} onBefore={() => confirm('Are you sure?')}>
-                                                <TrashIcon size={16} />
-                                            </Link>
+                                        <Button
+                                            size="icon"
+                                            variant="destructive-outline"
+                                            onClick={(e) => handleDeleteClick(e, item.id)}
+                                        >
+                                            <TrashIcon size={16} />
                                         </Button>
                                     )}
                                 </div>
