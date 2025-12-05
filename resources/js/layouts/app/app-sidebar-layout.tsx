@@ -2,7 +2,8 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import { CardSidebar } from '@/components/card-sidebar';
+import { RightSidebar } from '@/components/right-sidebar';
+import { CartSidebarHeader } from '@/components/cart-sidebar-header';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { type BreadcrumbItem } from '@/types';
 import { type PropsWithChildren } from 'react';
@@ -20,7 +21,13 @@ export default function AppSidebarLayout({
                     {children}
 
                 </AppContent>
-                <CardSidebar />
+                <RightSidebar
+                    id='right'
+                    variant='inset'
+                    header={<CartSidebarHeader />}
+                >
+
+                </RightSidebar>
 
             </AppShell>
         </>

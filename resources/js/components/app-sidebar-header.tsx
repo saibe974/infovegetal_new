@@ -174,7 +174,7 @@ export function AppSidebarHeader({
                         )}
                         <div>
                             <div className="w-full flex items-center justify-between gap-4">
-                                <SidebarTrigger className="" targetId='card' icon={ShoppingCart} />
+                                <SidebarTrigger className="" targetId='right' icon={ShoppingCart} />
                             </div>
                         </div>
 

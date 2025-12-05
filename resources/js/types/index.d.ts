@@ -101,3 +101,14 @@ export interface User {
     permissions?: { id: number; name: string }[];
     [key: string]: unknown; // This allows for additional properties...
 }
+
+export interface RightSidebarProps {
+    id?: string;
+    side?: 'left' | 'right';
+    variant?: 'sidebar' | 'floating' | 'inset';
+    className?: string;
+    header?: ReactNode;
+    children?: ReactNode;
+    footer?: ReactNode;
+    [key: string]: any;
+}

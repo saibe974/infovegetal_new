@@ -25,6 +25,25 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+
+// Helper functions for managing sidebar state in cookies
+function getSidebarStateFromCookie(): Record<SidebarId, boolean> {
+  try {
+    const cookies = document.cookie.split(';')
+    const statesCookie = cookies.find(c => c.trim().startsWith(SIDEBAR_COOKIE_NAME))
+    if (statesCookie) {
+      const value = statesCookie.split('=')[1]
+      return JSON.parse(decodeURIComponent(value))
+    }
+  } catch (e) {
+    console.warn('Failed to parse sidebar state cookie', e)
+  }
+  return { default: true }
+}
+
+function saveSidebarStateToCookie(states: Record<SidebarId, boolean>) {
+  document.cookie = `${SIDEBAR_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(states))}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+}
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
@@ -74,6 +93,12 @@ function SidebarProvider({
   // mobile open state per sidebar id
   const [openMobileMap, setOpenMobileMap] = React.useState<Record<SidebarId, boolean>>({})
 
+  // Initialize sidebar states from cookie
+  const [openMap, setOpenMap] = React.useState<Record<SidebarId, boolean>>(() => {
+    const savedStates = getSidebarStateFromCookie()
+    return savedStates
+  })
+
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
@@ -86,14 +111,15 @@ function SidebarProvider({
       } else {
         _setOpen(openState)
       }
-      // keep cookie for legacy default
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      // Update cookie for default sidebar
+      setOpenMap((prev) => {
+        const updated = { ...prev, default: openState }
+        saveSidebarStateToCookie(updated)
+        return updated
+      })
     },
     [setOpenProp, open]
   )
-
-  // map to store other sidebars' open state (keyed by id)
-  const [openMap, setOpenMap] = React.useState<Record<SidebarId, boolean>>({})
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(
@@ -107,7 +133,11 @@ function SidebarProvider({
         setOpen((open) => !open)
         return
       }
-      setOpenMap((m) => ({ ...m, [id]: !m[id] }))
+      setOpenMap((m) => {
+        const updated = { ...m, [id]: !m[id] }
+        saveSidebarStateToCookie(updated)
+        return updated
+      })
     },
     [isMobile, setOpen]
   )
