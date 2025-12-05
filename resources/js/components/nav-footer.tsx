@@ -195,7 +195,7 @@ export function NavFooterExtended({
                                         <SidebarMenuButton
                                             asChild
                                             onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
-                                            title={item.title}
+                                            tooltip={item.title}
                                         >
                                             <button type="button" className="w-full text-left flex items-center gap-2">
                                                 {label}
@@ -210,8 +210,8 @@ export function NavFooterExtended({
                                         >
                                             <SidebarMenuSub>
                                                 {(item as NavItemExtended).subItems!.map((sub) => (
-                                                    <SidebarMenuItem key={sub.title} title={sub.title}>
-                                                        <SidebarMenuButton asChild>
+                                                    <SidebarMenuItem key={sub.title} >
+                                                        <SidebarMenuButton tooltip={sub.title} asChild>
                                                             {renderLink(sub.href, (
                                                                 <>
                                                                     {sub.icon && <Icon iconNode={sub.icon} className="h-4 w-4" />}
@@ -225,7 +225,7 @@ export function NavFooterExtended({
                                         </div>
                                     </>
                                 ) : (
-                                    <SidebarMenuButton title={item.title} asChild>
+                                    <SidebarMenuButton tooltip={item.title} asChild>
                                         {renderLink(item.href ?? (item as NavItem).href, label, (item as any).target)}
                                     </SidebarMenuButton>
                                 )}
