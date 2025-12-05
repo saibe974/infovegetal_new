@@ -189,12 +189,13 @@ export function NavFooterExtended({
                         );
 
                         return (
-                            <SidebarMenuItem key={item.title}>
+                            <SidebarMenuItem key={item.title} >
                                 {hasSub ? (
                                     <>
                                         <SidebarMenuButton
                                             asChild
                                             onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
+                                            title={item.title}
                                         >
                                             <button type="button" className="w-full text-left flex items-center gap-2">
                                                 {label}
@@ -209,7 +210,7 @@ export function NavFooterExtended({
                                         >
                                             <SidebarMenuSub>
                                                 {(item as NavItemExtended).subItems!.map((sub) => (
-                                                    <SidebarMenuItem key={sub.title}>
+                                                    <SidebarMenuItem key={sub.title} title={sub.title}>
                                                         <SidebarMenuButton asChild>
                                                             {renderLink(sub.href, (
                                                                 <>
@@ -224,7 +225,7 @@ export function NavFooterExtended({
                                         </div>
                                     </>
                                 ) : (
-                                    <SidebarMenuButton asChild>
+                                    <SidebarMenuButton title={item.title} asChild>
                                         {renderLink(item.href ?? (item as NavItem).href, label, (item as any).target)}
                                     </SidebarMenuButton>
                                 )}
