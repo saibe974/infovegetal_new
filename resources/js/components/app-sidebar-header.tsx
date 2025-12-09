@@ -29,7 +29,7 @@ export function AppSidebarHeader({
     const { auth, locale } = usePage<SharedData>().props;
     const { t } = useI18n();
     const { isOpenId } = useSidebar(); // récupère l'état du sidebar
-    
+
     const isMobile = useIsMobile()
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -42,10 +42,10 @@ export function AppSidebarHeader({
 
     // calcul dynamique de la largeur du header en fonction de l'état du sidebar "main"
     const mainOpen = isOpenId('main');
-    const headerWidth = !isMobile && mainOpen 
-        ? 'calc(100% - var(--sidebar-width))' 
-        : !isMobile 
-            ? 'calc(100% - var(--sidebar-width-icon))' 
+    const headerWidth = !isMobile && mainOpen
+        ? 'calc(100% - var(--sidebar-width))'
+        : !isMobile
+            ? 'calc(100% - var(--sidebar-width-icon))'
             : '100%';
 
     const handleSearch = (s: string) => {

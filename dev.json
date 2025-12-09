@@ -151,6 +151,27 @@
                     "text": "Pas maintenant — note ajoutée, on reprend plus tard."
                 }
             ]
+        },
+        {
+            "id": 9,
+            "title": "UI: optimiser le comportement sticky des sidebars",
+            "status": "backlog",
+            "assignees": [
+                "copilot"
+            ],
+            "createdAt": "2025-12-09",
+            "messages": [
+                {
+                    "author": "saibe",
+                    "date": "2025-12-09",
+                    "text": "Le sticky sur products/index.tsx fonctionne avec ResizeObserver mais nécessite une optimisation future. Actuellement utilise une correction de -30px dans le calcul de largeur (el.clientWidth - paddingLeft - paddingRight - 30) dont l'origine exacte reste à identifier."
+                },
+                {
+                    "author": "copilot",
+                    "date": "2025-12-09",
+                    "text": "TODO: 1) Investiguer la source des 30px de correction (margin, border, scrollbar?) avec DevTools. 2) Optimiser le useEffect pour éviter les recalculs continus pendant les animations de sidebars. 3) Possibilité d'utiliser le contexte useSidebar plutôt que ResizeObserver pour trigger les updates uniquement sur changement d'état."
+                }
+            ]
         }
     ]
 }

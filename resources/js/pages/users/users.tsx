@@ -270,7 +270,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
             {/* <InfiniteScroll data="collection"> */}
             <div>
                 {viewMode === 'table' ? (
-                    <UsersTable 
+                    <UsersTable
                         users={users}
                         roles={roles}
                         auth={auth}
@@ -280,13 +280,13 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                     />
                 ) : (
                     <div>
-                        <UsersCardsList 
+                        <UsersCardsList
                             users={users}
                             roles={roles}
                             auth={auth}
                             canEdit={canEdit}
                             canDelete={canDelete}
-                            // canPreview={canPreview}
+                        // canPreview={canPreview}
                         />
                     </div>
                     // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />

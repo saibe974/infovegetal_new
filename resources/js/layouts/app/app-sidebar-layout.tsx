@@ -19,8 +19,8 @@ export default function AppSidebarLayout({
                 <AppContent variant="sidebar" className="overflow-x-hidden pt-14">
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
                     {children}
-
                 </AppContent>
+
                 <RightSidebar
                     id='right'
                     variant='inset'
