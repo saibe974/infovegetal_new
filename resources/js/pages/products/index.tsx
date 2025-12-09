@@ -95,12 +95,12 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
         window.addEventListener('resize', update);
 
         // ResizeObserver pour réagir aux changements de layout (sidebar resize)
-        let ro: ResizeObserver | null = null;
-        const headerEl = document.querySelector(selector) as HTMLElement | null;
-        if (headerEl && typeof ResizeObserver !== 'undefined') {
-            ro = new ResizeObserver(update);
-            ro.observe(headerEl);
-        }
+        // let ro: ResizeObserver | null = null;
+        // const headerEl = document.querySelector(selector) as HTMLElement | null;
+        // if (headerEl && typeof ResizeObserver !== 'undefined') {
+        //     ro = new ResizeObserver(update);
+        //     ro.observe(headerEl);
+        // }
 
         // Observer l'élément <main> pour détecter les changements de largeur 
         // causés par les deux sidebars (gauche et droite)
@@ -113,7 +113,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
         return () => {
             window.removeEventListener('resize', update);
-            if (ro) ro.disconnect();
+            // if (ro) ro.disconnect();
             if (mainRo) mainRo.disconnect();
         };
     }, [rightSidebarOpen, mainSidebarOpen]); // Se déclenche uniquement quand les sidebars changent
