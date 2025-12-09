@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Resources\ProductCategoryResource;
+use App\Models\CategoryProducts;
 use Inertia\Inertia;
 use App\Models\ProductCategory;
 
@@ -15,7 +16,7 @@ class ProductCategoryController extends Controller
     public function index(Request $request)
     {
         $search = $request->get('q');
-        $query = ProductCategory::orderFromRequest(request());
+        $query = CategoryProducts::orderFromRequest(request());
         if ($search) {
             $query->where('name', 'like', '%' . $search . '%');
         }

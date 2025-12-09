@@ -125,6 +125,14 @@ export default function servicesSection({ active }: { active: boolean }) {
                                 </div>
                             )}
 
+                            {activeId !== item.id && (
+                                <div className="absolute inset-0 pointer-events-none">
+                                    <div dangerouslySetInnerHTML={{ __html: item.svg }} className="w-full h-full opacity-30 text-gray-300 dark:text-gray-700" >
+                                    </div>
+                                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t " />
+                                </div>
+                            )}
+
                             {/* top-right affordance */}
                             <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
                                 <MoreHorizontal
