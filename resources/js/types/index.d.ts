@@ -64,6 +64,7 @@ export interface NavItem {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    target?: string;
 }
 
 export interface NavItemExtended extends NavItem {
@@ -99,4 +100,15 @@ export interface User {
     roles?: { id: number; name: string }[];
     permissions?: { id: number; name: string }[];
     [key: string]: unknown; // This allows for additional properties...
+}
+
+export interface RightSidebarProps {
+    id?: string;
+    side?: 'left' | 'right';
+    variant?: 'sidebar' | 'floating' | 'inset';
+    className?: string;
+    header?: ReactNode;
+    children?: ReactNode;
+    footer?: ReactNode;
+    [key: string]: any;
 }

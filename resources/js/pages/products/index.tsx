@@ -3,7 +3,7 @@ import products from '@/routes/products';
 import { useEffect, useRef, useState } from 'react';
 import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
+import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
+import { useSidebar } from '@/components/ui/sidebar';
 import ProductsImportTreatment from '@/components/products/import';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -37,6 +38,10 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
     const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
 
+    const { isOpenId } = useSidebar();
+    const rightSidebarOpen = isOpenId('right');
+    const mainSidebarOpen = isOpenId('main');
+
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
@@ -45,6 +50,8 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     const [search, setSearch] = useState('');
 
     const [topOffset, setTopOffset] = useState<number>(0);
+    const [width, setWidth] = useState<number>(0);
+    const [stickyKey, setStickyKey] = useState<number>(0);
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
@@ -63,24 +70,53 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     }, [viewMode]);
 
     useEffect(() => {
-        const selector = '.top-sticky'; // classe à ajouter sur le sticky du dessus
+        const selector = '.top-sticky';
         const getHeight = () => {
             const el = document.querySelector(selector) as HTMLElement | null;
             return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
         };
 
-        const update = () => setTopOffset(getHeight());
+        const getWidth = () => {
+            const el = document.querySelector('main') as HTMLElement | null;
+            if (!el) return 0;
+            const computedStyle = window.getComputedStyle(el);
+            const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+            const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - 30);
+        }
+
+        const update = () => {
+            setTopOffset(getHeight());
+            setWidth(getWidth());
+            setStickyKey(prev => prev + 1);
+        };
+
         update();
         window.addEventListener('resize', update);
-        // si ton layout change dynamiquement (menu mobile), tu peux aussi observer le DOM :
-        const obs = new MutationObserver(update);
-        const parent = document.body;
-        obs.observe(parent, { childList: true, subtree: true });
+
+        // ResizeObserver pour réagir aux changements de layout (sidebar resize)
+        let ro: ResizeObserver | null = null;
+        const headerEl = document.querySelector(selector) as HTMLElement | null;
+        if (headerEl && typeof ResizeObserver !== 'undefined') {
+            ro = new ResizeObserver(update);
+            ro.observe(headerEl);
+        }
+
+        // Observer l'élément <main> pour détecter les changements de largeur 
+        // causés par les deux sidebars (gauche et droite)
+        let mainRo: ResizeObserver | null = null;
+        const mainEl = document.querySelector('main') as HTMLElement | null;
+        if (mainEl && typeof ResizeObserver !== 'undefined') {
+            mainRo = new ResizeObserver(update);
+            mainRo.observe(mainEl);
+        }
+
         return () => {
             window.removeEventListener('resize', update);
-            obs.disconnect();
+            if (ro) ro.disconnect();
+            if (mainRo) mainRo.disconnect();
         };
-    }, []);
+    }, [rightSidebarOpen, mainSidebarOpen]); // Se déclenche uniquement quand les sidebars changent
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -129,16 +165,16 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
     // console.log(collection);
 
     return (
-        <div>
+        <>
+            <Head title="Products" />
             <BasicSticky
-                topOffset={topOffset}
-                stickyStyle={{ top: topOffset }}
-                stickyClassName="bg-background"
-                wrapperClassName="relative z-20"
+                key={stickyKey}
+                stickyClassName='z-25 bg-background'
+                stickyStyle={{ top: topOffset, width: width }}
             >
-                <div className="flex items-center py-2 relative w-full">
+                <div className="flex items-center relative w-full gap-2 border-b border-sidebar-border/50 py-2">
 
-                    <div className="flex gap-2 mr-2">
+                    <div className="flex gap-2">
                         <button
                             type="button"
                             aria-pressed={viewMode === 'table'}
@@ -168,7 +204,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         </button>
                     </div>
 
-                    <div className="w-200 left-0 top-1 mr-2" >
+                    <div className="w-200 flex-1">
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
@@ -179,8 +215,6 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                             query={q ?? ''}
                         />
                     </div>
-
-
 
                     {canImportExport && (
                         <div className="ml-auto flex items-center gap-2">
@@ -202,14 +236,14 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                 </div>
             </BasicSticky>
 
-            <InfiniteScroll data="collection">
+            <InfiniteScroll data="collection" className=''>
                 {viewMode === 'table' ? (
                     <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
                 ) : (
                     <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
                 )}
             </InfiniteScroll>
-        </div>
+        </>
 
     )
 })

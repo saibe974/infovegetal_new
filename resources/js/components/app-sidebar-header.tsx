@@ -12,10 +12,12 @@ import { SelectWithItems } from './ui/select-with-items';
 import { SelectLang } from './ui/selectLang';
 import AppearanceToggleDropdown from './appearance-dropdown';
 import { ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import { AlignJustify } from 'lucide-react'; // optionnel : icône pour le trigger
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './ui/dropdown-menu';
 import BasicSticky from 'react-sticky-el';
+import { useSidebar } from '@/components/ui/sidebar';
 
 
 export function AppSidebarHeader({
@@ -23,25 +25,28 @@ export function AppSidebarHeader({
 }: {
     breadcrumbs?: BreadcrumbItemType[];
     collection?: PaginatedCollection<Product>;
-    // q: string | null;
 }) {
     const { auth, locale } = usePage<SharedData>().props;
     const { t } = useI18n();
+    const { isOpenId } = useSidebar(); // récupère l'état du sidebar
 
     const isMobile = useIsMobile()
-
     const page = usePage<{ searchPropositions?: string[] }>();
-
-    // console.log(page.props)
     const searchPropositions = page.props.searchPropositions ?? [];
-
     const collection = page.props.collection ?? { meta: { total: 0 } };
-    // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
     const timerRef = useRef<number | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
     const isHomePage = usePage().component === 'home';
+
+    // calcul dynamique de la largeur du header en fonction de l'état du sidebar "main"
+    const mainOpen = isOpenId('main');
+    const headerWidth = !isMobile && mainOpen
+        ? 'calc(100% - var(--sidebar-width))'
+        : !isMobile
+            ? 'calc(100% - var(--sidebar-width-icon))'
+            : '100%';
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -105,95 +110,103 @@ export function AppSidebarHeader({
 
     return (
         <>
-            < BasicSticky stickyClassName="bg-sidebar " wrapperClassName="top-sticky relative z-21 bg-sidebar" >
-                < header className="z-21 flex justify-between h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4 sticky top-0 w-full" >
+            <header
+                className={
+                    "top-sticky z-21 flex justify-between h-16 shrink-0 items-center gap-2 " +
+                    "border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,left] ease-linear md:px-4 fixed top-0 bg-sidebar"
+                }
+                style={{
+                    width: headerWidth,
+                }}
+            >
 
-                    <div className='flex items-center gap-2'>
-                        <SidebarTrigger className="-ml-1" />
-                        <Breadcrumbs breadcrumbs={breadcrumbs} />
+                <div className='flex items-center gap-2'>
+                    <SidebarTrigger className="-ml-1" targetId='main' />
+                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+                </div>
+
+                {isHomePage && (
+                    <div className='hidden md:block md:w-3xl'>
+                        <SearchSoham
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            propositions={searchPropositions}
+                            loading={fetching}
+                            //@ts-ignore
+                            count={collection?.meta.total ?? 0}
+                            query={''}
+                            filters={false}
+                            search={false}
+                        />
                     </div>
+                )}
 
-                    {isHomePage && (
-                        <div className='hidden md:block md:w-3xl'>
-                            <SearchSoham
-                                value={search}
-                                onChange={handleSearch}
-                                onSubmit={onSelect}
-                                propositions={searchPropositions}
-                                loading={fetching}
-                                //@ts-ignore
-                                count={collection?.meta.total ?? 0}
-                                query={''}
-                                filters={false}
-                                search={false}
-                            />
+                <div className=''>
+                    <div className="w-full flex items-center justify-between gap-6">
+                        {/* <div className='flex items-center gap-2'> */}
+                        {auth.user ? (
+                            // <NavigationMenuItem className=''>
+                            <NavUser />
+                            // </NavigationMenuItem>
+                        ) : (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger className='flex items-center'>
+                                    <UserIcon />
+                                    <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className='flex flex-col items-start gap-2 p-4'>
+                                    <Link
+                                        href={login()}
+                                        className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
+                                    >
+                                        {t('Log in')}
+                                    </Link>
+                                    <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
+                                    <Link
+                                        href={register()}
+                                        className="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+                                    >
+                                        {t('Register')}
+                                    </Link>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                        <div>
+                            <div className={''}>
+                                <Link href="/#"><ShoppingCart size={21} /></Link>
+                            </div>
                         </div>
-                    )}
 
-                    <div className=''>
-                        <div className="w-full flex items-center justify-between gap-6">
-                            {/* <div className='flex items-center gap-2'> */}
-                            {auth.user ? (
-                                // <NavigationMenuItem className=''>
-                                <NavUser />
-                                // </NavigationMenuItem>
-                            ) : (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className='flex items-center'>
-                                        <UserIcon />
-                                        <ChevronDownIcon className="size-5 opacity-100 md:hidden" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
-                                        <Link
-                                            href={login()}
-                                            className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
-                                        >
-                                            {t('Log in')}
-                                        </Link>
-                                        <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
-                                        <Link
-                                            href={register()}
-                                            className="inline-block rounded-sm border border-transparent px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
-                                        >
-                                            {t('Register')}
-                                        </Link>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
-                            <div>
-                                <div className={''}>
-                                    <Link href="/#"><ShoppingCart size={21} /></Link>
-                                </div>
-                            </div>
-
-                            <div className='lg:hidden'>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className='flex items-center'>
-                                        <EllipsisVertical />
-                                        {/* <ChevronDownIcon className="size-5 opacity-100 md:hidden" /> */}
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
-                                        <SelectLang />
-                                        <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
-                                        <AppearanceToggleDropdown />
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-
-
-                            <div className='hidden lg:flex'>
-                                {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
-                                {/* <NavigationMenuContent className=''> */}
-                                <SelectLang />
-                                <AppearanceToggleDropdown />
-                                {/* </NavigationMenuContent> */}
-                            </div>
-
-                            {/* </div> */}
+                        <div className='lg:hidden'>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger className='flex items-center'>
+                                    <EllipsisVertical />
+                                    {/* <ChevronDownIcon className="size-5 opacity-100 md:hidden" /> */}
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className='flex flex-col items-center gap-2 p-4'>
+                                    <SelectLang />
+                                    <div className='w-full h-0.5 bg-black/10 dark:bg-accent' />
+                                    <AppearanceToggleDropdown />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
+
+
+                        <div className='hidden lg:flex gap-2 pl-2'>
+                            {/* <NavigationMenuTrigger><SettingsIcon /></NavigationMenuTrigger> */}
+                            {/* <NavigationMenuContent className=''> */}
+                            <SelectLang />
+                            <AppearanceToggleDropdown />
+                            {/* </NavigationMenuContent> */}
+                        </div>
+
+                        {/* </div> */}
                     </div>
-                </header >
-            </BasicSticky >
+                </div>
+            </header >
+            {/* </div > */}
+            {/* </BasicSticky > */}
         </>
     );
 }

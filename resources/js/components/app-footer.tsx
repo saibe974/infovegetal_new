@@ -3,6 +3,7 @@ import AppLogo from "./app-logo";
 import { NavFooter } from "./nav-footer";
 import { AppLogoIconMini } from "./app-logo-icon";
 import { Button } from "./ui/button";
+import { Link } from "@inertiajs/react";
 
 export function AppFooter() {
     const { t } = useI18n();
@@ -16,9 +17,9 @@ export function AppFooter() {
     ];
 
     const infoLinks = [
-        { title: t('Mentions légales'), href: '/' },
-        { title: t('Conditions de vente'), href: '/' },
-        { title: t('Notre politique'), href: '/' },
+        { title: t('Mentions légales'), href: '/legals/legal-notices' },
+        { title: t('Conditions de vente'), href: '/legals/sale-conditions' },
+        { title: t('Notre politique'), href: '/legals/our-policy' },
     ]
 
     const contact = [
@@ -46,7 +47,7 @@ export function AppFooter() {
     ]
 
     return (
-        <footer className="w-full border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
+        <footer className="w-full mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
             <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-20 md:gap-0 items-center">
 
                 <div className="md:flex-1 items-start flex justify-center">
@@ -62,7 +63,8 @@ export function AppFooter() {
                         <h4 className="font-semibold text-xl mb-2">{t('Liens')}</h4>
                         {footerLinks.map((link) => (
                             <Button key={link.title} variant="link" className="p-0 font-light">
-                                {link.title}
+
+                                <Link href={link.href} >{link.title}</Link>
                             </Button>
                         ))}
                     </div>
@@ -73,8 +75,10 @@ export function AppFooter() {
                     <div className="flex flex-col items-center md:items-start">
                         <h4 className="font-semibold text-xl mb-2">{t('Infos')}</h4>
                         {infoLinks.map((link) => (
-                            <Button key={link.title} variant="link" className="p-0 font-light">
-                                {link.title}
+                            <Button asChild key={link.title} variant="link" className="p-0 font-light">
+
+                                <a href={link.href} target="_blank" rel="noopener noreferrer">{link.title}</a>
+
                             </Button>
                         ))}
                     </div>

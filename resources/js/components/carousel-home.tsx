@@ -70,7 +70,7 @@ export function CarouselHome() {
                                         <div className="absolute inset-0 flex items-center justify-start p-6 md:p-10">
                                             <div className="w-full text-center pointer-events-auto p-4 md:p-6 rounded-lg flex flex-col items-center">
                                                 <h3 className="text-white text-2xl md:text-4xl font-bold leading-tight">
-                                                    {overlays[index].title}
+                                                    {overlays[index].title.charAt(0).toUpperCase() + overlays[index].title.slice(1)}
                                                 </h3>
                                                 {overlays[index].subtitle && (
                                                     <p className="text-white/90 mt-2 text-sm md:text-lg">

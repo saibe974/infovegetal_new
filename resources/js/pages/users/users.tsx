@@ -34,6 +34,8 @@ import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products-table';
 import { ProductsCardsList } from '@/components/products-cards-list';
 import users from '@/routes/users';
+import UsersTable from '@/components/users-table';
+import UsersCardsList from '@/components/users-cards-list';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -105,7 +107,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
-        const stored = localStorage.getItem('products_view_mode');
+        const stored = localStorage.getItem('users_view_mode');
         return stored === 'grid' ? 'grid' : 'table';
     });
 
@@ -113,7 +115,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
     useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
-            localStorage.setItem('products_view_mode', viewMode);
+            localStorage.setItem('users_view_mode', viewMode);
         } catch (e) {
             // ignore (ex: stockage bloqué)
         }
@@ -198,6 +200,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
 
     return (
         <div>
+            <Head title="Users" />
             <BasicSticky
                 topOffset={topOffset}
                 stickyStyle={{ top: topOffset }}
@@ -267,116 +270,25 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
             {/* <InfiniteScroll data="collection"> */}
             <div>
                 {viewMode === 'table' ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>{t('Name')}</TableHead>
-                                <TableHead>{t('Email')}</TableHead>
-                                <TableHead>{t('Current roles')}</TableHead>
-                                {canPreview && <TableHead>{t('Change role')}</TableHead>}
-                                <TableHead>{t('Joined')}</TableHead>
-                                {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {users.map((user) => (
-                                <TableRow key={user.id}>
-                                    <TableCell className="font-medium">
-                                        {user.name}
-                                    </TableCell>
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-wrap gap-1">
-                                            {user.roles && user.roles.length > 0 ? (
-                                                user.roles.map((role) => (
-                                                    <Badge
-                                                        key={role.id}
-                                                        variant={
-                                                            role.name === 'dev'
-                                                                ? 'destructive'
-                                                                : role.name === 'admin'
-                                                                    ? 'default'
-                                                                    : role.name === 'client'
-                                                                        ? 'secondary'
-                                                                        : 'outline'
-                                                        }
-                                                    >
-                                                        {role.name}
-                                                    </Badge>
-                                                ))
-                                            ) : (
-                                                <Badge variant="outline">
-                                                    {t('No role')}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    {canPreview && <TableCell>
-                                        <Select
-                                            onValueChange={(value) =>
-                                                handleRoleChange(user.id, value)
-                                            }
-                                            disabled={
-                                                // updating === user.id ||
-                                                user.id === auth.user?.id
-                                            }
-                                        >
-                                            <SelectTrigger className="w-[140px]">
-                                                <SelectValue
-                                                    placeholder={t('Select role')}
-                                                />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {roles.map((role) => (
-                                                    <SelectItem
-                                                        key={role.id}
-                                                        value={role.name}
-                                                    >
-                                                        {role.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {user.id === auth.user?.id && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                {t('Cannot modify your own role')}
-                                            </p>
-                                        )}
-                                    </TableCell>
-                                    }
-                                    <TableCell className="text-sm text-muted-foreground">
-                                        {new Date(
-                                            user.created_at
-                                        ).toLocaleDateString()}
-                                    </TableCell>
-                                    {(canEdit || canDelete) && (
-                                        <TableCell>
-                                            <div className="flex gap-2 justify-end">
-                                                {canEdit && (
-                                                    <Button asChild size="icon" variant="outline">
-                                                        <Link href={`/admin/users/${user.id}/edit`}>
-                                                            <EditIcon size={16} />
-                                                        </Link>
-                                                    </Button>
-                                                )}
-                                                {canDelete && (
-                                                    <Button asChild size="icon" variant="destructive-outline">
-                                                        <Link href={`/admin/users/${user.id}/destroy`} onBefore={() => confirm('Are you sure?')}>
-                                                            <TrashIcon size={16} />
-                                                        </Link>
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                    <UsersTable
+                        users={users}
+                        roles={roles}
+                        auth={auth}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canPreview={canPreview}
+                    />
                 ) : (
-                    <Card className="relative h-4xl w-80 flex flex-col p-4 gap-4">
-                        <h2 className='bg-info'>vue card à faire</h2>
-                    </Card>
+                    <div>
+                        <UsersCardsList
+                            users={users}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                        // canPreview={canPreview}
+                        />
+                    </div>
                     // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
                 )}
                 {/* </InfiniteScroll> */}

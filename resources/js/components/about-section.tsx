@@ -5,8 +5,8 @@ export function AboutSection() {
     const { t } = useI18n();
 
     return (
-        <section className='flex flex-col lg:flex-row gap-5 items-start md:items-center justify-around px-10 lg:px-0 max-w-full'>
-            <div className="relative w-40 md:w-60 lg:w-80 overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
+        <section className='flex flex-col lg:flex-row gap-2 items-start md:items-center justify-around px-10 lg:px-0 max-w-full'>
+            <div className="relative w-40 md:w-60 lg:w-100 overflow-hidden ">
                 <AppLogoIcon className="inset-0 m-auto fill-current text-black/30 dark:text-white/30" />
             </div>
 

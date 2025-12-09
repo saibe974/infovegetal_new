@@ -18,7 +18,11 @@ import { AboutSection } from '@/components/about-section';
 import ServicesSection from '@/components/services-section';
 import { ProductsCardsList } from '@/components/products-cards-list';
 import { Button } from '@/components/ui/button';
-import { AppFooter } from '@/components/app.footer';
+import { AppFooter } from '@/components/app-footer';
+import { Carousel, CarouselContent } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay"
+import { ProductsCarousel } from '@/components/products-carousel';
+import { Link } from "@inertiajs/react"
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/' },
@@ -32,6 +36,9 @@ type Props = {
 
 export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
     const { t } = useI18n();
+    const plugin = useRef(
+        Autoplay({ delay: 10000, stopOnInteraction: true })
+    )
 
     // Produits saisonniers et populaires temporaires
     const seasonProducts = collection.data.slice(1, 5);
@@ -59,21 +66,26 @@ export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
 
                 </div>
 
-                <ProductsCardsList limit={4} products={seasonProducts} />
-                <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
-                    {t('Tout afficher')}
-                </Button>
+                {/* <ProductsCardsList limit={4} products={seasonProducts} /> */}
+
+                <ProductsCarousel products={seasonProducts} />
+
+                <Link href='/products'>
+                    <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
+                        {t('Tout afficher')}
+                    </Button>
+                </Link>
             </div>
 
             <AboutSection />
 
-            <div className='flex flex-col gap-10 items-center w-full max-w-full px-10 md:px-0'>
+            <div className='flex flex-col gap-10 items-center w-fit max-w-full px-10 md:px-0'>
                 <h3 className='text-3xl font-sans'>{t('Meilleures ventes')}</h3>
-                <ProductsCardsList limit={4} products={popularProducts} />
+                {/* <ProductsCardsList limit={4} products={popularProducts} /> */}
+                <ProductsCarousel products={popularProducts} />
             </div>
             <ServicesSection active={true} />
 
-            <AppFooter />
         </div>
     );
 })

@@ -14,6 +14,24 @@ type Props = {
 };
 
 export default function ProductsTable({ collection, canEdit = false, canDelete = false }: Props) {
+
+    const goToProductPage = (id: number) => {
+        canEdit ? window.location.href = `/admin/products/${id}/edit` :
+            window.location.href = `/products/${id}`;
+    }
+
+    const handleEditClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        window.location.href = `/admin/products/${id}/edit`;
+    }
+
+    const handleDeleteClick = (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        if (confirm('Are you sure?')) {
+            window.location.href = `/admin/products/${id}/destroy`;
+        }
+    }
+
     return (
         <Table>
             <TableHeader>
@@ -27,20 +45,15 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
                 </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="">
                 {collection.data.map((item) => (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} className="group hover:cursor-pointer" onClick={() => goToProductPage(item.id)}>
                         <TableCell>{item.id}</TableCell>
                         <TableCell>
                             {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
                         </TableCell>
-                        <TableCell>
-                            <Link
-                                href={canEdit ? `/admin/products/${item.id}/edit` : `/products/${item.id}`}
-                                className="hover:underline"
-                            >
-                                {item.name}
-                            </Link>
+                        <TableCell className='group group-hover:underline underline-offset-2'>
+                            {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
                         </TableCell>
                         <TableCell>{item.category ? item.category.name : ''}</TableCell>
                         <TableCell>
@@ -57,22 +70,26 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 )}
                             </div>
                         </TableCell>
-                        <TableCell>{item.price}</TableCell>
+                        <TableCell>{item.price} €</TableCell>
                         {(canEdit || canDelete) && (
                             <TableCell>
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex gap-2 justify-end" onClick={e => e.stopPropagation()}>
                                     {canEdit && (
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={`/admin/products/${item.id}/edit`}>
-                                                <EditIcon size={16} />
-                                            </Link>
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            onClick={(e) => handleEditClick(e, item.id)}
+                                        >
+                                            <EditIcon size={16} />
                                         </Button>
                                     )}
                                     {canDelete && (
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link href={`/admin/products/${item.id}/destroy`} onBefore={() => confirm('Are you sure?')}>
-                                                <TrashIcon size={16} />
-                                            </Link>
+                                        <Button
+                                            size="icon"
+                                            variant="destructive-outline"
+                                            onClick={(e) => handleDeleteClick(e, item.id)}
+                                        >
+                                            <TrashIcon size={16} />
                                         </Button>
                                     )}
                                 </div>
