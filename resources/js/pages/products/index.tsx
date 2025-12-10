@@ -94,16 +94,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
         update();
         window.addEventListener('resize', update);
 
-        // ResizeObserver pour réagir aux changements de layout (sidebar resize)
-        // let ro: ResizeObserver | null = null;
-        // const headerEl = document.querySelector(selector) as HTMLElement | null;
-        // if (headerEl && typeof ResizeObserver !== 'undefined') {
-        //     ro = new ResizeObserver(update);
-        //     ro.observe(headerEl);
-        // }
-
         // Observer l'élément <main> pour détecter les changements de largeur 
-        // causés par les deux sidebars (gauche et droite)
         let mainRo: ResizeObserver | null = null;
         const mainEl = document.querySelector('main') as HTMLElement | null;
         if (mainEl && typeof ResizeObserver !== 'undefined') {
@@ -113,10 +104,9 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
 
         return () => {
             window.removeEventListener('resize', update);
-            // if (ro) ro.disconnect();
             if (mainRo) mainRo.disconnect();
         };
-    }, [rightSidebarOpen, mainSidebarOpen]); // Se déclenche uniquement quand les sidebars changent
+    }, [rightSidebarOpen, mainSidebarOpen]);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -172,7 +162,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                 stickyClassName='z-25 bg-background'
                 stickyStyle={{ top: topOffset, width: width }}
             >
-                <div className="flex items-center relative w-full gap-2 border-b border-sidebar-border/50 py-2">
+                <div className="z-25 flex items-center relative w-full gap-2 border-b border-sidebar-border/50 py-2">
 
                     <div className="flex gap-2">
                         <button
@@ -204,7 +194,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                         </button>
                     </div>
 
-                    <div className="w-200 flex-1">
+                    <div className="z-50 w-200 flex-1">
                         <SearchSoham
                             value={search}
                             onChange={handleSearch}
