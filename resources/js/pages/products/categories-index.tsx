@@ -24,7 +24,7 @@ type Props = {
     q: string | null;
 };
 
-export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
+export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);

@@ -7,7 +7,7 @@ import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react';
+import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid, LoaderIcon, Loader2Icon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import SearchSoham from '@/components/ui/searchSoham';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
@@ -29,7 +29,8 @@ type Props = {
     q: string | null;
 };
 
-export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
+
+export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     // console.log(collection)
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -170,6 +171,7 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
             <BasicSticky
                 key={stickyKey}
                 stickyClassName='z-25 bg-background'
+                wrapperClassName='relative z-25'
                 stickyStyle={{ top: topOffset, width: width }}
             >
                 <div className="flex items-center relative w-full gap-2 border-b border-sidebar-border/50 py-2">
@@ -243,6 +245,12 @@ export default withAppLayout(breadcrumbs, ({ collection, q }: Props) => {
                     <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
                 )}
             </InfiniteScroll>
+
+            {collection.meta.current_page < collection.meta.last_page &&
+                <div className='w-full h-50 flex items-center justify-center mt-4'>
+                    <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
+                </div>
+            }
         </>
 
     )

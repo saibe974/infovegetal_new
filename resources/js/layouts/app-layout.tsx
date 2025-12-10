@@ -10,9 +10,10 @@ import { toast } from 'sonner';
 interface AppLayoutProps {
     children: ReactNode;
     breadcrumbs?: BreadcrumbItem[];
+    hideFooterOnInfiniteScroll?: boolean;
 }
 
-const AppLayout = ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
+const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, ...props }: AppLayoutProps) => {
     const page = usePage<SharedData>();
 
     const isHomePage = usePage().component === 'home';
@@ -30,20 +31,19 @@ const AppLayout = ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
     return (
         <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
             {children}
-            {/* {page.props.collection.meta.current_page === page.props.collection.meta.last_page || isHomePage ? */}
-            <AppFooter /> 
-           
+            <AppFooter hideOnInfiniteScroll={hideFooterOnInfiniteScroll} />
+
             <Toaster position="top-center" richColors />
         </AppLayoutTemplate>
     );
 };
 
-export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], component: FC<T>) {
+export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], hideFooterOnInfiniteScroll: boolean = false, component: FC<T>,) {
 
 
     // @ts-expect-error layout exists for inertia
-    component.layout = (page: ReactNode) => <AppLayout breadcrumbs={breadcrumbs}>
-        <div className="p-2 lg:p-4">
+    component.layout = (page: ReactNode) => <AppLayout breadcrumbs={breadcrumbs} hideFooterOnInfiniteScroll={hideFooterOnInfiniteScroll}>
+        <div className="p-2 lg:p-4 min-h-screen">
             {page}
 
         </div>

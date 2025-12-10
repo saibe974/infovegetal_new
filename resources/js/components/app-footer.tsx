@@ -4,8 +4,12 @@ import { NavFooter } from "./nav-footer";
 import { AppLogoIconMini } from "./app-logo-icon";
 import { Button } from "./ui/button";
 import { Link } from "@inertiajs/react";
+import { cn } from "@/lib/utils";
+interface AppFooterProps {
+    hideOnInfiniteScroll?: boolean;
+}
 
-export function AppFooter() {
+export function AppFooter({ hideOnInfiniteScroll = false }: AppFooterProps) {
     const { t } = useI18n();
 
     const footerLinks = [
@@ -47,7 +51,10 @@ export function AppFooter() {
     ]
 
     return (
-        <footer className="w-full mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6">
+        <footer className={cn(
+            "w-full mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6",
+            hideOnInfiniteScroll && "hidden"
+        )}>
             <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-20 md:gap-0 items-center">
 
                 <div className="md:flex-1 items-start flex justify-center">

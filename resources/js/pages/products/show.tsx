@@ -17,13 +17,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default withAppLayout<Props>(breadcrumbs, ({ product }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
                 <Link href="#"
-                    onClick={(e) => { e.preventDefault(); window.history.back(); }}>
-                    <ArrowLeftCircle />
+                    onClick={(e) => { e.preventDefault(); window.history.back(); }}
+                    className='hover:text-gray-500 transition-colors duration-200'
+                >
+                    <ArrowLeftCircle size={35} />
                 </Link>
                 <h1 className="text-3xl font-bold">{product.name}</h1>
             </div>
