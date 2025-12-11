@@ -657,6 +657,7 @@ export function CsvUploadFilePond({
                         buttonClassName ??
                         'clickable inline-flex items-center border px-3 py-1 rounded text-sm'
                     }
+                    title={title}
                 >
                     <DownloadIcon />
                     {buttonLabel ?? ''}

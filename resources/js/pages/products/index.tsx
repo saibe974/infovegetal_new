@@ -179,7 +179,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
 function DownloadCsvButton() {
     return (
-        <a href="/admin/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
+        <a href="/admin/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm" title='Export CSV'>
             <UploadIcon />
         </a>
     );
