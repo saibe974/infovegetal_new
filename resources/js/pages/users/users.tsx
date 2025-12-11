@@ -26,8 +26,7 @@ import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react';
-import BasicSticky from 'react-sticky-el';
+import { UploadIcon, EditIcon, TrashIcon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
@@ -36,6 +35,8 @@ import { ProductsCardsList } from '@/components/products/products-cards-list';
 import users from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -103,43 +104,11 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
-    const [topOffset, setTopOffset] = useState<number>(0);
-
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
         const stored = localStorage.getItem('users_view_mode');
         return stored === 'grid' ? 'grid' : 'table';
     });
-
-    // sauvegarde à chaque changement (safe)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            localStorage.setItem('users_view_mode', viewMode);
-        } catch (e) {
-            // ignore (ex: stockage bloqué)
-        }
-    }, [viewMode]);
-
-    useEffect(() => {
-        const selector = '.top-sticky'; // classe à ajouter sur le sticky du dessus
-        const getHeight = () => {
-            const el = document.querySelector(selector) as HTMLElement | null;
-            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
-        };
-
-        const update = () => setTopOffset(getHeight());
-        update();
-        window.addEventListener('resize', update);
-        // si ton layout change dynamiquement (menu mobile), tu peux aussi observer le DOM :
-        const obs = new MutationObserver(update);
-        const parent = document.body;
-        obs.observe(parent, { childList: true, subtree: true });
-        return () => {
-            window.removeEventListener('resize', update);
-            obs.disconnect();
-        };
-    }, []);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -201,71 +170,38 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
     return (
         <div>
             <Head title="Users" />
-            <BasicSticky
-                topOffset={topOffset}
-                stickyStyle={{ top: topOffset }}
-                stickyClassName="bg-background"
-                wrapperClassName="relative z-20"
+            <StickyBar
+                zIndex={20}
+                borderBottom={false}
             >
-                <div className="flex items-center py-2 relative w-full">
-
-                    <div className="flex gap-2 mr-2">
-                        <button
-                            type="button"
-                            aria-pressed={viewMode === 'table'}
-                            onClick={() => setViewMode('table')}
-                            className={`
-                                p-2 rounded-md transition border ${viewMode === 'table' ?
-                                    'bg-accent' :
-                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
-                            `}
-                            title="Afficher en tableau"
-                        >
-                            <List />
-                        </button>
-
-                        <button
-                            type="button"
-                            aria-pressed={viewMode === 'grid'}
-                            onClick={() => setViewMode('grid')}
-                            className={`
-                                p-2 rounded-md transition border ${viewMode === 'grid' ?
-                                    'bg-accent' :
-                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
-                            `}
-                            title="Afficher en grille"
-                        >
-                            <LayoutGrid />
-                        </button>
-                    </div>
-
-                    <div className="w-200 left-0 top-1 mr-2" >
-                        <SearchSelect
-                            value={search}
-                            onChange={handleSearch}
-                            onSubmit={onSelect}
-                            propositions={searchPropositions}
-                            loading={fetching}
-                        // count={collection.meta.total}
-                        // query={q ?? ''}
-                        />
-                    </div>
-
-                    {canImportExport && (
-                        <div className="ml-auto flex items-center gap-2">
-
-                            <CsvUploadFilePond
-                                title="Upload CSV"
-                                description="Uploadez un fichier CSV"
-                                uploadUrl="/upload"
-                                successRedirectUrl={products.index().url}
-                                buttonLabel=""
-                            />
-                            <DownloadCsvButton />
-                        </div>
-                    )}
+                <ViewModeToggle
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    storageKey="users_view_mode"
+                />
+                <div className="w-200 left-0 top-1 mr-2">
+                    <SearchSelect
+                        value={search}
+                        onChange={handleSearch}
+                        onSubmit={onSelect}
+                        propositions={searchPropositions}
+                        loading={fetching}
+                    />
                 </div>
-            </BasicSticky>
+
+                {canImportExport && (
+                    <div className="ml-auto flex items-center gap-2">
+                        <CsvUploadFilePond
+                            title="Upload CSV"
+                            description="Uploadez un fichier CSV"
+                            uploadUrl="/upload"
+                            successRedirectUrl={products.index().url}
+                            buttonLabel=""
+                        />
+                        <DownloadCsvButton />
+                    </div>
+                )}
+            </StickyBar>
 
             {/* <InfiniteScroll data="collection"> */}
             <div>

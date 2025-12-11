@@ -7,8 +7,7 @@ import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid, LoaderIcon, Loader2Icon } from 'lucide-react';
-import BasicSticky from 'react-sticky-el';
+import { UploadIcon, EditIcon, TrashIcon, LoaderIcon, Loader2Icon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
@@ -17,6 +16,8 @@ import { ProductsCardsList } from '@/components/products/products-cards-list';
 import { useSidebar } from '@/components/ui/sidebar';
 import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -41,10 +42,6 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
     const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
 
-    const { isOpenId } = useSidebar();
-    const rightSidebarOpen = isOpenId('right');
-    const mainSidebarOpen = isOpenId('main');
-
     const page = usePage<{ searchPropositions?: string[] }>();
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
@@ -52,64 +49,11 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
-    const [topOffset, setTopOffset] = useState<number>(0);
-    const [width, setWidth] = useState<number>(0);
-    const [stickyKey, setStickyKey] = useState<number>(0);
-
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
         const stored = localStorage.getItem('products_view_mode');
         return stored === 'grid' ? 'grid' : 'table';
     });
-
-    // sauvegarde à chaque changement (safe)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            localStorage.setItem('products_view_mode', viewMode);
-        } catch (e) {
-            // ignore (ex: stockage bloqué)
-        }
-    }, [viewMode]);
-
-    useEffect(() => {
-        const selector = '.top-sticky';
-        const getHeight = () => {
-            const el = document.querySelector(selector) as HTMLElement | null;
-            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
-        };
-
-        const getWidth = () => {
-            const el = document.querySelector('main') as HTMLElement | null;
-            if (!el) return 0;
-            const computedStyle = window.getComputedStyle(el);
-            const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-            const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - 30);
-        }
-
-        const update = () => {
-            setTopOffset(getHeight());
-            setWidth(getWidth());
-            setStickyKey(prev => prev + 1);
-        };
-
-        update();
-        window.addEventListener('resize', update);
-
-        // Observer l'élément <main> pour détecter les changements de largeur 
-        let mainRo: ResizeObserver | null = null;
-        const mainEl = document.querySelector('main') as HTMLElement | null;
-        if (mainEl && typeof ResizeObserver !== 'undefined') {
-            mainRo = new ResizeObserver(update);
-            mainRo.observe(mainEl);
-        }
-
-        return () => {
-            window.removeEventListener('resize', update);
-            if (mainRo) mainRo.disconnect();
-        };
-    }, [rightSidebarOpen, mainSidebarOpen]);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -160,75 +104,42 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     return (
         <>
             <Head title="Products" />
-            <BasicSticky
-                key={stickyKey}
-                stickyClassName='z-25 bg-background'
-                wrapperClassName='relative z-25'
-                stickyStyle={{ top: topOffset, width: width }}
-            >
-                <div className="z-25 flex items-center relative w-full gap-2 border-b border-sidebar-border/50 py-2">
-
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            aria-pressed={viewMode === 'table'}
-                            onClick={() => setViewMode('table')}
-                            className={`
-                                p-2 rounded-md transition border ${viewMode === 'table' ?
-                                    'bg-accent' :
-                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
-                            `}
-                            title="Afficher en tableau"
-                        >
-                            <List />
-                        </button>
-
-                        <button
-                            type="button"
-                            aria-pressed={viewMode === 'grid'}
-                            onClick={() => setViewMode('grid')}
-                            className={`
-                                p-2 rounded-md transition border ${viewMode === 'grid' ?
-                                    'bg-accent' :
-                                    'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'}
-                            `}
-                            title="Afficher en grille"
-                        >
-                            <LayoutGrid />
-                        </button>
-                    </div>
-
-                    <div className="z-50 w-200 flex-1">
-                        <SearchSelect
-                            value={search}
-                            onChange={handleSearch}
-                            onSubmit={onSelect}
-                            propositions={searchPropositions}
-                            loading={fetching}
-                            count={collection.meta.total}
-                            query={q ?? ''}
-                        />
-                    </div>
-
-                    {canImportExport && (
-                        <div className="ml-auto flex items-center gap-2">
-                            <CsvUploadFilePond
-                                title='Upload CSV'
-                                description='Uploadez un fichier CSV'
-                                uploadUrl='/upload'
-                                importProcessUrl={products.admin.import.process.url()}
-                                importProcessChunkUrl={products.admin.import.process_chunk.url()}
-                                importCancelUrl={products.admin.import.cancel.url()}
-                                importProgressUrl={(id) => products.admin.import.progress.url({ id })}
-                                postTreatmentComponent={ProductsImportTreatment}
-                                successRedirectUrl={products.index().url}
-                                buttonLabel=''
-                            />
-                            <DownloadCsvButton />
-                        </div>
-                    )}
+            <StickyBar>
+                <ViewModeToggle
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    storageKey="products_view_mode"
+                />
+                <div className="z-50 w-200 flex-1">
+                    <SearchSelect
+                        value={search}
+                        onChange={handleSearch}
+                        onSubmit={onSelect}
+                        propositions={searchPropositions}
+                        loading={fetching}
+                        count={collection.meta.total}
+                        query={q ?? ''}
+                    />
                 </div>
-            </BasicSticky>
+
+                {canImportExport && (
+                    <div className="ml-auto flex items-center gap-2">
+                        <CsvUploadFilePond
+                            title='Upload CSV'
+                            description='Uploadez un fichier CSV'
+                            uploadUrl='/upload'
+                            importProcessUrl={products.admin.import.process.url()}
+                            importProcessChunkUrl={products.admin.import.process_chunk.url()}
+                            importCancelUrl={products.admin.import.cancel.url()}
+                            importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                            postTreatmentComponent={ProductsImportTreatment}
+                            successRedirectUrl={products.index().url}
+                            buttonLabel=''
+                        />
+                        <DownloadCsvButton />
+                    </div>
+                )}
+            </StickyBar>
 
             {collection.data.length === 0 ? (
                 <div className='w-full h-200 flex flex-col items-center justify-center gap-4'>
