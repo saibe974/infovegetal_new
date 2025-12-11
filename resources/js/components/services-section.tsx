@@ -127,9 +127,9 @@ export default function servicesSection({ active }: { active: boolean }) {
 
                             {activeId !== item.id && (
                                 <div className="absolute inset-0 pointer-events-none">
-                                    <div dangerouslySetInnerHTML={{ __html: item.svg }} className="w-full h-full opacity-30 text-gray-300 dark:text-gray-700" >
+                                    <div className="w-full h-full opacity-30 text-gray-400 dark:text-gray-700">
+                                        <AnimatedSVG svg={item.svg} duration={0} />
                                     </div>
-                                    <div className="absolute inset-0 pointer-events-none bg-gradient-to-t " />
                                 </div>
                             )}
 

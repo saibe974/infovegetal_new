@@ -34,7 +34,7 @@ type Props = {
 
 
 
-export default withAppLayout(breadcrumbs, ({ collection, }: Props) => {
+export default withAppLayout(breadcrumbs, false, ({ collection, }: Props) => {
     const { t } = useI18n();
     const plugin = useRef(
         Autoplay({ delay: 10000, stopOnInteraction: true })

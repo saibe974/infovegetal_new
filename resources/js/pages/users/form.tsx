@@ -28,7 +28,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 
-export default withAppLayout<Props>(breadcrumbs, ({ user }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
     // console.log(product);
     // console.log(Routing);
 
@@ -41,8 +41,10 @@ export default withAppLayout<Props>(breadcrumbs, ({ user }) => {
             <div className="flex items-center py-2 gap-2 justify-between">
                 <div className="flex items-center gap-2">
                     <Link href="#"
-                        onClick={(e) => { e.preventDefault(); window.history.back(); }}>
-                        <ArrowLeftCircle />
+                        onClick={(e) => { e.preventDefault(); window.history.back(); }}
+                        className='hover:text-gray-500 transition-colors duration-200'
+                    >
+                        <ArrowLeftCircle size={35} />
                     </Link>
                     <h2>
                         Editer un utilisateur

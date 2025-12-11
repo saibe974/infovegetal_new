@@ -71,7 +71,7 @@ export function UserCard({
     const isCurrentUser = currentUser?.id === user.id;
 
     return (
-        <Card className={`relative h-full w-75 flex flex-col p-4 gap-4 ${className ?? ""}`}>
+        <Card className={`relative h-105 w-75 flex flex-col p-4 gap-4 ${className ?? ""}`}>
             <CardHeader className="p-0">
                 <CardTitle className="text-lg font-semibold">
                     {user.name}

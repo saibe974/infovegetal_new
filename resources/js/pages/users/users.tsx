@@ -51,7 +51,7 @@ interface UsersPageProps {
 
 
 
-export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => {
+export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProps) => {
 
     // console.log(users)
     const { t } = useI18n();
@@ -286,7 +286,7 @@ export default withAppLayout(breadcrumbs, ({ users, roles }: UsersPageProps) => 
                             auth={auth}
                             canEdit={canEdit}
                             canDelete={canDelete}
-                        // canPreview={canPreview}
+                            canChangeRole={canPreview}
                         />
                     </div>
                     // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
