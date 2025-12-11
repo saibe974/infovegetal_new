@@ -11,7 +11,7 @@ export function AppContent({
     ...props
 }: AppContentProps) {
     if (variant === 'sidebar') {
-        return <SidebarInset style={{ isolation: 'auto' }} {...props}>{children}</SidebarInset>;
+        return <SidebarInset {...props}>{children}</SidebarInset>;
     }
 
     return (
