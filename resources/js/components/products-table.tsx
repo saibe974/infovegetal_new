@@ -41,7 +41,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <SortableTableHead field='name'>Name</SortableTableHead>
                     <SortableTableHead field='category_products_id'>Category</SortableTableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Price</TableHead>
+                    <SortableTableHead field='price'>Price</SortableTableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
                 </TableRow>
             </TableHeader>
