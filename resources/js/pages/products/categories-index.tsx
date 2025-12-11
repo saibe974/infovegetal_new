@@ -78,7 +78,9 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     return (
         <div>
             {/* @ts-ignore */}
-            <StickyBar>
+            <StickyBar
+                className='mb-4'
+            >
                 <div className="flex items-center py-2 relative w-full">
 
                     <div className="w-200 left-0 top-1 z-100 mr-2" >

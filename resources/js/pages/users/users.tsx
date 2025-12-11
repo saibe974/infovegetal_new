@@ -173,6 +173,7 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
             <StickyBar
                 zIndex={20}
                 borderBottom={false}
+                className='mb-4'
             >
                 <ViewModeToggle
                     viewMode={viewMode}

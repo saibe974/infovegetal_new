@@ -6,12 +6,16 @@ interface StickySearchBarProps {
     children: ReactNode;
     zIndex?: number;
     borderBottom?: boolean;
+    stickyClassName?: string;
+    className?: string;
 }
 
 export function StickyBar({
     children,
     zIndex = 25,
     borderBottom = true,
+    stickyClassName = '',
+    className = '',
 }: StickySearchBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
@@ -59,8 +63,8 @@ export function StickyBar({
     return (
         <BasicSticky
             key={stickyKey}
-            stickyClassName={`z-${zIndex} bg-background`}
-            wrapperClassName={`relative z-${zIndex}`}
+            stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
+            wrapperClassName={`relative z-${zIndex} ${className}`}
             stickyStyle={{ top: topOffset, ...(width && { width }) }}
         >
             <div className={`z-${zIndex} flex items-center relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>

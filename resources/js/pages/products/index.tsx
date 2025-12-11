@@ -104,7 +104,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     return (
         <>
             <Head title="Products" />
-            <StickyBar>
+            <StickyBar className='mb-4'>
                 <ViewModeToggle
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
