@@ -1,6 +1,6 @@
 import React from "react";
 import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@/components/ui/table';
-import { SortableTableHead } from '@/components/sortable-table-head';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Link } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

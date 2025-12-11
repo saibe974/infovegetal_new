@@ -3,8 +3,9 @@ import { ReactNode, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { InfiniteScroll, usePage, router, Form, Head, Link } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { AppFooter } from '@/components/app-footer';
+import { AppFooter } from '@/components/app/app-footer';
 import { ArrowLeftCircle } from 'lucide-react';
+import Heading from '@/components/heading';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Conditions de vente', href: '/legals/sale-conditions' },
@@ -20,14 +21,14 @@ export default withAppLayout(breadcrumbs, false, () => {
             <Head title="Conditions de vente" />
 
             <div className="flex items-center py-2 gap-2 justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex justify-center gap-2">
                     <Link href="#"
                         onClick={(e) => { e.preventDefault(); window.history.back(); }}
                         className='hover:text-gray-500 transition-colors duration-200'
                     >
                         <ArrowLeftCircle size={35} />
                     </Link>
-                    <h2 className='text-3xl'>Conditions de vente</h2>
+                    <Heading title={t('Conditions de vente')} />
                 </div>
             </div>
 

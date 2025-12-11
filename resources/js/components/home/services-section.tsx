@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import DrawSVGPlugin from "gsap/DrawSVGPlugin";
-import AnimatedSVG from "./animatedSVG";
+import AnimatedSVG from "../ui/animatedSVG";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { services } from '../lib/services'
+import { services } from '../../lib/services'
 import { SplitText } from "gsap/SplitText";
 import { MousePointer, ChevronDown, MoreHorizontal } from "lucide-react";
 

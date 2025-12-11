@@ -1,16 +1,17 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
-import { SortableTableHead } from '@/components/sortable-table-head';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSoham from '@/components/app/search-select';
+import { useSidebar } from '@/components/ui/sidebar';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -31,6 +32,53 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
+
+    const { isOpenId } = useSidebar();
+    const rightSidebarOpen = isOpenId('right');
+    const mainSidebarOpen = isOpenId('main');
+
+    const [topOffset, setTopOffset] = useState<number>(0);
+    const [width, setWidth] = useState<number>(0);
+    const [stickyKey, setStickyKey] = useState<number>(0);
+
+    useEffect(() => {
+        const selector = '.top-sticky';
+        const getHeight = () => {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+        };
+
+        const getWidth = () => {
+            const el = document.querySelector('main') as HTMLElement | null;
+            if (!el) return 0;
+            const computedStyle = window.getComputedStyle(el);
+            const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
+            const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - 30);
+        }
+
+        const update = () => {
+            setTopOffset(getHeight());
+            setWidth(getWidth());
+            setStickyKey(prev => prev + 1);
+        };
+
+        update();
+        window.addEventListener('resize', update);
+
+        // Observer l'élément <main> pour détecter les changements de largeur 
+        let mainRo: ResizeObserver | null = null;
+        const mainEl = document.querySelector('main') as HTMLElement | null;
+        if (mainEl && typeof ResizeObserver !== 'undefined') {
+            mainRo = new ResizeObserver(update);
+            mainRo.observe(mainEl);
+        }
+
+        return () => {
+            window.removeEventListener('resize', update);
+            if (mainRo) mainRo.disconnect();
+        };
+    }, [rightSidebarOpen, mainSidebarOpen]);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -79,7 +127,12 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     return (
         <div>
             {/* @ts-ignore */}
-            <BasicSticky stickyClassName='z-50 bg-background' className="relative z-100">
+            <BasicSticky
+                key={stickyKey}
+                stickyClassName='z-25 bg-background'
+                wrapperClassName='relative z-25'
+                stickyStyle={{ top: topOffset, width: width }}
+            >
                 <div className="flex items-center py-2 relative w-full">
 
                     <div className="w-200 left-0 top-1 z-100 mr-2" >

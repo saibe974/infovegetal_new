@@ -1,6 +1,6 @@
-import NavFooterExtended, { NavFooter } from '@/components/nav-footer';
-import NavMain, { NavMainExtended } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
+import NavFooterExtended, { NavFooter } from '@/components/ui/nav-footer';
+import NavMain, { NavMainExtended } from '@/components/ui/nav-main';
+import { NavUser } from '@/components/users/nav-user';
 import {
     Sidebar,
     SidebarContent,

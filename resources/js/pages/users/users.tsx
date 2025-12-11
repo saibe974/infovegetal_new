@@ -25,17 +25,17 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { SortableTableHead } from '@/components/sortable-table-head';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
-import ProductsTable from '@/components/products-table';
-import { ProductsCardsList } from '@/components/products-cards-list';
+import ProductsTable from '@/components/products/products-table';
+import { ProductsCardsList } from '@/components/products/products-cards-list';
 import users from '@/routes/users';
-import UsersTable from '@/components/users-table';
-import UsersCardsList from '@/components/users-cards-list';
+import UsersTable from '@/components/users/users-table';
+import UsersCardsList from '@/components/users/users-cards-list';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -240,7 +240,7 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
                     </div>
 
                     <div className="w-200 left-0 top-1 mr-2" >
-                        <SearchSoham
+                        <SearchSelect
                             value={search}
                             onChange={handleSearch}
                             onSubmit={onSelect}

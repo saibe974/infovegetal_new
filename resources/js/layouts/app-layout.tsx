@@ -1,4 +1,4 @@
-import { AppFooter } from '@/components/app-footer';
+import { AppFooter } from '@/components/app/app-footer';
 import ScrollToTopButton from '@/components/ui/scroll-to-top-btn';
 import { Toaster } from '@/components/ui/sonner';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';

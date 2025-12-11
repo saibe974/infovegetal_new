@@ -1,4 +1,4 @@
-import InputError from '@/components/input-error';
+import InputError from '@/components/ui/input-error';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';

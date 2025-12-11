@@ -4,18 +4,19 @@ import { useEffect, useRef, useState } from 'react';
 import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
-import { SortableTableHead } from '@/components/sortable-table-head';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UploadIcon, EditIcon, TrashIcon, List, LayoutGrid, LoaderIcon, Loader2Icon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
-import ProductsTable from '@/components/products-table';
-import { ProductsCardsList } from '@/components/products-cards-list';
+import ProductsTable from '@/components/products/products-table';
+import { ProductsCardsList } from '@/components/products/products-cards-list';
 import { useSidebar } from '@/components/ui/sidebar';
 import ProductsImportTreatment from '@/components/products/import';
+import { useI18n } from '@/lib/i18n';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -32,6 +33,7 @@ type Props = {
 
 export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     // console.log(collection)
+    const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
     const isAuthenticated = !!user;
@@ -197,7 +199,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                     </div>
 
                     <div className="z-50 w-200 flex-1">
-                        <SearchSoham
+                        <SearchSelect
                             value={search}
                             onChange={handleSearch}
                             onSubmit={onSelect}
@@ -228,13 +230,31 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                 </div>
             </BasicSticky>
 
-            <InfiniteScroll data="collection" className=''>
-                {viewMode === 'table' ? (
-                    <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
-                ) : (
-                    <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
-                )}
-            </InfiniteScroll>
+            {collection.data.length === 0 ? (
+                <div className='w-full h-200 flex flex-col items-center justify-center gap-4'>
+                    {q ? (
+                        <>
+                            <p className='text-lg'>{t('Aucun produit ne correspond à votre recherche.')}</p>
+                            <Button
+                                variant='secondary'
+                                onClick={() => router.visit(products.index().url)}
+                            >
+                                {t('Réinitialiser la recherche')}
+                            </Button>
+                        </>
+                    ) : (
+                        <p className='text-lg'>{t('Aucun produit disponible.')}</p>
+                    )}
+                </div>
+            ) :
+                <InfiniteScroll data="collection" className=''>
+                    {viewMode === 'table' ? (
+                        <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
+                    ) : (
+                        <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
+                    )}
+                </InfiniteScroll>
+            }
 
             {collection.meta.current_page < collection.meta.last_page &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>

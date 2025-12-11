@@ -1,4 +1,4 @@
-import InputError from '@/components/input-error';
+import InputError from '@/components/ui/input-error';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -19,7 +19,7 @@ import { Form } from '@inertiajs/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { Check, Copy, Loader2, ScanLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AlertError from './alert-error';
+import AlertError from './ui/alert-error';
 
 function GridScanIcon() {
     return (

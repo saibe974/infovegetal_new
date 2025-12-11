@@ -1,4 +1,4 @@
-import AppLogoIcon, { AppLogoIconMini } from '@/components/app-logo-icon';
+import AppLogoIcon, { AppLogoIconMini } from '@/components/app/app-logo-icon';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';

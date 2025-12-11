@@ -4,24 +4,24 @@ import { ReactNode, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { InfiniteScroll, usePage, router } from '@inertiajs/react';
-import { SortableTableHead } from '@/components/sortable-table-head';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Loader2, DownloadIcon } from 'lucide-react';
 import BasicSticky from 'react-sticky-el';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSoham from '@/components/app/search-select';
 import { Badge } from '@/components/ui/badge';
-import { CarouselHome } from '@/components/carousel-home';
-import AppLogo from '@/components/app-logo';
+import { CarouselHome } from '@/components/home/carousel-home';
+import AppLogo from '@/components/app/app-logo';
 import { useI18n } from '@/lib/i18n';
-import { AppLogoIconMini } from '@/components/app-logo-icon';
-import { AboutSection } from '@/components/about-section';
-import ServicesSection from '@/components/services-section';
-import { ProductsCardsList } from '@/components/products-cards-list';
+import { AppLogoIconMini } from '@/components/app/app-logo-icon';
+import { AboutSection } from '@/components/home/about-section';
+import ServicesSection from '@/components/home/services-section';
+import { ProductsCardsList } from '@/components/products/products-cards-list';
 import { Button } from '@/components/ui/button';
-import { AppFooter } from '@/components/app-footer';
+import { AppFooter } from '@/components/app/app-footer';
 import { Carousel, CarouselContent } from '@/components/ui/carousel';
 import Autoplay from "embla-carousel-autoplay"
-import { ProductsCarousel } from '@/components/products-carousel';
+import { ProductsCarousel } from '@/components/products/products-carousel';
 import { Link } from "@inertiajs/react"
 
 const breadcrumbs: BreadcrumbItem[] = [

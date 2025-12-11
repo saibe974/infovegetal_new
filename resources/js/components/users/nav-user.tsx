@@ -9,13 +9,13 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
-import { UserInfo } from '@/components/user-info';
-import { UserMenuContent } from '@/components/user-menu-content';
+import { UserInfo } from '@/components/users/user-info';
+import { UserMenuContent } from '@/components/users/user-menu-content';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { NavigationMenuItem, NavigationMenuTrigger } from './ui/navigation-menu';
+import { NavigationMenuItem, NavigationMenuTrigger } from '../ui/navigation-menu';
 
 export function NavUser() {
     const { auth } = usePage<SharedData>().props;

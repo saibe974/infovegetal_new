@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditIcon, TrashIcon } from 'lucide-react';
 import { type User, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from '@/lib/i18n';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { router } from '@inertiajs/react';
 
 interface UsersTableProps {

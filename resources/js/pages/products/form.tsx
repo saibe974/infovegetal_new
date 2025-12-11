@@ -17,7 +17,7 @@ import type { BreadcrumbItem, ProductDetailed } from '@/types';
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, LinkIcon, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSelect from '@/components/app/search-select';
 import { useState } from 'react';
 // import { StepsField } from '@/components/forms/steps-field';
 // import { useState } from 'react';
@@ -102,7 +102,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     defaultValue={(Array.isArray((product as any).tags) ? (product as any).tags.map((t: any) => t.name).join(', ') : '')}
                                     placeholder="ex: vivace, pot, promotion"
                                 /> */}
-                                <SearchSoham
+                                <SearchSelect
                                     value={tag}
                                     onChange={writeTags}
                                     onSubmit={() => { }}

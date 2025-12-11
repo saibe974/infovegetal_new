@@ -8,7 +8,7 @@ import type { BreadcrumbItem, ProductDetailed, User } from '@/types';
 import { Form, Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, LinkIcon, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import SearchSoham from '@/components/ui/searchSoham';
+import SearchSoham from '@/components/app/search-select';
 import { useState } from 'react';
 import users from '@/routes/users';
 

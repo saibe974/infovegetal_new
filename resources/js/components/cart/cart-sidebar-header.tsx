@@ -1,5 +1,5 @@
 import { CheckCircle, Eye, PlusCircle, Save, Trash2 } from "lucide-react";
-import { SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "./ui/sidebar";
+import { SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 
 export function CartSidebarHeader() {
     return (

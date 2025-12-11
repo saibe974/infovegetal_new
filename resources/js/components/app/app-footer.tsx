@@ -1,8 +1,8 @@
 import { useI18n } from "@/lib/i18n";
 import AppLogo from "./app-logo";
-import { NavFooter } from "./nav-footer";
+import { NavFooter } from "../ui/nav-footer";
 import { AppLogoIconMini } from "./app-logo-icon";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { Link } from "@inertiajs/react";
 import { cn } from "@/lib/utils";
 interface AppFooterProps {

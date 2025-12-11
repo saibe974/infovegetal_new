@@ -3,8 +3,10 @@ import { ReactNode, useRef, useState } from 'react';
 import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
 import { InfiniteScroll, usePage, router, Form, Head, Link } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { AppFooter } from '@/components/app-footer';
+import { AppFooter } from '@/components/app/app-footer';
 import { ArrowLeftCircle } from 'lucide-react';
+import Heading from '@/components/heading';
+
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Mentions légales', href: '/legals/legal-notices' },
@@ -29,9 +31,9 @@ export default withAppLayout(breadcrumbs, false, () => {
                     </Link>
                 </div>
             </div>
-            <div className='w-fit mx-auto h-180 flex flex-col justify-center items-center gap-15'>
-                <h2 className='text-4xl'>Mentions légales</h2>
-                <p className='text-lg text-wrap p-3'>
+            <div className='w-fit mx-auto h-180 flex flex-col justify-center  gap-15'>
+                <Heading title={t('Mentions légales')} />
+                <p className=' text-wrap p-3'>
                     Siège social : ID'VEGETAL, 50 chemin de l'Ermitage - 39230 PASSENANS <br />
                     Tél. : 06.85.31.86.53<br />
                     Fax : 03.84.44.61.99<br />

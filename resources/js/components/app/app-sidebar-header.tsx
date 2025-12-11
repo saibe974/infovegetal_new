@@ -1,21 +1,21 @@
-import { Breadcrumbs } from '@/components/breadcrumbs';
+import { Breadcrumbs } from '@/components/app/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { SharedData, type BreadcrumbItem as BreadcrumbItemType, Product, PaginatedCollection } from '@/types';
-import { NavUser } from './nav-user';
+import { NavUser } from '../users/nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
 import { dashboard, home, login, register } from '@/routes';
 import products from '@/routes/products';
-import SearchSoham from './ui/searchSoham';
+import SearchSelect from '@/components/app/search-select';
 import { useRef, useState } from 'react';
-import { SelectWithItems } from './ui/select-with-items';
-import { SelectLang } from './ui/selectLang';
-import AppearanceToggleDropdown from './appearance-dropdown';
+import { SelectWithItems } from '../ui/select-with-items';
+import { SelectLang } from '../ui/selectLang';
+import AppearanceToggleDropdown from '../appearance-dropdown';
 import { ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
 import { AlignJustify } from 'lucide-react'; // optionnel : icône pour le trigger
 import { useIsMobile } from '@/hooks/use-mobile';
-import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from './ui/navigation-menu';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from '../ui/navigation-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import BasicSticky from 'react-sticky-el';
 import { useSidebar } from '@/components/ui/sidebar';
 
@@ -127,7 +127,7 @@ export function AppSidebarHeader({
 
                 {isHomePage && (
                     <div className='hidden md:block md:w-3xl'>
-                        <SearchSoham
+                        <SearchSelect
                             value={search}
                             onChange={handleSearch}
                             onSubmit={onSelect}

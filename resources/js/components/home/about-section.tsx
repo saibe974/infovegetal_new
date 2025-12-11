@@ -1,5 +1,5 @@
 import { useI18n } from "@/lib/i18n";
-import AppLogoIcon, { AppLogoIconMini } from '@/components/app-logo-icon';
+import AppLogoIcon, { AppLogoIconMini } from '@/components/app/app-logo-icon';
 
 export function AboutSection() {
     const { t } = useI18n();

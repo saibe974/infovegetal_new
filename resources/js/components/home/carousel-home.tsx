@@ -11,7 +11,7 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel"
-import { Button } from "./ui/button"
+import { Button } from "@/components/ui/button"
 import { AlignRight, ArrowRight, ChevronRight } from "lucide-react"
 
 const images = [

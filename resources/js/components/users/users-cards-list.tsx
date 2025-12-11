@@ -1,5 +1,5 @@
 import React from "react";
-import { UserCard } from "@/components/user-card";
+import { UserCard } from "@/components/users/user-card";
 import { type User, PaginatedCollection, SharedData } from "@/types";
 
 interface UsersCardsListProps {

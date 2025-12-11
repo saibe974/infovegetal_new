@@ -1,9 +1,9 @@
-import { AppContent } from '@/components/app-content';
-import { AppShell } from '@/components/app-shell';
-import { AppSidebar } from '@/components/app-sidebar';
-import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import { RightSidebar } from '@/components/right-sidebar';
-import { CartSidebarHeader } from '@/components/cart-sidebar-header';
+import { AppContent } from '@/components/app/app-content';
+import { AppShell } from '@/components/app/app-shell';
+import { AppSidebar } from '@/components/app/app-sidebar';
+import { AppSidebarHeader } from '@/components/app/app-sidebar-header';
+import { RightSidebar } from '@/components/app/right-sidebar';
+import { CartSidebarHeader } from '@/components/cart/cart-sidebar-header';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { type BreadcrumbItem } from '@/types';
 import { type PropsWithChildren } from 'react';

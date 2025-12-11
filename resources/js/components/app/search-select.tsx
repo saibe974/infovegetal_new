@@ -25,7 +25,7 @@ interface Option {
     label: string;
 }
 
-export default function SearchSoham({
+export default function SearchSelect({
     value,
     onChange,
     onSubmit,

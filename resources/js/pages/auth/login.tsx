@@ -1,4 +1,4 @@
-import InputError from '@/components/input-error';
+import InputError from '@/components/ui/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
