@@ -4,19 +4,21 @@ import { useEffect } from 'react';
 interface ViewModeToggleProps {
     viewMode: 'table' | 'grid';
     onViewModeChange: (mode: 'table' | 'grid') => void;
-    storageKey: string;
+    pageKey: string;
 }
 
-export function ViewModeToggle({ viewMode, onViewModeChange, storageKey }: ViewModeToggleProps) {
-    // Sauvegarder à chaque changement
+export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewModeToggleProps) {
+    // Sauvegarder à chaque changement dans un objet "views"
     useEffect(() => {
         if (typeof window === 'undefined') return;
         try {
-            localStorage.setItem(storageKey, viewMode);
+            const views = JSON.parse(localStorage.getItem('views') || '{}');
+            views[pageKey] = viewMode;
+            localStorage.setItem('views', JSON.stringify(views));
         } catch (e) {
             // ignore (ex: stockage bloqué)
         }
-    }, [viewMode, storageKey]);
+    }, [viewMode, pageKey]);
 
     return (
         <div className="flex gap-2">

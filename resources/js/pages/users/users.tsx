@@ -106,8 +106,8 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
-        const stored = localStorage.getItem('users_view_mode');
-        return stored === 'grid' ? 'grid' : 'table';
+        const views = JSON.parse(localStorage.getItem('views') || '{}');
+        return views.users === 'grid' ? 'grid' : 'table';
     });
 
     const handleSearch = (s: string) => {
@@ -177,7 +177,7 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
                 <ViewModeToggle
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
-                    storageKey="users_view_mode"
+                    pageKey="users"
                 />
                 <div className="w-200 left-0 top-1 mr-2">
                     <SearchSelect

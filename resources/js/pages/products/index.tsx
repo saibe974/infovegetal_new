@@ -51,8 +51,8 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
-        const stored = localStorage.getItem('products_view_mode');
-        return stored === 'grid' ? 'grid' : 'table';
+        const views = JSON.parse(localStorage.getItem('views') || '{}');
+        return views.products === 'grid' ? 'grid' : 'table';
     });
 
     const handleSearch = (s: string) => {
@@ -108,7 +108,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                 <ViewModeToggle
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
-                    storageKey="products_view_mode"
+                    pageKey="products"
                 />
                 <div className="z-50 w-200 flex-1">
                     <SearchSelect
