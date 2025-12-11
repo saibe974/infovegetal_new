@@ -112,7 +112,7 @@ export function AppSidebarHeader({
         <>
             <header
                 className={
-                    "top-sticky z-21 flex justify-between h-16 shrink-0 items-center gap-2 " +
+                    "top-sticky z-30 flex justify-between h-16 shrink-0 items-center gap-2 " +
                     "border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,left] ease-linear md:px-4 fixed top-0 bg-sidebar"
                 }
                 style={{
