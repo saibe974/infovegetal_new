@@ -12,7 +12,7 @@ interface StickySearchBarProps {
 
 export function StickyBar({
     children,
-    zIndex = 25,
+    zIndex = 30,
     borderBottom = true,
     stickyClassName = '',
     className = '',
