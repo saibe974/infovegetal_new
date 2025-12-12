@@ -2,29 +2,30 @@ import { ReactNode, useEffect, useState } from 'react';
 import BasicSticky from 'react-sticky-el';
 import { ViewModeToggle } from './view-mode-toggle';
 
-interface StickySearchBarProps {
+interface StickyBarProps {
     children: ReactNode;
     zIndex?: number;
     borderBottom?: boolean;
     stickyClassName?: string;
     className?: string;
+    topOffsetElement?: string;
 }
 
 export function StickyBar({
     children,
-    zIndex = 30,
+    zIndex = 25,
     borderBottom = true,
     stickyClassName = '',
     className = '',
-}: StickySearchBarProps) {
+    topOffsetElement = '.top-sticky',
+}: StickyBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
     const [stickyKey, setStickyKey] = useState<number>(0);
 
     useEffect(() => {
-        const selector = '.top-sticky';
         const getHeight = () => {
-            const el = document.querySelector(selector) as HTMLElement | null;
+            const el = document.querySelector(topOffsetElement) as HTMLElement | null;
             return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
         };
 
@@ -64,6 +65,7 @@ export function StickyBar({
     return (
         <BasicSticky
             key={stickyKey}
+            topOffset={-topOffset}
             stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
             wrapperClassName={`relative z-${zIndex} ${className}`}
             stickyStyle={{ top: topOffset, ...(width && { width }) }}

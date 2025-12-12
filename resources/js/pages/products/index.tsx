@@ -105,7 +105,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
         <>
             <Head title="Products" />
             <StickyBar
-                className='z-25 mb-4'
+                className='header-search z-25 mb-4'
             >
                 <ViewModeToggle
                     viewMode={viewMode}
