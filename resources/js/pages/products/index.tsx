@@ -104,13 +104,15 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     return (
         <>
             <Head title="Products" />
-            <StickyBar className='mb-4'>
+            <StickyBar
+                className='z-25 mb-4'
+            >
                 <ViewModeToggle
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     pageKey="products"
                 />
-                <div className="z-50 w-200 flex-1">
+                <div className="w-200 flex-1">
                     <SearchSelect
                         value={search}
                         onChange={handleSearch}

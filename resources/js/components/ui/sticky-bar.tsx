@@ -34,6 +34,7 @@ export function StickyBar({
             const computedStyle = window.getComputedStyle(el);
             const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
             const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
+            // je ne sais pas d'où vient ce 30px, mais sans ça la largeur est trop grande
             return Math.ceil(el.clientWidth - paddingLeft - paddingRight - 30);
         }
 
