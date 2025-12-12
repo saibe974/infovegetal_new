@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
-import dbProducts from '@/routes/db-products';
+import tags from '@/routes/tags';
 import { useI18n } from '@/lib/i18n';
+import { Badge } from '@/components/ui/badge';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -18,24 +19,21 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: products.index().url,
     },
     {
-        title: 'Database',
-        href: dbProducts.index().url,
+        title: 'Tags',
+        href: tags.index().url,
     },
 ];
 
-type DbProduct = {
+type Tag = {
     id: number;
     name: string;
-    description: string | null;
-    champs: Record<string, any> | null;
-    categories: Record<string, any> | null;
-    traitement: string | null;
+    slug: string;
     created_at: string;
     updated_at: string;
 };
 
 type Props = {
-    collection: PaginatedCollection<DbProduct>;
+    collection: PaginatedCollection<Tag>;
     q?: string | null;
 };
 
@@ -86,7 +84,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
     return (
         <>
-            <Head title={t('Database')} />
+            <Head title={t('Tags')} />
             <StickyBar className='mb-4'>
                 <div className="w-200 flex-1">
                     <SearchSelect
@@ -102,9 +100,9 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
                 <div className="ml-auto flex items-center gap-2">
                     <Button asChild size="sm">
-                        <Link href={dbProducts.create().url}>
+                        <Link href={tags.create().url}>
                             <PlusIcon size={16} className="mr-2" />
-                            {t('Add Database')}
+                            {t('Add Tag')}
                         </Link>
                     </Button>
                 </div>
@@ -116,9 +114,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
                             <SortableTableHead field="name">{t('Name')}</SortableTableHead>
-                            <TableHead>{t('Description')}</TableHead>
-                            <TableHead>{t('Treatment')}</TableHead>
-                            <TableHead>{t('maj')}</TableHead>
+                            <SortableTableHead field="slug">{t('Slug')}</SortableTableHead>
                             <TableHead className='text-end'>{t('Actions')}</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -127,31 +123,27 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    <Link href={dbProducts.edit(item.id).url} className="hover:underline font-medium">
+                                    <Link href={tags.edit(item.id).url} className="hover:underline font-medium">
                                         {item.name}
                                     </Link>
                                 </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                    {item.description || '-'}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {item.traitement || '-'}
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {new Date(item.updated_at).toLocaleDateString()}
+                                <TableCell>
+                                    <Badge variant="secondary" className="font-mono text-xs">
+                                        {item.slug}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
                                         <Button asChild size="icon" variant="outline">
-                                            <Link href={dbProducts.edit(item.id).url}>
+                                            <Link href={tags.edit(item.id).url}>
                                                 <EditIcon size={16} />
                                             </Link>
                                         </Button>
                                         <Button asChild size="icon" variant="destructive-outline">
                                             <Link
-                                                href={dbProducts.destroy(item.id).url}
+                                                href={tags.destroy(item.id).url}
                                                 method="delete"
-                                                onBefore={() => confirm(t('Are you sure you want to delete this database?'))}
+                                                onBefore={() => confirm(t('Are you sure you want to delete this tag?'))}
                                             >
                                                 <TrashIcon size={16} />
                                             </Link>
