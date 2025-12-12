@@ -21,6 +21,7 @@ import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTree
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import productCategories from '@/routes/products-categories';
+import dbProducts from '@/routes/db-products';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
@@ -91,7 +92,7 @@ export function AppSidebar() {
             //@ts-ignore
             mainNavItems[1].subItems.push({
                 title: t('Database'),
-                href: '#',
+                href: dbProducts.index().url,
                 icon: ServerIcon,
             });
         }
