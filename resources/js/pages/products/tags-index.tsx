@@ -9,20 +9,9 @@ import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
-import tags from '@/routes/tags';
+import tagsProducts from '@/routes/tags-products';
 import { useI18n } from '@/lib/i18n';
 import { Badge } from '@/components/ui/badge';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Products',
-        href: products.index().url,
-    },
-    {
-        title: 'Tags',
-        href: tags.index().url,
-    },
-];
 
 type Tag = {
     id: number;
@@ -37,124 +26,139 @@ type Props = {
     q?: string | null;
 };
 
-export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
-    const { t } = useI18n();
-    const page = usePage<{ searchPropositions?: string[] }>();
-    const searchPropositions = page.props.searchPropositions ?? [];
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [fetching, setFetching] = useState(false);
-    const [search, setSearch] = useState('');
+export default withAppLayout(
+    () => {
+        const { t } = useI18n();
+        return [
+            {
+                title: t('Products'),
+                href: products.index().url,
+            },
+            {
+                title: t('Tags'),
+                href: tagsProducts.index().url,
+            },
+        ];
+    },
+    true,
+    ({ collection, q }: Props) => {
+        const { t } = useI18n();
+        const page = usePage<{ searchPropositions?: string[] }>();
+        const searchPropositions = page.props.searchPropositions ?? [];
+        const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+        const [fetching, setFetching] = useState(false);
+        const [search, setSearch] = useState('');
 
-    const handleSearch = (s: string) => {
-        setSearch(s);
-        clearTimeout(timerRef.current!);
-        router.cancelAll();
-        if (s.length < 2) {
-            return;
-        }
-        setFetching(true);
-        timerRef.current = setTimeout(() => {
-            router.reload({
-                only: ['searchPropositions'],
-                data: { q: s },
-                onSuccess: () => setFetching(false),
-            })
-        }, 300)
-    };
+        const handleSearch = (s: string) => {
+            setSearch(s);
+            clearTimeout(timerRef.current!);
+            router.cancelAll();
+            if (s.length < 2) {
+                return;
+            }
+            setFetching(true);
+            timerRef.current = setTimeout(() => {
+                router.reload({
+                    only: ['searchPropositions'],
+                    data: { q: s },
+                    onSuccess: () => setFetching(false),
+                })
+            }, 300)
+        };
 
-    const onSelect = (mysearch: string, options?: { force?: boolean }) => {
-        const trimmed = (mysearch ?? '').trim();
-        if (options?.force && trimmed.length === 0) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('q');
-            router.visit(url.toString(), { replace: true });
+        const onSelect = (mysearch: string, options?: { force?: boolean }) => {
+            const trimmed = (mysearch ?? '').trim();
+            if (options?.force && trimmed.length === 0) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('q');
+                router.visit(url.toString(), { replace: true });
+                setSearch('');
+                return;
+            }
+
+            if (trimmed.length === 0) {
+                return;
+            }
+
             setSearch('');
-            return;
-        }
+            router.reload({
+                data: { q: trimmed },
+            })
+        };
 
-        if (trimmed.length === 0) {
-            return;
-        }
+        return (
+            <>
+                <Head title={t('Tags')} />
+                <StickyBar className='mb-4'>
+                    <div className="w-200 flex-1">
+                        <SearchSelect
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            propositions={searchPropositions}
+                            loading={fetching}
+                            count={collection.meta.total}
+                            query={q ?? ''}
+                        />
+                    </div>
 
-        setSearch('');
-        router.reload({
-            data: { q: trimmed },
-        })
-    };
+                    <div className="ml-auto flex items-center gap-2">
+                        <Button asChild size="sm">
+                            <Link href={tagsProducts.create().url}>
+                                <PlusIcon size={16} className="mr-2" />
+                                {t('Add Tag')}
+                            </Link>
+                        </Button>
+                    </div>
+                </StickyBar>
 
-    return (
-        <>
-            <Head title={t('Tags')} />
-            <StickyBar className='mb-4'>
-                <div className="w-200 flex-1">
-                    <SearchSelect
-                        value={search}
-                        onChange={handleSearch}
-                        onSubmit={onSelect}
-                        propositions={searchPropositions}
-                        loading={fetching}
-                        count={collection.meta.total}
-                        query={q ?? ''}
-                    />
-                </div>
-
-                <div className="ml-auto flex items-center gap-2">
-                    <Button asChild size="sm">
-                        <Link href={tags.create().url}>
-                            <PlusIcon size={16} className="mr-2" />
-                            {t('Add Tag')}
-                        </Link>
-                    </Button>
-                </div>
-            </StickyBar>
-
-            <InfiniteScroll data="collection">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <SortableTableHead field="id">ID</SortableTableHead>
-                            <SortableTableHead field="name">{t('Name')}</SortableTableHead>
-                            <SortableTableHead field="slug">{t('Slug')}</SortableTableHead>
-                            <TableHead className='text-end'>{t('Actions')}</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {collection.data.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell>{item.id}</TableCell>
-                                <TableCell>
-                                    <Link href={tags.edit(item.id).url} className="hover:underline font-medium">
-                                        {item.name}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="secondary" className="font-mono text-xs">
-                                        {item.slug}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex gap-2 justify-end">
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={tags.edit(item.id).url}>
-                                                <EditIcon size={16} />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link
-                                                href={tags.destroy(item.id).url}
-                                                method="delete"
-                                                onBefore={() => confirm(t('Are you sure you want to delete this tag?'))}
-                                            >
-                                                <TrashIcon size={16} />
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </TableCell>
+                <InfiniteScroll data="collection">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <SortableTableHead field="id">ID</SortableTableHead>
+                                <SortableTableHead field="name">{t('Name')}</SortableTableHead>
+                                <SortableTableHead field="slug">{t('Slug')}</SortableTableHead>
+                                <TableHead className='text-end'>{t('Actions')}</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </InfiniteScroll>
-        </>
-    )
-})
+                        </TableHeader>
+                        <TableBody>
+                            {collection.data.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell>{item.id}</TableCell>
+                                    <TableCell>
+                                        <Link href={tagsProducts.edit(item.id)} className="hover:underline font-medium">
+                                            {item.name}
+                                        </Link>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary" className="font-mono text-xs">
+                                            {item.slug}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2 justify-end">
+                                            <Button asChild size="icon" variant="outline">
+                                                <Link href={tagsProducts.edit(item.id)}>
+                                                    <EditIcon size={16} />
+                                                </Link>
+                                            </Button>
+                                            <Button asChild size="icon" variant="destructive-outline">
+                                                <Link
+                                                    href={tagsProducts.destroy(item.id)}
+                                                    method="delete"
+                                                    onBefore={() => confirm(t('Are you sure you want to delete this tag?'))}
+                                                >
+                                                    <TrashIcon size={16} />
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </InfiniteScroll>
+            </>
+        )
+    })

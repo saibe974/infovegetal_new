@@ -55,9 +55,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
     });
 
-    Route::resource('products-categories', \App\Http\Controllers\ProductCategoryController::class)->middleware(['role:admin']);
+    Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role:admin']);
-    Route::resource('tags', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);
+    Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);
 });
 
 // Gestion des utilisateurs (admin uniquement)

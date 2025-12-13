@@ -20,9 +20,9 @@ import { Link } from '@inertiajs/react';
 import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
-import productCategories from '@/routes/products-categories';
+import categoryProducts from '@/routes/category-products';
 import dbProducts from '@/routes/db-products';
-import tags from '@/routes/tags';
+import tagsProducts from '@/routes/tags-products';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
@@ -96,13 +96,8 @@ export function AppSidebar() {
                 icon: Flower2Icon,
                 subItems: [
                     {
-                        title: t('All products'),
-                        href: products.index(),
-                        icon: ListIcon,
-                    },
-                    {
                         title: t('Categories'),
-                        href: productCategories.index(),
+                        href: categoryProducts.index(),
                         icon: FolderTreeIcon,
                     },
                 ],
@@ -113,7 +108,7 @@ export function AppSidebar() {
             //@ts-ignore
             mainNavItems[1].subItems.push({
                 title: t('Tags'),
-                href: tags.index().url,
+                href: tagsProducts.index(),
                 icon: TagIcon,
             });
             //@ts-ignore

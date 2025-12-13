@@ -38,17 +38,26 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
     );
 };
 
-export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[], hideFooterOnInfiniteScroll: boolean = false, component: FC<T>,) {
+export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[] | (() => BreadcrumbItem[]), hideFooterOnInfiniteScroll: boolean = false, component: FC<T>,) {
 
 
     // @ts-expect-error layout exists for inertia
-    component.layout = (page: ReactNode) => <AppLayout breadcrumbs={breadcrumbs} hideFooterOnInfiniteScroll={hideFooterOnInfiniteScroll}>
-        <div className="p-2 lg:p-4 min-h-screen">
-            {page}
+    component.layout = (page: ReactNode) => {
+        const BreadcrumbWrapper = () => {
+            const resolvedBreadcrumbs = typeof breadcrumbs === 'function'
+                ? breadcrumbs()
+                : breadcrumbs;
 
-        </div>
-        <ScrollToTopButton />
-    </AppLayout>;
+            return <AppLayout breadcrumbs={resolvedBreadcrumbs} hideFooterOnInfiniteScroll={hideFooterOnInfiniteScroll}>
+                <div className="p-2 lg:p-4 min-h-screen">
+                    {page}
+                </div>
+                <ScrollToTopButton />
+            </AppLayout>;
+        };
+
+        return <BreadcrumbWrapper />;
+    };
     return component;
 }
 

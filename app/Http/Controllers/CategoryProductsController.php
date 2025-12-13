@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Http\Resources\ProductCategoryResource;
+use App\Http\Resources\CategoryProductsResource;
 use App\Models\CategoryProducts;
 use Inertia\Inertia;
 
-class ProductCategoryController extends Controller
+class CategoryProductsController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -22,7 +22,7 @@ class ProductCategoryController extends Controller
 
         return Inertia::render('products/categories-index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => ProductCategoryResource::collection(
+            'collection' => Inertia::scroll(fn() => CategoryProductsResource::collection(
                 $query->paginate(12)
             )),
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
