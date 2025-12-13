@@ -139,13 +139,29 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                     <SidebarMenuButton
                                         asChild
                                         isActive={isActive}
-                                        tooltip={{ children: item.title }}
-                                        onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
+                                        tooltip={{
+                                            children: item.title,
+                                            side: 'right',
+                                        }}
                                     >
-                                        <span>
+                                        <Link
+                                            href={item.href}
+                                            prefetch
+                                            onClick={(e) => {
+                                                const itemUrl = typeof item.href === 'string' ? item.href : item.href.url;
+                                                // Si on est déjà sur cette URL, basculer les sous-éléments sans naviguer
+                                                if (page.url === itemUrl || page.url.startsWith(itemUrl)) {
+                                                    e.preventDefault();
+                                                    setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }));
+                                                } else {
+                                                    // Sinon, ouvrir les sous-éléments lors de la navigation
+                                                    setOpenMap((m) => ({ ...m, [item.title]: true }));
+                                                }
+                                            }}
+                                        >
                                             {item.icon && <item.icon />}
                                             <span>{item.title}</span>
-                                        </span>
+                                        </Link>
                                     </SidebarMenuButton>
 
                                     <div

@@ -56,6 +56,32 @@ export function AppSidebar() {
     let mainNavItems: NavItemExtended[] = [];
     let footerNavItems: NavItemExtended[] = [];
 
+    const legalRoutes = {
+        title: t('Infos'),
+        href: '',
+        icon: Info,
+        subItems: [
+            {
+                title: t('Mentions legales'),
+                href: legal.notices(),
+                icon: BookCheck,
+                target: '_self',
+            },
+            {
+                title: t('Conditions de vente'),
+                href: legal.sale_conditions(),
+                icon: BadgeEuro,
+                target: '_self',
+            },
+            {
+                title: t('Notre politique'),
+                href: legal.our_policy(),
+                icon: GlobeLock,
+                target: '_self',
+            },
+        ],
+    }
+
     if (isAuthenticated) {
         // title = t('Administration');
         mainNavItems = [
@@ -125,31 +151,7 @@ export function AppSidebar() {
                 icon: Folder,
                 target: '_blank',
             },
-            {
-                title: t('Infos'),
-                href: '',
-                icon: Info,
-                subItems: [
-                    {
-                        title: t('Mentions legales'),
-                        href: legal.notices(),
-                        icon: BookCheck,
-                        target: '_self',
-                    },
-                    {
-                        title: t('Conditions de vente'),
-                        href: legal.sale_conditions(),
-                        icon: BadgeEuro,
-                        target: '_self',
-                    },
-                    {
-                        title: t('Notre politique'),
-                        href: legal.our_policy(),
-                        icon: GlobeLock,
-                        target: '_self',
-                    },
-                ],
-            }
+            legalRoutes,
         ];
     } else {
         mainNavItems = [
@@ -171,31 +173,7 @@ export function AppSidebar() {
                 href: documentation(),
                 icon: BookOpen,
             },
-            {
-                title: t('Infos'),
-                href: '',
-                icon: Info,
-                subItems: [
-                    {
-                        title: t('Mentions legales'),
-                        href: legal.notices(),
-                        icon: BookCheck,
-                        target: '_self',
-                    },
-                    {
-                        title: t('Conditions de vente'),
-                        href: legal.sale_conditions(),
-                        icon: BadgeEuro,
-                        target: '_self',
-                    },
-                    {
-                        title: t('Notre politique'),
-                        href: legal.our_policy(),
-                        icon: GlobeLock,
-                        target: '_self',
-                    },
-                ],
-            }
+            legalRoutes,
         ];
     }
 
