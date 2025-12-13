@@ -39,6 +39,7 @@ export default withAppLayout(
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         const [fetching, setFetching] = useState(false);
         const [search, setSearch] = useState('');
+        const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
 
         const handleSearch = (s: string) => {
             setSearch(s);
@@ -49,14 +50,15 @@ export default withAppLayout(
                 return;
             }
             setFetching(true);
-            timerRef.current = setTimeout(() => {
-                router.reload({
-                    only: ['searchPropositions'],
-                    data: { q: s },
-                    onSuccess: () => setFetching(false),
-                    // preserveState: true,
-                })
-            }, 300)
+            timerRef.current = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/search-propositions?context=categories&q=${encodeURIComponent(s)}&limit=10`);
+                    const json = await res.json();
+                    setSearchPropositions((json.propositions || []) as string[]);
+                } finally {
+                    setFetching(false);
+                }
+            }, 300);
         };
 
         // @ts-ignore
@@ -77,9 +79,12 @@ export default withAppLayout(
             }
 
             setSearch('');
-            router.reload({
-                data: { q: trimmed },
-            })
+            // Validation: navigation complète pour réactualiser la page
+            router.get(window.location.pathname, { q: trimmed }, {
+                preserveState: false,
+                replace: true,
+                preserveScroll: false,
+            });
 
             console.log("selected:", trimmed);
         };
@@ -97,7 +102,7 @@ export default withAppLayout(
                                 value={search}
                                 onChange={handleSearch}
                                 onSubmit={onSelect}
-                                propositions={searchPropositions}
+                                propositions={searchPropositionsState}
                                 loading={fetching}
                                 count={collection.meta.total}
                                 query={q ?? ''}

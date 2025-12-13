@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Http\Resources\ProductResource;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\SearchController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -74,3 +75,6 @@ Route::get('/csrf-refresh', function () {
 
 require __DIR__ . '/settings.php';
 require __DIR__ . '/auth.php';
+
+// Endpoint JSON public pour les propositions de recherche
+Route::get('/search-propositions', [SearchController::class, 'propositions'])->name('search.propositions');
