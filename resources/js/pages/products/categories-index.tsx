@@ -7,7 +7,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
@@ -86,7 +86,7 @@ export default withAppLayout(
                 preserveScroll: false,
             });
 
-            console.log("selected:", trimmed);
+            // console.log("selected:", trimmed);
         };
 
         return (
@@ -127,7 +127,7 @@ export default withAppLayout(
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {collection.data.map((item) => (
+                            {Array.from(new Map(collection.data.map((item) => [item.id, item])).values()).map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell>{item.id}</TableCell>
                                     <TableCell>
@@ -157,6 +157,12 @@ export default withAppLayout(
 
                     </Table>
                 </InfiniteScroll>
+
+                {collection.meta.current_page < collection.meta.last_page &&
+                    <div className='w-full h-50 flex items-center justify-center mt-4'>
+                        <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
+                    </div>
+                }
             </div>
 
         )

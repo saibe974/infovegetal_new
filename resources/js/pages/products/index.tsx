@@ -32,7 +32,7 @@ type Props = {
 };
 
 
-export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
+export default withAppLayout(breadcrumbs, false, ({ collection, q }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -54,6 +54,24 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
         const views = JSON.parse(localStorage.getItem('views') || '{}');
         return views.products === 'grid' ? 'grid' : 'table';
     });
+
+    // Contrôle "voir plus": devient false en bas de page ou si dernière page
+    const [seeMore, setSeeMore] = useState(true);
+    useEffect(() => {
+        const onScroll = () => {
+            const threshold = 200;
+            const scrolled = window.scrollY + window.innerHeight;
+            const total = document.documentElement.scrollHeight;
+            const isNearBottom = scrolled >= total - threshold;
+            if (isNearBottom || collection.meta.current_page >= collection.meta.last_page) {
+                setSeeMore(false);
+            }
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, [collection.meta.current_page, collection.meta.last_page]);
+
 
     // Local state for client-fetched propositions to avoid Inertia refresh
     const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
@@ -151,7 +169,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
             </StickyBar>
 
             {collection.data.length === 0 ? (
-                <div className='w-full h-200 flex flex-col items-center justify-center gap-4'>
+                <div className='w-full flex flex-col items-center justify-center gap-4'>
                     {q ? (
                         <>
                             <p className='text-lg'>{t('Aucun produit ne correspond à votre recherche.')}</p>
@@ -169,14 +187,25 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
             ) :
                 <InfiniteScroll data="collection" className=''>
                     {viewMode === 'table' ? (
-                        <ProductsTable collection={collection} canEdit={canEdit} canDelete={canDelete} />
+                        <ProductsTable
+                            collection={{
+                                ...collection,
+                                data: Array.from(new Map(collection.data.map((p) => [p.id, p])).values()),
+                            }}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                        />
                     ) : (
-                        <ProductsCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
+                        <ProductsCardsList
+                            products={Array.from(new Map(collection.data.map((p) => [p.id, p])).values())}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                        />
                     )}
                 </InfiniteScroll>
             }
 
-            {collection.meta.current_page < collection.meta.last_page &&
+            {seeMore && collection.meta.current_page < collection.meta.last_page &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
                     <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
                 </div>

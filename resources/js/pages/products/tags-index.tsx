@@ -129,7 +129,7 @@ export default withAppLayout(
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {collection.data.map((item) => (
+                            {Array.from(new Map(collection.data.map((item) => [item.id, item])).values()).map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell>{item.id}</TableCell>
                                     <TableCell>

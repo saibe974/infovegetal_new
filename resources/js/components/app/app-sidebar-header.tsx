@@ -117,6 +117,7 @@ export function AppSidebarHeader({
                 }
                 style={{
                     width: headerWidth,
+                    ['--app-header-height' as any]: '64px',
                 }}
             >
 

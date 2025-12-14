@@ -49,7 +49,7 @@ export function withAppLayout<T>(breadcrumbs: BreadcrumbItem[] | (() => Breadcru
                 : breadcrumbs;
 
             return <AppLayout breadcrumbs={resolvedBreadcrumbs} hideFooterOnInfiniteScroll={hideFooterOnInfiniteScroll}>
-                <div className="p-2 lg:p-4 min-h-screen">
+                <div className="p-2 lg:p-4">
                     {page}
                 </div>
                 <ScrollToTopButton />
