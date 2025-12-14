@@ -56,6 +56,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
     });
 
+    Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role:admin']);
+    Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role:admin']);
     Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);

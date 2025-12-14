@@ -4,6 +4,7 @@
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../js/components/categories/*.tsx';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -274,5 +275,68 @@
   .clickable[data-disabled="true"],
   [data-clickable][data-disabled="true"] {
     @apply pointer-events-none opacity-50;
+  }
+
+  /* ---- Category tree depth helpers ---- */
+  .depth-0 {}
+
+  .depth-1 {
+    background-color: color-mix(in oklab, var(--muted) 30%, transparent);
+  }
+
+  .depth-2 {
+    background-color: color-mix(in oklab, var(--muted) 45%, transparent);
+  }
+
+  .depth-3 {
+    background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+  }
+
+  .depth-4 {
+    background-color: color-mix(in oklab, var(--muted) 70%, transparent);
+  }
+
+  .depth-5 {
+    background-color: color-mix(in oklab, var(--muted) 80%, transparent);
+  }
+
+  .dark .depth-1 {
+    background-color: color-mix(in oklab, var(--muted) 12%, transparent);
+  }
+
+  .dark .depth-2 {
+    background-color: color-mix(in oklab, var(--muted) 18%, transparent);
+  }
+
+  .dark .depth-3 {
+    background-color: color-mix(in oklab, var(--muted) 24%, transparent);
+  }
+
+  .dark .depth-4 {
+    background-color: color-mix(in oklab, var(--muted) 28%, transparent);
+  }
+
+  .dark .depth-5 {
+    background-color: color-mix(in oklab, var(--muted) 32%, transparent);
+  }
+
+  .depth-1 .border-l {
+    border-left-color: color-mix(in oklab, var(--border) 80%, var(--foreground) 20%);
+  }
+
+  .depth-2 .border-l {
+    border-left-color: color-mix(in oklab, var(--border) 70%, var(--foreground) 30%);
+  }
+
+  .depth-3 .border-l {
+    border-left-color: color-mix(in oklab, var(--border) 60%, var(--foreground) 40%);
+  }
+
+  .depth-4 .border-l {
+    border-left-color: color-mix(in oklab, var(--border) 50%, var(--foreground) 50%);
+  }
+
+  .depth-5 .border-l {
+    border-left-color: color-mix(in oklab, var(--border) 40%, var(--foreground) 60%);
   }
 }

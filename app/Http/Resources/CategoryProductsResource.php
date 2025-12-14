@@ -14,6 +14,18 @@ class CategoryProductsResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        // Assure que la profondeur est calculée si le modèle nested set la fournit
+        $depth = $this->depth ?? (method_exists($this->resource, 'getDepth') ? $this->resource->getDepth() : null);
+        // Optimise has_children sans charger toute la relation
+        $hasChildren = isset($this->lft, $this->rgt) ? (($this->rgt - $this->lft) > 1) : $this->children()->exists();
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'parent_id' => $this->parent_id,
+            'depth' => $depth,
+            'has_children' => (bool) $hasChildren,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
     }
 }

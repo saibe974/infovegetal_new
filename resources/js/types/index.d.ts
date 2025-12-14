@@ -28,6 +28,11 @@ export interface PaginatedCollection<T> {
 export interface ProductCategory {
     id: number;
     name: string;
+    parent_id?: number | null;
+    depth?: number;
+    has_children?: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Product {

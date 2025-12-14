@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Http\Resources\CategoryProductsResource;
 use App\Models\CategoryProducts;
 use Inertia\Inertia;
@@ -18,6 +19,22 @@ class CategoryProductsController extends Controller
         $query = CategoryProducts::query()->orderFromRequest($request);
         if ($search) {
             $query->where('name', 'like', '%' . $search . '%');
+        }
+
+        // Si pas de recherche, on récupère les catégories racines avec pagination
+        if (!$search) {
+            $query->whereNull('parent_id')->defaultOrder();
+            
+            return Inertia::render('products/categories-index', [
+                'q' => $search,
+                'collection' => Inertia::scroll(fn() => CategoryProductsResource::collection(
+                    $query->paginate(20)
+                )),
+                // Compte total de toutes les catégories (racines + sous-catégories)
+                'totalCount' => CategoryProducts::query()->count(),
+                'children' => Inertia::optional(fn() => $this->getChildrenForExpanded($request)),
+                'searchPropositions' => null,
+            ]);
         }
 
         return Inertia::render('products/categories-index', [
@@ -75,6 +92,108 @@ class CategoryProductsController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    /**
+     * Reorder categories with nested set structure.
+     */
+    public function reorder(Request $request)
+    {
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|exists:category_products,id',
+            'items.*.parent_id' => 'nullable|exists:category_products,id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Séparer les racines et les enfants
+            $roots = [];
+            $children = [];
+
+            foreach ($validated['items'] as $item) {
+                if ($item['parent_id'] === null) {
+                    $roots[] = $item;
+                } else {
+                    $children[] = $item;
+                }
+            }
+
+            // D'abord, traiter les racines
+            foreach ($roots as $item) {
+                $category = CategoryProducts::find($item['id']);
+                $category->saveAsRoot();
+            }
+
+            // Ensuite, traiter les enfants
+            foreach ($children as $item) {
+                $category = CategoryProducts::find($item['id']);
+                $parent = CategoryProducts::find($item['parent_id']);
+                if ($parent) {
+                    $category->appendToNode($parent)->save();
+                }
+            }
+
+            // Reconstruire l'arbre pour garantir la cohérence
+            CategoryProducts::fixTree();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Hierarchy updated successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update hierarchy', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Récupère les enfants d'une catégorie.
+     */
+    public function children(Request $request)
+    {
+        $parentId = $request->get('parent_id');
+        $perPage = (int) ($request->get('per_page') ?? 12);
+        $page = (int) ($request->get('page') ?? 1);
+        
+        if (!$parentId) {
+            return response()->json([]);
+        }
+
+        $query = CategoryProducts::where('parent_id', $parentId)
+            ->defaultOrder();
+
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        $data = CategoryProductsResource::collection($paginator->items())->resolve();
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Récupère les enfants des catégories expandées.
+     */
+    private function getChildrenForExpanded(Request $request)
+    {
+        $expandedIds = $request->get('expanded', []);
+        
+        if (empty($expandedIds)) {
+            return [];
+        }
+
+        // Récupérer les enfants directs des catégories expandées
+        $children = CategoryProducts::whereIn('parent_id', $expandedIds)
+            ->defaultOrder()
+            ->get();
+
+        return CategoryProductsResource::collection($children);
     }
 
     /**

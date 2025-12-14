@@ -11,10 +11,12 @@ import { EditIcon, Loader2Icon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
+import { DraggableCategoriesTable } from '@/components/categories/draggable-categories-table';
 
 type Props = {
     collection: PaginatedCollection<ProductCategory>;
     q: string | null;
+    children?: ProductCategory[];
 };
 
 export default withAppLayout(
@@ -32,7 +34,7 @@ export default withAppLayout(
         ];
     },
     true,
-    ({ collection, q }: Props) => {
+    ({ collection, q, children }: Props) => {
         const page = usePage<{ searchPropositions?: string[] }>();
         const searchPropositions = page.props.searchPropositions ?? [];
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
@@ -117,52 +119,63 @@ export default withAppLayout(
                     </div>
                 </StickyBar>
 
-                <InfiniteScroll data="collection">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <SortableTableHead field="id">ID</SortableTableHead>
-                                <SortableTableHead field="name">Name</SortableTableHead>
-                                <TableHead className='text-end'>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {Array.from(new Map(collection.data.map((item) => [item.id, item])).values()).map((item) => (
-                                <TableRow key={item.id}>
-                                    <TableCell>{item.id}</TableCell>
-                                    <TableCell>
-                                        <Link href={categoryProducts.edit(item.id)} className="hover:underline">
-                                            {item.name}
-                                        </Link>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2 justify-end">
-                                            <Button asChild size="icon" variant="outline">
-                                                <Link href={categoryProducts.edit(item.id)}>
-                                                    <EditIcon size={16} />
+                {q ? (
+                    // Mode recherche : affichage classique avec InfiniteScroll
+                    <>
+                        <InfiniteScroll data="collection">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <SortableTableHead field="id">ID</SortableTableHead>
+                                        <SortableTableHead field="name">Name</SortableTableHead>
+                                        <TableHead className='text-end'>Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from(new Map(collection.data.map((item) => [item.id, item])).values()).map((item) => (
+                                        <TableRow key={item.id}>
+                                            <TableCell>{item.id}</TableCell>
+                                            <TableCell>
+                                                <Link href={categoryProducts.edit(item.id)} className="hover:underline flex items-center gap-2">
+                                                    <span style={{ marginLeft: `${(item.depth || 0) * 24}px` }} className="flex items-center gap-2">
+                                                        {item.depth && item.depth > 0 && (
+                                                            <span className="text-muted-foreground">↳</span>
+                                                        )}
+                                                        {item.name}
+                                                    </span>
                                                 </Link>
-                                            </Button>
-                                            <Button asChild size="icon" variant="destructive-outline">
-                                                <Link href={categoryProducts.destroy(item.id)}
-                                                    onBefore={() => confirm('Are you sure?')}>
-                                                    <TrashIcon size={16} />
-                                                </Link>
-                                            </Button>
-                                        </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex gap-2 justify-end">
+                                                    <Button asChild size="icon" variant="outline">
+                                                        <Link href={categoryProducts.edit(item.id)}>
+                                                            <EditIcon size={16} />
+                                                        </Link>
+                                                    </Button>
+                                                    <Button asChild size="icon" variant="destructive-outline">
+                                                        <Link href={categoryProducts.destroy(item.id)}
+                                                            onBefore={() => confirm('Are you sure?')}>
+                                                            <TrashIcon size={16} />
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </InfiniteScroll>
 
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-
-                    </Table>
-                </InfiniteScroll>
-
-                {collection.meta.current_page < collection.meta.last_page &&
-                    <div className='w-full h-50 flex items-center justify-center mt-4'>
-                        <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
-                    </div>
-                }
+                        {collection.meta.current_page < collection.meta.last_page &&
+                            <div className='w-full h-50 flex items-center justify-center mt-4'>
+                                <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
+                            </div>
+                        }
+                    </>
+                ) : (
+                    // Mode normal : table drag & drop pour réorganiser
+                    <DraggableCategoriesTable collection={collection} children={children} />
+                )}
             </div>
 
         )
