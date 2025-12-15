@@ -10,30 +10,32 @@ import {
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 export type Id = number | string;
-
 type ItemKey<T> = keyof T & string;
-
-export type MovePayload<T> = {
-    id: Id;
-    parentId: Id | null;
-    beforeId: Id | null;
-    afterId: Id | null;
-    next: T[];
-};
 
 export type RenderItemProps<T> = {
     item: T;
     depth: number;
     isExpanded: boolean;
     isLoading: boolean;
+    isDragging: boolean;
+
+    // UX drag
+    isOver: boolean; // over (any zone)
+    insertLine: 'before' | 'after' | null; // ✅ ligne d’insertion
+    isInsideTarget: boolean; // ✅ surbrillance “inside” après délai
+
     setNodeRef: (el: HTMLElement | null) => void;
     attributes: any;
     listeners: any;
-    isDragging: boolean;
     toggleExpand: () => void;
 };
 
@@ -43,16 +45,23 @@ export type SortableTreeProps<T extends Record<string, any>> = {
     parentKey?: ItemKey<T>; // default: 'parent_id'
     depthKey?: ItemKey<T>; // default: 'depth'
     maxDepth?: number; // default: 3
-    expandOnHoverMs?: number; // default: 600 (during drag)
-    expandOnHoverIdleMs?: number; // default: 600 (not dragging)
-    enableIdleHoverExpand?: boolean; // default: true
-    hasChildren?: (item: T, allItems: T[]) => boolean; // optional indicator
-    loadChildren?: (item: T) => Promise<T[]>; // lazy fetch children
-    onMove?: (move: MovePayload<T>) => void | Promise<void>;
+
+    // intent tuning
+    insideDelayMs?: number; // default: 500
+    edgeRatio?: number; // default: 0.25 (top/bottom zones => between)
+    expandOnInside?: boolean; // default: true (auto-open when inside intent triggers)
+
+    hasChildren?: (item: T, all: T[]) => boolean; // "ouvrable"
+    loadChildren?: (item: T) => Promise<T[]>;
+
     onChange?: (next: T[]) => void;
-    autoSave?: boolean;
     renderItem: (props: RenderItemProps<T>) => React.ReactNode;
 };
+
+type DropIntent =
+    | { type: 'between'; overId: Id; where: 'before' | 'after' }
+    | { type: 'inside'; overId: Id }
+    | null;
 
 function getField<T extends Record<string, any>, R = any>(obj: T, key: ItemKey<T>, fallback?: R): R {
     const v = obj[key];
@@ -63,302 +72,337 @@ function setField<T extends Record<string, any>>(obj: T, key: ItemKey<T>, value:
     return { ...(obj as any), [key]: value } as T;
 }
 
-function useStableKeys<T extends Record<string, any>>(props: SortableTreeProps<T>) {
+function useKeys<T extends Record<string, any>>(props: SortableTreeProps<T>) {
     const idKey = props.idKey ?? ('id' as ItemKey<T>);
     const parentKey = props.parentKey ?? ('parent_id' as ItemKey<T>);
     const depthKey = props.depthKey ?? ('depth' as ItemKey<T>);
     return { idKey, parentKey, depthKey } as const;
 }
 
-function NodeRow<T extends Record<string, any>>({
+function Row<T extends Record<string, any>>({
     item,
     sortableId,
-    render,
     depth,
     isExpanded,
     isLoading,
+    isOver,
+    insertLine,
+    isInsideTarget,
+    toggleExpand,
+    render,
 }: {
     item: T;
     sortableId: Id;
     depth: number;
     isExpanded: boolean;
     isLoading: boolean;
+    isOver: boolean;
+    insertLine: 'before' | 'after' | null;
+    isInsideTarget: boolean;
+    toggleExpand: () => void;
     render: (ctx: RenderItemProps<T>) => React.ReactNode;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
+
     const style: React.CSSProperties = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
     };
+
     return (
         <div ref={setNodeRef} style={style}>
-            {render({ item, depth, isExpanded, isLoading, setNodeRef, attributes, listeners, isDragging, toggleExpand: () => { } })}
+            {render({
+                item,
+                depth,
+                isExpanded,
+                isLoading,
+                isDragging,
+                isOver,
+                insertLine,
+                isInsideTarget,
+                setNodeRef,
+                attributes,
+                listeners,
+                toggleExpand,
+            })}
         </div>
     );
 }
 
-export function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
-    const { idKey, parentKey, depthKey } = useStableKeys(props);
+export default function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
+    const { idKey, parentKey, depthKey } = useKeys(props);
+
     const maxDepth = props.maxDepth ?? 3;
-    const expandOnHoverMs = props.expandOnHoverMs ?? 600;
-    const expandOnHoverIdleMs = props.expandOnHoverIdleMs ?? 600;
-    const enableIdleHoverExpand = props.enableIdleHoverExpand ?? true;
-    const autoSave = props.autoSave ?? false;
+    const insideDelayMs = props.insideDelayMs ?? 500;
+    const edgeRatio = props.edgeRatio ?? 0.25;
+    const expandOnInside = props.expandOnInside ?? true;
 
     const [items, setItems] = useState<T[]>([]);
     const [expanded, setExpanded] = useState<Set<Id>>(new Set());
     const [loading, setLoading] = useState<Set<Id>>(new Set());
+
     const [activeId, setActiveId] = useState<Id | null>(null);
     const [overId, setOverId] = useState<Id | null>(null);
-    const hoverTimer = useRef<number | null>(null);
-    const hoverTargetId = useRef<Id | null>(null);
-    const idleHoverTimers = useRef<Map<Id, number>>(new Map());
+    const [dropIntent, setDropIntent] = useState<DropIntent>(null);
 
+    const insideTimerRef = useRef<number | null>(null);
+
+    const clearInsideTimer = () => {
+        if (insideTimerRef.current) {
+            window.clearTimeout(insideTimerRef.current);
+            insideTimerRef.current = null;
+        }
+    };
+
+    // --- merge stable props.items + extras ---
     useEffect(() => {
         setItems((prev) => {
-            const merged = [...prev, ...props.items];
+            const incoming = props.items ?? [];
+            const incomingIds = new Set(incoming.map((x) => getField<T, Id>(x, idKey) as Id));
+            const extras = prev.filter((x) => !incomingIds.has(getField<T, Id>(x, idKey) as Id));
+            const merged = [...incoming, ...extras];
             return Array.from(new Map(merged.map((c) => [getField(c, idKey) as Id, c])).values());
         });
     }, [props.items, idKey]);
 
-    const idMap = useMemo(() => new Map<Id, T>(items.map((x) => [getField(x, idKey) as Id, x])), [items, idKey]);
+    const idMap = useMemo(
+        () => new Map<Id, T>(items.map((x) => [getField<T, Id>(x, idKey) as Id, x])),
+        [items, idKey],
+    );
 
+    const getId = (x: T) => getField<T, Id>(x, idKey) as Id;
+    const getParent = (x: T) => getField<T, Id | null>(x, parentKey, null) as Id | null;
+    const getDepth = (x: T) => getField<T, number>(x, depthKey, 0) as number;
+
+    const canHaveChildren = (it: T) => {
+        if (props.hasChildren) return props.hasChildren(it, items);
+        const id = getId(it);
+        return items.some((x) => getParent(x) === id);
+    };
+
+    // --- visibilité ---
     const isVisible = (it: T): boolean => {
-        let pid = (getField<T, Id | null>(it, parentKey, null) as Id | null);
+        let pid = getParent(it);
         while (pid != null) {
             if (!expanded.has(pid)) return false;
             const p = idMap.get(pid);
             if (!p) break;
-            pid = (getField<T, Id | null>(p, parentKey, null) as Id | null);
+            pid = getParent(p);
         }
         return true;
     };
-    const visible = useMemo(() => items.filter(isVisible), [items, expanded]);
+    const visible = useMemo(() => items.filter(isVisible), [items, expanded, idMap]);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
-
-    const hasChildren = (it: T) => {
-        if (props.hasChildren) return props.hasChildren(it, items);
-        const id = getField<T, Id>(it, idKey) as Id;
-        return items.some((x) => (getField<T, Id | null>(x, parentKey, null) as Id | null) === id) || expanded.has(id);
-    };
-
+    // --- expand/collapse + lazy-load ---
     const toggleExpand = async (id: Id) => {
-        const isOpen = expanded.has(id);
-        if (isOpen) {
-            setExpanded((prev) => {
-                const next = new Set(prev);
-                next.delete(id);
-                return next;
+        if (expanded.has(id)) {
+            setExpanded((s) => {
+                const n = new Set(s);
+                n.delete(id);
+                return n;
             });
-            setLoading((s) => { const n = new Set(s); n.delete(id); return n; });
             return;
         }
 
-        // already have children in items?
-        if (items.some((x) => (getField<T, Id | null>(x, parentKey, null) as Id | null) === id)) {
-            setExpanded((s) => new Set(s).add(id));
-            return;
-        }
+        // open immediately
+        setExpanded((s) => new Set(s).add(id));
 
-        if (!props.loadChildren) {
-            setExpanded((s) => new Set(s).add(id));
-            return;
-        }
+        // already have children loaded
+        if (items.some((x) => getParent(x) === id)) return;
+        if (!props.loadChildren) return;
 
         setLoading((s) => new Set(s).add(id));
         try {
             const parent = idMap.get(id);
-            const parentDepth = parent ? (getField<T, number>(parent, depthKey, 0)) : 0;
-            const children = await props.loadChildren(parent as T);
+            if (!parent) return;
+
+            const parentDepth = getDepth(parent);
+            const children = await props.loadChildren(parent);
+
             setItems((prev) => {
-                const existing = new Set(prev.map((p) => getField<T, Id>(p, idKey) as Id));
+                const existing = new Set(prev.map((p) => getId(p)));
+
                 const normalized = children
-                    .filter((c) => !existing.has(getField<T, Id>(c, idKey) as Id))
+                    .filter((c) => !existing.has(getId(c)))
                     .map((c) => {
                         const withParent = setField(c, parentKey, id);
                         const d = getField<T, number>(withParent, depthKey, NaN);
                         return Number.isFinite(d) ? withParent : setField(withParent, depthKey, parentDepth + 1);
                     });
-                const idx = items.findIndex((x) => (getField<T, Id>(x, idKey) as Id) === id);
+
+                const idx = prev.findIndex((x) => getId(x) === id);
                 if (idx === -1) return prev;
+
                 return [...prev.slice(0, idx + 1), ...normalized, ...prev.slice(idx + 1)];
             });
-            setExpanded((s) => new Set(s).add(id));
         } finally {
-            setLoading((s) => { const n = new Set(s); n.delete(id); return n; });
+            setLoading((s) => {
+                const n = new Set(s);
+                n.delete(id);
+                return n;
+            });
         }
     };
 
-    const onDragStart = (e: DragStartEvent) => setActiveId(e.active.id as Id);
+    // --- dnd sensors ---
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
+
+    const onDragStart = (e: DragStartEvent) => {
+        setActiveId(e.active.id as Id);
+        setDropIntent(null);
+        clearInsideTimer();
+    };
 
     const onDragOver = (e: DragOverEvent) => {
-        const currentOverId = (e.over?.id as Id) ?? null;
-        setOverId(currentOverId);
-        if (currentOverId == null) {
-            if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-            hoverTargetId.current = null;
+        const over = e.over;
+        const oid = (over?.id as Id) ?? null;
+
+        setOverId(oid);
+
+        if (!oid || !over) {
+            setDropIntent(null);
+            clearInsideTimer();
             return;
         }
-        if (hoverTargetId.current !== currentOverId) {
-            if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-            hoverTargetId.current = currentOverId;
-            hoverTimer.current = window.setTimeout(() => {
-                if (!expanded.has(currentOverId) && !loading.has(currentOverId)) {
-                    toggleExpand(currentOverId);
-                }
-            }, expandOnHoverMs) as unknown as number;
+
+        // Determine pointer Y within the item rect -> before/after/center
+        const pe = e.activatorEvent as MouseEvent | PointerEvent | undefined;
+        const clientY = pe && 'clientY' in pe ? pe.clientY : null;
+
+        // fallback = after
+        if (clientY == null || !over.rect) {
+            setDropIntent({ type: 'between', overId: oid, where: 'after' });
+            clearInsideTimer();
+            return;
         }
+
+        const top = over.rect.top;
+        const h = over.rect.height || 1;
+        const y = clientY - top;
+        const edge = h * edgeRatio;
+
+        if (y <= edge) {
+            setDropIntent({ type: 'between', overId: oid, where: 'before' });
+            clearInsideTimer();
+            return;
+        }
+
+        if (y >= h - edge) {
+            setDropIntent({ type: 'between', overId: oid, where: 'after' });
+            clearInsideTimer();
+            return;
+        }
+
+        // center zone -> after short delay become "inside"
+        setDropIntent({ type: 'between', overId: oid, where: 'after' });
+
+        clearInsideTimer();
+        insideTimerRef.current = window.setTimeout(() => {
+            setDropIntent({ type: 'inside', overId: oid });
+            if (expandOnInside) void toggleExpand(oid);
+        }, insideDelayMs) as unknown as number;
     };
 
     const onDragEnd = (e: DragEndEvent) => {
         const { active, over } = e;
+
+        clearInsideTimer();
         setActiveId(null);
         setOverId(null);
-        if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-        hoverTargetId.current = null;
-        if (!over || active.id === over.id) return;
+
+        if (!over || active.id === over.id) {
+            setDropIntent(null);
+            return;
+        }
 
         const activeItem = idMap.get(active.id as Id);
         const overItem = idMap.get(over.id as Id);
-        if (!activeItem || !overItem) return;
+        if (!activeItem || !overItem) {
+            setDropIntent(null);
+            return;
+        }
 
-        const getId = (x: T) => getField<T, Id>(x, idKey) as Id;
-        const getParent = (x: T) => getField<T, Id | null>(x, parentKey, null) as Id | null;
-        const getDepth = (x: T) => getField<T, number>(x, depthKey, 0) as number;
+        const overItemId = getId(overItem);
 
-        const collectSubtreeIds = (rootId: Id): Id[] => {
-            const start = items.findIndex((x) => getId(x) === rootId);
-            if (start === -1) return [];
-            const rootDepth = getDepth(items[start]);
-            const ids: Id[] = [rootId];
-            for (let i = start + 1; i < items.length; i++) {
-                const d = getDepth(items[i]);
-                if (d <= rootDepth) break;
-                ids.push(getId(items[i]));
-            }
-            return ids;
-        };
+        const intent = dropIntent;
+        const dropInside = intent?.type === 'inside' && intent.overId === overItemId;
+        const betweenWhere =
+            intent?.type === 'between' && intent.overId === overItemId ? intent.where : 'after';
 
-        const isDescendantOf = (maybeChildId: Id, maybeAncestorId: Id): boolean => {
-            let cur = idMap.get(maybeChildId) || null;
-            const guard = new Set<Id>();
-            while (cur && getParent(cur) != null) {
-                if (getParent(cur) === maybeAncestorId) return true;
-                const p = getParent(cur);
-                if (p != null && guard.has(p)) break;
-                if (p != null) guard.add(p);
-                cur = p != null ? idMap.get(p) || null : null;
-            }
-            return false;
-        };
+        const targetParentId: Id | null = dropInside ? overItemId : getParent(overItem);
 
-        const dropInto = expanded.has(getField<T, Id>(overItem, idKey) as Id);
-        const targetParentId: Id | null = dropInto ? (getField<T, Id>(overItem, idKey) as Id) : getParent(overItem);
-        if (targetParentId != null && isDescendantOf(targetParentId, getField<T, Id>(activeItem, idKey) as Id)) return;
+        // collect subtree (flat list)
+        const rootId = getId(activeItem);
+        const start = items.findIndex((x) => getId(x) === rootId);
+        if (start === -1) {
+            setDropIntent(null);
+            return;
+        }
 
-        const subtreeIds = collectSubtreeIds(getField<T, Id>(activeItem, idKey) as Id);
-        if (subtreeIds.length === 0) return;
+        const rootDepth = getDepth(items[start]);
+        const subtreeIds: Id[] = [rootId];
+        for (let i = start + 1; i < items.length; i++) {
+            const d = getDepth(items[i]);
+            if (d <= rootDepth) break;
+            subtreeIds.push(getId(items[i]));
+        }
 
         const movingSet = new Set(subtreeIds);
-        const remaining: T[] = [];
         const block: T[] = [];
+        const remaining: T[] = [];
         for (const it of items) (movingSet.has(getId(it)) ? block : remaining).push(it);
 
+        // compute depth shift
         const parentDepth = targetParentId == null ? -1 : getDepth(idMap.get(targetParentId) as T);
         const targetDepth = targetParentId == null ? 0 : parentDepth + 1;
         const delta = targetDepth - getDepth(activeItem);
 
+        // depth guard
         for (const n of block) {
             const nd = getDepth(n) + delta;
-            if (nd < 0 || nd > maxDepth) return;
+            if (nd < 0 || nd > maxDepth) {
+                setDropIntent(null);
+                return;
+            }
         }
 
+        // apply move (no mutation)
         const movedBlock: T[] = block.map((n) => {
             const newDepth = getDepth(n) + delta;
-            const newParent = getId(n) === getId(activeItem) ? targetParentId : getParent(n);
+            const newParent = getId(n) === rootId ? targetParentId : getParent(n);
             return setField(setField(n, depthKey, newDepth), parentKey, newParent);
         });
 
-        const overIdxRemaining = remaining.findIndex((x) => getId(x) === getField<T, Id>(overItem, idKey));
-        if (dropInto) {
-            const parentIdx = remaining.findIndex((x) => getId(x) === getField<T, Id>(overItem, idKey));
+        // insert index
+        const overIdx = remaining.findIndex((x) => getId(x) === overItemId);
+
+        if (dropInside) {
+            // insert right after the parent row
+            const parentIdx = overIdx;
             const insertAt = parentIdx === -1 ? remaining.length : parentIdx + 1;
             remaining.splice(insertAt, 0, ...movedBlock);
+            if (targetParentId != null && !expanded.has(targetParentId)) setExpanded((s) => new Set(s).add(targetParentId));
         } else {
-            const insertAt = overIdxRemaining === -1 ? remaining.length : overIdxRemaining;
+            // between: before => at overIdx, after => overIdx + 1
+            const base = overIdx === -1 ? remaining.length : overIdx;
+            const insertAt = betweenWhere === 'before' ? base : base + 1;
             remaining.splice(insertAt, 0, ...movedBlock);
         }
 
         const next = remaining;
-        const siblings = next.filter((n) => (getParent(n) ?? null) === targetParentId);
-        const ix = siblings.findIndex((s) => getId(s) === getId(activeItem));
-        const beforeId = ix > 0 ? getId(siblings[ix - 1]) : null;
-        const afterId = ix >= 0 && ix < siblings.length - 1 ? getId(siblings[ix + 1]) : null;
-
         setItems(next);
         props.onChange?.(next);
-        if (targetParentId != null && !expanded.has(targetParentId)) setExpanded((s) => new Set(s).add(targetParentId));
 
-        if (autoSave && props.onMove) {
-            const preferBefore = beforeId !== null ? beforeId : null;
-            const onlyAfter = preferBefore === null ? (afterId ?? null) : null;
-            props.onMove({ id: getId(activeItem), parentId: targetParentId, beforeId: preferBefore, afterId: onlyAfter, next });
-        }
+        setDropIntent(null);
     };
 
-    const renderWithControls = (it: T) => {
-        const id = getField<T, Id>(it, idKey) as Id;
-        const depth = getField<T, number>(it, depthKey, 0);
-        const isExpanded = expanded.has(id);
-        const isLoading = loading.has(id) && isExpanded && !items.some((x) => getField<T, Id | null>(x, parentKey, null) === id);
-        const doToggle = () => toggleExpand(id);
-
-        // Wrap props so renderItem can access dnd-kit handles
-        return (
-            <div
-                key={String(id)}
-                onMouseEnter={() => {
-                    if (!enableIdleHoverExpand) return;
-                    if (expanded.has(id) || loading.has(id)) return;
-                    // Debounce per-id to avoid spamming fetches
-                    const existing = idleHoverTimers.current.get(id);
-                    if (existing) {
-                        window.clearTimeout(existing);
-                        idleHoverTimers.current.delete(id);
-                    }
-                    const t = window.setTimeout(() => {
-                        // Only expand if still not expanded at fire time
-                        if (!expanded.has(id) && !loading.has(id)) {
-                            toggleExpand(id);
-                        }
-                        idleHoverTimers.current.delete(id);
-                    }, expandOnHoverIdleMs) as unknown as number;
-                    idleHoverTimers.current.set(id, t);
-                }}
-                onMouseLeave={() => {
-                    const existing = idleHoverTimers.current.get(id);
-                    if (existing) {
-                        window.clearTimeout(existing);
-                        idleHoverTimers.current.delete(id);
-                    }
-                }}
-            >
-                <NodeRow<T>
-                    item={it}
-                    sortableId={id}
-                    depth={depth}
-                    isExpanded={isExpanded}
-                    isLoading={!!isLoading}
-                    render={(ctx) => props.renderItem({ ...ctx, toggleExpand: doToggle })}
-                />
-            </div>
-        );
-    };
+    useEffect(() => {
+        return () => clearInsideTimer();
+    }, []);
 
     return (
         <DndContext
@@ -368,13 +412,40 @@ export function SortableTree<T extends Record<string, any>>(props: SortableTreeP
             onDragOver={onDragOver}
             onDragEnd={onDragEnd}
         >
-            <SortableContext items={visible.map((x) => getField<T, Id>(x, idKey))} strategy={verticalListSortingStrategy}>
+            <SortableContext items={visible.map((x) => getId(x))} strategy={verticalListSortingStrategy}>
                 <div>
-                    {visible.map((it) => renderWithControls(it))}
+                    {visible.map((it) => {
+                        const id = getId(it);
+                        const depth = getDepth(it);
+
+                        const isExpanded = expanded.has(id);
+                        const isLoading = loading.has(id);
+                        const isOver = !!activeId && overId === id;
+
+                        const insertLine =
+                            !!activeId && dropIntent?.type === 'between' && dropIntent.overId === id ? dropIntent.where : null;
+
+                        const isInsideTarget =
+                            !!activeId && dropIntent?.type === 'inside' && dropIntent.overId === id;
+
+                        return (
+                            <Row<T>
+                                key={String(id)}
+                                item={it}
+                                sortableId={id}
+                                depth={depth}
+                                isExpanded={isExpanded}
+                                isLoading={isLoading}
+                                isOver={isOver}
+                                insertLine={insertLine}
+                                isInsideTarget={isInsideTarget}
+                                toggleExpand={() => void toggleExpand(id)}
+                                render={props.renderItem}
+                            />
+                        );
+                    })}
                 </div>
             </SortableContext>
         </DndContext>
     );
 }
-
-export default SortableTree;

@@ -195,52 +195,56 @@ class CategoryProductsController extends Controller
     public function reorder(Request $request)
     {
         $validated = $request->validate([
-            'items' => 'required|array',
-            'items.*.id' => 'required|exists:category_products,id',
-            'items.*.parent_id' => 'nullable|exists:category_products,id',
+            'items' => ['required','array'],
+            'items.*.id' => ['required','integer','exists:category_products,id'],
+            'items.*.parent_id' => ['nullable','integer','exists:category_products,id'],
+            'items.*.position' => ['required','integer','min:0'],
         ]);
 
-        try {
-            DB::beginTransaction();
+        return DB::transaction(function () use ($validated) {
+            $rows = collect($validated['items']);
 
-            // Séparer les racines et les enfants
-            $roots = [];
-            $children = [];
-
-            foreach ($validated['items'] as $item) {
-                if ($item['parent_id'] === null) {
-                    $roots[] = $item;
-                } else {
-                    $children[] = $item;
+            // Sécurité anti-cycles simple : parent_id != id
+            foreach ($rows as $r) {
+                if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
+                    abort(422, 'Invalid parent.');
                 }
             }
 
-            // D'abord, traiter les racines
-            foreach ($roots as $item) {
-                $category = CategoryProducts::find($item['id']);
-                $category->saveAsRoot();
-            }
+            $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
 
-            // Ensuite, traiter les enfants
-            foreach ($children as $item) {
-                $category = CategoryProducts::find($item['id']);
-                $parent = CategoryProducts::find($item['parent_id']);
-                if ($parent) {
-                    $category->appendToNode($parent)->save();
+            $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
+                $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
+                $prev = null;
+
+                foreach ($children as $r) {
+                    $node = \App\Models\CategoryProducts::findOrFail($r['id']);
+
+                    if ($parentId === null) {
+                        $node->saveAsRoot();
+                    } else {
+                        $parent = \App\Models\CategoryProducts::findOrFail($parentId);
+                        $node->appendToNode($parent)->save();
+                    }
+
+                    if ($prev) {
+                        $node->afterNode($prev)->save();
+                    }
+
+                    $prev = $node;
+
+                    // recurse
+                    $placeChildren($node->id);
                 }
-            }
+            };
 
-            // Reconstruire l'arbre pour garantir la cohérence
-            CategoryProducts::fixTree();
+            // Démarrer par les racines
+            $placeChildren(null);
 
-            DB::commit();
-
-            return response()->json(['message' => 'Hierarchy updated successfully']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to update hierarchy', 'error' => $e->getMessage()], 500);
-        }
+            return response()->json(['ok' => true]);
+        });
     }
+
 
     /**
      * Récupère les enfants d'une catégorie.
