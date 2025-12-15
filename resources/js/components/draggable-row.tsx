@@ -19,7 +19,7 @@ type Props = {
     isChildVisible?: boolean;
 };
 
-export function DraggableCategoryRow({
+export function DraggableRow({
     category,
     isOver = false,
     isOverInto = false,
@@ -103,7 +103,7 @@ export function DraggableCategoryRow({
                                     className="hover:bg-accent rounded p-0.5 transition-transform duration-200 ease-in-out"
                                     aria-expanded={isExpanded}
                                 >
-                                    {isLoadingChildren ? (
+                                    {(isExpanded && isLoadingChildren) ? (
                                         <Loader2Icon size={14 + Math.min(6, (category.depth || 0) * 2)} className="animate-spin text-muted-foreground" />
                                     ) : isExpanded ? (
                                         <ChevronDown size={14 + Math.min(6, (category.depth || 0) * 2)} className="text-muted-foreground transition-transform duration-200 ease-in-out" />

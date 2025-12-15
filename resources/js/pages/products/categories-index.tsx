@@ -11,7 +11,7 @@ import { EditIcon, Loader2Icon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
-import { DraggableCategoriesTable } from '@/components/categories/draggable-categories-table';
+import { DraggableTable } from '@/components/draggable-table';
 
 type Props = {
     collection: PaginatedCollection<ProductCategory>;
@@ -121,6 +121,7 @@ export default withAppLayout(
 
                 {q ? (
                     // Mode recherche : affichage classique avec InfiniteScroll
+                    // à redéfinir en composant table-hiearchable
                     <>
                         <InfiniteScroll data="collection">
                             <Table>
@@ -174,7 +175,7 @@ export default withAppLayout(
                     </>
                 ) : (
                     // Mode normal : table drag & drop pour réorganiser
-                    <DraggableCategoriesTable collection={collection} children={children} />
+                    <DraggableTable collection={collection} children={children} />
                 )}
             </div>
 

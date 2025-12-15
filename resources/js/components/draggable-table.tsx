@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
@@ -7,7 +7,7 @@ import { EditIcon, TrashIcon, GripVertical, SaveIcon, Loader2Icon } from 'lucide
 import { Link, router, InfiniteScroll } from '@inertiajs/react';
 import categoryProducts from '@/routes/category-products';
 import { ProductCategory, PaginatedCollection } from '@/types';
-import { DraggableCategoryRow } from './draggable-category-row';
+import { DraggableRow } from './draggable-row';
 import { toast } from 'sonner';
 
 type Props = {
@@ -15,7 +15,7 @@ type Props = {
     children?: ProductCategory[];
 };
 
-export function DraggableCategoriesTable({ collection, children = [] }: Props) {
+export function DraggableTable({ collection, children = [] }: Props) {
     const MAX_DEPTH = 3;
     const EXPAND_ON_HOVER_MS = 700;
     const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -77,21 +77,18 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
         } catch { }
     }, [expandedIds]);
 
-    // Restaurer les enfants pour tous les parents ouverts dès que catégories ou expandedIds changent
+    // Restaurer les enfants pour tous les parents ouverts dès que catégories ou expandedIds changent (en parallèle)
     useEffect(() => {
-        const fetchChildrenForExpanded = async () => {
+        const fetchChildrenForExpandedParallel = async () => {
             const parentIds = Array.from(expandedIds);
-            for (const pid of parentIds) {
-                // Ne pas recharger si on a déjà des enfants de ce parent
-                const hasAnyChildLoaded = categories.some(c => c.parent_id === pid);
-                if (hasAnyChildLoaded) continue;
+            // Filtrer uniquement les parents sans enfants déjà présents
+            const toFetch = parentIds.filter(pid => !categories.some(c => c.parent_id === pid));
+            if (toFetch.length === 0) return;
+            // Marquer tous ces parents comme en cours de chargement
+            setLoadingIds(prev => new Set([...prev, ...toFetch]));
+
+            const requests = toFetch.map(async (pid) => {
                 try {
-                    // Marquer le parent comme en cours de chargement (affiche Loader2Icon dès l'ouverture/refresh)
-                    setLoadingIds(prev => {
-                        const next = new Set(prev);
-                        next.add(pid);
-                        return next;
-                    });
                     const response = await fetch(`/category-products/children?parent_id=${pid}`, {
                         headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     });
@@ -107,7 +104,6 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
                             .map((c: ProductCategory) => ({ ...c, parent_id: pid, depth: (c.depth ?? (parentDepth + 1)) }));
                         const parentIndex = prev.findIndex(c => c.id === pid);
                         if (parentIndex === -1) {
-                            // Ajouter le parent avant d'insérer les enfants
                             const withParent = parent ? [...prev, parent] : prev;
                             const newParentIndex = withParent.findIndex(c => c.id === pid);
                             return newParentIndex === -1
@@ -119,17 +115,18 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
                 } catch (e) {
                     console.warn('Failed to restore children for expanded parent', pid, e);
                 } finally {
-                    // Retirer l'état de chargement pour ce parent
                     setLoadingIds(prev => {
                         const next = new Set(prev);
                         next.delete(pid);
                         return next;
                     });
                 }
-            }
+            });
+
+            await Promise.allSettled(requests);
         };
         if (expandedIds.size > 0) {
-            fetchChildrenForExpanded();
+            fetchChildrenForExpandedParallel();
         }
     }, [expandedIds, categories, collection.data]);
 
@@ -272,11 +269,21 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
             : (categories.find(c => c.id === overId)?.parent_id ?? overId))
         : null;
 
-    // Filtrer les catégories visibles (racines + enfants des catégories expandées)
-    const visibleCategories = (Array.isArray(categories) ? categories : []).filter(cat => {
-        if (cat.parent_id === null) return true;
-        return cat.parent_id !== null && cat.parent_id !== undefined && expandedIds.has(cat.parent_id);
-    });
+    // Filtrer les catégories visibles: une catégorie est visible si tous ses ancêtres sont expandés jusqu'à la racine
+    const idToCategory = new Map<number, ProductCategory>(categories.map(c => [c.id, c]));
+    const isCategoryVisible = (cat: ProductCategory): boolean => {
+        let currentParentId = cat.parent_id;
+        while (currentParentId != null) {
+            // Si un parent n'est pas expandé, la catégorie n'est pas visible
+            if (!expandedIds.has(currentParentId)) return false;
+            const parent = idToCategory.get(currentParentId);
+            if (!parent) break; // sécurité: si parent introuvable, on s'arrête
+            currentParentId = parent.parent_id ?? null;
+        }
+        // Racine ou tous les ancêtres expandés
+        return true;
+    };
+    const visibleCategories = (Array.isArray(categories) ? categories : []).filter(isCategoryVisible);
 
     // Calculer l'index d'insertion pour le fantôme (placeholder) unique
     const dropTargetIndex = (() => {
@@ -295,11 +302,39 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
         const isCurrentlyExpanded = expandedIds.has(categoryId);
 
         if (isCurrentlyExpanded) {
-            // Si déjà expandé, on ferme simplement
+            // Si déjà expandé, on ferme le parent ET on retire toutes les expansions descendants
             setExpandedIds(prev => {
                 const newSet = new Set(prev);
+                // BFS pour trouver tous les descendants
+                const toVisit: number[] = [categoryId];
+                const descendants: number[] = [];
+                while (toVisit.length) {
+                    const pid = toVisit.shift()!;
+                    const children = categories.filter(c => c.parent_id === pid).map(c => c.id);
+                    for (const cid of children) {
+                        descendants.push(cid);
+                        toVisit.push(cid);
+                    }
+                }
+                // Retirer le parent et ses descendants des expandedIds
                 newSet.delete(categoryId);
+                descendants.forEach(id => newSet.delete(id));
                 return newSet;
+            });
+            // Nettoyer d'éventuels états de chargement pour ces IDs
+            setLoadingIds(prev => {
+                const next = new Set(prev);
+                next.delete(categoryId);
+                const toVisit: number[] = [categoryId];
+                while (toVisit.length) {
+                    const pid = toVisit.shift()!;
+                    const children = categories.filter(c => c.parent_id === pid).map(c => c.id);
+                    for (const cid of children) {
+                        next.delete(cid);
+                        toVisit.push(cid);
+                    }
+                }
+                return next;
             });
         } else {
             // Si fermé, vérifier si les enfants existent déjà en mémoire
@@ -418,18 +453,22 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
                             <SortableContext items={visibleCategories.map(cat => cat.id)} strategy={verticalListSortingStrategy}>
                                 {visibleCategories.map((category, idx) => {
                                     const row = (
-                                        <DraggableCategoryRow
+                                        <DraggableRow
                                             key={category.id}
                                             category={category}
                                             isOver={effectiveOverId === category.id}
                                             isOverInto={overId != null && expandedIds.has(overId) && overId === category.id}
                                             isActive={activeId === category.id}
-                                            hasChildren={category.has_children || false}
+                                            // Afficher le bouton (chevron/loader) si:
+                                            // - l'API indique des enfants
+                                            // - OU des enfants existent déjà en mémoire
+                                            // - OU la catégorie est ouverte (pour permettre le loader + fetch)
+                                            hasChildren={Boolean(category.has_children) || categories.some(c => c.parent_id === category.id) || expandedIds.has(category.id)}
                                             isExpanded={expandedIds.has(category.id)}
                                             onToggleExpand={toggleExpand}
-                                            // Le loader ne doit apparaître que lorsqu'un chargement est réellement en cours
-                                            // Utiliser uniquement loadingIds pour éviter les faux positifs quand les enfants sont déjà dans le DOM
-                                            isLoadingChildren={loadingIds.has(category.id)}
+                                            // Au refresh ou à l'ouverture: afficher le loader tant que la catégorie est ouverte
+                                            // ET que ses enfants ne sont pas encore présents en DOM (même avant que loadingIds soit positionné)
+                                            isLoadingChildren={expandedIds.has(category.id) && !categories.some(c => c.parent_id === category.id)}
                                             isChildVisible={category.parent_id != null && expandedIds.has(category.parent_id)}
                                         />
                                     );
@@ -439,7 +478,8 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
                                         ? ((overItem.depth ?? 0) + 1)
                                         : (overItem.depth ?? 0);
                                     return shouldRenderPlaceholder ? (
-                                        <>
+                                        // Fragment avec key pour satisfaire l'exigence de clé unique par enfant
+                                        <React.Fragment key={`pair-${category.id}`}>
                                             <TableRow key={`placeholder-${category.id}`} className={[`depth-${targetDepth}`, 'h-7 bg-primary/5'].join(' ')}>
                                                 <TableCell colSpan={4} className="py-0 text-xs">
                                                     <div className="mx-2 my-1 flex items-center gap-2 text-muted-foreground">
@@ -466,7 +506,7 @@ export function DraggableCategoriesTable({ collection, children = [] }: Props) {
                                                 </TableCell>
                                             </TableRow>
                                             {row}
-                                        </>
+                                        </React.Fragment>
                                     ) : row;
                                 })}
                             </SortableContext>
