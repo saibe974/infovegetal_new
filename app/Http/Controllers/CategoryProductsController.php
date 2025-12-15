@@ -95,6 +95,101 @@ class CategoryProductsController extends Controller
     }
 
     /**
+     * Déplace une catégorie par rapport à un parent/sibling (move granulaire).
+     * Payload attendu:
+     * { id: number, parent_id: number|null, before_id?: number|null, after_id?: number|null }
+     */
+    public function move(Request $request)
+    {
+        $data = $request->validate([
+            'id' => 'required|exists:category_products,id',
+            'parent_id' => 'nullable|exists:category_products,id',
+            'before_id' => 'nullable|different:after_id|exists:category_products,id',
+            'after_id' => 'nullable|different:before_id|exists:category_products,id',
+        ]);
+
+        if (!empty($data['before_id']) && !empty($data['after_id'])) {
+            return response()->json(['message' => 'Specify either before_id or after_id, not both'], 422);
+        }
+
+        $category = CategoryProducts::findOrFail($data['id']);
+        $targetParentId = $data['parent_id'] ?? null;
+        $beforeId = $data['before_id'] ?? null;
+        $afterId = $data['after_id'] ?? null;
+
+        // Interdire de se déplacer sous un de ses propres descendants ou sous soi-même
+        if ($targetParentId !== null) {
+            if ((int)$targetParentId === (int)$category->getKey()) {
+                return response()->json(['message' => 'Cannot move under itself'], 422);
+            }
+            $parent = CategoryProducts::findOrFail($targetParentId);
+            if ($parent->isDescendantOf($category)) {
+                return response()->json(['message' => 'Cannot move under a descendant'], 422);
+            }
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if ($targetParentId === null) {
+                // Déplacement au niveau racine
+                if ($beforeId) {
+                    $sibling = CategoryProducts::findOrFail($beforeId);
+                    if ($sibling->parent_id !== null) {
+                        return response()->json(['message' => 'before_id must be a root sibling'], 422);
+                    }
+                    if ($sibling->isDescendantOf($category)) {
+                        return response()->json(['message' => 'Cannot position relative to a descendant'], 422);
+                    }
+                    $category->beforeNode($sibling)->save();
+                } elseif ($afterId) {
+                    $sibling = CategoryProducts::findOrFail($afterId);
+                    if ($sibling->parent_id !== null) {
+                        return response()->json(['message' => 'after_id must be a root sibling'], 422);
+                    }
+                    if ($sibling->isDescendantOf($category)) {
+                        return response()->json(['message' => 'Cannot position relative to a descendant'], 422);
+                    }
+                    $category->afterNode($sibling)->save();
+                } else {
+                    $category->saveAsRoot();
+                }
+            } else {
+                // Déplacement sous un parent donné
+                $parent = CategoryProducts::findOrFail($targetParentId);
+
+                if ($beforeId) {
+                    $sibling = CategoryProducts::findOrFail($beforeId);
+                    if ((int)$sibling->parent_id !== (int)$parent->getKey()) {
+                        return response()->json(['message' => 'before_id must be a child of parent_id'], 422);
+                    }
+                    if ($sibling->isDescendantOf($category)) {
+                        return response()->json(['message' => 'Cannot position relative to a descendant'], 422);
+                    }
+                    $category->beforeNode($sibling)->save();
+                } elseif ($afterId) {
+                    $sibling = CategoryProducts::findOrFail($afterId);
+                    if ((int)$sibling->parent_id !== (int)$parent->getKey()) {
+                        return response()->json(['message' => 'after_id must be a child of parent_id'], 422);
+                    }
+                    if ($sibling->isDescendantOf($category)) {
+                        return response()->json(['message' => 'Cannot position relative to a descendant'], 422);
+                    }
+                    $category->afterNode($sibling)->save();
+                } else {
+                    $category->appendToNode($parent)->save();
+                }
+            }
+
+            DB::commit();
+            return response()->json(['message' => 'Category moved']);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Move failed', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Reorder categories with nested set structure.
      */
     public function reorder(Request $request)

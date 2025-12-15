@@ -401,18 +401,7 @@ export function CsvUploadFilePond({
     ]);
 
     useEffect(() => {
-        console.log('[Polling][Effect] Triggered', {
-            hasProgressUrl: !!importProgressUrl,
-            uploadId,
-            importStatus,
-            shouldPollRef: shouldPollRef.current,
-        });
-
         if (!importProgressUrl || !uploadId) {
-            console.log('[Polling] Stopped: no URL or ID', {
-                hasUrl: !!importProgressUrl,
-                uploadId,
-            });
             stopProgressPolling();
             return;
         }

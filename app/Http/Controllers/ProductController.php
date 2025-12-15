@@ -427,7 +427,7 @@ class ProductController extends Controller
 
         // dd($items);
         // Prend les 7 premiers
-        return array_slice($items, 0, 7);
+        return $items;
     }
     private function updateImportState(string $id, array $payload): void
     {

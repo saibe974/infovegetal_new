@@ -58,6 +58,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role:admin']);
     Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role:admin']);
+    // Move endpoint pour dnd-kit (déplacement granulaire)
+    Route::post('products/categories/move', [\App\Http\Controllers\CategoryProductsController::class, 'move'])
+        ->name('products.categories.move')
+        ->middleware(['role:admin']);
     Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);
