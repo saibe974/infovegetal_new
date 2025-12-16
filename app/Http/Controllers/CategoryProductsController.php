@@ -25,14 +25,19 @@ class CategoryProductsController extends Controller
         if (!$search) {
             $query->whereNull('parent_id')->defaultOrder();
             
+            $roots = $query->paginate(20);
+            $rootIds = $roots->pluck('id')->toArray();
+            
+            // Charger les enfants directs des racines
+            $allChildren = CategoryProducts::whereIn('parent_id', $rootIds)
+                ->defaultOrder()
+                ->get();
+            
             return Inertia::render('products/categories-index', [
                 'q' => $search,
-                'collection' => Inertia::scroll(fn() => CategoryProductsResource::collection(
-                    $query->paginate(20)
-                )),
-                // Compte total de toutes les catégories (racines + sous-catégories)
+                'collection' => Inertia::scroll(fn() => CategoryProductsResource::collection($roots)),
                 'totalCount' => CategoryProducts::query()->count(),
-                'children' => Inertia::optional(fn() => $this->getChildrenForExpanded($request)),
+                'children' => CategoryProductsResource::collection($allChildren),
                 'searchPropositions' => null,
             ]);
         }

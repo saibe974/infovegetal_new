@@ -40,6 +40,7 @@ export type RenderItemProps<T> = {
 };
 
 export type SortableTreeProps<T extends Record<string, any>> = {
+    // Données plates (structure brute du serveur)
     items: T[];
     idKey?: ItemKey<T>; // default: 'id'
     parentKey?: ItemKey<T>; // default: 'parent_id'
@@ -54,7 +55,10 @@ export type SortableTreeProps<T extends Record<string, any>> = {
     hasChildren?: (item: T, all: T[]) => boolean; // "ouvrable"
     loadChildren?: (item: T) => Promise<T[]>;
 
-    onChange?: (next: T[]) => void;
+    // Callback quand l'arbre change (retourne données plates + raison)
+    onChange?: (next: T[], reason?: 'drag' | 'expand' | 'collapse') => void;
+
+    // Rendu personnalisé de chaque item
     renderItem: (props: RenderItemProps<T>) => React.ReactNode;
 };
 
@@ -69,7 +73,10 @@ function getField<T extends Record<string, any>, R = any>(obj: T, key: ItemKey<T
 }
 
 function setField<T extends Record<string, any>>(obj: T, key: ItemKey<T>, value: any): T {
-    return { ...(obj as any), [key]: value } as T;
+    // Utiliser Object.assign pour préserver toutes les propriétés
+    const result = Object.assign({}, obj as any);
+    result[key as string] = value;
+    return result as T;
 }
 
 function useKeys<T extends Record<string, any>>(props: SortableTreeProps<T>) {
@@ -202,11 +209,13 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                 n.delete(id);
                 return n;
             });
+            props.onChange?.(items, 'collapse');
             return;
         }
 
         // open immediately
         setExpanded((s) => new Set(s).add(id));
+        props.onChange?.(items, 'expand');
 
         // already have children loaded
         if (items.some((x) => getParent(x) === id)) return;
@@ -374,7 +383,14 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         const movedBlock: T[] = block.map((n) => {
             const newDepth = getDepth(n) + delta;
             const newParent = getId(n) === rootId ? targetParentId : getParent(n);
-            return setField(setField(n, depthKey, newDepth), parentKey, newParent);
+            const updated = setField(setField(n, depthKey, newDepth), parentKey, newParent);
+            console.log('Updating item:', {
+                original: n,
+                updated,
+                newDepth,
+                newParent,
+            });
+            return updated;
         });
 
         // insert index
@@ -395,7 +411,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
         const next = remaining;
         setItems(next);
-        props.onChange?.(next);
+        props.onChange?.(next, 'drag');
 
         setDropIntent(null);
     };

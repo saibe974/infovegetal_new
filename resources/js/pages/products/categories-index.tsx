@@ -1,7 +1,7 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
@@ -11,7 +11,7 @@ import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertic
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
-import SortableTree from '@/components/sortable-tree';
+import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
 import { toast } from 'sonner';
 
 type Props = {
@@ -24,13 +24,6 @@ function uniqById(items: ProductCategory[]) {
     return Array.from(new Map(items.map((c) => [c.id, c])).values());
 }
 
-function signature(items: ProductCategory[]) {
-    return [...items]
-        .sort((a, b) => a.id - b.id)
-        .map((x) => `${x.id}:${x.parent_id ?? 'null'}:${x.depth ?? 0}`)
-        .join('|');
-}
-
 export default withAppLayout(
     () => {
         const { t } = useI18n();
@@ -41,6 +34,7 @@ export default withAppLayout(
     },
     true,
     ({ collection, q, children }: Props) => {
+        const { t } = useI18n();
         const [pending, setPending] = useState<ProductCategory[] | null>(null);
         const [saving, setSaving] = useState(false);
 
@@ -52,16 +46,183 @@ export default withAppLayout(
         const [search, setSearch] = useState('');
         const [searchPropositionsState, setSearchPropositions] = useState<string[]>(initialSearchPropositions);
 
-        const initialItems = useMemo(() => {
-            return uniqById([...(collection?.data ?? []), ...(children ?? [])]);
-        }, [collection?.data, children]);
+        // Fusion des données racines et des enfants du premier niveau
+        // IMPORTANT: On ne recalcule cette valeur que quand les props changent du serveur
+        // Le SortableTree gère les modifications locales en interne
+        const allItems = useMemo(() => {
+            // Enfants peuvent être une collection Inertia ({ data, links, meta })
+            // On ne veut QUE children.data si présent, sinon children si déjà un tableau
+            const childrenArray = Array.isArray(children)
+                ? children
+                : (children && Array.isArray((children as any).data)
+                    ? ((children as any).data as ProductCategory[])
+                    : []);
 
-        const workingItems = pending ?? initialItems;
+            // Filtrage strict: on garde uniquement les objets avec un id numérique
+            const roots = (collection?.data ?? []).filter((x: any): x is ProductCategory => x && typeof x.id === 'number');
+            const childs = (childrenArray ?? []).filter((x: any): x is ProductCategory => x && typeof x.id === 'number');
 
+            // Regrouper les enfants par parent_id
+            const byParent = new Map<number, ProductCategory[]>();
+            for (const c of childs) {
+                const pid = (c as any).parent_id as number | undefined;
+                if (typeof pid === 'number') {
+                    const arr = byParent.get(pid) ?? [];
+                    arr.push(c);
+                    byParent.set(pid, arr);
+                }
+            }
+
+            // Intercaler: parent puis ses enfants immédiats
+            const ordered: ProductCategory[] = [];
+            const seenChildIds = new Set<number>();
+            for (const p of roots) {
+                const pDepth = typeof (p as any).depth === 'number' ? (p as any).depth : 0;
+                const pNorm: ProductCategory = { ...(p as any), depth: pDepth };
+                ordered.push(pNorm);
+                const arr = byParent.get(p.id) ?? [];
+                for (const ch of arr) {
+                    const chDepth = typeof (ch as any).depth === 'number' ? (ch as any).depth : pDepth + 1;
+                    const chNorm: ProductCategory = {
+                        ...(ch as any),
+                        depth: chDepth,
+                        parent_id: (ch as any).parent_id ?? p.id,
+                    };
+                    ordered.push(chNorm);
+                    if (typeof chNorm.id === 'number') seenChildIds.add(chNorm.id);
+                }
+            }
+
+            // Enfants dont le parent n'est pas dans la page courante: on les met en fin (comportement de secours)
+            for (const c of childs) {
+                if (typeof c.id === 'number' && !seenChildIds.has(c.id)) {
+                    ordered.push(c);
+                }
+            }
+
+            const merged = uniqById(ordered);
+
+            console.log('allItems ordered (parent -> child interleaved):', merged);
+            if (merged.length > 0) {
+                console.log('First item sample:', merged[0], 'has id?', merged[0].id, 'has name?', merged[0].name);
+            }
+            return merged;
+        }, [collection?.data, children]);  // Ne dépend QUE des props du serveur, pas de pending
+
+        // Déterminer si il y a des changements
         const hasChanges = useMemo(() => {
             if (!pending) return false;
-            return signature(pending) !== signature(initialItems);
-        }, [pending, initialItems]);
+            return JSON.stringify(pending.map(i => ({ id: i.id, parent_id: i.parent_id }))) !==
+                JSON.stringify(allItems.map(i => ({ id: i.id, parent_id: i.parent_id })));
+        }, [pending, allItems]);
+
+        // Lazy-load des enfants quand on expand
+        const loadChildren = async (item: ProductCategory): Promise<ProductCategory[]> => {
+            try {
+                const res = await fetch(`/category-products/children?parent_id=${item.id}`);
+                const data = await res.json();
+                return data.data ?? [];
+            } catch (e) {
+                console.error('Failed to load children:', e);
+                return [];
+            }
+        };
+
+        // Rendu personnalisé de chaque item
+        const renderItem = (props: RenderItemProps<ProductCategory>) => {
+            const {
+                item,
+                depth,
+                isExpanded,
+                toggleExpand,
+                isDragging,
+                insertLine, // 'before' | 'after' | null
+                isInsideTarget, // true = intention “inside”
+                isOver, // survol (optionnel pour un léger highlight)
+                setNodeRef,
+                attributes,
+                listeners,
+            } = props;
+
+            const hasValidId = !!item && typeof (item as any).id === 'number' && Number.isFinite((item as any).id);
+            const displayName = (item as any)?.name ?? '(sans nom)';
+
+            return (
+                <div
+                    ref={setNodeRef}
+                    className={[
+                        'relative flex items-center gap-2 px-3 py-2 text-sm',
+                        'border-b border-border/30 transition-colors',
+                        !isDragging ? 'hover:bg-slate-700/30 dark:hover:bg-slate-700/30' : '',
+                        isOver ? 'bg-muted/20' : '',
+                        isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
+                        isDragging ? 'opacity-50' : '',
+                    ].join(' ')}
+                    style={{
+                        marginLeft: depth * 24,
+                    }}
+                >
+                    {insertLine === 'before' && (
+                        <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-primary" />
+                    )}
+                    {insertLine === 'after' && (
+                        <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-primary" />
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={toggleExpand}
+                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                    >
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
+                        aria-label="Drag"
+                    >
+                        <GripVertical size={14} />
+                    </div>
+
+                    <span className="truncate font-medium flex-1">{displayName}</span>
+
+                    <div className="flex gap-2 justify-end flex-shrink-0">
+                        {hasValidId && (
+                            <>
+                                <Button asChild size="icon" variant="outline">
+                                    <Link href={categoryProducts.edit((item as any).id)}>
+                                        <EditIcon size={16} />
+                                    </Link>
+                                </Button>
+                                <Button asChild size="icon" variant="destructive-outline">
+                                    <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
+                                        <TrashIcon size={16} />
+                                    </Link>
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+
+        const handleTreeChange = (items: ProductCategory[], reason?: 'drag' | 'expand' | 'collapse') => {
+            // Ignorer les changements d'expand/collapse (ne pas tracker comme "pending")
+            if (reason === 'expand' || reason === 'collapse') return;
+
+            // Pour les drags, mettre à jour le pending
+            if (reason === 'drag') {
+                console.log('Tree changed by drag:', items);
+                if (items.length > 0) {
+                    console.log('First item after drag:', items[0], 'has id?', items[0].id, 'has name?', items[0].name);
+                }
+                setPending(items);
+            }
+        };
 
         const handleSearch = (s: string) => {
             setSearch(s);
@@ -108,7 +269,7 @@ export default withAppLayout(
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
                 const payload = (() => {
-                    const items = pending.map((i) => ({
+                    const items = pending.map((i: ProductCategory) => ({
                         id: i.id,
                         parent_id: i.parent_id ?? null,
                         position: 0,
@@ -150,7 +311,6 @@ export default withAppLayout(
 
         const cancel = () => {
             setPending(null);
-            router.reload({ only: ['collection', 'children'] });
         };
 
         return (
@@ -236,105 +396,18 @@ export default withAppLayout(
                             </div>
                         )}
 
-                        <SortableTree<ProductCategory>
-                            items={workingItems}
-                            maxDepth={3}
-                            insideDelayMs={500}
-                            edgeRatio={0.25}
-                            expandOnInside={true}
-                            onChange={(next) => setPending(next)}
-                            loadChildren={async (item) => {
-                                const url = categoryProducts.children.url({ query: { parent_id: item.id } });
-                                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                                const json = await res.json();
-                                const data: ProductCategory[] = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
-                                return data;
-                            }}
-                            hasChildren={() => true}
-                            renderItem={({
-                                item,
-                                depth,
-                                isExpanded,
-                                isLoading,
-                                isOver,
-                                insertLine,
-                                isInsideTarget,
-                                attributes,
-                                listeners,
-                                setNodeRef,
-                                toggleExpand,
-                            }) => (
-                                <div className="relative">
-                                    {/* Ligne d’insertion */}
-                                    {insertLine === 'before' && <div className="absolute -top-1 left-0 right-0 h-0.5 bg-primary" />}
-                                    {insertLine === 'after' && <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary" />}
+                        <div className="border rounded-md overflow-hidden">
+                            <SortableTree
+                                items={allItems}
+                                idKey="id"
+                                parentKey="parent_id"
+                                depthKey="depth"
+                                loadChildren={loadChildren}
+                                onChange={handleTreeChange}
+                                renderItem={renderItem}
+                            />
+                        </div>
 
-                                    <div
-                                        ref={setNodeRef}
-                                        className={`flex items-center justify-between rounded border px-2 py-1
-                      ${depth > 0 ? 'bg-muted/30' : 'bg-background'}
-                      ${isInsideTarget ? 'ring-2 ring-primary ring-offset-2' : ''}
-                      ${isOver && !isInsideTarget ? 'ring-1 ring-primary/40 ring-offset-1' : ''}
-                    `}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <button className="cursor-grab active:cursor-grabbing hover:bg-accent rounded p-1" {...attributes} {...listeners}>
-                                                <GripVertical size={16} className="text-muted-foreground" />
-                                            </button>
-
-                                            <div className="flex items-center" aria-hidden>
-                                                {Array.from({ length: Math.max(0, depth) }).map((_, i) => (
-                                                    <span key={i} className="w-6 h-6 mr-1 border-muted-foreground/40" />
-                                                ))}
-                                            </div>
-
-                                            {depth > 0 && (
-                                                <span className="w-4 h-4 mr-1 relative" aria-hidden>
-                                                    <svg viewBox="0 0 8 8" className="absolute inset-0 text-muted-foreground/60" width="16" height="16">
-                                                        <path d="M1 0 v7 h7" fill="none" stroke="currentColor" strokeWidth="1" />
-                                                    </svg>
-                                                </span>
-                                            )}
-
-                                            <button
-                                                className="hover:underline flex items-center gap-1"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    toggleExpand();
-                                                }}
-                                            >
-                                                <span>{item.name}</span>
-
-                                                {(item as any).has_children && (
-                                                    isExpanded ? (
-                                                        isLoading ? (
-                                                            <Loader2Icon size={14 + Math.min(6, depth * 2)} className="animate-spin text-muted-foreground" />
-                                                        ) : (
-                                                            <ChevronDown size={14 + Math.min(6, depth * 2)} className="text-muted-foreground" />
-                                                        )
-                                                    ) : (
-                                                        <ChevronRight size={14 + Math.min(6, depth * 2)} className="text-muted-foreground" />
-                                                    )
-                                                )}
-                                            </button>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <Button asChild size="icon" variant="outline">
-                                                <Link href={categoryProducts.edit(item.id)}>
-                                                    <EditIcon size={16} />
-                                                </Link>
-                                            </Button>
-                                            <Button asChild size="icon" variant="destructive-outline">
-                                                <Link href={categoryProducts.destroy(item.id)} onBefore={() => confirm('Are you sure?')}>
-                                                    <TrashIcon size={16} />
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        />
 
                         {collection.meta && collection.meta.current_page < collection.meta.last_page && (
                             <div className="w-full h-50 flex items-center justify-center mt-4">
