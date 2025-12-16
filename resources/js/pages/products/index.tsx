@@ -32,8 +32,11 @@ type Props = {
 };
 
 
-export default withAppLayout(breadcrumbs, false, ({ collection, q }: Props) => {
-    // console.log(collection)
+export default withAppLayout(breadcrumbs, (props: any) => {
+    const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
+    return uniqueCount < props.collection.meta.total;
+}, ({ collection, q }: Props) => {
+    console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -125,6 +128,7 @@ export default withAppLayout(breadcrumbs, false, ({ collection, q }: Props) => {
     };
 
     // console.log(collection);
+    const uniqueCount = Array.from(new Set(collection.data.map((p: Product) => p.id))).length;
 
     return (
         <>
@@ -205,7 +209,7 @@ export default withAppLayout(breadcrumbs, false, ({ collection, q }: Props) => {
                 </InfiniteScroll>
             }
 
-            {seeMore && collection.meta.current_page < collection.meta.last_page &&
+            {uniqueCount < collection.meta.total &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
                     <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
                 </div>
