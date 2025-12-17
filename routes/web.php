@@ -33,10 +33,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Route d'upload générique (gère POST pour l'envoi, PATCH pour les chunks, DELETE pour revert)
     Route::match(['post', 'patch', 'delete'], 'upload', \App\Http\Controllers\UploadController::class)->name('upload');
 
-    // API routes
-    // Route::prefix('api')->name('api.')->group(function () {
-    //     Route::get('/db-products', [\App\Http\Controllers\Api\DbProductsController::class, 'index'])->name('db-products.index');
-    // });
+    // API routes accessibles depuis l'admin (JSON)
+    Route::prefix('api')
+        ->name('api.')
+        ->middleware(['role:admin'])
+        ->group(function () {
+            Route::get('/db-products', [\App\Http\Controllers\Api\DbProductsController::class, 'index'])
+                ->name('db-products.index');
+        });
 
     // Routes admin des produits - nécessite le rôle admin
     Route::middleware(['role:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {

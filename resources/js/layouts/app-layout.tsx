@@ -25,7 +25,7 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
         if (page.props.flash.error) {
             toast.error(page.props.flash.error);
         }
-        console.log(page)
+        // console.log(page)
     }, [page.props]);
 
     return (
