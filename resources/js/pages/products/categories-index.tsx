@@ -7,7 +7,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@
 import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
@@ -324,13 +324,23 @@ export default withAppLayout(
                     </div>
 
                     {hasChanges && (
-                        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded flex items-center justify-between">
+                        <div className=" flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" onClick={cancel} disabled={saving}>
-                                    Annuler
+                                <Button variant="destructive" onClick={cancel} disabled={saving} title={t('Cancel changes')}>
+                                    <RotateCcw size={20} />
                                 </Button>
-                                <Button size="sm" onClick={save} disabled={saving}>
-                                    {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+                                <Button onClick={save} disabled={saving}>
+                                    {saving ?
+                                        <>
+                                            <Loader2Icon size={20} className="animate-spin" /> {t('Saving...')}
+                                        </>
+
+                                        :
+                                        <>
+                                            <SaveIcon size={20} /> {t('Save')}
+                                        </>
+
+                                    }
                                 </Button>
                             </div>
                         </div>
