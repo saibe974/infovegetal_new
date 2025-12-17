@@ -21,7 +21,6 @@ export function StickyBar({
 }: StickyBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
-    const [stickyKey, setStickyKey] = useState<number>(0);
 
     useEffect(() => {
         const getHeight = () => {
@@ -42,7 +41,6 @@ export function StickyBar({
         const update = () => {
             setTopOffset(getHeight());
             setWidth(getWidth());
-            setStickyKey(prev => prev + 1);
         };
 
         update();
@@ -64,7 +62,6 @@ export function StickyBar({
 
     return (
         <BasicSticky
-            key={stickyKey}
             topOffset={-topOffset}
             stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
             wrapperClassName={`relative z-${zIndex} ${className}`}
