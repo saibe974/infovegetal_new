@@ -102,10 +102,10 @@ export default withAppLayout(
 
             const merged = uniqById(ordered);
 
-            console.log('allItems ordered (parent -> child interleaved):', merged);
-            if (merged.length > 0) {
-                console.log('First item sample:', merged[0], 'has id?', merged[0].id, 'has name?', merged[0].name);
-            }
+            // console.log('allItems ordered (parent -> child interleaved):', merged);
+            // if (merged.length > 0) {
+            //     console.log('First item sample:', merged[0], 'has id?', merged[0].id, 'has name?', merged[0].name);
+            // }
             return merged;
         }, [collection?.data, children]);  // Ne dépend QUE des props du serveur, pas de pending
 
@@ -162,13 +162,6 @@ export default withAppLayout(
                         marginLeft: depth * 24,
                     }}
                 >
-                    {insertLine === 'before' && (
-                        <div className="pointer-events-none absolute left-0 right-0 top-0 h-px bg-primary" />
-                    )}
-                    {insertLine === 'after' && (
-                        <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-px bg-primary" />
-                    )}
-
                     <button
                         type="button"
                         onClick={toggleExpand}
@@ -216,10 +209,10 @@ export default withAppLayout(
 
             // Pour les drags, mettre à jour le pending
             if (reason === 'drag') {
-                console.log('Tree changed by drag:', items);
-                if (items.length > 0) {
-                    console.log('First item after drag:', items[0], 'has id?', items[0].id, 'has name?', items[0].name);
-                }
+                // console.log('Tree changed by drag:', items);
+                // if (items.length > 0) {
+                //     console.log('First item after drag:', items[0], 'has id?', items[0].id, 'has name?', items[0].name);
+                // }
                 setPending(items);
             }
         };
@@ -329,6 +322,19 @@ export default withAppLayout(
                             />
                         </div>
                     </div>
+
+                    {hasChanges && (
+                        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={cancel} disabled={saving}>
+                                    Annuler
+                                </Button>
+                                <Button size="sm" onClick={save} disabled={saving}>
+                                    {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </StickyBar>
 
                 {q ? (
@@ -382,23 +388,10 @@ export default withAppLayout(
                     </>
                 ) : (
                     <div className="space-y-2">
-                        {hasChanges && (
-                            <div className="mb-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded flex items-center justify-between">
-                                <span className="text-sm">Vous avez des modifications non sauvegardées</span>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={cancel} disabled={saving}>
-                                        Annuler
-                                    </Button>
-                                    <Button size="sm" onClick={save} disabled={saving}>
-                                        {saving ? 'Sauvegarde…' : 'Sauvegarder'}
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="border rounded-md overflow-hidden">
                             <SortableTree
-                                items={allItems}
+                                items={pending ?? allItems}
                                 idKey="id"
                                 parentKey="parent_id"
                                 depthKey="depth"

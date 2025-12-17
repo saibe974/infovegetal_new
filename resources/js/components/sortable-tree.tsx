@@ -4,6 +4,7 @@ import {
     DragEndEvent,
     DragOverEvent,
     DragStartEvent,
+    DragOverlay,
     KeyboardSensor,
     PointerSensor,
     closestCenter,
@@ -28,10 +29,10 @@ export type RenderItemProps<T> = {
     isLoading: boolean;
     isDragging: boolean;
 
-    // UX drag
-    isOver: boolean; // over (any zone)
-    insertLine: 'before' | 'after' | null; // ✅ ligne d’insertion
-    isInsideTarget: boolean; // ✅ surbrillance “inside” après délai
+    // UX drag (on conserve pour l'inside si tu veux un highlight)
+    isOver: boolean;
+    insertLine: 'before' | 'after' | null; // gardé mais tu ne l'affiches plus
+    isInsideTarget: boolean;
 
     setNodeRef: (el: HTMLElement | null) => void;
     attributes: any;
@@ -40,25 +41,20 @@ export type RenderItemProps<T> = {
 };
 
 export type SortableTreeProps<T extends Record<string, any>> = {
-    // Données plates (structure brute du serveur)
     items: T[];
-    idKey?: ItemKey<T>; // default: 'id'
-    parentKey?: ItemKey<T>; // default: 'parent_id'
-    depthKey?: ItemKey<T>; // default: 'depth'
-    maxDepth?: number; // default: 3
+    idKey?: ItemKey<T>;
+    parentKey?: ItemKey<T>;
+    depthKey?: ItemKey<T>;
+    maxDepth?: number;
 
-    // intent tuning
-    insideDelayMs?: number; // default: 500
-    edgeRatio?: number; // default: 0.25 (top/bottom zones => between)
-    expandOnInside?: boolean; // default: true (auto-open when inside intent triggers)
+    insideDelayMs?: number;
+    edgeRatio?: number;
+    expandOnInside?: boolean;
 
-    hasChildren?: (item: T, all: T[]) => boolean; // "ouvrable"
+    hasChildren?: (item: T, all: T[]) => boolean;
     loadChildren?: (item: T) => Promise<T[]>;
 
-    // Callback quand l'arbre change (retourne données plates + raison)
     onChange?: (next: T[], reason?: 'drag' | 'expand' | 'collapse') => void;
-
-    // Rendu personnalisé de chaque item
     renderItem: (props: RenderItemProps<T>) => React.ReactNode;
 };
 
@@ -73,7 +69,6 @@ function getField<T extends Record<string, any>, R = any>(obj: T, key: ItemKey<T
 }
 
 function setField<T extends Record<string, any>>(obj: T, key: ItemKey<T>, value: any): T {
-    // Utiliser Object.assign pour préserver toutes les propriétés
     const result = Object.assign({}, obj as any);
     result[key as string] = value;
     return result as T;
@@ -111,10 +106,12 @@ function Row<T extends Record<string, any>>({
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
 
+    // ✅ clé UX: pendant le drag, on rend la "ligne" invisible mais elle garde sa place,
+    // et le vrai "fantôme" est rendu via DragOverlay.
     const style: React.CSSProperties = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        visibility: isDragging ? 'hidden' : 'visible',
     };
 
     return (
@@ -154,7 +151,6 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     const [dropIntent, setDropIntent] = useState<DropIntent>(null);
 
     const insideTimerRef = useRef<number | null>(null);
-
     const clearInsideTimer = () => {
         if (insideTimerRef.current) {
             window.clearTimeout(insideTimerRef.current);
@@ -213,11 +209,9 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             return;
         }
 
-        // open immediately
         setExpanded((s) => new Set(s).add(id));
         props.onChange?.(items, 'expand');
 
-        // already have children loaded
         if (items.some((x) => getParent(x) === id)) return;
         if (!props.loadChildren) return;
 
@@ -264,11 +258,13 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         setActiveId(e.active.id as Id);
         setDropIntent(null);
         clearInsideTimer();
+        console.log('Drag started for id:', e.active.id);
     };
 
     const onDragOver = (e: DragOverEvent) => {
         const over = e.over;
         const oid = (over?.id as Id) ?? null;
+        console.log('Drag over id:', oid);
 
         setOverId(oid);
 
@@ -278,46 +274,63 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             return;
         }
 
-        // Determine pointer Y within the item rect -> before/after/center
-        const pe = e.activatorEvent as MouseEvent | PointerEvent | undefined;
-        const clientY = pe && 'clientY' in pe ? pe.clientY : null;
+        // Position du centre de l'élément dragué par rapport au survolé
+        const activeRect = e.active.rect.current.translated ?? e.active.rect.current.initial;
 
-        // fallback = after
-        if (clientY == null || !over.rect) {
-            setDropIntent({ type: 'between', overId: oid, where: 'after' });
-            clearInsideTimer();
-            return;
-        }
-
-        const top = over.rect.top;
-        const h = over.rect.height || 1;
-        const y = clientY - top;
-        const edge = h * edgeRatio;
-
-        if (y <= edge) {
+        if (!activeRect || !over.rect) {
             setDropIntent({ type: 'between', overId: oid, where: 'before' });
             clearInsideTimer();
             return;
         }
 
-        if (y >= h - edge) {
+        const activeCenterY = activeRect.top + activeRect.height / 2;
+        const top = over.rect.top;
+        const h = over.rect.height || 1;
+        const relativeY = activeCenterY - top;
+        const edge = h * edgeRatio;
+
+        console.log('📏 Position:', {
+            relativeY,
+            h,
+            edge,
+            zone: relativeY <= edge ? 'top' : relativeY >= h - edge ? 'bottom' : 'center'
+        });
+
+        if (relativeY <= edge) {
+            console.log('➡️ Setting intent: BEFORE (top edge)');
+            setDropIntent({ type: 'between', overId: oid, where: 'before' });
+            clearInsideTimer();
+            return;
+        }
+
+        if (relativeY >= h - edge) {
+            console.log('➡️ Setting intent: AFTER (bottom edge)');
             setDropIntent({ type: 'between', overId: oid, where: 'after' });
             clearInsideTimer();
             return;
         }
 
-        // center zone -> after short delay become "inside"
+        console.log('➡️ Setting intent: CENTER (will become inside after delay)');
         setDropIntent({ type: 'between', overId: oid, where: 'after' });
 
         clearInsideTimer();
         insideTimerRef.current = window.setTimeout(() => {
+            console.log('✨ Inside intent triggered for', oid);
             setDropIntent({ type: 'inside', overId: oid });
             if (expandOnInside) void toggleExpand(oid);
         }, insideDelayMs) as unknown as number;
     };
 
+    const subtreeEndIndex = (list: T[], startIndex: number) => {
+        const startDepth = getDepth(list[startIndex]);
+        let i = startIndex + 1;
+        while (i < list.length && getDepth(list[i]) > startDepth) i++;
+        return i;
+    };
+
     const onDragEnd = (e: DragEndEvent) => {
         const { active, over } = e;
+        console.log('Drag ended. Active id:', active.id, 'Over id:', over?.id);
 
         clearInsideTimer();
         setActiveId(null);
@@ -339,8 +352,9 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
         const intent = dropIntent;
         const dropInside = intent?.type === 'inside' && intent.overId === overItemId;
-        const betweenWhere =
-            intent?.type === 'between' && intent.overId === overItemId ? intent.where : 'after';
+        let betweenWhere = intent?.type === 'between' && intent.overId === overItemId ? intent.where : 'after';
+
+        console.log('🔍 Drop intent:', { intent, dropInside, betweenWhere });
 
         const targetParentId: Id | null = dropInside ? overItemId : getParent(overItem);
 
@@ -370,7 +384,6 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         const targetDepth = targetParentId == null ? 0 : parentDepth + 1;
         const delta = targetDepth - getDepth(activeItem);
 
-        // depth guard
         for (const n of block) {
             const nd = getDepth(n) + delta;
             if (nd < 0 || nd > maxDepth) {
@@ -379,35 +392,54 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             }
         }
 
-        // apply move (no mutation)
         const movedBlock: T[] = block.map((n) => {
             const newDepth = getDepth(n) + delta;
             const newParent = getId(n) === rootId ? targetParentId : getParent(n);
-            const updated = setField(setField(n, depthKey, newDepth), parentKey, newParent);
-            console.log('Updating item:', {
-                original: n,
-                updated,
-                newDepth,
-                newParent,
-            });
-            return updated;
+            return setField(setField(n, depthKey, newDepth), parentKey, newParent);
         });
 
-        // insert index
+        if (!dropInside) {
+            const activeIdxInItems = items.findIndex((x) => getId(x) === rootId);
+            const overIdxInItems = items.findIndex((x) => getId(x) === overItemId);
+            if (activeIdxInItems > overIdxInItems) {
+                betweenWhere = 'before';
+            } else if (activeIdxInItems < overIdxInItems) {
+                betweenWhere = 'after';
+            }
+        }
+
         const overIdx = remaining.findIndex((x) => getId(x) === overItemId);
 
+        console.log('📍 Insertion:', {
+            overIdx,
+            dropInside,
+            betweenWhere,
+            remainingIds: remaining.map(x => getId(x)),
+            movingIds: movedBlock.map(x => getId(x))
+        });
+
         if (dropInside) {
-            // insert right after the parent row
             const parentIdx = overIdx;
             const insertAt = parentIdx === -1 ? remaining.length : parentIdx + 1;
             remaining.splice(insertAt, 0, ...movedBlock);
-            if (targetParentId != null && !expanded.has(targetParentId)) setExpanded((s) => new Set(s).add(targetParentId));
+
+            if (targetParentId != null && !expanded.has(targetParentId)) {
+                setExpanded((s) => new Set(s).add(targetParentId));
+            }
         } else {
-            // between: before => at overIdx, after => overIdx + 1
-            const base = overIdx === -1 ? remaining.length : overIdx;
-            const insertAt = betweenWhere === 'before' ? base : base + 1;
-            remaining.splice(insertAt, 0, ...movedBlock);
+            if (overIdx === -1) {
+                remaining.push(...movedBlock);
+            } else if (betweenWhere === 'before') {
+                console.log('✅ Inserting BEFORE at index:', overIdx);
+                remaining.splice(overIdx, 0, ...movedBlock);
+            } else {
+                // Correction : insérer juste après l'élément survolé
+                console.log('✅ Inserting AFTER at index:', overIdx + 1);
+                remaining.splice(overIdx + 1, 0, ...movedBlock);
+            }
         }
+
+        console.log('📦 Final order:', remaining.map(x => getId(x)));
 
         const next = remaining;
         setItems(next);
@@ -419,6 +451,8 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     useEffect(() => {
         return () => clearInsideTimer();
     }, []);
+
+    const activeItem = activeId != null ? idMap.get(activeId) : null;
 
     return (
         <DndContext
@@ -462,6 +496,26 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                     })}
                 </div>
             </SortableContext>
+
+            {/* ✅ Le seul "fantôme" visible : DragOverlay */}
+            <DragOverlay>
+                {activeItem ? (
+                    props.renderItem({
+                        item: activeItem,
+                        depth: getDepth(activeItem),
+                        isExpanded: false,
+                        isLoading: false,
+                        isDragging: true,
+                        isOver: false,
+                        insertLine: null,
+                        isInsideTarget: false,
+                        setNodeRef: () => { },
+                        attributes: {},
+                        listeners: {},
+                        toggleExpand: () => { },
+                    })
+                ) : null}
+            </DragOverlay>
         </DndContext>
     );
 }
