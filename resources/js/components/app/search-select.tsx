@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { Button } from "../ui/button";
 
 interface SearchBarProps {
     value: string;
@@ -15,7 +16,7 @@ interface SearchBarProps {
     // Current query string (e.g., from URL/props) to display as tags
     query?: string;
     placeholder?: string,
-    filters?: boolean,
+    filters?: ReactNode,
     search?: boolean,
     selection?: (string | Option)[]
 }
@@ -34,12 +35,13 @@ export default function SearchSelect({
     count,
     query,
     placeholder,
-    filters = true,
+    filters = undefined,
     search = true,
     selection = undefined
 }: SearchBarProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
+    const [openFilters, setOpenFilters] = useState(false);
 
     const toOptions = (arr?: (string | Option)[]) =>
         (arr ?? []).map((s) => (typeof s === "string" ? { value: s, label: s } : s));
@@ -48,6 +50,8 @@ export default function SearchSelect({
     const [selected, setSelected] = useState<Option[]>(toOptions(selection) || []);
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const inputRef = useRef<HTMLInputElement>(null);
+    const filtersRef = useRef<HTMLDivElement | null>(null);
+    const lastMouseDownInsideRef = useRef(false);
     // Resolve list of strings to display as propositions
     const list: string[] = (propositions ?? []) as string[];
     // Track last submitted query to avoid duplicate submit loops
@@ -165,8 +169,10 @@ export default function SearchSelect({
                 {filters && (
                     <button
                         type="button"
-                        onClick={() => alert(t('Filter options coming soon!'))}
+                        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setOpenFilters((v) => !v); }}
+                        onClick={(e) => { e.stopPropagation(); }}
                         className="text-muted-foreground hover:text-foreground px-1"
+                        title="Filters"
                     >
                         <SlidersHorizontalIcon size={16} />
                     </button>
@@ -193,8 +199,32 @@ export default function SearchSelect({
                     ref={inputRef}
                     value={value}
                     onChange={(e) => {
-                        onChange(e.target.value);
+                        const v = e.target.value;
+                        onChange(v);
                         setOpen(true);
+                        if (filters && v && v.trim() !== '') {
+                            setOpenFilters(false);
+                        }
+                    }}
+                    onFocus={() => {
+                        if (filters && (!value || value.trim() === '') && selected.length === 0) {
+                            setOpenFilters(true);
+                        }
+                    }}
+                    onBlur={() => {
+                        // Delay to allow clicks inside filters to set flag first
+                        setTimeout(() => {
+                            // if (lastMouseDownInsideRef.current) {
+                            //     // click started inside filters, keep open
+                            //     lastMouseDownInsideRef.current = false;
+                            //     return;
+                            // }
+                            const active = document.activeElement as Element | null;
+                            if (filtersRef.current && active && filtersRef.current.contains(active)) {
+                                return;
+                            }
+                            setOpenFilters(false);
+                        }, 0);
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder ?? t('Search...')}
@@ -261,6 +291,29 @@ export default function SearchSelect({
                         )}
                     </div>
                 )
+            }
+
+            {openFilters && filters &&
+                <div
+                    ref={filtersRef}
+                    onMouseDown={(e) => {
+                        e.stopPropagation();
+                        // Mark that the mousedown started inside filters so blur handler keeps it open
+                        lastMouseDownInsideRef.current = true;
+                    }}
+
+                    className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50 h-100 overflow-y-scroll"
+                >
+                    <div className="flex justify-center items-center py-2 text-muted-foreground w-full h-full relative">
+                        <Button variant="ghost" size="sm" className="absolute top-2 right-2"
+                            onClick={() => setOpenFilters(false)}
+                        >
+                            <X size={16} />
+                        </Button>
+                        {filters}
+                    </div>
+
+                </div>
             }
         </div >
     );
