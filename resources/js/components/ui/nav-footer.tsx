@@ -7,6 +7,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarMenuSub,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { NavItemExtended, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -68,6 +69,7 @@ export function NavFooterExtended({
     className?: string;
 }) {
     const page = usePage();
+    const { state, isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
 
     // initial open map based on current path (similar to NavMainExtended)
@@ -195,7 +197,7 @@ export function NavFooterExtended({
                                         <SidebarMenuButton
                                             asChild
                                             onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
-                                            tooltip={item.title}
+                                            tooltip={!isOpenId('main') ? item.title : undefined}
                                         >
                                             <button type="button" className="w-full text-left flex items-center gap-2">
                                                 {label}
@@ -211,7 +213,7 @@ export function NavFooterExtended({
                                             <SidebarMenuSub>
                                                 {(item as NavItemExtended).subItems!.map((sub) => (
                                                     <SidebarMenuItem key={sub.title} >
-                                                        <SidebarMenuButton tooltip={sub.title} asChild>
+                                                        <SidebarMenuButton tooltip={!isOpenId('main') ? sub.title : undefined} asChild>
                                                             {renderLink(sub.href, (
                                                                 <>
                                                                     {sub.icon && <Icon iconNode={sub.icon} className="h-4 w-4" />}
@@ -225,7 +227,7 @@ export function NavFooterExtended({
                                         </div>
                                     </>
                                 ) : (
-                                    <SidebarMenuButton tooltip={item.title} asChild>
+                                    <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild>
                                         {renderLink(item.href ?? (item as NavItem).href, label, (item as any).target)}
                                     </SidebarMenuButton>
                                 )}

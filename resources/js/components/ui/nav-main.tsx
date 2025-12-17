@@ -5,13 +5,15 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarMenuSub,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { type NavItem, type NavItemExtended } from '@/types';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 
 function NavMain({ items = [] }: { items: NavItem[] }) {
     const page = usePage();
+    const { state } = useSidebar();
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -25,7 +27,7 @@ function NavMain({ items = [] }: { items: NavItem[] }) {
                                     ? item.href
                                     : item.href.url,
                             )}
-                            tooltip={{ children: item.title }}
+                            tooltip={state === 'collapsed' ? { children: item.title } : undefined}
                         >
                             <Link href={item.href} prefetch>
                                 {item.icon && <item.icon />}
@@ -41,7 +43,10 @@ function NavMain({ items = [] }: { items: NavItem[] }) {
 
 export function NavMainExtended({ items = [], title = 'Navigation' }: { items: NavItemExtended[]; title?: string }) {
     const page = usePage();
+    const { state, isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
+
+    console.log(isOpenId);
 
     // initialize open state per item key (use title as key)
     const initialOpenMap = items.reduce((acc: Record<string, boolean>, item) => {
@@ -139,10 +144,10 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                     <SidebarMenuButton
                                         asChild
                                         isActive={isActive}
-                                        tooltip={{
+                                        tooltip={!isOpenId('main') ? {
                                             children: item.title,
                                             side: 'right',
-                                        }}
+                                        } : undefined}
                                     >
                                         <Link
                                             href={item.href}
@@ -178,7 +183,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                                         isActive={page.url.startsWith(
                                                             typeof subItem.href === 'string' ? subItem.href : subItem.href.url,
                                                         )}
-                                                        tooltip={{ children: subItem.title }}
+                                                        tooltip={!isOpenId('main') ? { children: subItem.title } : undefined}
                                                     >
                                                         <Link href={subItem.href} prefetch>
                                                             {subItem.icon && <subItem.icon />}
@@ -191,7 +196,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                     </div>
                                 </>
                             ) : (
-                                <SidebarMenuButton asChild isActive={isActive} tooltip={{ children: item.title }}>
+                                <SidebarMenuButton asChild isActive={isActive} tooltip={!isOpenId('main') ? { children: item.title } : undefined}>
                                     <Link href={item.href} prefetch>
                                         {item.icon && <item.icon />}
                                         <span>{item.title}</span>
