@@ -22,7 +22,7 @@ trait HasSortable
         ]);
 
         if (! ($validated['sort'] ?? null)) {
-            $builder->orderByDesc('created_at');
+            $builder->orderByDesc('updated_at');
             return;
         }
 
