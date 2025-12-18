@@ -18,6 +18,7 @@ import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
+import { ProductsFilters } from '@/components/products/products-filters';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -59,21 +60,21 @@ export default withAppLayout(breadcrumbs, (props: any) => {
     });
 
     // Contrôle "voir plus": devient false en bas de page ou si dernière page
-    const [seeMore, setSeeMore] = useState(true);
-    useEffect(() => {
-        const onScroll = () => {
-            const threshold = 200;
-            const scrolled = window.scrollY + window.innerHeight;
-            const total = document.documentElement.scrollHeight;
-            const isNearBottom = scrolled >= total - threshold;
-            if (isNearBottom || collection.meta.current_page >= collection.meta.last_page) {
-                setSeeMore(false);
-            }
-        };
-        onScroll();
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
-    }, [collection.meta.current_page, collection.meta.last_page]);
+    // const [seeMore, setSeeMore] = useState(true);
+    // useEffect(() => {
+    //     const onScroll = () => {
+    //         const threshold = 200;
+    //         const scrolled = window.scrollY + window.innerHeight;
+    //         const total = document.documentElement.scrollHeight;
+    //         const isNearBottom = scrolled >= total - threshold;
+    //         if (isNearBottom || collection.meta.current_page >= collection.meta.last_page) {
+    //             setSeeMore(false);
+    //         }
+    //     };
+    //     onScroll();
+    //     window.addEventListener('scroll', onScroll, { passive: true });
+    //     return () => window.removeEventListener('scroll', onScroll);
+    // }, [collection.meta.current_page, collection.meta.last_page]);
 
 
     // Local state for client-fetched propositions to avoid Inertia refresh
@@ -150,6 +151,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                         loading={fetching}
                         count={collection.meta.total}
                         query={q ?? ''}
+                        filters={<ProductsFilters />}
                     />
                 </div>
 

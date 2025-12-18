@@ -46,7 +46,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
     const { state, isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
 
-    console.log(isOpenId);
+    // console.log(isOpenId);
 
     // initialize open state per item key (use title as key)
     const initialOpenMap = items.reduce((acc: Record<string, boolean>, item) => {
