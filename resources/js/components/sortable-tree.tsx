@@ -258,79 +258,73 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         setActiveId(e.active.id as Id);
         setDropIntent(null);
         clearInsideTimer();
-        console.log('Drag started for id:', e.active.id);
+        // console.log('Drag started for id:', e.active.id);
     };
 
     const onDragOver = (e: DragOverEvent) => {
-        const over = e.over;
-        const oid = (over?.id as Id) ?? null;
-        console.log('Drag over id:', oid);
+        // const over = e.over;
+        // const oid = (over?.id as Id) ?? null;
+        // console.log('Drag over id:', oid);
 
-        setOverId(oid);
+        // setOverId(oid);
 
-        if (!oid || !over) {
-            setDropIntent(null);
-            clearInsideTimer();
-            return;
-        }
+        // if (!oid || !over) {
+        //     setDropIntent(null);
+        //     clearInsideTimer();
+        //     return;
+        // }
 
-        // Position du centre de l'élément dragué par rapport au survolé
-        const activeRect = e.active.rect.current.translated ?? e.active.rect.current.initial;
+        // // Position du centre de l'élément dragué par rapport au survolé
+        // const activeRect = e.active.rect.current.translated ?? e.active.rect.current.initial;
 
-        if (!activeRect || !over.rect) {
-            setDropIntent({ type: 'between', overId: oid, where: 'before' });
-            clearInsideTimer();
-            return;
-        }
+        // if (!activeRect || !over.rect) {
+        //     setDropIntent({ type: 'between', overId: oid, where: 'before' });
+        //     clearInsideTimer();
+        //     return;
+        // }
 
-        const activeCenterY = activeRect.top + activeRect.height / 2;
-        const top = over.rect.top;
-        const h = over.rect.height || 1;
-        const relativeY = activeCenterY - top;
-        const edge = h * edgeRatio;
+        // const activeCenterY = activeRect.top + activeRect.height / 2;
+        // const top = over.rect.top;
+        // const h = over.rect.height || 1;
+        // const relativeY = activeCenterY - top;
+        // const edge = h * edgeRatio;
 
-        console.log('📏 Position:', {
-            relativeY,
-            h,
-            edge,
-            zone: relativeY <= edge ? 'top' : relativeY >= h - edge ? 'bottom' : 'center'
-        });
+        // console.log('📏 Position:', {
+        //     relativeY,
+        //     h,
+        //     edge,
+        //     zone: relativeY <= edge ? 'top' : relativeY >= h - edge ? 'bottom' : 'center'
+        // });
 
-        if (relativeY <= edge) {
-            console.log('➡️ Setting intent: BEFORE (top edge)');
-            setDropIntent({ type: 'between', overId: oid, where: 'before' });
-            clearInsideTimer();
-            return;
-        }
+        // if (relativeY <= edge) {
+        //     console.log('➡️ Setting intent: BEFORE (top edge)');
+        //     setDropIntent({ type: 'between', overId: oid, where: 'before' });
+        //     clearInsideTimer();
+        //     return;
+        // }
 
-        if (relativeY >= h - edge) {
-            console.log('➡️ Setting intent: AFTER (bottom edge)');
-            setDropIntent({ type: 'between', overId: oid, where: 'after' });
-            clearInsideTimer();
-            return;
-        }
+        // if (relativeY >= h - edge) {
+        //     console.log('➡️ Setting intent: AFTER (bottom edge)');
+        //     setDropIntent({ type: 'between', overId: oid, where: 'after' });
+        //     clearInsideTimer();
+        //     return;
+        // }
 
-        console.log('➡️ Setting intent: CENTER (will become inside after delay)');
-        setDropIntent({ type: 'between', overId: oid, where: 'after' });
+        // console.log('➡️ Setting intent: CENTER (will become inside after delay)');
+        // setDropIntent({ type: 'between', overId: oid, where: 'after' });
 
-        clearInsideTimer();
-        insideTimerRef.current = window.setTimeout(() => {
-            console.log('✨ Inside intent triggered for', oid);
-            setDropIntent({ type: 'inside', overId: oid });
-            if (expandOnInside) void toggleExpand(oid);
-        }, insideDelayMs) as unknown as number;
+        // clearInsideTimer();
+        // insideTimerRef.current = window.setTimeout(() => {
+        //     console.log('✨ Inside intent triggered for', oid);
+        //     setDropIntent({ type: 'inside', overId: oid });
+        //     if (expandOnInside) void toggleExpand(oid);
+        // }, insideDelayMs) as unknown as number;
     };
 
-    const subtreeEndIndex = (list: T[], startIndex: number) => {
-        const startDepth = getDepth(list[startIndex]);
-        let i = startIndex + 1;
-        while (i < list.length && getDepth(list[i]) > startDepth) i++;
-        return i;
-    };
 
     const onDragEnd = (e: DragEndEvent) => {
         const { active, over } = e;
-        console.log('Drag ended. Active id:', active.id, 'Over id:', over?.id);
+        // console.log('Drag ended. Active id:', active.id, 'Over id:', over?.id);
 
         clearInsideTimer();
         setActiveId(null);
@@ -410,13 +404,13 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
         const overIdx = remaining.findIndex((x) => getId(x) === overItemId);
 
-        console.log('📍 Insertion:', {
-            overIdx,
-            dropInside,
-            betweenWhere,
-            remainingIds: remaining.map(x => getId(x)),
-            movingIds: movedBlock.map(x => getId(x))
-        });
+        // console.log('📍 Insertion:', {
+        //     overIdx,
+        //     dropInside,
+        //     betweenWhere,
+        //     remainingIds: remaining.map(x => getId(x)),
+        //     movingIds: movedBlock.map(x => getId(x))
+        // });
 
         if (dropInside) {
             const parentIdx = overIdx;

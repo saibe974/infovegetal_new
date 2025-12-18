@@ -293,7 +293,6 @@ export default withAppLayout(
 
                 toast.success('Hiérarchie sauvegardée avec succès');
                 setPending(null);
-                router.reload({ only: ['collection', 'children'] });
             } catch (e) {
                 console.error(e);
                 toast.error('Erreur lors de la sauvegarde');
@@ -401,7 +400,7 @@ export default withAppLayout(
 
                         <div className="border rounded-md overflow-hidden">
                             <SortableTree
-                                items={pending ?? allItems}
+                                items={allItems}
                                 idKey="id"
                                 parentKey="parent_id"
                                 depthKey="depth"
