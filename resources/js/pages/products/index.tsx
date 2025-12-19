@@ -19,6 +19,7 @@ import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
 import { ProductsFilters } from '@/components/products/products-filters';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -218,21 +219,38 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                 </div>
 
                 {canImportExport && (
-                    <div className="ml-auto flex items-center gap-2">
-                        <CsvUploadFilePond
-                            title='Upload CSV'
-                            description='Uploadez un fichier CSV'
-                            uploadUrl='/upload'
-                            importProcessUrl={products.admin.import.process.url()}
-                            importProcessChunkUrl={products.admin.import.process_chunk.url()}
-                            importCancelUrl={products.admin.import.cancel.url()}
-                            importProgressUrl={(id) => products.admin.import.progress.url({ id })}
-                            postTreatmentComponent={ProductsImportTreatment}
-                            successRedirectUrl={products.index().url}
-                            buttonLabel=''
-                        />
-                        <DownloadCsvButton />
-                    </div>
+                    // <div className="ml-auto flex items-center gap-2">
+                    //     <CsvUploadFilePond
+                    //         title='Upload CSV'
+                    //         description='Uploadez un fichier CSV'
+                    //         uploadUrl='/upload'
+                    //         importProcessUrl={products.admin.import.process.url()}
+                    //         importProcessChunkUrl={products.admin.import.process_chunk.url()}
+                    //         importCancelUrl={products.admin.import.cancel.url()}
+                    //         importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                    //         postTreatmentComponent={ProductsImportTreatment}
+                    //         successRedirectUrl={products.index().url}
+                    //         buttonLabel=''
+                    //     />
+                    //     <DownloadCsvButton />
+                    // </div>
+                    <ButtonsActions
+                        import={
+                            <CsvUploadFilePond
+                                title='Upload CSV'
+                                description='Uploadez un fichier CSV'
+                                uploadUrl='/upload'
+                                importProcessUrl={products.admin.import.process.url()}
+                                importProcessChunkUrl={products.admin.import.process_chunk.url()}
+                                importCancelUrl={products.admin.import.cancel.url()}
+                                importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                                postTreatmentComponent={ProductsImportTreatment}
+                                successRedirectUrl={products.index().url}
+                                buttonLabel=''
+                            />
+                        }
+                        export={'/admin/products/export'}
+                    />
                 )}
             </StickyBar>
 

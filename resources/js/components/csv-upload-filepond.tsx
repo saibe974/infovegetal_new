@@ -15,6 +15,7 @@ import {
 import { FilePond } from 'react-filepond';
 import type { FilePondProps } from 'react-filepond';
 import 'filepond/dist/filepond.min.css';
+import { Button } from './ui/button';
 
 type CsvUploadConfig = {
     /** Titre de la boîte de dialogue */
@@ -640,17 +641,18 @@ export function CsvUploadFilePond({
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
-                <button
-                    type="button"
-                    className={
-                        buttonClassName ??
-                        'clickable inline-flex items-center border px-3 py-1 rounded text-sm'
-                    }
+                <Button
+                    // type="button"
+                    // className={
+                    //     buttonClassName ??
+                    //     'clickable inline-flex items-center border px-3 py-1 rounded text-sm'
+                    // }
+                    variant={'outline'}
                     title={title}
                 >
                     <DownloadIcon />
                     {buttonLabel ?? ''}
-                </button>
+                </Button>
             </DialogTrigger>
 
             <DialogContent

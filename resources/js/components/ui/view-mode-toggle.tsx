@@ -1,5 +1,6 @@
 import { List, LayoutGrid } from 'lucide-react';
 import { useEffect } from 'react';
+import { Button } from './button';
 
 interface ViewModeToggleProps {
     viewMode: 'table' | 'grid';
@@ -22,10 +23,12 @@ export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewMode
 
     return (
         <div className="flex gap-2">
-            <button
-                type="button"
+            <Button
+                // type="button"
+
                 aria-pressed={viewMode === 'table'}
                 onClick={() => onViewModeChange('table')}
+                variant={'outline'}
                 className={`
                     p-2 rounded-md transition border ${viewMode === 'table'
                         ? 'bg-accent'
@@ -35,9 +38,9 @@ export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewMode
                 title="Afficher en tableau"
             >
                 <List />
-            </button>
+            </Button>
 
-            <button
+            <Button
                 type="button"
                 aria-pressed={viewMode === 'grid'}
                 onClick={() => onViewModeChange('grid')}
@@ -47,10 +50,11 @@ export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewMode
                         : 'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'
                     }
                 `}
+                variant={'outline'}
                 title="Afficher en grille"
             >
                 <LayoutGrid />
-            </button>
+            </Button>
         </div>
     );
 }

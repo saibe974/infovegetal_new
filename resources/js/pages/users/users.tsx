@@ -37,6 +37,7 @@ import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -168,7 +169,7 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
     };
 
     return (
-        <div>
+        <div className='w-full'>
             <Head title="Users" />
             <StickyBar
                 zIndex={20}
@@ -180,7 +181,7 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
                     onViewModeChange={setViewMode}
                     pageKey="users"
                 />
-                <div className="w-200 left-0 top-1 mr-2">
+                {/* <div className="w-full left-0 top-1 mr-2"> */}
                     <SearchSelect
                         value={search}
                         onChange={handleSearch}
@@ -188,19 +189,32 @@ export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProp
                         propositions={searchPropositions}
                         loading={fetching}
                     />
-                </div>
+                {/* </div> */}
 
                 {canImportExport && (
-                    <div className="ml-auto flex items-center gap-2">
-                        <CsvUploadFilePond
-                            title="Upload CSV"
-                            description="Uploadez un fichier CSV"
-                            uploadUrl="/upload"
-                            successRedirectUrl={products.index().url}
-                            buttonLabel=""
-                        />
-                        <DownloadCsvButton />
-                    </div>
+                    // <div className="ml-auto flex items-center gap-2">
+                    //     <CsvUploadFilePond
+                    //         title="Upload CSV"
+                    //         description="Uploadez un fichier CSV"
+                    //         uploadUrl="/upload"
+                    //         successRedirectUrl={products.index().url}
+                    //         buttonLabel=""
+                    //     />
+                    //     <DownloadCsvButton />
+                    // </div>
+                    <ButtonsActions
+                        import={
+                            <CsvUploadFilePond
+                                title="Upload CSV"
+                                description="Uploadez un fichier CSV"
+                                uploadUrl="/admin/users/import"
+                                successRedirectUrl={products.index().url}
+                                buttonLabel=""
+                            />
+                        }
+                        export={"/admin/users/export"}
+                    />
+
                 )}
             </StickyBar>
 
