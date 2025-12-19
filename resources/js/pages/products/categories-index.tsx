@@ -162,14 +162,16 @@ export default withAppLayout(
                         marginLeft: depth * 24,
                     }}
                 >
-                    <button
-                        type="button"
-                        onClick={toggleExpand}
-                        className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
-                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                    >
-                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
+                    {!isDragging && (
+                        <button
+                            type="button"
+                            onClick={toggleExpand}
+                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                    )}
 
                     <div
                         {...listeners}
@@ -183,7 +185,7 @@ export default withAppLayout(
                     <span className="truncate font-medium flex-1">{displayName}</span>
 
                     <div className="flex gap-2 justify-end flex-shrink-0">
-                        {hasValidId && (
+                        {hasValidId && !isDragging && (
                             <>
                                 <Button asChild size="icon" variant="outline">
                                     <Link href={categoryProducts.edit((item as any).id)}>
@@ -303,6 +305,8 @@ export default withAppLayout(
 
         const cancel = () => {
             setPending(null);
+            // router.reload({ only: ['collection', 'children'] });
+            router.reload();
         };
 
         return (
@@ -316,7 +320,8 @@ export default withAppLayout(
                                 onSubmit={onSelect}
                                 propositions={searchPropositionsState}
                                 loading={fetching}
-                                count={collection.meta.total}
+                                // count={collection.meta.total}
+                                count={allItems.length}
                                 query={q ?? ''}
                             />
                         </div>
@@ -410,12 +415,6 @@ export default withAppLayout(
                             />
                         </div>
 
-
-                        {collection.meta && collection.meta.current_page < collection.meta.last_page && (
-                            <div className="w-full h-50 flex items-center justify-center mt-4">
-                                <Loader2Icon size={50} className="animate-spin text-main-purple dark:text-main-green" />
-                            </div>
-                        )}
                     </div>
                 )}
             </div>

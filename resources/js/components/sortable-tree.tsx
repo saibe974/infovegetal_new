@@ -135,10 +135,11 @@ function Row<T extends Record<string, any>>({
 }
 
 export default function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
+    console.log(props);
     const { idKey, parentKey, depthKey } = useKeys(props);
 
     const maxDepth = props.maxDepth ?? 3;
-    const insideDelayMs = props.insideDelayMs ?? 500;
+    const insideDelayMs = props.insideDelayMs ?? 750;
     const edgeRatio = props.edgeRatio ?? 0.25;
     const expandOnInside = props.expandOnInside ?? true;
 
@@ -262,26 +263,28 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     };
 
     const onDragOver = (e: DragOverEvent) => {
+        const { active, over } = e;
+
         // const over = e.over;
-        // const oid = (over?.id as Id) ?? null;
+        const oid = (over?.id as Id) ?? null;
         // console.log('Drag over id:', oid);
 
-        // setOverId(oid);
+        setOverId(oid);
 
-        // if (!oid || !over) {
-        //     setDropIntent(null);
-        //     clearInsideTimer();
-        //     return;
-        // }
+        if (!oid || !over) {
+            // setDropIntent(null);
+            clearInsideTimer();
+            return;
+        }
 
         // // Position du centre de l'élément dragué par rapport au survolé
-        // const activeRect = e.active.rect.current.translated ?? e.active.rect.current.initial;
+        const activeRect = e.active.rect.current.translated ?? e.active.rect.current.initial;
 
-        // if (!activeRect || !over.rect) {
-        //     setDropIntent({ type: 'between', overId: oid, where: 'before' });
-        //     clearInsideTimer();
-        //     return;
-        // }
+        if (!activeRect || !over.rect) {
+            // setDropIntent({ type: 'between', overId: oid, where: 'before' });
+            clearInsideTimer();
+            return;
+        }
 
         // const activeCenterY = activeRect.top + activeRect.height / 2;
         // const top = over.rect.top;
@@ -313,12 +316,12 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         // console.log('➡️ Setting intent: CENTER (will become inside after delay)');
         // setDropIntent({ type: 'between', overId: oid, where: 'after' });
 
-        // clearInsideTimer();
-        // insideTimerRef.current = window.setTimeout(() => {
-        //     console.log('✨ Inside intent triggered for', oid);
-        //     setDropIntent({ type: 'inside', overId: oid });
-        //     if (expandOnInside) void toggleExpand(oid);
-        // }, insideDelayMs) as unknown as number;
+        clearInsideTimer();
+        insideTimerRef.current = window.setTimeout(() => {
+            //     console.log('✨ Inside intent triggered for', oid);
+            setDropIntent({ type: 'inside', overId: oid });
+            if (expandOnInside) void toggleExpand(oid);
+        }, insideDelayMs) as unknown as number;
     };
 
 
