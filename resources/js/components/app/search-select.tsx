@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, ReactNode } from "react";
+import { useState, useRef, useEffect, ReactNode, ReactElement, cloneElement, isValidElement } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,12 @@ export default function SearchSelect({
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
     const [openFilters, setOpenFilters] = useState(false);
+    const hasFilters = Boolean(filters);
+    const renderedFilters = hasFilters && isValidElement(filters)
+        ? cloneElement(filters as ReactElement<{ closeFilters?: () => void }>, {
+            closeFilters: () => setOpenFilters(false),
+        })
+        : filters;
 
     const toOptions = (arr?: (string | Option)[]) =>
         (arr ?? []).map((s) => (typeof s === "string" ? { value: s, label: s } : s));
@@ -166,7 +172,7 @@ export default function SearchSelect({
             >
 
 
-                {filters && (
+                {hasFilters && (
                     <button
                         type="button"
                         onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setOpenFilters((v) => !v); }}
@@ -202,12 +208,12 @@ export default function SearchSelect({
                         const v = e.target.value;
                         onChange(v);
                         setOpen(true);
-                        if (filters && v && v.trim() !== '') {
+                        if (hasFilters && v && v.trim() !== '') {
                             setOpenFilters(false);
                         }
                     }}
                     onFocus={() => {
-                        if (filters && (!value || value.trim() === '') && selected.length === 0) {
+                        if (hasFilters && (!value || value.trim() === '') && selected.length === 0) {
                             setOpenFilters(true);
                         }
                     }}
@@ -293,7 +299,7 @@ export default function SearchSelect({
                 )
             }
 
-            {openFilters && filters &&
+            {openFilters && renderedFilters &&
                 <div
                     ref={filtersRef}
                     onMouseDown={(e) => {
@@ -310,7 +316,7 @@ export default function SearchSelect({
                         >
                             <X size={16} />
                         </Button>
-                        {filters}
+                        {renderedFilters}
                     </div>
 
                 </div>

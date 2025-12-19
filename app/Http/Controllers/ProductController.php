@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\FormProductRequest;
+use App\Http\Resources\CategoryProductsResource;
 use App\Http\Resources\ProductResource;
+use App\Models\CategoryProducts;
 use App\Models\Product;
 use App\Services\ProductImportService;
 use Illuminate\Http\Request;
@@ -26,6 +28,26 @@ class ProductController extends Controller
     {
         $query = Product::with(['category','tags'])->orderFromRequest($request);
         $search = $request->get('q');
+
+        $activeInput = $request->get('active');
+        $activeFilter = null;
+
+        if ($activeInput !== null && $activeInput !== '') {
+            $activeFilter = match (strtolower((string) $activeInput)) {
+                '1', 'true', 'yes', 'on', 'active' => true,
+                '0', 'false', 'no', 'off', 'inactive' => false,
+                default => null,
+            };
+
+            if ($activeFilter !== null) {
+                $query->where('active', $activeFilter);
+            }
+        }
+
+        $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
+        if ($categoryId) {
+            $query->where('category_products_id', $categoryId);
+        }
 
         if ($search) {
             $normalized = trim($search);
@@ -52,6 +74,16 @@ class ProductController extends Controller
             'collection' => Inertia::scroll(fn() => ProductResource::collection(
                 $query->paginate(12)
             )),
+            'filters' => [
+                'active' => $activeFilter,
+                'category' => $categoryId,
+            ],
+            'categories' => CategoryProductsResource::collection(
+                CategoryProducts::query()
+                    ->defaultOrder()
+                    ->withDepth()
+                    ->get(['id', 'name', 'parent_id', 'lft', 'rgt'])
+            )->resolve(),
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
 

@@ -1,7 +1,7 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { useEffect, useRef, useState } from 'react';
-import { SharedData, type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
+import { SharedData, type BreadcrumbItem, Product, PaginatedCollection, type ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
@@ -27,16 +27,33 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+type FiltersState = {
+    active: 'all' | 'active' | 'inactive';
+    category: number | null;
+};
+
+type RawFilters = {
+    active: boolean | null;
+    category: number | null;
+};
+
 type Props = {
     collection: PaginatedCollection<Product>;
     q: string | null;
+    filters?: RawFilters;
+    categories?: ProductCategory[];
 };
+
+const normalizeFilters = (raw?: RawFilters): FiltersState => ({
+    active: raw?.active === true ? 'active' : raw?.active === false ? 'inactive' : 'all',
+    category: raw?.category ?? null,
+});
 
 
 export default withAppLayout(breadcrumbs, (props: any) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [] }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -53,11 +70,47 @@ export default withAppLayout(breadcrumbs, (props: any) => {
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
+    const [filtersState, setFiltersState] = useState<FiltersState>(() => normalizeFilters(incomingFilters));
+
+    useEffect(() => {
+        setFiltersState(normalizeFilters(incomingFilters));
+    }, [incomingFilters?.active, incomingFilters?.category]);
+
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
         const views = JSON.parse(localStorage.getItem('views') || '{}');
         return views.products === 'grid' ? 'grid' : 'table';
     });
+
+    const buildQueryParams = (nextFilters: FiltersState, searchOverride: string | null = q ?? '') => {
+        const params: Record<string, any> = {};
+        const qValue = (searchOverride ?? '').trim();
+
+        if (qValue.length > 0) {
+            params.q = qValue;
+        }
+
+        if (nextFilters.active === 'active') {
+            params.active = 1;
+        } else if (nextFilters.active === 'inactive') {
+            params.active = 0;
+        }
+
+        if (nextFilters.category) {
+            params.category = nextFilters.category;
+        }
+
+        return params;
+    };
+
+    const applyFilters = (next: FiltersState) => {
+        setFiltersState(next);
+        router.get(window.location.pathname, buildQueryParams(next), {
+            preserveState: false,
+            replace: true,
+            preserveScroll: false,
+        });
+    };
 
     // Contrôle "voir plus": devient false en bas de page ou si dernière page
     // const [seeMore, setSeeMore] = useState(true);
@@ -105,10 +158,12 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         const trimmed = (mysearch ?? '').trim();
         // If explicit clear requested, remove q from URL instead of setting q=""
         if (options?.force && trimmed.length === 0) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('q');
-            router.visit(url.toString(), { replace: true });
             setSearch('');
+            router.get(window.location.pathname, buildQueryParams(filtersState, null), {
+                preserveState: false,
+                replace: true,
+                preserveScroll: false,
+            });
             return;
         }
 
@@ -119,7 +174,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
         setSearch('');
         // Validation: navigation complète pour réactualiser la page
-        router.get(window.location.pathname, { q: trimmed }, {
+        router.get(window.location.pathname, buildQueryParams(filtersState, trimmed), {
             preserveState: false,
             replace: true,
             preserveScroll: false,
@@ -151,7 +206,14 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                         loading={fetching}
                         count={collection.meta.total}
                         query={q ?? ''}
-                        filters={<ProductsFilters />}
+                        filters={(
+                            <ProductsFilters
+                                categories={categories}
+                                active={filtersState.active}
+                                categoryId={filtersState.category}
+                                onApply={applyFilters}
+                            />
+                        )}
                     />
                 </div>
 
