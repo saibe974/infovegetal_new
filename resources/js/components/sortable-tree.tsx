@@ -135,7 +135,7 @@ function Row<T extends Record<string, any>>({
 }
 
 export default function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
-    console.log(props);
+    // console.log(props);
     const { idKey, parentKey, depthKey } = useKeys(props);
 
     const maxDepth = props.maxDepth ?? 3;

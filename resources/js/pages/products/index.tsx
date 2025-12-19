@@ -37,7 +37,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
 }, ({ collection, q }: Props) => {
-    console.log(collection)
+    // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;

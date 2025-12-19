@@ -216,23 +216,57 @@ class CategoryProductsController extends Controller
                 }
             }
 
+            // Vérifier qu'on n'a pas d'imbrication circulaire
+            $rows->each(function ($r) use ($rows) {
+                $parentId = $r['parent_id'];
+                $visitedIds = new \SplFixedArray(1000);
+                $visitedCount = 0;
+                
+                while ($parentId !== null) {
+                    if ($visitedCount > 0 && in_array($parentId, array_slice((array)$visitedIds, 0, $visitedCount))) {
+                        abort(422, 'Circular parent reference detected.');
+                    }
+                    $visitedIds[$visitedCount++] = $parentId;
+                    
+                    $parent = $rows->firstWhere('id', $parentId);
+                    $parentId = $parent ? $parent['parent_id'] : null;
+                    
+                    if ($visitedCount > 100) break;
+                }
+            });
+
             $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
 
+            // Approach: delete all nodes and rebuild the tree from scratch
+            // This avoids any nested set corruption
+            $allIds = $rows->pluck('id')->toArray();
+            $allNodes = \App\Models\CategoryProducts::whereIn('id', $allIds)->get();
+            
+            // Detach all nodes from the tree first
+            foreach ($allNodes as $node) {
+                $node->parent_id = null;
+                $node->save();
+            }
+            
+            // Now rebuild the tree
             $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
                 $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
                 $prev = null;
 
                 foreach ($children as $r) {
                     $node = \App\Models\CategoryProducts::findOrFail($r['id']);
+                    $node->refresh();
 
                     if ($parentId === null) {
                         $node->saveAsRoot();
                     } else {
                         $parent = \App\Models\CategoryProducts::findOrFail($parentId);
+                        $parent->refresh();
                         $node->appendToNode($parent)->save();
                     }
 
                     if ($prev) {
+                        $prev->refresh();
                         $node->afterNode($prev)->save();
                     }
 

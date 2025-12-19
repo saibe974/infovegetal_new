@@ -192,11 +192,13 @@ export default withAppLayout(
                                         <EditIcon size={16} />
                                     </Link>
                                 </Button>
-                                <Button asChild size="icon" variant="destructive-outline">
-                                    <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
-                                        <TrashIcon size={16} />
-                                    </Link>
-                                </Button>
+                                {item.id !== 1 && (
+                                    <Button asChild size="icon" variant="destructive-outline">
+                                        <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
+                                            <TrashIcon size={16} />
+                                        </Link>
+                                    </Button>
+                                )}
                             </>
                         )}
                     </div>
