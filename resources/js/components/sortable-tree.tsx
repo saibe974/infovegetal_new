@@ -436,7 +436,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             }
         }
 
-        console.log('📦 Final order:', remaining.map(x => getId(x)));
+        // console.log('📦 Final order:', remaining.map(x => getId(x)));
 
         const next = remaining;
         setItems(next);
