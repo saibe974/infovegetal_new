@@ -84,6 +84,7 @@ export default withAppLayout(breadcrumbs, false, ({ collection, }: Props) => {
                 {/* <ProductsCardsList limit={4} products={popularProducts} /> */}
                 <ProductsCarousel products={popularProducts} />
             </div>
+
             <ServicesSection active={true} />
 
         </div>

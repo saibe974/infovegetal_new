@@ -18,6 +18,7 @@ import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMe
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import BasicSticky from 'react-sticky-el';
 import { useSidebar } from '@/components/ui/sidebar';
+import { ProductsFilters } from '../products/products-filters';
 
 
 export function AppSidebarHeader({
@@ -138,6 +139,14 @@ export function AppSidebarHeader({
                             count={collection?.meta.total ?? 0}
                             query={''}
                             search={true}
+                            filters={(
+                                <ProductsFilters
+                                    categories={[]}
+                                    active={'all'}
+                                    categoryId={1}
+                                    onApply={() => { }}
+                                />
+                            )}
                         />
                     </div>
                 )}
