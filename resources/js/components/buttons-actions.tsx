@@ -11,6 +11,7 @@ type Props = {
     cancel?: () => void;
     add?: () => void;
     saving?: boolean;
+    className?: string;
 };
 
 export function ButtonsActions({
@@ -20,11 +21,12 @@ export function ButtonsActions({
     cancel: onCancel,
     add: onAdd,
     saving,
+    className,
 }: Props) {
     const { t } = useI18n();
 
     return (
-        <div className="flex items-center gap-2 justify-between ml-auto">
+        <div className={`flex items-center gap-2 justify-between ml-auto ${className}`}>
             {onCancel &&
                 <Button onClick={onCancel} variant={'destructive-outline'} title={t('Cancel')} disabled={saving} size={'icon'}>
                     <RotateCcw size={10} />

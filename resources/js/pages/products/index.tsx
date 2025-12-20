@@ -77,6 +77,16 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         setFiltersState(normalizeFilters(incomingFilters));
     }, [incomingFilters?.active, incomingFilters?.category]);
 
+    const getCategoryName = (categoryId: number | null) => {
+        const category = categories.find((cat) => cat.id === categoryId);
+        return category ? category.name : null;
+    }
+
+    const filtersActive = [
+        filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
+        filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
+    ].filter(Boolean) as { name: string; label: string }[];
+
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
         const views = JSON.parse(localStorage.getItem('views') || '{}');
@@ -113,23 +123,22 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         });
     };
 
-    // Contrôle "voir plus": devient false en bas de page ou si dernière page
-    // const [seeMore, setSeeMore] = useState(true);
-    // useEffect(() => {
-    //     const onScroll = () => {
-    //         const threshold = 200;
-    //         const scrolled = window.scrollY + window.innerHeight;
-    //         const total = document.documentElement.scrollHeight;
-    //         const isNearBottom = scrolled >= total - threshold;
-    //         if (isNearBottom || collection.meta.current_page >= collection.meta.last_page) {
-    //             setSeeMore(false);
-    //         }
-    //     };
-    //     onScroll();
-    //     window.addEventListener('scroll', onScroll, { passive: true });
-    //     return () => window.removeEventListener('scroll', onScroll);
-    // }, [collection.meta.current_page, collection.meta.last_page]);
+    const removeFilter = (key: 'active' | 'category') => {
+        const nextFilters = { ...filtersState };
+        if (key === 'active') {
+            nextFilters.active = 'all';
+        } else if (key === 'category') {
+            nextFilters.category = null;
+        }
+        applyFilters(nextFilters);
+    }
 
+    const clearAllFilters = () => {
+        applyFilters({
+            active: 'all',
+            category: null,
+        });
+    }
 
     // Local state for client-fetched propositions to avoid Inertia refresh
     const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
@@ -184,7 +193,6 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         // console.log("selected:", trimmed);
     };
 
-    // console.log(collection);
     const uniqueCount = Array.from(new Set(collection.data.map((p: Product) => p.id))).length;
 
     return (
@@ -215,26 +223,15 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                                 onApply={applyFilters}
                             />
                         )}
+                        filtersActive={filtersActive}
+                        removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
+                        // clearAllFilters={clearAllFilters}
                     />
                 </div>
 
                 {canImportExport && (
-                    // <div className="ml-auto flex items-center gap-2">
-                    //     <CsvUploadFilePond
-                    //         title='Upload CSV'
-                    //         description='Uploadez un fichier CSV'
-                    //         uploadUrl='/upload'
-                    //         importProcessUrl={products.admin.import.process.url()}
-                    //         importProcessChunkUrl={products.admin.import.process_chunk.url()}
-                    //         importCancelUrl={products.admin.import.cancel.url()}
-                    //         importProgressUrl={(id) => products.admin.import.progress.url({ id })}
-                    //         postTreatmentComponent={ProductsImportTreatment}
-                    //         successRedirectUrl={products.index().url}
-                    //         buttonLabel=''
-                    //     />
-                    //     <DownloadCsvButton />
-                    // </div>
                     <ButtonsActions
+                        className='hidden md:block'
                         import={
                             <CsvUploadFilePond
                                 title='Upload CSV'
@@ -300,12 +297,4 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
     )
 })
-
-function DownloadCsvButton() {
-    return (
-        <a href="/admin/products/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm" title='Export CSV'>
-            <UploadIcon />
-        </a>
-    );
-}
 

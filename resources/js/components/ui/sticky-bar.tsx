@@ -35,7 +35,7 @@ export function StickyBar({
             const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
             const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
             // je ne sais pas d'où vient ce 30px (et 16 si écran moins large), mais sans ça la largeur est trop grande
-            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - 30);
+            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - (window.innerWidth < 1024 ? 16 : 30));
         }
 
         const update = () => {
@@ -64,7 +64,7 @@ export function StickyBar({
         <BasicSticky
             topOffset={-topOffset}
             stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
-            wrapperClassName={`relative z-${zIndex} ${className} w-full`}
+            wrapperClassName={`relative z-${zIndex} ${className}`}
             stickyStyle={{ top: topOffset, ...(width && { width }) }}
         >
             <div className={`z-${zIndex} flex items-center relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>

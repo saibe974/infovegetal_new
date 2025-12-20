@@ -4,6 +4,7 @@ import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalI
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
+import Heading from "../heading";
 
 interface SearchBarProps {
     value: string;
@@ -19,6 +20,8 @@ interface SearchBarProps {
     filters?: ReactNode,
     search?: boolean,
     selection?: (string | Option)[]
+    filtersActive?: { name: string; label: string }[];
+    removeFilter?: (filterName: string) => void;
 }
 
 interface Option {
@@ -37,7 +40,9 @@ export default function SearchSelect({
     placeholder,
     filters = undefined,
     search = true,
-    selection = undefined
+    selection = undefined,
+    filtersActive = undefined,
+    removeFilter = undefined,
 }: SearchBarProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
@@ -83,9 +88,18 @@ export default function SearchSelect({
         if (newSelected.length === 0) {
             onSubmit('', { force: true });
         }
+
     };
 
+    // console.log(filtersActive)
+
     const handleClear = () => {
+        // if (filtersActive && filtersActive.length > 0) {
+        //     filtersActive.forEach((filter) => {
+        //         // console.log(filter)
+        //         removeFilter?.(filter.name, 'all');
+        //     });
+        // }
         setSelected([]);
         onChange("");
         onSubmit("", { force: true });
@@ -103,6 +117,13 @@ export default function SearchSelect({
             e.preventDefault();
             const last = selected[selected.length - 1];
             handleRemove(last.value);
+            return;
+        }
+
+        if (e.key === "Backspace" && value === "" && selected.length === 0 && filtersActive && filtersActive.length > 0) {
+            e.preventDefault();
+            const lastFilter = filtersActive[filtersActive.length - 1];
+            removeFilter?.(lastFilter.name);
             return;
         }
 
@@ -160,6 +181,7 @@ export default function SearchSelect({
         onSubmit(next);
     }, [selected]);
 
+
     return (
         <div className="relative w-full">
 
@@ -175,14 +197,31 @@ export default function SearchSelect({
                 {hasFilters && (
                     <button
                         type="button"
-                        onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setOpenFilters((v) => !v); }}
-                        onClick={(e) => { e.stopPropagation(); }}
+                        onMouseDown={(e) => { setOpenFilters((v) => !v); }}
+                        // onClick={(e) => { e.stopPropagation(); }}
                         className="text-muted-foreground hover:text-foreground px-1"
                         title="Filters"
                     >
                         <SlidersHorizontalIcon size={16} />
                     </button>
                 )}
+
+                {filtersActive?.map((filter) => (
+                    <span
+                        key={filter.name}
+                        className="flex items-center gap-1 bg-main-green dark:bg-main-green text-black text-sm px-2 py-0.5 rounded-xl"
+                    >
+                        {filter.label}
+                        <X
+                            size={14}
+                            className="cursor-pointer hover:text-destructive"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                removeFilter?.(filter.name);
+                            }}
+                        />
+                    </span>
+                ))}
 
                 {selected.map((opt) => (
                     <span
@@ -201,6 +240,8 @@ export default function SearchSelect({
                     </span>
                 ))}
 
+
+
                 <input
                     ref={inputRef}
                     value={value}
@@ -208,29 +249,47 @@ export default function SearchSelect({
                         const v = e.target.value;
                         onChange(v);
                         setOpen(true);
-                        if (hasFilters && v && v.trim() !== '') {
-                            setOpenFilters(false);
-                        }
+                        // if (hasFilters && v && v.trim() !== '') {
+                        //     setOpenFilters(false);
+                        // }
                     }}
-                    onFocus={() => {
-                        if (hasFilters && (!value || value.trim() === '') && selected.length === 0) {
+                    onFocus={(e) => {
+                        if (hasFilters) {
                             setOpenFilters(true);
+                        }
+                        if (e.target.value.trim().length >= 3) {
+                            setOpen(true);
                         }
                     }}
                     onBlur={() => {
-                        // Delay to allow clicks inside filters to set flag first
+                        // Délai pour permettre aux interactions avec le panneau (Select, boutons) de se terminer
                         setTimeout(() => {
-                            // if (lastMouseDownInsideRef.current) {
-                            //     // click started inside filters, keep open
-                            //     lastMouseDownInsideRef.current = false;
-                            //     return;
-                            // }
+                            // Si mouseDown a commencé dans le panneau, ne pas fermer
+                            if (lastMouseDownInsideRef.current) {
+                                lastMouseDownInsideRef.current = false;
+                                return;
+                            }
+                            
                             const active = document.activeElement as Element | null;
+                            
+                            // Vérifier si le focus est toujours dans le panneau de filtres
                             if (filtersRef.current && active && filtersRef.current.contains(active)) {
                                 return;
                             }
+                            
+                            // Vérifier si le focus est dans un Select portal (radix-ui portals)
+                            if (active && active.closest('[role="listbox"]')) {
+                                return;
+                            }
+                            
+                            // Vérifier si le focus est dans un autre portal radix
+                            if (active && active.closest('[data-radix-popper-content-wrapper]')) {
+                                return;
+                            }
+                            
                             setOpenFilters(false);
-                        }, 0);
+                            setOpen(false);
+                        }, 150);
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder ?? t('Search...')}
@@ -238,7 +297,7 @@ export default function SearchSelect({
                 />
 
                 {/* Bouton clear */}
-                {(selected.length > 0 || value) && (
+                {((filtersActive && filtersActive.length > 0) || selected.length > 0 || value) && (
                     <button
                         type="button"
                         onClick={handleClear}
@@ -267,60 +326,68 @@ export default function SearchSelect({
                 )}
             </div>
 
-            {/* propositions */}
-            {
-                open && value.length >= 3 && (
-                    <div className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50">
-                        {loading ? (
-                            <div className="flex justify-center items-center py-2 text-muted-foreground">
-                                <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
-                            </div>
-                        ) : list.length > 0 ? (
-                            list.map((name: string, i: number) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handleSelect(name)}
-                                    className={cn(
-                                        "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
-                                        highlightedIndex === i
-                                            ? "bg-accent text-accent-foreground"
-                                            : "hover:bg-accent/60 hover:text-accent-foreground"
-                                    )}
-                                >
-                                    {name}
-                                </button>
-                            ))
-                        ) : (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">
-                                {t('No results.')}
-                            </div>
-                        )}
-                    </div>
-                )
-            }
-
-            {openFilters && renderedFilters &&
+            {/* Panneau combiné filtres + propositions */}
+            {(openFilters || (open && value.length >= 3)) && (
                 <div
                     ref={filtersRef}
                     onMouseDown={(e) => {
                         e.stopPropagation();
-                        // Mark that the mousedown started inside filters so blur handler keeps it open
                         lastMouseDownInsideRef.current = true;
                     }}
-
-                    className="absolute top-full left-0 w-full mt-1 border bg-popover rounded-md shadow-lg z-50 h-100 overflow-y-scroll"
+                    className="absolute top-full left-0 w-full mt-1 py-4 px-2 border bg-popover rounded-md shadow-lg z-50 overflow-hidden"
                 >
-                    <div className="flex justify-center items-center py-2 text-muted-foreground w-full h-full relative">
-                        <Button variant="ghost" size="sm" className="absolute top-2 right-2"
-                            onClick={() => setOpenFilters(false)}
-                        >
-                            <X size={16} />
-                        </Button>
-                        {renderedFilters}
-                    </div>
+                    <div className={cn(
+                        "flex",
+                        open && value.length >= 3 ? "flex-row" : "flex-col"
+                    )}>
 
+                        {/* Propositions */}
+                        {open && value.length >= 3 && (
+                            <div className={cn(
+                                "px-4",
+                                openFilters && renderedFilters ? "w-1/2 border-r border-r-accent" : "w-full"
+                            )}>
+                                <Heading title={t('Propositions')} />
+                                {loading ? (
+                                    <div className="flex justify-center items-center py-2 text-muted-foreground">
+                                        <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
+                                    </div>
+                                ) : list.length > 0 ? (
+                                    list.map((name: string, i: number) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleSelect(name)}
+                                            className={cn(
+                                                "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
+                                                highlightedIndex === i
+                                                    ? "bg-accent text-accent-foreground"
+                                                    : "hover:bg-accent/60 hover:text-accent-foreground"
+                                            )}
+                                        >
+                                            {name}
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                                        {t('No results.')}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Filtres */}
+                        {openFilters && renderedFilters && (
+                            <div className={cn(
+                                "px-4",
+                                open && value.length >= 3 ? "w-1/2" : "w-full"
+                            )}>
+                                <Heading title={t('Filters')} />
+                                {renderedFilters}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            }
+            )}
         </div >
     );
 }

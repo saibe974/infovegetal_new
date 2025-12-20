@@ -316,7 +316,7 @@ export default withAppLayout(
             <div>
                 <StickyBar className="mb-4">
                     <div className="flex items-center py-2 relative w-full">
-                        <div className="w-200 left-0 top-1 z-100 mr-2">
+                        <div className="w-full left-0 top-1 z-100 mr-2">
                             <SearchSelect
                                 value={search}
                                 onChange={handleSearch}
