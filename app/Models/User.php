@@ -10,11 +10,12 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 use Kalnoy\Nestedset\NodeTrait;
+use Lab404\Impersonate\Models\Impersonate;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles, NodeTrait;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles, NodeTrait, Impersonate;
 
     /**
      * The attributes that are mass assignable.
@@ -58,5 +59,23 @@ class User extends Authenticatable
     public function files(): HasMany
     {
         return $this->hasMany(File::class);
+    }
+
+    /**
+     * Détermine si l'utilisateur peut impersonner d'autres utilisateurs.
+     * Seuls les admins peuvent impersonner.
+     */
+    public function canImpersonate(): bool
+    {
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Détermine si l'utilisateur peut être impersonné.
+     * Les admins ne peuvent pas être impersonés par sécurité.
+     */
+    public function canBeImpersonated(): bool
+    {
+        return !$this->hasRole('admin');
     }
 }

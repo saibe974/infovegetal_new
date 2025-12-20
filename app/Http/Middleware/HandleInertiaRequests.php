@@ -56,6 +56,7 @@ class HandleInertiaRequests extends Middleware
 
         $user = $request->user();
         $userArray = null;
+        $impersonatorId = null;
 
         if ($user) {
             $user->loadMissing(['roles', 'permissions']);
@@ -71,7 +72,15 @@ class HandleInertiaRequests extends Middleware
                 ->map(fn ($role) => $role->only(['id', 'name']))
                 ->values();
             $userArray['permissions'] = $allPermissions;
+            
+            // Utiliser le service du package laravel-impersonate
+            if ($user->isImpersonated()) {
+                $impersonatorId = app('impersonate')->getImpersonatorId();
+            }
         }
+
+        // Get list of users for impersonation dropdown
+        $users = \App\Models\User::select('id', 'name', 'email')->get();
 
         return [
             ...parent::share($request),
@@ -81,7 +90,9 @@ class HandleInertiaRequests extends Middleware
             // 'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $user ? $userArray : null,
+                'impersonate_from' => $impersonatorId,
             ],
+            'users' => $users,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

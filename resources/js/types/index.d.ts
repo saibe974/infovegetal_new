@@ -79,12 +79,14 @@ export interface NavItemExtended extends NavItem {
 
 export interface Auth {
     user?: User | null;
+    impersonate_from?: number | null;
 }
 
 export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
+    users?: User[];
     sidebarOpen: boolean;
     flash: {
         success?: string;

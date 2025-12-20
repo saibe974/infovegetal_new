@@ -5,24 +5,40 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/users/user-info';
+import { ImpersonateSelect } from '@/components/users/impersonate-select';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
-import { type User } from '@/types';
-import { Link, router } from '@inertiajs/react';
-import { LogOut, Settings } from 'lucide-react';
+import { type User, type SharedData } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
+import { LogOut, Settings, UserCheck } from 'lucide-react';
+import { isAdmin } from '@/lib/roles';
+import { useState } from 'react';
 
 interface UserMenuContentProps {
     user: User;
+    users?: User[];
 }
 
-export function UserMenuContent({ user }: UserMenuContentProps) {
+export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
+    const { auth } = usePage<SharedData>().props;
+    const [showImpersonate, setShowImpersonate] = useState(false);
+    const isCurrentUserAdmin = isAdmin(auth.user);
 
     const handleLogout = () => {
         cleanup();
         router.flushAll();
     };
+
+    const handleStopImpersonate = () => {
+        cleanup();
+        router.post('/admin/impersonate/stop', {
+            preserveState: false,
+        });
+    };
+
+    const isImpersonating = !!auth.impersonate_from;
 
     return (
         <>
@@ -32,6 +48,40 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {isCurrentUserAdmin && (
+                <>
+                    {showImpersonate ? (
+                        <ImpersonateSelect
+                            users={users}
+                            onClose={() => setShowImpersonate(false)}
+                        />
+                    ) : (
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem
+                                onClick={() => setShowImpersonate(true)}
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                }}
+                            >
+                                <UserCheck className="mr-2 size-4" />
+                                Impersonate user
+                            </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                    )}
+                    <DropdownMenuSeparator />
+                </>
+            )}
+            {isImpersonating && (
+                <>
+                    <DropdownMenuGroup>
+                        <DropdownMenuItem onClick={handleStopImpersonate}>
+                            <UserCheck className="mr-2 size-4" />
+                            Stop impersonating
+                        </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                </>
+            )}
             <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
                     <Link
@@ -62,3 +112,5 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
         </>
     );
 }
+
+

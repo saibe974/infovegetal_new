@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/app/app-sidebar';
 import { AppSidebarHeader } from '@/components/app/app-sidebar-header';
 import { RightSidebar } from '@/components/app/right-sidebar';
 import { CartSidebarHeader } from '@/components/cart/cart-sidebar-header';
+import { ImpersonationBanner } from '@/components/users/impersonation-banner';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { type BreadcrumbItem } from '@/types';
 import { type PropsWithChildren } from 'react';
@@ -17,6 +18,7 @@ export default function AppSidebarLayout({
             <AppShell variant="sidebar">
                 <AppSidebar />
                 <AppContent variant="sidebar" className="overflow-x-hidden pt-14">
+                    <ImpersonationBanner />
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
                     {children}
                 </AppContent>
@@ -33,3 +35,4 @@ export default function AppSidebarLayout({
         </>
     );
 }
+

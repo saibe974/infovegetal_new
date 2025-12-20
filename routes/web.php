@@ -78,6 +78,12 @@ Route::middleware(['role:admin'])->group(function () {
     Route::post('users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
+    
+    // Routes d'impersonation du package laravel-impersonate
+    Route::get('/impersonate/take/{id}/{guardName?}',
+        '\Lab404\Impersonate\Controllers\ImpersonateController@take')->name('impersonate');
+    Route::get('/impersonate/leave',
+        '\Lab404\Impersonate\Controllers\ImpersonateController@leave')->name('impersonate.leave');
 });
 
 Route::get('/csrf-refresh', function () {
