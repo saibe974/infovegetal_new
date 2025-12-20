@@ -1,6 +1,6 @@
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,215 +26,441 @@ import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { UploadIcon, EditIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
-import users from '@/routes/users';
+import usersRoutes from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
+import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
+import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Users management',
-        href: users.index().url,
+        href: usersRoutes.index().url,
     },
 ];
 
 interface UsersPageProps {
     users: User[];
     roles: Array<{ id: number; name: string }>;
+    q?: string | null;
 }
 
 
 
-export default withAppLayout(breadcrumbs, true, ({ users, roles }: UsersPageProps) => {
+export default withAppLayout(
+    breadcrumbs,
+    true,
+    ({ users, roles, q }: UsersPageProps) => {
 
-    // console.log(users)
-    const { t } = useI18n();
+        // console.log(users)
+        const { t } = useI18n();
+        type TreeUser = User & { depth: number; parent_id: number | null };
+        const [pending, setPending] = useState<TreeUser[] | null>(null);
+        const [saving, setSaving] = useState(false);
 
-    const { auth, locale } = usePage<SharedData>().props;
-    const user = auth?.user;
-    const isAuthenticated = !!user;
-    const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
-    const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
-    const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
-    const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
-    const canPreview = isDev(user) || hasPermission(user, 'preview');
+        const { auth, locale } = usePage<SharedData>().props;
+        const user = auth?.user;
+        const isAuthenticated = !!user;
+        const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
+        const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
+        const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+        const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
+        const canPreview = isDev(user) || hasPermission(user, 'preview');
 
 
-    const breadcrumbs: BreadcrumbItem[] = [
-        {
-            title: t('Users management'),
-            href: '/users',
-        },
-    ];
+        const breadcrumbs: BreadcrumbItem[] = [
+            {
+                title: t('Users management'),
+                href: '/users',
+            },
+        ];
 
-    // Vérifier que l'utilisateur est admin
-    if (!isAdmin(auth.user)) {
-        return (
-            <AppLayout breadcrumbs={breadcrumbs}>
-                <Head title={t('Users management')} />
-                <SettingsLayout>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('Access denied')}</CardTitle>
-                            <CardDescription>
-                                {t('You do not have permission to access this page')}
-                            </CardDescription>
-                        </CardHeader>
-                    </Card>
-                </SettingsLayout>
-            </AppLayout>
-        );
-    }
+        // Vérifier que l'utilisateur est admin
+        if (!isAdmin(auth.user)) {
+            return (
+                <AppLayout breadcrumbs={breadcrumbs}>
+                    <Head title={t('Users management')} />
+                    <SettingsLayout>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('Access denied')}</CardTitle>
+                                <CardDescription>
+                                    {t('You do not have permission to access this page')}
+                                </CardDescription>
+                            </CardHeader>
+                        </Card>
+                    </SettingsLayout>
+                </AppLayout>
+            );
+        }
 
-    const canEdit = isAdmin(user) || hasPermission(user, 'edit users');
-    const canDelete = isAdmin(user) || hasPermission(user, 'delete users');
-    const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users');
+        const canEdit = isAdmin(user) || hasPermission(user, 'edit users');
+        const canDelete = isAdmin(user) || hasPermission(user, 'delete users');
+        const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users');
 
-    const page = usePage<{ searchPropositions?: string[] }>();
-    const searchPropositions = page.props.searchPropositions ?? [];
-    // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [fetching, setFetching] = useState(false);
-    const [search, setSearch] = useState('');
+        const page = usePage<{ searchPropositions?: string[] }>();
+        const searchPropositions = page.props.searchPropositions ?? [];
+        // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
+        const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+        const [fetching, setFetching] = useState(false);
+        const [search, setSearch] = useState('');
 
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
-        if (typeof window === 'undefined') return 'table';
-        const views = JSON.parse(localStorage.getItem('views') || '{}');
-        return views.users === 'grid' ? 'grid' : 'table';
-    });
+        const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+            if (typeof window === 'undefined') return 'table';
+            const views = JSON.parse(localStorage.getItem('views') || '{}');
+            return views.users === 'grid' ? 'grid' : 'table';
+        });
 
-    const handleSearch = (s: string) => {
-        setSearch(s);
+        const handleSearch = (s: string) => {
+            setSearch(s);
+            // @ts-ignore
+            clearTimeout(timerRef.current);
+            router.cancelAll();
+            if (s.length < 2) {
+                return;
+            }
+            setFetching(true);
+            timerRef.current = setTimeout(() => {
+                router.reload({
+                    only: ['searchPropositions'],
+                    data: { q: s },
+                    onSuccess: () => setFetching(false),
+                    // preserveState: true,
+                })
+            }, 300)
+        }
+
         // @ts-ignore
-        clearTimeout(timerRef.current);
-        router.cancelAll();
-        if (s.length < 2) {
-            return;
-        }
-        setFetching(true);
-        timerRef.current = setTimeout(() => {
-            router.reload({
-                only: ['searchPropositions'],
-                data: { q: s },
-                onSuccess: () => setFetching(false),
-                // preserveState: true,
-            })
-        }, 300)
-    }
+        const onSelect = (mysearch: string, options?: { force?: boolean }) => {
+            const trimmed = (mysearch ?? '').trim();
+            // If explicit clear requested, remove q from URL instead of setting q=""
+            if (options?.force && trimmed.length === 0) {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('q');
+                router.visit(url.toString(), { replace: true });
+                setSearch('');
+                return;
+            }
 
-    // @ts-ignore
-    const onSelect = (mysearch: string, options?: { force?: boolean }) => {
-        const trimmed = (mysearch ?? '').trim();
-        // If explicit clear requested, remove q from URL instead of setting q=""
-        if (options?.force && trimmed.length === 0) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('q');
-            router.visit(url.toString(), { replace: true });
+            // Otherwise ignore empty submissions
+            if (trimmed.length === 0) {
+                return;
+            }
+
             setSearch('');
-            return;
-        }
+            router.reload({
+                data: { q: trimmed },
+            })
 
-        // Otherwise ignore empty submissions
-        if (trimmed.length === 0) {
-            return;
-        }
-
-        setSearch('');
-        router.reload({
-            data: { q: trimmed },
-        })
-
-        // console.log("selected:", trimmed);
-    };
+            // console.log("selected:", trimmed);
+        };
 
 
-    const handleRoleChange = (userId: number, roleName: string) => {
-        // setUpdating(userId);
-        // router.post(
-        //     `/settings/users/${userId}/role`,
-        //     { role: roleName },
-        //     {
-        //         preserveScroll: true,
-        //         onFinish: () => setUpdating(null),
-        //     }
-        // );
-    };
+        const handleRoleChange = (userId: number, roleName: string) => {
+            // setUpdating(userId);
+            // router.post(
+            //     `/settings/users/${userId}/role`,
+            //     { role: roleName },
+            //     {
+            //         preserveScroll: true,
+            //         onFinish: () => setUpdating(null),
+            //     }
+            // );
+        };
 
-    return (
-        <div>
-            <Head title="Users" />
-            <StickyBar
-                zIndex={20}
-                borderBottom={false}
-                className='mb-4'
-            >
-                <ViewModeToggle
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    pageKey="users"
-                />
-                <div className="w-200 left-0 top-1 mr-2">
-                    <SearchSelect
-                        value={search}
-                        onChange={handleSearch}
-                        onSubmit={onSelect}
-                        propositions={searchPropositions}
-                        loading={fetching}
-                    />
+        // Construire une liste plate pour le SortableTree avec calcul de depth basé sur parent_id
+        const allItems = useMemo<TreeUser[]>(() => {
+            const safeUsers = Array.isArray(users) ? users : [];
+
+            // Créer un map id -> user pour accès rapide
+            const userMap = new Map<number, any>();
+            const usersWithParent = safeUsers
+                .filter((u: any) => u && typeof u.id === 'number')
+                .map((u: any) => ({
+                    ...u,
+                    parent_id: (u as any).parent_id ?? null,
+                }));
+
+            usersWithParent.forEach(u => userMap.set(u.id, u));
+
+            // Calculer le depth pour chaque user en parcourant la chaîne parent
+            return usersWithParent.map((u: any) => {
+                let depth = 0;
+                let parentId = u.parent_id;
+                const visited = new Set<number>();
+
+                while (parentId !== null && !visited.has(parentId)) {
+                    visited.add(parentId);
+                    const parent = userMap.get(parentId);
+                    if (!parent) break;
+                    depth++;
+                    parentId = parent.parent_id ?? null;
+                }
+
+                return {
+                    ...u,
+                    depth,
+                };
+            });
+        }, [users]);
+
+        const hasChanges = useMemo(() => {
+            if (!pending) return false;
+            const a = pending.map(i => i.id);
+            const b = allItems.map(i => i.id);
+            return JSON.stringify(a) !== JSON.stringify(b) ||
+                JSON.stringify(pending.map(i => i.parent_id ?? null)) !== JSON.stringify(allItems.map(i => i.parent_id ?? null));
+        }, [pending, allItems]);
+
+        const loadChildren = async (): Promise<TreeUser[]> => {
+            // Pas de hiérarchie utilisateur à charger côté client pour l'instant
+            return [];
+        };
+
+        const handleTreeChange = (items: TreeUser[], reason?: 'drag' | 'expand' | 'collapse') => {
+            if (reason === 'expand' || reason === 'collapse') return;
+            if (reason === 'drag') setPending(items);
+        };
+
+        const save = async () => {
+            if (!pending) return;
+
+            setSaving(true);
+            try {
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+                const payload = (() => {
+                    const items = pending.map((i: any) => ({
+                        id: i.id,
+                        parent_id: i.parent_id ?? null,
+                        position: 0,
+                    }));
+
+                    const posByParent = new Map<number | null, number>();
+                    for (const it of items) {
+                        const pid = it.parent_id;
+                        const pos = posByParent.get(pid) ?? 0;
+                        it.position = pos;
+                        posByParent.set(pid, pos + 1);
+                    }
+
+                    return { items };
+                })();
+
+                const reorderUrl = '/admin/users/reorder';
+                const res = await fetch(reorderUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+
+                toast.success(t('Hierarchy saved successfully'));
+                setPending(null);
+            } catch (e) {
+                console.error(e);
+                toast.error(t('Error while saving'));
+            } finally {
+                setSaving(false);
+            }
+        };
+
+        const cancel = () => {
+            setPending(null);
+            router.reload();
+        };
+
+        // Rendu personnalisé de chaque item
+        const renderItem = (props: RenderItemProps<User>) => {
+            const {
+                item,
+                depth,
+                isExpanded,
+                toggleExpand,
+                isDragging,
+                insertLine, // 'before' | 'after' | null
+                isInsideTarget, // true = intention “inside”
+                isOver, // survol (optionnel pour un léger highlight)
+                setNodeRef,
+                attributes,
+                listeners,
+            } = props;
+
+            const hasValidId = !!item && typeof (item as any).id === 'number' && Number.isFinite((item as any).id);
+            const displayName = (item as any)?.name ?? '(sans nom)';
+
+            return (
+                <div
+                    ref={setNodeRef}
+                    className={[
+                        'relative flex items-center gap-2 px-3 py-2 text-sm',
+                        'border-b border-border/30 transition-colors',
+                        !isDragging ? 'hover:bg-slate-700/30 dark:hover:bg-slate-700/30' : '',
+                        isOver ? 'bg-muted/20' : '',
+                        isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
+                        isDragging ? 'opacity-50' : '',
+                    ].join(' ')}
+                    style={{
+                        marginLeft: depth * 24,
+                    }}
+                >
+                    {!isDragging && (
+                        <button
+                            type="button"
+                            onClick={toggleExpand}
+                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                    )}
+
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
+                        aria-label="Drag"
+                    >
+                        <GripVertical size={14} />
+                    </div>
+
+                    <span className="truncate font-medium flex-1">{displayName}</span>
+
+                    {/* <div className="flex gap-2 justify-end flex-shrink-0">
+                    {hasValidId && !isDragging && (
+                        <>
+                            <Button asChild size="icon" variant="outline">
+                                <Link href={categoryProducts.edit((item as any).id)}>
+                                    <EditIcon size={16} />
+                                </Link>
+                            </Button>
+                            {item.id !== 1 && (
+                                <Button asChild size="icon" variant="destructive-outline">
+                                    <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
+                                        <TrashIcon size={16} />
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
+                    )}
+                </div> */}
                 </div>
+            );
+        };
 
-                {canImportExport && (
-                    <div className="ml-auto flex items-center gap-2">
-                        <CsvUploadFilePond
-                            title="Upload CSV"
-                            description="Uploadez un fichier CSV"
-                            uploadUrl="/upload"
-                            successRedirectUrl={products.index().url}
-                            buttonLabel=""
-                        />
-                        <DownloadCsvButton />
-                    </div>
-                )}
-            </StickyBar>
-
-            {/* <InfiniteScroll data="collection"> */}
+        return (
             <div>
-                {viewMode === 'table' ? (
-                    <UsersTable
-                        users={users}
-                        roles={roles}
-                        auth={auth}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canPreview={canPreview}
+                <Head title="Users" />
+                <StickyBar
+                    zIndex={20}
+                    borderBottom={false}
+                    className='mb-4'
+                >
+                    <ViewModeToggle
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        pageKey="users"
                     />
-                ) : (
-                    <div>
-                        <UsersCardsList
-                            users={users}
-                            roles={roles}
-                            auth={auth}
-                            canEdit={canEdit}
-                            canDelete={canDelete}
-                            canChangeRole={canPreview}
+                    <div className="w-200 left-0 top-1 mr-2">
+                        <SearchSelect
+                            value={search}
+                            onChange={handleSearch}
+                            onSubmit={onSelect}
+                            propositions={searchPropositions}
+                            loading={fetching}
                         />
                     </div>
-                    // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
+
+                    {canImportExport && (
+                        <div className="ml-auto flex items-center gap-2">
+                            <CsvUploadFilePond
+                                title="Upload CSV"
+                                description="Uploadez un fichier CSV"
+                                uploadUrl="/upload"
+                                successRedirectUrl={products.index().url}
+                                buttonLabel=""
+                            />
+                            <DownloadCsvButton />
+                        </div>
+                    )}
+
+                    {hasChanges && (
+                        <div className="ml-2 flex items-center gap-2">
+                            <Button variant="destructive" onClick={cancel} disabled={saving} title={t('Cancel changes')}>
+                                <RotateCcw size={20} />
+                            </Button>
+                            <Button onClick={save} disabled={saving}>
+                                {saving ? (
+                                    <>
+                                        <Loader2Icon size={20} className="animate-spin" /> {t('Saving...')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <SaveIcon size={20} /> {t('Save')}
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+                </StickyBar>
+                {q ? (
+                    <div>
+                        {viewMode === 'table' ? (
+                            <UsersTable
+                                users={users}
+                                roles={roles}
+                                auth={auth}
+                                canEdit={canEdit}
+                                canDelete={canDelete}
+                                canPreview={canPreview}
+                            />
+                        ) : (
+                            <div>
+                                <UsersCardsList
+                                    users={users}
+                                    roles={roles}
+                                    auth={auth}
+                                    canEdit={canEdit}
+                                    canDelete={canDelete}
+                                    canChangeRole={canPreview}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="border rounded-md overflow-hidden">
+                            <SortableTree
+                                items={allItems}
+                                idKey="id"
+                                parentKey="parent_id"
+                                depthKey="depth"
+                                loadChildren={loadChildren}
+                                onChange={handleTreeChange}
+                                renderItem={renderItem}
+                            />
+                        </div>
+                    </div>
                 )}
-                {/* </InfiniteScroll> */}
+
             </div>
-        </div>
 
-    );
+        );
 
-})
+    })
 
 
 function DownloadCsvButton() {

@@ -77,6 +77,7 @@ Route::middleware(['role:admin'])->group(function () {
     Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
     Route::post('users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
+    Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
 });
 
 Route::get('/csrf-refresh', function () {
