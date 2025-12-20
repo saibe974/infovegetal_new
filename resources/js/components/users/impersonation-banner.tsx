@@ -19,9 +19,8 @@ export function ImpersonationBanner() {
 
     const handleStopImpersonate = () => {
         // Utiliser la route du package laravel-impersonate (GET)
-        router.visit('/impersonate/leave', {
-            preserveState: false,
-        });
+        // Actualiser la page après le leave pour restaurer l'authentification
+        window.location.href = '/impersonate/leave';
     };
 
     return (

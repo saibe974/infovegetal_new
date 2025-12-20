@@ -33,9 +33,8 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
 
     const handleStopImpersonate = () => {
         cleanup();
-        router.post('/admin/impersonate/stop', {
-            preserveState: false,
-        });
+        // Utiliser la route du package laravel-impersonate
+        window.location.href = '/impersonate/leave';
     };
 
     const isImpersonating = !!auth.impersonate_from;

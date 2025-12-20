@@ -208,7 +208,9 @@ export default function SearchSelect({
                         const v = e.target.value;
                         onChange(v);
                         setOpen(true);
-                        if (hasFilters && v && v.trim() !== '') {
+                        // Keep filters open for short queries (<=2 chars) so
+                        // the initial list remains visible while typing.
+                        if (hasFilters && v && v.trim() !== '' && v.trim().length >= 3) {
                             setOpenFilters(false);
                         }
                     }}
