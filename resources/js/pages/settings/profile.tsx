@@ -1,5 +1,5 @@
 import { send } from '@/routes/verification';
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
 
@@ -20,9 +20,12 @@ import { isAdmin } from '@/lib/roles';
 export default function Profile({
     mustVerifyEmail,
     status,
+    editingUser,
 }: {
     mustVerifyEmail: boolean;
     status?: string;
+    // Optional user being edited (when an admin edits another user)
+    editingUser?: User;
 }) {
     const { auth, locale } = usePage<SharedData>().props as SharedData & { locale?: string };
     const { t } = useI18n();
@@ -33,6 +36,8 @@ export default function Profile({
             href: edit().url,
         },
     ];
+
+    const targetUser = editingUser ?? auth.user;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -46,7 +51,9 @@ export default function Profile({
                     />
 
                     <Form
-                        {...update.form()}
+                        // If editing another user, POST to admin update route, otherwise use current profile update
+                        action={editingUser ? `/admin/users/${targetUser?.id}` : undefined}
+                        method={editingUser ? 'post' : undefined}
                         options={{
                             preserveScroll: true,
                         }}
@@ -54,13 +61,16 @@ export default function Profile({
                     >
                         {({ processing, recentlySuccessful, errors }) => (
                             <>
+                                {/* When editing another user, spoof PUT for RESTful update */}
+                                {editingUser && <input type="hidden" name="_method" value="PUT" />}
+
                                 <div className="grid gap-2">
                                     <Label htmlFor="name">{t('Name')}</Label>
 
                                     <Input
                                         id="name"
                                         className="mt-1 block w-full"
-                                        defaultValue={auth.user?.name || ''}
+                                        defaultValue={(targetUser as any)?.name || ''}
                                         name="name"
                                         required
                                         autoComplete="name"
@@ -80,7 +90,7 @@ export default function Profile({
                                         id="email"
                                         type="email"
                                         className="mt-1 block w-full"
-                                        defaultValue={auth.user?.email || ''}
+                                        defaultValue={(targetUser as any)?.email || ''}
                                         name="email"
                                         required
                                         autoComplete="username"
@@ -94,56 +104,59 @@ export default function Profile({
                                 </div>
 
                                 {/* Section Rôles */}
-                                {auth.user?.roles && auth.user.roles.length > 0 && (
+                                {targetUser?.roles && targetUser.roles.length > 0 && (
                                     <div className="grid gap-2">
                                         <Label>{t('Roles')}</Label>
                                         <div className="flex flex-wrap gap-2">
-                                            {auth.user.roles.map((role) => (
+                                            {targetUser.roles.map((role) => (
                                                 <Badge key={role.id} variant="secondary">
                                                     {role.name}
                                                 </Badge>
                                             ))}
                                         </div>
                                         <p className="text-sm text-muted-foreground">
-                                            {t('Your current roles in the system')}
+                                            {t('Current roles in the system')}
                                         </p>
                                     </div>
                                 )}
 
-                                {/* Section Permissions (admin uniquement) */}
-                                {isAdmin(auth.user) && auth.user?.permissions && auth.user.permissions.length > 0 && (
+                                {/* Section Permissions (affiché si l'éditeur est admin) */}
+                                {isAdmin(auth.user) && targetUser?.permissions && targetUser.permissions.length > 0 && (
                                     <div className="grid gap-2">
                                         <Label>{t('Permissions')}</Label>
                                         <div className="flex flex-wrap gap-2">
-                                            {auth.user.permissions.map((permission) => (
+                                            {targetUser.permissions.map((permission) => (
                                                 <Badge key={permission.id} variant="outline" className="text-xs">
                                                     {permission.name}
                                                 </Badge>
                                             ))}
                                         </div>
                                         <p className="text-sm text-muted-foreground">
-                                            {t('Your permissions as administrator')}
+                                            {t('Permissions for this user')}
                                         </p>
                                     </div>
                                 )}
 
                                 {mustVerifyEmail &&
-                                    auth.user?.email_verified_at === null && (
+                                    (targetUser as any)?.email_verified_at === null && (
                                         <div>
                                             <p className="-mt-4 text-sm text-muted-foreground">
-                                                {t('Your email address is unverified.')}{' '}
-                                                <Link
-                                                    href={send()}
-                                                    as="button"
-                                                    className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                                >
-                                                    {t('Click here to resend the verification email.')}
-                                                </Link>
+                                                {t('The user email address is unverified.')}{' '}
+                                                {/* Only allow resend for own profile */}
+                                                {!editingUser && (
+                                                    <Link
+                                                        href={send()}
+                                                        as="button"
+                                                        className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                                    >
+                                                        {t('Click here to resend the verification email.')}
+                                                    </Link>
+                                                )}
                                             </p>
 
                                             {status ===
                                                 'verification-link-sent' && (
-                                                    <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to your email address.')}</div>
+                                                    <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
                                                 )}
                                         </div>
                                     )}

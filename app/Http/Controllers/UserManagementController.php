@@ -12,6 +12,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 class UserManagementController extends Controller
 {
@@ -34,10 +35,20 @@ class UserManagementController extends Controller
         ]);
     }
 
-    public function edit(User $user)
+    public function edit(Request $request, User $user): Response
     {
-        return Inertia::render('users/form', [
-            'user' => $user,
+        // Autorisation: seul l'utilisateur lui-même ou un admin peut éditer
+        if ($request->user()->id !== $user->id && !$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        return Inertia::render('settings/profile', [
+            // Indiquer si la cible supporte la vérification d'email
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
+            'status' => $request->session()->get('status'),
+            // Fournir l'utilisateur à éditer (peut être différent de l'utilisateur connecté)
+            'editingUser' => $user,
+            'isEditingOther' => $request->user()->id !== $user->id,
         ]);
     }
 

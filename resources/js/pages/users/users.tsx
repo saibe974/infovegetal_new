@@ -177,6 +177,18 @@ export default withAppLayout(
             // );
         };
 
+        const handleEdit = (userId: number) => {
+            router.visit(`/admin/users/${userId}/edit`);
+        };
+
+        const handleDelete = (userId: number) => {
+            if (confirm(t('Are you sure?'))) {
+                router.visit(`/admin/users/${userId}/destroy`, {
+                    method: 'delete',
+                });
+            }
+        };
+
         // Construire une liste plate pour le SortableTree avec calcul de depth basé sur parent_id
         const allItems = useMemo<TreeUser[]>(() => {
             const safeUsers = Array.isArray(users) ? users : [];
@@ -340,24 +352,36 @@ export default withAppLayout(
 
                     <span className="truncate font-medium flex-1">{displayName}</span>
 
-                    {/* <div className="flex gap-2 justify-end flex-shrink-0">
-                    {hasValidId && !isDragging && (
-                        <>
-                            <Button asChild size="icon" variant="outline">
-                                <Link href={categoryProducts.edit((item as any).id)}>
-                                    <EditIcon size={16} />
-                                </Link>
-                            </Button>
-                            {item.id !== 1 && (
-                                <Button asChild size="icon" variant="destructive-outline">
-                                    <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
+                    <div className="flex gap-2 justify-end flex-shrink-0">
+                        {hasValidId && !isDragging && (
+                            <>
+                                {canEdit && (
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            handleEdit((item as any).id);
+                                        }}
+                                    >
+                                        <EditIcon size={16} />
+                                    </Button>
+                                )}
+                                {canDelete && (
+                                    <Button
+                                        size="icon"
+                                        variant="destructive-outline"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            handleDelete((item as any).id);
+                                        }}
+                                    >
                                         <TrashIcon size={16} />
-                                    </Link>
-                                </Button>
-                            )}
-                        </>
-                    )}
-                </div> */}
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
             );
         };
@@ -407,6 +431,7 @@ export default withAppLayout(
                                 />
                             }
                             export={"/admin/users/export"}
+                            add={() => { }}
                         />
 
                     )}

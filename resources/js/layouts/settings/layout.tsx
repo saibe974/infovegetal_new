@@ -6,7 +6,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
-import { type NavItem, type SharedData } from '@/types';
+import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { isAdmin } from '@/lib/roles';
@@ -35,7 +35,8 @@ const sidebarNavItems: NavItem[] = [
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
-    const { auth } = usePage<SharedData>().props;
+    const pageProps = usePage<SharedData & { editingUser?: User }>().props;
+    const { auth, editingUser } = pageProps;
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
@@ -44,22 +45,35 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     const currentPath = window.location.pathname;
 
-    // Ajouter le lien "Users" si l'utilisateur est admin
+    // Ajout de lien si l'utilisateur est admin
     const navItems = [...sidebarNavItems];
     if (isAdmin(auth.user)) {
         navItems.push({
-            title: 'Users',
-            href: '/settings/users',
+            title: 'Database access',
+            href: '#',
             icon: null,
         });
+
+        // navItems.push({
+        //     title: 'Margin settings',
+        //     href: '#',
+        //     icon: null,
+        // });
     }
 
     return (
         <div className="px-4 py-6">
             <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
+                title={editingUser ? editingUser.name : 'Settings'}
+                description={editingUser ? `Manage settings for ${editingUser.name}` : 'Manage your profile and account settings'}
             />
+
+            {/* {editingUser && (
+                <div className="mt-2 flex items-center gap-2">
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">{`Editing user`}</span>
+                    <span className="text-sm text-muted-foreground">{editingUser.email}</span>
+                </div>
+            )} */}
 
             <div className="flex flex-col lg:flex-row lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
