@@ -60,6 +60,8 @@ export function StickyBar({
         };
     }, []);
 
+    // console.log(topOffset)
+
     return (
         <BasicSticky
             topOffset={-topOffset}

@@ -4,10 +4,10 @@ import categoryProducts from '@/routes/category-products';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link, InfiniteScroll, usePage, router } from '@inertiajs/react';
+import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, LoaderIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
@@ -118,7 +118,11 @@ export default withAppLayout(
         }, [pending, allItems]);
 
         // Lazy-load des enfants quand on expand
+        const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
+
+        // Modifier loadChildren pour tracker l'état
         const loadChildren = async (item: ProductCategory): Promise<ProductCategory[]> => {
+            setLoadingItems(prev => new Set(prev).add(item.id));
             try {
                 const res = await fetch(`/category-products/children?parent_id=${item.id}`);
                 const data = await res.json();
@@ -126,6 +130,12 @@ export default withAppLayout(
             } catch (e) {
                 console.error('Failed to load children:', e);
                 return [];
+            } finally {
+                setLoadingItems(prev => {
+                    const next = new Set(prev);
+                    next.delete(item.id);
+                    return next;
+                });
             }
         };
 
@@ -147,32 +157,38 @@ export default withAppLayout(
 
             const hasValidId = !!item && typeof (item as any).id === 'number' && Number.isFinite((item as any).id);
             const displayName = (item as any)?.name ?? '(sans nom)';
-
+            // Le serveur retourne déjà has_children
+            const hasChildren = (item as any).has_children === true;
             return (
                 <div
                     ref={setNodeRef}
                     className={[
                         'relative flex items-center gap-2 px-3 py-2 text-sm',
                         'border-b border-border/30 transition-colors',
-                        !isDragging ? 'hover:bg-slate-700/30 dark:hover:bg-slate-700/30' : '',
+                        !isDragging ? 'hover:bg-muted/50' : '',
                         isOver ? 'bg-muted/20' : '',
                         isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
                         isDragging ? 'opacity-50' : '',
+                        item.id === 1 ? 'bg-muted' : '',
                     ].join(' ')}
                     style={{
                         marginLeft: depth * 24,
                     }}
                 >
-                    {!isDragging && (
-                        <button
-                            type="button"
-                            onClick={toggleExpand}
-                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
-                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                        >
-                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                    )}
+                    <div className='h-6 w-6'>
+                        {!isDragging && hasChildren && (
+                            <button
+                                type="button"
+                                onClick={toggleExpand}
+                                className="h-full w-full flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
+                                aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                            >
+                                {
+                                    isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                                }
+                            </button>
+                        )}
+                    </div>
 
                     <div
                         {...listeners}
@@ -183,7 +199,9 @@ export default withAppLayout(
                         <GripVertical size={14} />
                     </div>
 
-                    <span className="truncate font-medium flex-1">{displayName}</span>
+                    <span className="truncate font-medium flex-1 flex items-center gap-2">
+                        {displayName} {loadingItems.has(item.id) && <Loader2Icon size={15} className='animate-spin' />}
+                    </span>
 
                     <div className="flex gap-2 justify-end flex-shrink-0">
                         {hasValidId && !isDragging && (
@@ -313,30 +331,27 @@ export default withAppLayout(
         };
 
         return (
-            <div>
+            <>
+                <Head title="Categories" />
                 <StickyBar className="mb-4">
-                    <div className="flex items-center py-2 relative w-full">
-                        <div className="w-full left-0 top-1 z-100 mr-2">
-                            <SearchSelect
-                                value={search}
-                                onChange={handleSearch}
-                                onSubmit={onSelect}
-                                propositions={searchPropositionsState}
-                                loading={fetching}
-                                // count={collection.meta.total}
-                                count={allItems.length}
-                                query={q ?? ''}
-                            />
-                        </div>
-                    </div>
+                    <SearchSelect
+                        value={search}
+                        onChange={handleSearch}
+                        onSubmit={onSelect}
+                        propositions={searchPropositionsState}
+                        loading={fetching}
+                        // count={collection.meta.total}
+                        count={allItems.length}
+                        query={q ?? ''}
+                    />
 
                     {/* {hasChanges && ( */}
-                        <ButtonsActions
-                            cancel={hasChanges ? cancel : undefined}
-                            save={hasChanges ? save : undefined}
-                            saving={saving}
-                            add={() => {}}
-                        />
+                    <ButtonsActions
+                        cancel={hasChanges ? cancel : undefined}
+                        save={hasChanges ? save : undefined}
+                        saving={saving}
+                        add={() => { }}
+                    />
                     {/* )} */}
                 </StickyBar>
 
@@ -390,23 +405,23 @@ export default withAppLayout(
                         )}
                     </>
                 ) : (
-                    <div className="space-y-2">
+                    // <div className="">
 
-                        <div className="border rounded-md overflow-hidden">
-                            <SortableTree
-                                items={allItems}
-                                idKey="id"
-                                parentKey="parent_id"
-                                depthKey="depth"
-                                loadChildren={loadChildren}
-                                onChange={handleTreeChange}
-                                renderItem={renderItem}
-                            />
-                        </div>
-
+                    <div className="border rounded-md overflow-hidden">
+                        <SortableTree
+                            items={allItems}
+                            idKey="id"
+                            parentKey="parent_id"
+                            depthKey="depth"
+                            loadChildren={loadChildren}
+                            onChange={handleTreeChange}
+                            renderItem={renderItem}
+                        />
                     </div>
+
+                    // </div>
                 )}
-            </div>
+            </>
         );
     },
 );

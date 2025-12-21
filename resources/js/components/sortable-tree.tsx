@@ -92,6 +92,7 @@ function Row<T extends Record<string, any>>({
     isInsideTarget,
     toggleExpand,
     render,
+    className,
 }: {
     item: T;
     sortableId: Id;
@@ -102,6 +103,7 @@ function Row<T extends Record<string, any>>({
     insertLine: 'before' | 'after' | null;
     isInsideTarget: boolean;
     toggleExpand: () => void;
+    className?: string;
     render: (ctx: RenderItemProps<T>) => React.ReactNode;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId });
@@ -115,7 +117,7 @@ function Row<T extends Record<string, any>>({
     };
 
     return (
-        <div ref={setNodeRef} style={style}>
+        <div ref={setNodeRef} style={style} className={className}>
             {render({
                 item,
                 depth,
@@ -460,7 +462,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             onDragEnd={onDragEnd}
         >
             <SortableContext items={visible.map((x) => getId(x))} strategy={verticalListSortingStrategy}>
-                <div>
+                <div className='bg-card rounded-lg'>
                     {visible.map((it) => {
                         const id = getId(it);
                         const depth = getDepth(it);
@@ -488,6 +490,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                                 isInsideTarget={isInsideTarget}
                                 toggleExpand={() => void toggleExpand(id)}
                                 render={props.renderItem}
+                                
                             />
                         );
                     })}
