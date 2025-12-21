@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -59,6 +60,19 @@ class User extends Authenticatable
     public function files(): HasMany
     {
         return $this->hasMany(File::class);
+    }
+
+    /**
+     * Many-to-many relation to DbProducts via pivot `db_products_users`.
+     */
+    public function dbProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\DbProducts::class,
+            'db_products_users',
+            'user_id',
+            'db_product_id',
+        )->withTimestamps()->withPivot('attributes');
     }
 
     /**

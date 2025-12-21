@@ -11,8 +11,10 @@ use Illuminate\Support\Facades\Gate as FacadesGate;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\DbProducts;
 
 class UserManagementController extends Controller
 {
@@ -47,8 +49,11 @@ class UserManagementController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             // Fournir l'utilisateur à éditer (peut être différent de l'utilisateur connecté)
-            'editingUser' => $user,
+            'editingUser' => $user->load(['roles', 'permissions']),
             'isEditingOther' => $request->user()->id !== $user->id,
+            // Provide lists for roles and permissions to populate selects
+            'allRoles' => Role::all(['id', 'name']),
+            'allPermissions' => Permission::all(['id', 'name']),
         ]);
     }
 
@@ -75,6 +80,64 @@ class UserManagementController extends Controller
         $user->syncRoles([$request->role]);
 
         return back()->with('success', 'User role updated successfully');
+    }
+
+    /**
+     * Update user's basic info, roles and permissions (admin or self limited).
+     */
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        // Only admin or the user itself can update
+        $me = $request->user();
+        if ($me->id !== $user->id && !$me->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $rules = [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['integer', 'exists:roles,id'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['integer', 'exists:permissions,id'],
+        ];
+
+        $validated = $request->validate($rules);
+
+        // Update basic fields
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->save();
+
+        // Roles: only admin can change roles; additionally prevent admin from removing own admin role
+        if (isset($validated['roles'])) {
+            if (!$me->hasRole('admin')) {
+                // non-admin cannot change roles
+                // ignore
+            } else {
+                // If admin is editing themselves, disallow removing own admin role
+                if ($me->id === $user->id) {
+                    // ensure admin role remains
+                    $current = collect($validated['roles']);
+                    $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')->value('id');
+                    if ($adminRole && !$current->contains((int)$adminRole)) {
+                        return back()->with('error', 'You cannot remove your own admin role');
+                    }
+                }
+
+                // sync by role ids
+                $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
+                $user->syncRoles($roleNames);
+            }
+        }
+
+        // Permissions: only admin can change
+        if (isset($validated['permissions']) && $me->hasRole('admin')) {
+            $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
+            $user->syncPermissions($permNames);
+        }
+
+        return back()->with('success', 'User updated successfully');
     }
 
     /**
@@ -159,6 +222,29 @@ class UserManagementController extends Controller
         });
     }
 
+    public function editDb(Request $request, User $user): RedirectResponse
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $request->validate([
+            'db_ids' => ['nullable', 'array'],
+            'db_ids.*' => ['integer', 'exists:db_products,id'],
+        ]);
+
+        $dbIds = $request->input('db_ids', []);
+
+        // Normalize to array of ints
+        $dbIds = is_array($dbIds) ? array_map('intval', $dbIds) : [];
+
+        // Sync the many-to-many pivot
+        $user->dbProducts()->sync($dbIds);
+
+        return back()->with('success', 'User DB association updated successfully');
+    }   
+
     /**
      * Export users as CSV.
      */
@@ -191,5 +277,26 @@ class UserManagementController extends Controller
         };
 
         return new StreamedResponse($callback, 200, $headers);
+    }
+
+    /**
+     * Show the DB association form for a user.
+     */
+    public function db(Request $request, User $user): Response
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
+
+        $selected = $user->dbProducts()->pluck('db_products.id')->toArray();
+
+        return Inertia::render('users/db', [
+            'user' => $user->load(['roles', 'permissions']),
+            'dbProducts' => $dbProducts,
+            'selectedDbId' => $selected,
+        ]);
     }
 }

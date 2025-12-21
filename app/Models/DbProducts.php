@@ -32,5 +32,14 @@ class DbProducts extends Model
         'mergins' => 'array',
     ];
 
+    /**
+     * Inverse many-to-many relation to users via pivot `db_products_users`.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'db_products_users', 'db_product_id', 'user_id')
+            ->withTimestamps()->withPivot('attributes');
+    }
+
     
 }

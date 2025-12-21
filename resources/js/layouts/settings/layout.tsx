@@ -50,7 +50,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     if (isAdmin(auth.user)) {
         navItems.push({
             title: 'Database access',
-            href: '#',
+            href: editingUser ? `/admin/users/${editingUser.id}/db` : '#',
             icon: null,
         });
 

@@ -22,6 +22,8 @@ interface SearchBarProps {
     selection?: (string | Option)[]
     filtersActive?: { name: string; label: string }[];
     removeFilter?: (filterName: string) => void;
+    // Minimum characters required to show propositions (default: 3). Set to 0 to show on focus.
+    minQueryLength?: number;
 }
 
 interface Option {
@@ -43,6 +45,7 @@ export default function SearchSelect({
     selection = undefined,
     filtersActive = undefined,
     removeFilter = undefined,
+    minQueryLength = 3,
 }: SearchBarProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
@@ -67,6 +70,15 @@ export default function SearchSelect({
     const list: string[] = (propositions ?? []) as string[];
     // Track last submitted query to avoid duplicate submit loops
     const lastSubmittedRef = useRef<string | null>(null);
+
+    // Keep internal `selected` in sync when `selection` prop changes (e.g. parent initializes or updates selections)
+    useEffect(() => {
+        const opts = toOptions(selection);
+        setSelected(opts);
+        // Prevent immediate onSubmit triggered by selected-change effect
+        lastSubmittedRef.current = opts.map((s) => s.value).join(" ");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [JSON.stringify(selection || [])]);
 
     const handleSelect = (name: string) => {
         const option = { value: name, label: name };
@@ -251,7 +263,7 @@ export default function SearchSelect({
                         setOpen(true);
                         // Keep filters open for short queries (<=2 chars) so
                         // the initial list remains visible while typing.
-                        if (hasFilters && v && v.trim() !== '' && v.trim().length >= 3) {
+                        if (hasFilters && v && v.trim() !== '' && v.trim().length >= minQueryLength) {
                             setOpenFilters(false);
                         }
                     }}
@@ -259,7 +271,9 @@ export default function SearchSelect({
                         if (hasFilters) {
                             setOpenFilters(true);
                         }
-                        if (e.target.value.trim().length >= 3) {
+                        if (e.target.value.trim().length >= minQueryLength) {
+                            setOpen(true);
+                        } else if (minQueryLength === 0) {
                             setOpen(true);
                         }
                     }}
@@ -329,7 +343,7 @@ export default function SearchSelect({
             </div>
 
             {/* Panneau combiné filtres + propositions */}
-            {(openFilters || (open && value.length >= 3)) && (
+            {(openFilters || (open && value.length >= minQueryLength)) && (
                 <div
                     ref={filtersRef}
                     onMouseDown={(e) => {
@@ -340,11 +354,11 @@ export default function SearchSelect({
                 >
                     <div className={cn(
                         "flex",
-                        open && value.length >= 3 ? "flex-row" : "flex-col"
+                        open && value.length >= minQueryLength ? "flex-row" : "flex-col"
                     )}>
 
                         {/* Propositions */}
-                        {open && value.length >= 3 && (
+                        {open && value.length >= minQueryLength && (
                             <div className={cn(
                                 "px-4",
                                 openFilters && renderedFilters ? "w-1/2 border-r border-r-accent" : "w-full"
@@ -381,7 +395,7 @@ export default function SearchSelect({
                         {openFilters && renderedFilters && (
                             <div className={cn(
                                 "px-4",
-                                open && value.length >= 3 ? "w-1/2" : "w-full"
+                                open && value.length >= minQueryLength ? "w-1/2" : "w-full"
                             )}>
                                 <Heading title={t('Filters')} />
                                 {renderedFilters}
