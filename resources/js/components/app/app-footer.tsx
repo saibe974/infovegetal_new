@@ -34,13 +34,13 @@ export function AppFooter({ hideOnInfiniteScroll = false }: AppFooterProps) {
             tel: "+33 06 85 31 86 53",
             email: "bernard.paillot@infovegetal.com"
         },
-        {
-            id: 2,
-            type: "Logistique",
-            name: "Godfried Bernaert",
-            tel: "0032 475 46 18 75",
-            email: "godfried@adriaenssens-dierickx.be"
-        },
+        // {
+        //     id: 2,
+        //     type: "Logistique",
+        //     name: "Godfried Bernaert",
+        //     tel: "0032 475 46 18 75",
+        //     email: "godfried@adriaenssens-dierickx.be"
+        // },
         {
             id: 3,
             type: "Conception",

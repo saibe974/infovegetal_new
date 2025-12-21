@@ -37,7 +37,7 @@ export default function Profile({
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Profile settings'),
-            href: edit().url,
+            href: edit((editingUser ?? auth.user)!.id).url,
         },
     ];
 
@@ -130,8 +130,8 @@ export default function Profile({
                                     preserveScroll: true,
                                 });
                             } else {
-                                // settings/profile route uses PATCH
-                                router.patch(update().url, payload, {
+                                // settings/profile route uses PATCH — include target user id
+                                router.patch(update((editingUser ?? auth.user)!.id).url, payload, {
                                     preserveScroll: true,
                                 });
                             }

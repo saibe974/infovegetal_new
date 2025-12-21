@@ -10,54 +10,84 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
 
 class ProfileController extends Controller
 {
     /**
      * Show the user's profile settings page.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, ?User $user = null): Response
     {
+        $target = $user ?? $request->user();
+
+        // Only the user themself or an admin can view/edit
+        if ($request->user()->id !== $target->id && !$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $target instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'editingUser' => $target->loadMissing(['roles', 'permissions']),
+            'allRoles' => \Spatie\Permission\Models\Role::with('permissions:id,name')->get(['id', 'name']),
+            'allPermissions' => \Spatie\Permission\Models\Permission::all(['id', 'name']),
         ]);
     }
 
     /**
      * Update the user's profile settings.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request, ?User $user = null): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $target = $user ?? $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Authorization: only self or admin
+        if ($request->user()->id !== $target->id && !$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
         }
 
-        $request->user()->save();
+        $target->fill($request->validated());
 
-        return to_route('profile.edit');
+        if ($target->isDirty('email')) {
+            $target->email_verified_at = null;
+        }
+
+        $target->save();
+
+        // Redirect back to the same edit page (preserve route name)
+        return to_route('profile.edit', ['user' => $target->id]);
     }
 
     /**
      * Delete the user's account.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, ?User $user = null): RedirectResponse
     {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
+        $target = $user ?? $request->user();
 
-        $user = $request->user();
+        // If deleting own account, require password and log out
+        if ($target->id === $request->user()->id) {
+            $request->validate([
+                'password' => ['required', 'current_password'],
+            ]);
 
-        Auth::logout();
+            Auth::logout();
 
-        $user->delete();
+            $target->delete();
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        return redirect('/');
+            return redirect('/');
+        }
+
+        // Otherwise only admin can delete other users
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $target->delete();
+        return back()->with('success', 'User deleted');
     }
 }

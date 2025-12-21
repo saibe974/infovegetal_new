@@ -11,28 +11,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { isAdmin } from '@/lib/roles';
 
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: edit(),
-        icon: null,
-    },
-    {
-        title: 'Password',
-        href: editPassword(),
-        icon: null,
-    },
-    {
-        title: 'Two-Factor Auth',
-        href: show(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
-];
+// sidebarNavItems are built inside the component to access `auth` for user-specific routes
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
@@ -42,6 +21,29 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     if (typeof window === 'undefined') {
         return null;
     }
+
+    const sidebarNavItems: NavItem[] = [
+        {
+            title: 'Profile',
+            href: edit(auth.user!.id),
+            icon: null,
+        },
+        {
+            title: 'Password',
+            href: editPassword(auth.user!.id),
+            icon: null,
+        },
+        {
+            title: 'Two-Factor Auth',
+            href: show(auth.user!.id),
+            icon: null,
+        },
+        {
+            title: 'Appearance',
+            href: editAppearance(auth.user!.id),
+            icon: null,
+        },
+    ];
 
     const currentPath = window.location.pathname;
 

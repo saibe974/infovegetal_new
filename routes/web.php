@@ -74,14 +74,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Gestion des utilisateurs (admin uniquement)
 Route::middleware(['role:admin'])->group(function () {
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
+
     Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
     Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
     Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->name('users.db');
-    Route::post('users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
+    Route::post('admin/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->name('users.editDb');
     
+
+
     // Route d'impersonation - take (nécessite admin)
     Route::get('/impersonate/take/{id}/{guardName?}',
         '\Lab404\Impersonate\Controllers\ImpersonateController@take')->name('impersonate');
