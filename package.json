@@ -71,6 +71,7 @@
         "react-filepond": "^7.1.3",
         "react-select": "^5.10.2",
         "react-sticky-el": "^2.1.1",
+        "react18-json-view": "^0.2.9",
         "shadcn": "^3.5.0",
         "sonner": "^2.0.7",
         "tailwind-merge": "^3.0.1",

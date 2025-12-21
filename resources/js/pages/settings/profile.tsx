@@ -90,11 +90,6 @@ export default function Profile({
         return Array.from(names);
     }, [allPermissions, inheritedPermissionIds, targetUser?.permissions]);
 
-    // Debugging: log merged propositions in dev only
-    if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.debug('mergedPermissionPropositions', mergedPermissionPropositions, { inheritedPermissionIds, allPermissionsCount: (allPermissions || []).length, targetUserRoles: (targetUser?.roles || []).map((r: any) => r.name) });
-    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>

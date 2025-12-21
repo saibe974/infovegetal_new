@@ -286,17 +286,29 @@ class UserManagementController extends Controller
         $request->validate([
             'db_ids' => ['nullable', 'array'],
             'db_ids.*' => ['integer', 'exists:db_products,id'],
+            'attributes' => ['nullable', 'array'],
         ]);
 
         $dbIds = $request->input('db_ids', []);
+        $attributes = $request->input('attributes', []);
 
-        // Normalize to array of ints
-        $dbIds = is_array($dbIds) ? array_map('intval', $dbIds) : [];
+        // On prépare le tableau pour sync : [db_product_id => ['attributes' => ...], ...]
+        $syncData = [];
+        foreach ($dbIds as $dbId) {
+            $attr = $attributes[$dbId] ?? [];
+            // Si c'est une string JSON (cas rare), on la décode
+            if (is_string($attr)) {
+                $decoded = json_decode($attr, true);
+                $attr = is_array($decoded) ? $decoded : [];
+            }
+            $syncData[$dbId] = [
+                'attributes' => json_encode($attr),
+            ];
+        }
 
-        // Sync the many-to-many pivot
-        $user->dbProducts()->sync($dbIds);
+        $user->dbProducts()->sync($syncData);
 
-        return back()->with('success', 'User DB association updated successfully');
+        return back()->with('success', 'User DB association and attributes updated successfully');
     }   
 
     /**
@@ -345,12 +357,29 @@ class UserManagementController extends Controller
 
         $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
 
-        $selected = $user->dbProducts()->pluck('db_products.id')->toArray();
+        // On charge les pivots pour récupérer les attributs
+        $userWithPivots = $user->load(['dbProducts' => function ($q) {
+            $q->select('db_products.id');
+        }]);
+        $selected = $userWithPivots->dbProducts->pluck('id')->toArray();
+
+        // On prépare les attributs par db_product_id
+        $dbUserAttributes = [];
+        foreach ($userWithPivots->dbProducts as $dbProduct) {
+            $pivot = $dbProduct->pivot;
+            $attrs = [];
+            if ($pivot && $pivot->attributes) {
+                $decoded = json_decode($pivot->attributes, true);
+                if (is_array($decoded)) $attrs = $decoded;
+            }
+            $dbUserAttributes[$dbProduct->id] = $attrs;
+        }
 
         return Inertia::render('users/db', [
             'user' => $user->load(['roles', 'permissions']),
             'dbProducts' => $dbProducts,
             'selectedDbId' => $selected,
+            'dbUserAttributes' => $dbUserAttributes,
         ]);
     }
 }
