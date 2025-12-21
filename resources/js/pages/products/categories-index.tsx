@@ -332,7 +332,7 @@ export default withAppLayout(
 
         return (
             <>
-                <Head title="Categories" />
+                <Head title={t('Categories')} />
                 <StickyBar className="mb-4">
                     <SearchSelect
                         value={search}
