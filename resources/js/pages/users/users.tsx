@@ -39,6 +39,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
 import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
 import { toast } from 'sonner';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -411,32 +412,45 @@ export default withAppLayout(
                     )}
                 </StickyBar>
 
-                {/* <InfiniteScroll data="collection"> */}
-                <div>
-                    {viewMode === 'table' ? (
-                        <UsersTable
-                            users={users}
-                            roles={roles}
-                            auth={auth}
-                            canEdit={canEdit}
-                            canDelete={canDelete}
-                            canPreview={canPreview}
-                        />
-                    ) : (
-                        <div>
-                            <UsersCardsList
+                {q ? (
+                    <div>
+                        {viewMode === 'table' ? (
+                            <UsersTable
                                 users={users}
                                 roles={roles}
                                 auth={auth}
                                 canEdit={canEdit}
                                 canDelete={canDelete}
-                                canChangeRole={canPreview}
+                                canPreview={canPreview}
+                            />
+                        ) : (
+                            <div>
+                                <UsersCardsList
+                                    users={users}
+                                    roles={roles}
+                                    auth={auth}
+                                    canEdit={canEdit}
+                                    canDelete={canDelete}
+                                    canChangeRole={canPreview}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="border rounded-md overflow-hidden">
+                            <SortableTree
+                                items={allItems}
+                                idKey="id"
+                                parentKey="parent_id"
+                                depthKey="depth"
+                                loadChildren={loadChildren}
+                                onChange={handleTreeChange}
+                                renderItem={renderItem}
                             />
                         </div>
-                        // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
-                    )}
-                    {/* </InfiniteScroll> */}
-                </div>
+                    </div>
+                )}
             </div>
 
         );

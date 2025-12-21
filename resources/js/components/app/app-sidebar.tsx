@@ -46,6 +46,7 @@ export function AppSidebar() {
     const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
     const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
     const canPreview = isDev(user) || hasPermission(user, 'preview');
+    const canManageCategories = isAdmin(user) || hasPermission(user, 'manage categories');
 
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
@@ -94,15 +95,18 @@ export function AppSidebar() {
                 title: t('Products'),
                 href: products.index(),
                 icon: Flower2Icon,
-                subItems: [
-                    {
-                        title: t('Categories'),
-                        href: categoryProducts.index(),
-                        icon: FolderTreeIcon,
-                    },
-                ],
+                subItems: []
             },
         ];
+
+        if (canManageCategories) {
+            //@ts-ignore
+            mainNavItems[1].subItems.push({
+                title: t('Categories'),
+                href: categoryProducts.index(),
+                icon: FolderTreeIcon,
+            });
+        }
 
         if (canPreview) {
             //@ts-ignore
