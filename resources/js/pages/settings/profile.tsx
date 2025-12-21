@@ -2,7 +2,7 @@ import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import DeleteUser from '@/components/users/delete-user';
 import HeadingSmall from '@/components/heading-small';
@@ -57,6 +57,44 @@ export default function Profile({
         setSelectedRoleIds((targetUser?.roles ?? []).map((r: any) => r.id));
         setSelectedPermissionIds((targetUser?.permissions ?? []).map((p: any) => p.id));
     }, [targetUser?.id]);
+
+    // Compute inherited permissions from selected roles
+    const inheritedPermissionIds = useMemo(() => {
+        const set = new Set<number>();
+        (selectedRoleIds || []).forEach((rid) => {
+            const role = (allRoles as any[]).find((r) => r.id === rid);
+            if (role && role.permissions) {
+                role.permissions.forEach((p: any) => set.add(p.id));
+            }
+        });
+        return Array.from(set);
+    }, [selectedRoleIds, allRoles]);
+
+    // Permissions to display (union of inherited and explicitly selected)
+    const displayedPermissionIds = useMemo(() => {
+        const set = new Set<number>([...(inheritedPermissionIds || []), ...(selectedPermissionIds || [])]);
+        return Array.from(set);
+    }, [inheritedPermissionIds, selectedPermissionIds]);
+
+    // Merge allPermissions names with inherited permission names so propositions include both
+    const mergedPermissionPropositions = useMemo(() => {
+        const names = new Set<string>();
+        (allPermissions || []).forEach((p: any) => names.add(p.name));
+
+        // ensure inherited permissions from roles are present
+        (inheritedPermissionIds || []).forEach((pid) => {
+            const p = (allPermissions as any[]).find((x) => x.id === pid) || (targetUser?.permissions ?? []).find((x: any) => x.id === pid);
+            if (p) names.add(p.name);
+        });
+
+        return Array.from(names);
+    }, [allPermissions, inheritedPermissionIds, targetUser?.permissions]);
+
+    // Debugging: log merged propositions in dev only
+    if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.debug('mergedPermissionPropositions', mergedPermissionPropositions, { inheritedPermissionIds, allPermissionsCount: (allPermissions || []).length, targetUserRoles: (targetUser?.roles || []).map((r: any) => r.name) });
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -190,7 +228,7 @@ export default function Profile({
                                                 }).filter((v) => v !== null) as number[];
                                                 setSelectedPermissionIds(ids);
                                             }}
-                                            propositions={((allPermissions as any[]) || []).map((p) => p.name)}
+                                            propositions={mergedPermissionPropositions}
                                             selection={(selectedPermissionIds || []).map((id: number) => {
                                                 const p = (allPermissions as any[]).find((x) => x.id === id) || (targetUser?.permissions ?? []).find((x: any) => x.id === id);
                                                 return p ? { value: p.name, label: p.name } : { value: String(id), label: String(id) };
@@ -205,6 +243,21 @@ export default function Profile({
                                         ))}
                                     </div>
                                     <p className="text-sm text-muted-foreground">{t('Permissions for this user')}</p>
+
+                                    {/* Visual summary: badges for inherited vs explicit permissions
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {displayedPermissionIds.map((id) => {
+                                            const perm = (allPermissions as any[]).find((p) => p.id === id) || (targetUser?.permissions ?? []).find((p: any) => p.id === id);
+                                            if (!perm) return null;
+                                            const inherited = (inheritedPermissionIds || []).includes(id);
+                                            const explicit = (selectedPermissionIds || []).includes(id);
+                                            // inherited only -> slightly transparent; explicit -> normal; both -> highlight
+                                            const extraClass = inherited && !explicit ? 'opacity-70' : inherited && explicit ? 'ring-1 ring-accent/40' : '';
+                                            return (
+                                                <Badge key={id} className={`${extraClass}`}>{perm.name}{inherited && !explicit ? ' · inherited' : ''}</Badge>
+                                            );
+                                        })}
+                                    </div> */}
                                 </div>
                             )}
 

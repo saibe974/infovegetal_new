@@ -29,7 +29,7 @@ class UserManagementController extends Controller
         }
 
         $users = User::with(['roles', 'permissions'])->get();
-        $roles = Role::all(['id', 'name']);
+        $roles = Role::with('permissions:id,name')->get(['id', 'name']);
 
         return Inertia::render('users/users', [
             'users' => $users,
@@ -52,7 +52,7 @@ class UserManagementController extends Controller
             'editingUser' => $user->load(['roles', 'permissions']),
             'isEditingOther' => $request->user()->id !== $user->id,
             // Provide lists for roles and permissions to populate selects
-            'allRoles' => Role::all(['id', 'name']),
+            'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),
             'allPermissions' => Permission::all(['id', 'name']),
         ]);
     }
@@ -133,7 +133,30 @@ class UserManagementController extends Controller
 
         // Permissions: only admin can change
         if (isset($validated['permissions']) && $me->hasRole('admin')) {
-            $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
+            // Determine role ids to compute inherited permissions. If roles were provided in this update
+            // use them; otherwise fall back to the user's current roles.
+            $roleIds = [];
+            if (isset($validated['roles'])) {
+                $roleIds = array_map('intval', $validated['roles']);
+            } else {
+                $roleIds = $user->roles()->pluck('id')->map(fn($v) => (int)$v)->toArray();
+            }
+
+            // Permissions inherited from the selected/current roles
+            $inheritedPermissionIds = \Spatie\Permission\Models\Permission::whereHas('roles', function ($q) use ($roleIds) {
+                $q->whereIn('id', $roleIds);
+            })->pluck('id')->map(fn($v) => (int)$v)->toArray();
+
+            // Compute explicit permissions = selected permissions minus inherited ones
+            $selectedPermIds = array_map('intval', $validated['permissions']);
+            $explicitIds = array_values(array_diff($selectedPermIds, $inheritedPermissionIds));
+
+            // Sync only explicit permissions on the model (so model_has_permissions contains only overrides)
+            $permNames = [];
+            if (!empty($explicitIds)) {
+                $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $explicitIds)->pluck('name')->toArray();
+            }
+
             $user->syncPermissions($permNames);
         }
 
