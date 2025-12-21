@@ -385,77 +385,58 @@ export default withAppLayout(
                     </div>
 
                     {canImportExport && (
-                        <div className="ml-auto flex items-center gap-2">
-                            <CsvUploadFilePond
-                                title="Upload CSV"
-                                description="Uploadez un fichier CSV"
-                                uploadUrl="/upload"
-                                successRedirectUrl={products.index().url}
-                                buttonLabel=""
-                            />
-                            <DownloadCsvButton />
-                        </div>
-                    )}
+                        // <div className="ml-auto flex items-center gap-2">
+                        //     <CsvUploadFilePond
+                        //         title="Upload CSV"
+                        //         description="Uploadez un fichier CSV"
+                        //         uploadUrl="/upload"
+                        //         successRedirectUrl={products.index().url}
+                        //         buttonLabel=""
+                        //     />
+                        //     <DownloadCsvButton />
+                        // </div>
+                        <ButtonsActions
+                            import={
+                                <CsvUploadFilePond
+                                    title="Upload CSV"
+                                    description="Uploadez un fichier CSV"
+                                    uploadUrl="/admin/users/import"
+                                    successRedirectUrl={products.index().url}
+                                    buttonLabel=""
+                                />
+                            }
+                            export={"/admin/users/export"}
+                        />
 
-                    {hasChanges && (
-                        <div className="ml-2 flex items-center gap-2">
-                            <Button variant="destructive" onClick={cancel} disabled={saving} title={t('Cancel changes')}>
-                                <RotateCcw size={20} />
-                            </Button>
-                            <Button onClick={save} disabled={saving}>
-                                {saving ? (
-                                    <>
-                                        <Loader2Icon size={20} className="animate-spin" /> {t('Saving...')}
-                                    </>
-                                ) : (
-                                    <>
-                                        <SaveIcon size={20} /> {t('Save')}
-                                    </>
-                                )}
-                            </Button>
-                        </div>
                     )}
                 </StickyBar>
-                {q ? (
-                    <div>
-                        {viewMode === 'table' ? (
-                            <UsersTable
+
+                {/* <InfiniteScroll data="collection"> */}
+                <div>
+                    {viewMode === 'table' ? (
+                        <UsersTable
+                            users={users}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canPreview={canPreview}
+                        />
+                    ) : (
+                        <div>
+                            <UsersCardsList
                                 users={users}
                                 roles={roles}
                                 auth={auth}
                                 canEdit={canEdit}
                                 canDelete={canDelete}
-                                canPreview={canPreview}
-                            />
-                        ) : (
-                            <div>
-                                <UsersCardsList
-                                    users={users}
-                                    roles={roles}
-                                    auth={auth}
-                                    canEdit={canEdit}
-                                    canDelete={canDelete}
-                                    canChangeRole={canPreview}
-                                />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        <div className="border rounded-md overflow-hidden">
-                            <SortableTree
-                                items={allItems}
-                                idKey="id"
-                                parentKey="parent_id"
-                                depthKey="depth"
-                                loadChildren={loadChildren}
-                                onChange={handleTreeChange}
-                                renderItem={renderItem}
+                                canChangeRole={canPreview}
                             />
                         </div>
-                    </div>
-                )}
-
+                        // <UsersCardsList products={collection.data} canEdit={canEdit} canDelete={canDelete} />
+                    )}
+                    {/* </InfiniteScroll> */}
+                </div>
             </div>
 
         );

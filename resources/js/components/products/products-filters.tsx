@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { type ProductCategory } from "@/types";
+import { CheckIcon, XIcon } from "lucide-react";
 
 type FilterActive = 'all' | 'active' | 'inactive';
 
@@ -13,6 +14,7 @@ type ProductsFiltersProps = {
     active: FilterActive;
     categoryId: number | null;
     onApply: (filters: { active: FilterActive; category: number | null }) => void;
+    onFilterAdd?: (filter: { key: string; label: string; value: string }) => void;
     closeFilters?: () => void;
 };
 
@@ -21,6 +23,7 @@ export function ProductsFilters({
     active,
     categoryId,
     onApply,
+    onFilterAdd,
     closeFilters,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
@@ -53,25 +56,12 @@ export function ProductsFilters({
 
     const renderCategoryLabel = (category: ProductCategory) => {
         const depth = category.depth ?? 0;
-        const prefix = depth > 0 ? `${' '.repeat(depth * 2)}- ` : "";
+        const prefix = depth > 0 ? `${' '.repeat(depth * 2)} ` : "";
         return `${prefix}${category.name}`;
     };
 
     return (
-        <div className="w-full space-y-4 px-4 py-3 text-left">
-            <div className="flex items-start justify-between gap-2">
-                <Heading title={t('Filters')} description={t('Refine the products list')} />
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={reset}
-                    disabled={!hasFilters}
-                    className="px-2"
-                >
-                    {t('Clear')}
-                </Button>
-            </div>
-
+        <div className="w-full space-y-4 text-left ">
             <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Status')}</p>
                 <ToggleGroup
@@ -79,17 +69,18 @@ export function ProductsFilters({
                     variant="outline"
                     size="sm"
                     className="w-full"
+                    spacing={2}
                     value={localActive}
                     onValueChange={(val) => setLocalActive((val as FilterActive) || 'all')}
                 >
-                    <ToggleGroupItem value="all" className="flex-1 justify-center">
+                    <ToggleGroupItem value="all" className="flex-1">
                         {t('All')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="active" className="flex-1 justify-center">
-                        {t('Active')}
+                    <ToggleGroupItem value="active" className="flex-1">
+                        <CheckIcon className="w-4 h-4 text-green-600 dark:text-main-green" /> {t('Active')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="inactive" className="flex-1 justify-center">
-                        {t('Inactive')}
+                    <ToggleGroupItem value="inactive" className="flex-1">
+                        <XIcon className="w-4 h-4 text-destructive" /> {t('Inactive')}
                     </ToggleGroupItem>
                 </ToggleGroup>
             </div>

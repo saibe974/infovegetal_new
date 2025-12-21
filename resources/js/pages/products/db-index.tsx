@@ -11,6 +11,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import dbProducts from '@/routes/db-products';
 import { useI18n } from '@/lib/i18n';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -100,14 +101,17 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                     />
                 </div>
 
-                <div className="ml-auto flex items-center gap-2">
+                {/* <div className="ml-auto flex items-center gap-2">
                     <Button asChild size="sm">
                         <Link href={dbProducts.create().url}>
                             <PlusIcon size={16} className="mr-2" />
                             {t('Add Database')}
                         </Link>
                     </Button>
-                </div>
+                </div> */}
+                <ButtonsActions
+                    add={() => { }}
+                />
             </StickyBar>
 
             <InfiniteScroll data="collection">

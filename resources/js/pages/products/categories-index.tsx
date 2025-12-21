@@ -13,6 +13,7 @@ import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
 import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
 import { toast } from 'sonner';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 type Props = {
     collection: PaginatedCollection<ProductCategory>;
@@ -315,7 +316,7 @@ export default withAppLayout(
             <div>
                 <StickyBar className="mb-4">
                     <div className="flex items-center py-2 relative w-full">
-                        <div className="w-200 left-0 top-1 z-100 mr-2">
+                        <div className="w-full left-0 top-1 z-100 mr-2">
                             <SearchSelect
                                 value={search}
                                 onChange={handleSearch}
@@ -329,28 +330,14 @@ export default withAppLayout(
                         </div>
                     </div>
 
-                    {hasChanges && (
-                        <div className=" flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Button variant="destructive" onClick={cancel} disabled={saving} title={t('Cancel changes')}>
-                                    <RotateCcw size={20} />
-                                </Button>
-                                <Button onClick={save} disabled={saving}>
-                                    {saving ?
-                                        <>
-                                            <Loader2Icon size={20} className="animate-spin" /> {t('Saving...')}
-                                        </>
-
-                                        :
-                                        <>
-                                            <SaveIcon size={20} /> {t('Save')}
-                                        </>
-
-                                    }
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                    {/* {hasChanges && ( */}
+                        <ButtonsActions
+                            cancel={hasChanges ? cancel : undefined}
+                            save={hasChanges ? save : undefined}
+                            saving={saving}
+                            add={() => {}}
+                        />
+                    {/* )} */}
                 </StickyBar>
 
                 {q ? (

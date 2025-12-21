@@ -139,14 +139,14 @@ export function AppSidebarHeader({
                             count={collection?.meta.total ?? 0}
                             query={''}
                             search={true}
-                            filters={(
-                                <ProductsFilters
-                                    categories={[]}
-                                    active={'all'}
-                                    categoryId={1}
-                                    onApply={() => { }}
-                                />
-                            )}
+                            // filters={(
+                            //     <ProductsFilters
+                            //         categories={[]}
+                            //         active={'all'}
+                            //         categoryId={1}
+                            //         onApply={() => { }}
+                            //     />
+                            // )}
                         />
                     </div>
                 )}

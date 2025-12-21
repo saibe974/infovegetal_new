@@ -12,6 +12,7 @@ import SearchSelect from '@/components/app/search-select';
 import tagsProducts from '@/routes/tags-products';
 import { useI18n } from '@/lib/i18n';
 import { Badge } from '@/components/ui/badge';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 type Tag = {
     id: number;
@@ -108,14 +109,17 @@ export default withAppLayout(
                         />
                     </div>
 
-                    <div className="ml-auto flex items-center gap-2">
+                    {/* <div className="ml-auto flex items-center gap-2">
                         <Button asChild size="sm">
                             <Link href={tagsProducts.create().url}>
                                 <PlusIcon size={16} className="mr-2" />
                                 {t('Add Tag')}
                             </Link>
                         </Button>
-                    </div>
+                    </div> */}
+                    <ButtonsActions
+                        add={() => {}}
+                    />
                 </StickyBar>
 
                 <InfiniteScroll data="collection">
