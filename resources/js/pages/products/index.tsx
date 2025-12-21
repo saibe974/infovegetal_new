@@ -206,7 +206,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                     onViewModeChange={setViewMode}
                     pageKey="products"
                 />
-                <div className="w-200 flex-1">
+                {/* <div className="w-200 flex-1"> */}
                     <SearchSelect
                         value={search}
                         onChange={handleSearch}
@@ -227,11 +227,11 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                         removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
                         // clearAllFilters={clearAllFilters}
                     />
-                </div>
+                {/* </div> */}
 
                 {canImportExport && (
                     <ButtonsActions
-                        className='hidden md:block'
+                        className='hidden md:flex'
                         import={
                             <CsvUploadFilePond
                                 title='Upload CSV'
