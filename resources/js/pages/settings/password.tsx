@@ -12,16 +12,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit, update } from '@/routes/password';
+import { usePage } from '@inertiajs/react';
 
 export default function Password() {
     const { t } = useI18n();
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Password settings'),
-            href: edit().url,
+            href: edit(auth.user.id).url,
         },
     ];
 
@@ -37,7 +39,7 @@ export default function Password() {
                     />
 
                     <Form
-                        {...update.form()}
+                        {...update.form(auth.user.id)}
                         options={{
                             preserveScroll: true,
                         }}

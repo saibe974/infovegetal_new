@@ -160,7 +160,38 @@ class UserManagementController extends Controller
             $user->syncPermissions($permNames);
         }
 
-        return back()->with('success', 'User updated successfully');
+        // Redirection vers la page d'édition du profil
+        return to_route('users.edit', ['user' => $user->id]);
+
+    }
+
+    /**
+     * Delete the user's account (fusionne ProfileController::destroy).
+     */
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        $me = $request->user();
+        // Seul l'utilisateur lui-même ou un admin peut supprimer
+        if ($me->id !== $user->id && !$me->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Si suppression de son propre compte, demander le mot de passe et déconnecter
+        if ($me->id === $user->id) {
+            $request->validate([
+                'password' => ['required', 'current_password'],
+            ]);
+            \Illuminate\Support\Facades\Auth::logout();
+            $user->delete();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect('/');
+        }
+
+        // Suppression par un admin
+        $user->delete();
+        return to_route('users.index');
+    // ...existing code...
     }
 
     /**

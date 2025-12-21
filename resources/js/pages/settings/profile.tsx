@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import SearchSelect from '@/components/app/search-select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit, update } from '@/routes/profile';
+import { edit, update } from '@/routes/users';
 import { useI18n } from '@/lib/i18n';
 import { isAdmin } from '@/lib/roles';
 

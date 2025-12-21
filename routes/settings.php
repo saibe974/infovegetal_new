@@ -13,10 +13,7 @@ Route::middleware('auth')->group(function () {
         return redirect()->route('profile.edit', ['user' => $request->user()->id]);
     });
 
-    // New profile routes under admin/users/{user}/profile — controller handles authorization (self or admin)
-    Route::get('admin/users/{user}/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('admin/users/{user}/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('admin/users/{user}/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // ...existing code...
 
 
     Route::get('admin/users/{user}/password', function (Request $request, PasswordController $controller) {

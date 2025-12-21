@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editPassword } from '@/routes/password';
-import { edit } from '@/routes/profile';
+import { edit } from '@/routes/users';
 import { show } from '@/routes/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -22,25 +22,26 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         return null;
     }
 
+    const userId = editingUser ? editingUser.id : auth.user!.id;
     const sidebarNavItems: NavItem[] = [
         {
             title: 'Profile',
-            href: edit(auth.user!.id),
+            href: edit(userId),
             icon: null,
         },
         {
             title: 'Password',
-            href: editPassword(auth.user!.id),
+            href: editPassword(userId),
             icon: null,
         },
         {
             title: 'Two-Factor Auth',
-            href: show(auth.user!.id),
+            href: show(userId),
             icon: null,
         },
         {
             title: 'Appearance',
-            href: editAppearance(auth.user!.id),
+            href: editAppearance(userId),
             icon: null,
         },
     ];

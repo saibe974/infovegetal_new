@@ -9,7 +9,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import { disable, enable, show } from '@/routes/two-factor';
 import { type BreadcrumbItem } from '@/types';
-import { Form, Head } from '@inertiajs/react';
+import { usePage, Form, Head } from '@inertiajs/react';
 import { ShieldBan, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,10 +35,11 @@ export default function TwoFactor({
     } = useTwoFactorAuth();
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
 
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Two-Factor Authentication'),
-            href: show.url(),
+            href: show(auth.user.id).url,
         },
     ];
 

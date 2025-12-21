@@ -8,7 +8,7 @@ import { UserInfo } from '@/components/users/user-info';
 import { ImpersonateSelect } from '@/components/users/impersonate-select';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { logout } from '@/routes';
-import { edit } from '@/routes/profile';
+import { edit } from '@/routes/users';
 import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings, UserCheck } from 'lucide-react';
@@ -85,7 +85,7 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full"
-                        href={edit()}
+                        href={edit(user.id)}
                         as="button"
                         prefetch
                         onClick={cleanup}

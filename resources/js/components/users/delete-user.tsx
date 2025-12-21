@@ -53,7 +53,7 @@ export default function DeleteUser() {
                         </DialogDescription>
 
                         <Form
-                            action="/profile"
+                            action="/admin/users/{user}/edit"
                             method="delete"
                             options={{
                                 preserveScroll: true,
