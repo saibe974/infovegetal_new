@@ -87,6 +87,7 @@ function importProducts_peplant($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
+        'db_products_id' => 22, // peplant
     ];
     return $newRow;
 }

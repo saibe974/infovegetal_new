@@ -47,6 +47,9 @@ function importProducts_infovegetal_old($params = array(), $resolve)
         $productCategoryId = 51;
     }
 
+    
+
+
     $newRow = [
         'sku' => $sku,
         'name' => $name,

@@ -20,7 +20,7 @@ class Product extends Model
         'active',
         'attributes',
         'category_products_id',
-        
+        'db_products_id',
     ];
 
     protected $sortable = [
@@ -32,6 +32,7 @@ class Product extends Model
         'created_at',
         'updated_at',
         'category_products_id',
+        'db_products_id',
     ];
 
     protected $casts = [
@@ -43,6 +44,7 @@ class Product extends Model
         'deleted_at' => 'immutable_datetime',
     ];
 
+
     public function category()
     {
         return $this->belongsTo(CategoryProducts::class, 'category_products_id');
@@ -51,6 +53,12 @@ class Product extends Model
     public function tags()
     {
         return $this->belongsToMany(Tag::class)->withTimestamps();
+    }
+
+    // Relation vers la DB associée
+    public function dbProduct()
+    {
+        return $this->belongsTo(\App\Models\DbProducts::class, 'db_products_id');
     }
 
     /**

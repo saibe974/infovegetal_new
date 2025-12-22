@@ -123,6 +123,7 @@ function importProducts_ddk($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
+        'db_products_id' => 23, // ddk
     ];
     return $newRow;
 }

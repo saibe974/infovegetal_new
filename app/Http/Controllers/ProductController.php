@@ -26,11 +26,17 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category','tags'])->orderFromRequest($request);
+        $query = Product::with(['category','tags', 'dbProduct'])->orderFromRequest($request);
         $search = $request->get('q');
 
         $activeInput = $request->get('active');
         $activeFilter = null;
+
+        $user = $request->user();
+        if ($user && !$user->hasRole('admin')) {
+            $allowedDbIds = $user->dbProducts()->pluck('db_products.id')->toArray();
+            $query->whereIn('db_products_id', $allowedDbIds);
+        }
 
         if ($activeInput !== null && $activeInput !== '') {
             $activeFilter = match (strtolower((string) $activeInput)) {
@@ -69,11 +75,33 @@ class ProductController extends Controller
             });
         }
 
+        $products = $query->paginate(12);
+        $user = $request->user();
+        if ($user && !$user->hasRole('admin')) {
+            // Charger les pivots db_products_users pour l'utilisateur
+            $userDbProducts = $user->dbProducts()->get();
+            $pivotByDbId = [];
+            foreach ($userDbProducts as $dbProduct) {
+                $pivotByDbId[$dbProduct->id] = $dbProduct->pivot;
+            }
+            foreach ($products as $product) {
+                $dbId = $product->db_products_id;
+                if ($dbId && isset($pivotByDbId[$dbId])) {
+                    $attributes = $pivotByDbId[$dbId]->attributes;
+                    if ($attributes) {
+                        $attrs = is_array($attributes) ? $attributes : json_decode($attributes, true);
+                        if (is_array($attrs) && isset($attrs['marge'])) {
+                            $marge = (float) $attrs['marge'];
+                            $product->price = (float) $product->price + $marge;
+                        }
+                    }
+                }
+            }
+        }
+        
         return Inertia::render('products/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => ProductResource::collection(
-                $query->paginate(12)
-            )),
+            'collection' => Inertia::scroll(fn() => ProductResource::collection($products)),
             'filters' => [
                 'active' => $activeFilter,
                 'category' => $categoryId,

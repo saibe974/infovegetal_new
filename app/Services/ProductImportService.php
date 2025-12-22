@@ -15,6 +15,17 @@ class ProductImportService
 {
     public function run(string $id, string $fullPath, string $relativePath, int $limit = 4000): void
     {
+        // Charger l'état pour récupérer le db_products_id
+        $state = Cache::get("import:$id", []);
+        $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
+            ? (int) $state['db_products_id']
+            : null;
+
+        // Avant l'import, désactiver tous les produits de cette DB
+        if ($dbProductsId) {
+            Product::where('db_products_id', $dbProductsId)->update(['active' => 0]);
+        }
+
         // Première étape : découper le fichier CSV source en fichiers temporaires de données
         $this->splitIntoTempFiles($id, $fullPath, $limit);
 
@@ -252,7 +263,7 @@ class ProductImportService
                             'price' => $price,
                             'active' => $active,
                             'category_products_id' => $productCategoryId,
-                            
+                            'db_products_id' => $dbProductsId,
                         ];
                     endif;
 
@@ -306,7 +317,7 @@ class ProductImportService
                         Product::upsert(
                             $chunk,
                             ['sku'],
-                            ['name', 'description', 'img_link', 'price', 'active', 'category_products_id']
+                            ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id']
                         );
                     });
                 }
@@ -355,6 +366,15 @@ class ProductImportService
                     'status' => 'done',
                     'progress' => 100,
                 ]));
+
+                // Mettre à jour le updated_at de db_products si dbProductsId est défini
+                if (!empty($dbProductsId)) {
+                    try {
+                        \App\Models\DbProducts::where('id', $dbProductsId)->update(['updated_at' => now()]);
+                    } catch (\Throwable $e) {
+                        Log::warning('[Import]['.$id.'] Impossible de mettre à jour updated_at de db_products: '.$e->getMessage());
+                    }
+                }
 
                 Cache::forget("import:$id:cancel");
 
