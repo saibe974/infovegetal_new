@@ -98,10 +98,10 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall
+                    {/* <HeadingSmall
                         title={t('Profile information')}
                         description={t('Update your name and email address')}
-                    />
+                    /> */}
 
                     <form
                         className="space-y-6"

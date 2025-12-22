@@ -15,6 +15,7 @@ use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\DbProducts;
+use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
 
 class UserManagementController extends Controller
 {
@@ -55,6 +56,59 @@ class UserManagementController extends Controller
             'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),
             'allPermissions' => Permission::all(['id', 'name']),
         ]);
+    }
+
+    public function create(Request $request): Response
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        return Inertia::render('users/form', [
+            // Provide lists for roles and permissions to populate selects
+            'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),
+            'allPermissions' => Permission::all(['id', 'name']),
+        ]);
+    }   
+
+    public function store(Request $request): HttpFoundationRedirectResponse
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['integer', 'exists:roles,id'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['integer', 'exists:permissions,id'],
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => bcrypt($validated['password']),
+        ]);
+
+        // Assign roles
+        if (isset($validated['roles'])) {
+            $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
+            $user->syncRoles($roleNames);
+        }
+
+        // Assign permissions
+        if (isset($validated['permissions'])) {
+            $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
+            $user->syncPermissions($permNames);
+        }
+
+        // Redirige vers la page d'édition du nouvel utilisateur
+        return to_route('users.edit', ['user' => $user->id]);
     }
 
     /**
@@ -191,7 +245,6 @@ class UserManagementController extends Controller
         // Suppression par un admin
         $user->delete();
         return to_route('users.index');
-    // ...existing code...
     }
 
     /**

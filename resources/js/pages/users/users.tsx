@@ -421,6 +421,9 @@ export default withAppLayout(
                         //     <DownloadCsvButton />
                         // </div>
                         <ButtonsActions
+                            cancel={hasChanges ? cancel : undefined}
+                            save={hasChanges ? save : undefined}
+                            saving={saving}
                             import={
                                 <CsvUploadFilePond
                                     title="Upload CSV"
@@ -431,7 +434,9 @@ export default withAppLayout(
                                 />
                             }
                             export={"/admin/users/export"}
-                            add={() => { }}
+                            add={() => {
+                                router.visit('/admin/users/create');
+                            }}
                         />
 
                     )}

@@ -22,22 +22,24 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: users.index().url,
     },
     {
-        title: 'Editer',
+        title: 'Créer',
         href: '#',
     },
 ];
 
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
-    // console.log(product);
-    // console.log(Routing);
-
-    console.log(user);
-
+    const isNew = !user || !user.id;
+    // Correction : routes pour store/update
+    const storeUrl = '/admin/users/store';
+    const updateUrl = user && user.id ? `/admin/users/${user.id}` : '';
     return (
-        <Form className="space-y-4">
-            <Head title={`Editer l'utilisateur #${user.id}`} />
-
+        <Form
+            className="space-y-4"
+            method={isNew ? 'post' : 'put'}
+            action={isNew ? storeUrl : updateUrl}
+        >
+            <Head title={isNew ? 'Créer un utilisateur' : `Editer l'utilisateur #${user.id}`} />
             <div className="flex items-center py-2 gap-2 justify-between">
                 <div className="flex items-center gap-2">
                     <Link href="#"
@@ -47,27 +49,45 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
                         <ArrowLeftCircle size={35} />
                     </Link>
                     <h2>
-                        Editer un utilisateur
+                        {isNew ? 'Créer un utilisateur' : 'Editer un utilisateur'}
                     </h2>
                 </div>
             </div>
-
-
             <div className="grid items-start gap-8 md:grid-cols-[1fr_350px]">
                 <main className="space-y-4">
-                    <FormField
-                        label="Nom"
-                        htmlFor="name">
+                    <FormField label="Nom" htmlFor="name">
                         <Input
                             id="name"
                             name="name"
-                            defaultValue={user.name} />
+                            defaultValue={user?.name ?? ''}
+                            required
+                        />
                     </FormField>
-
-
+                    <FormField label="Email" htmlFor="email">
+                        <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            defaultValue={user?.email ?? ''}
+                            required
+                        />
+                    </FormField>
+                    {isNew && (
+                        <FormField label="Mot de passe" htmlFor="password">
+                            <Input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                            />
+                        </FormField>
+                    )}
+                    <Button type="submit" className="mt-4">
+                        <SaveIcon className="mr-2" />
+                        {isNew ? 'Créer' : 'Enregistrer'}
+                    </Button>
                 </main>
             </div>
         </Form>
-
     );
 });
