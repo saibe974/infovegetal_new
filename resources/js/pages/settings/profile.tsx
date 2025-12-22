@@ -33,15 +33,16 @@ export default function Profile({
     const pageProps = usePage().props as any;
     const errors = pageProps.errors ?? {};
     const { t } = useI18n();
+    const targetUser = editingUser ?? auth.user;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Profile settings'),
-            href: edit((editingUser ?? auth.user)!.id).url,
+            href: edit(targetUser!.id).url,
         },
     ];
 
-    const targetUser = editingUser ?? auth.user;
+
     // All possible roles/permissions provided by controller
     const allRoles = (usePage().props as any).allRoles ?? [];
     const allPermissions = (usePage().props as any).allPermissions ?? [];

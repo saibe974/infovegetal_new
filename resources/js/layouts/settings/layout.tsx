@@ -23,41 +23,45 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }
 
     const userId = editingUser ? editingUser.id : auth.user!.id;
+
     const sidebarNavItems: NavItem[] = [
         {
             title: 'Profile',
             href: edit(userId),
             icon: null,
         },
-        {
+    ];
+
+    if (userId == auth.user!.id) {
+        sidebarNavItems.push({
             title: 'Password',
             href: editPassword(userId),
             icon: null,
         },
-        {
-            title: 'Two-Factor Auth',
-            href: show(userId),
-            icon: null,
-        },
-        {
-            title: 'Appearance',
-            href: editAppearance(userId),
-            icon: null,
-        },
-    ];
+            {
+                title: 'Two-Factor Auth',
+                href: show(userId),
+                icon: null,
+            },
+            {
+                title: 'Appearance',
+                href: editAppearance(userId),
+                icon: null,
+            }
+        );
 
+    }
     const currentPath = window.location.pathname;
 
     // Ajout de lien si l'utilisateur est admin
-    const navItems = [...sidebarNavItems];
     if (isAdmin(auth.user)) {
-        navItems.push({
+        sidebarNavItems.push({
             title: 'Database access',
             href: editingUser ? `/admin/users/${editingUser.id}/db` : '#',
             icon: null,
         });
 
-        // navItems.push({
+        // sidebarNavItems.push({
         //     title: 'Margin settings',
         //     href: '#',
         //     icon: null,
@@ -81,7 +85,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             <div className="flex flex-col lg:flex-row lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav className="flex flex-col space-y-1 space-x-0">
-                        {navItems.map((item, index) => (
+                        {sidebarNavItems.map((item, index) => (
                             <Button
                                 key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
                                 size="sm"

@@ -26,7 +26,10 @@ Route::middleware('auth')->group(function () {
       ->name('password.update');
 
     Route::get('admin/users/{user}/appearance', function (Request $request) {
-        return Inertia::render('settings/appearance');
+        $user = \App\Models\User::findOrFail($request->route('user'));
+        return Inertia::render('settings/appearance', [
+            'editingUser' => $user->load(['roles', 'permissions']),
+        ]);
     })->name('appearance.edit');
 
     Route::get('admin/users/{user}/two-factor', function (Request $request, TwoFactorAuthenticationController $controller) {

@@ -377,6 +377,7 @@ class UserManagementController extends Controller
 
         return Inertia::render('users/db', [
             'user' => $user->load(['roles', 'permissions']),
+            'editingUser' => $user,
             'dbProducts' => $dbProducts,
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,

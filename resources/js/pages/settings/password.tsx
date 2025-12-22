@@ -18,12 +18,14 @@ export default function Password() {
     const { t } = useI18n();
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
-    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const pageProps = usePage<{ auth: { user: { id: number } }, editingUser?: { id: number } }>().props;
+    const { auth, editingUser } = pageProps;
+    const userId = editingUser ? editingUser.id : auth.user.id;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Password settings'),
-            href: edit(auth.user.id).url,
+            href: edit(userId).url,
         },
     ];
 
@@ -33,13 +35,13 @@ export default function Password() {
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall
+                    {/* <HeadingSmall
                         title={t('Update password')}
                         description={t('Ensure your account is using a long, random password to stay secure')}
-                    />
+                    /> */}
 
                     <Form
-                        {...update.form(auth.user.id)}
+                        {...update.form(userId)}
                         options={{
                             preserveScroll: true,
                         }}

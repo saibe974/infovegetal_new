@@ -47,10 +47,10 @@ export default function UserDbPage() {
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall
+                    {/* <HeadingSmall
                         title={t('Associate DB product')}
                         description={t('Link a DB product to this user')}
-                    />
+                    /> */}
 
                     <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
                         <div className="grid gap-2">

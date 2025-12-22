@@ -15,9 +15,13 @@ class PasswordController extends Controller
     /**
      * Show the user's password settings page.
      */
-    public function edit(): Response
+    public function edit(Request $request, $user = null): Response
     {
-        return Inertia::render('settings/password');
+        // Si la route fournit un user, on le charge, sinon on prend l'utilisateur courant
+        $targetUser = $user ? (is_object($user) ? $user : \App\Models\User::findOrFail($user)) : $request->user();
+        return Inertia::render('settings/password', [
+            'editingUser' => $targetUser->load(['roles', 'permissions']),
+        ]);
     }
 
     /**
