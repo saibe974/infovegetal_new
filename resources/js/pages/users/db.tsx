@@ -10,8 +10,11 @@ import { type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { FormField } from '@/components/ui/form-field';
-// Plus besoin d'AttributesEditor, on fait un tableau clé/valeur maison
 import SearchSelect from '@/components/app/search-select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PlusCircle, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function UserDbPage() {
     const { auth, user: propsUser, dbProducts, selectedDbId, dbUserAttributes } = usePage<SharedData & { user: User; dbProducts: Array<{ id: number; name: string }>; selectedDbId?: number | null; dbUserAttributes?: Record<string, any> }>().props as any;
@@ -53,7 +56,7 @@ export default function UserDbPage() {
                     /> */}
 
                     <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
-                        <div className="grid gap-2">
+                        <div className="flex flex-col gap-6">
                             <FormField label={t('Select DB product')}>
                                 <SearchSelect
                                     value={search}
@@ -76,107 +79,100 @@ export default function UserDbPage() {
 
                                 {/* Tableau d'éditeurs d'attributs pour chaque DB sélectionné */}
                                 {selectedIds.length > 0 && (
-                                    <div className="mt-6">
-                                        <table className="min-w-full border text-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th className="border px-2 py-1 text-left">{t('DB Product')}</th>
-                                                    <th className="border px-2 py-1 text-left">{t('Custom attributes')}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedIds.map((dbId) => {
-                                                    const db = (dbProducts as any[]).find((d) => d.id === dbId);
-                                                    return (
-                                                        <tr key={dbId}>
-                                                            <td className="border px-2 py-1 align-top font-medium">{db ? db.name : dbId}</td>
-                                                            <td className="border px-2 py-1">
-                                                                {/* Tableau clé/valeur */}
-                                                                <table className="w-full text-xs border">
-                                                                    <tbody>
-                                                                        {Object.entries(attributesByDbId[dbId] || {}).filter(([k]) => !k.startsWith('__')).map(([key, value]) => (
-                                                                            <tr key={key}>
-                                                                                <td className="border px-1 py-0.5 w-32">{key}</td>
-                                                                                <td className="border px-1 py-0.5">
-                                                                                    {value}
-                                                                                </td>
-                                                                                <td className="border px-1 py-0.5 w-8 text-center">
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="text-red-500 hover:underline"
-                                                                                        title={t('Delete')}
-                                                                                        onClick={() => setAttributesByDbId(prev => {
-                                                                                            const { [key]: _, ...rest } = prev[dbId] || {};
-                                                                                            return { ...prev, [dbId]: rest };
-                                                                                        })}
-                                                                                    >✕</button>
-                                                                                </td>
-                                                                            </tr>
-                                                                        ))}
-                                                                        {/* Ligne d'ajout */}
-                                                                        <tr>
-                                                                            <td className="border px-1 py-0.5">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    placeholder={t('Key')}
-                                                                                    className="border rounded px-1 py-0.5 w-full"
-                                                                                    value={attributesByDbId[dbId]?.__newKey || ''}
-                                                                                    onChange={e => setAttributesByDbId(prev => ({
-                                                                                        ...prev,
-                                                                                        [dbId]: {
-                                                                                            ...prev[dbId],
-                                                                                            __newKey: e.target.value
-                                                                                        }
-                                                                                    }))}
-                                                                                />
-                                                                            </td>
-                                                                            <td className="border px-1 py-0.5">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    placeholder={t('Value')}
-                                                                                    className="border rounded px-1 py-0.5 w-full"
-                                                                                    value={attributesByDbId[dbId]?.__newValue || ''}
-                                                                                    onChange={e => setAttributesByDbId(prev => ({
-                                                                                        ...prev,
-                                                                                        [dbId]: {
-                                                                                            ...prev[dbId],
-                                                                                            __newValue: e.target.value
-                                                                                        }
-                                                                                    }))}
-                                                                                />
-                                                                            </td>
-                                                                            <td className="border px-1 py-0.5 text-center">
-                                                                                <button
-                                                                                    type="button"
-                                                                                    className="border rounded px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200"
-                                                                                    onClick={() => {
-                                                                                        const key = attributesByDbId[dbId]?.__newKey?.trim();
-                                                                                        const value = attributesByDbId[dbId]?.__newValue;
-                                                                                        if (!key) return;
-                                                                                        setAttributesByDbId(prev => {
-                                                                                            const { __newKey, __newValue, ...rest } = prev[dbId] || {};
-                                                                                            return {
-                                                                                                ...prev,
-                                                                                                [dbId]: {
-                                                                                                    ...rest,
-                                                                                                    [key]: value,
-                                                                                                }
-                                                                                            };
-                                                                                        });
-                                                                                    }}
-                                                                                >{t('Add')}</button>
-                                                                            </td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                                {/* Champ caché pour envoyer le JSON de chaque dbId au backend */}
-                                                                <input type="hidden" name={`attributes[${dbId}]`} value={JSON.stringify(Object.fromEntries(Object.entries(attributesByDbId[dbId] || {}).filter(([k]) => !k.startsWith('__'))))} />
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                    <div className="mt-6 space-y-4">
+                                        {/* <HeadingSmall title={t('Custom attributes')} /> */}
+                                        {selectedIds.map((dbId) => {
+                                            const db = (dbProducts as any[]).find((d) => d.id === dbId);
+                                            const attrs = Object.entries(attributesByDbId[dbId] || {}).filter(([k]) => !k.startsWith('__'));
+                                            
+                                            return (
+                                                <Card key={dbId}>
+                                                    <CardHeader>
+                                                        <CardTitle className="text-base">{db ? db.name : dbId}</CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-3">
+                                                        {attrs.length > 0 && (
+                                                            <div className="space-y-2">
+                                                                {attrs.map(([key, value]) => (
+                                                                    <div key={key} className="flex items-center gap-3 py-2 px-3 rounded-md bg-muted/50">
+                                                                        <span className="text-sm font-medium text-muted-foreground min-w-[100px]">{key}</span>
+                                                                        <span className="text-sm flex-1">{value}</span>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                                                            title={t('Delete attribute')}
+                                                                            onClick={() => setAttributesByDbId(prev => {
+                                                                                const { [key]: _, ...rest } = prev[dbId] || {};
+                                                                                return { ...prev, [dbId]: rest };
+                                                                            })}
+                                                                        >
+                                                                            <X />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Formulaire d'ajout */}
+                                                        <div className="flex items-center gap-2 pt-2 border-t">
+                                                            <Input
+                                                                type="text"
+                                                                placeholder={t('Key')}
+                                                                className="h-9"
+                                                                value={attributesByDbId[dbId]?.__newKey || ''}
+                                                                onChange={e => setAttributesByDbId(prev => ({
+                                                                    ...prev,
+                                                                    [dbId]: {
+                                                                        ...prev[dbId],
+                                                                        __newKey: e.target.value
+                                                                    }
+                                                                }))}
+                                                            />
+                                                            <Input
+                                                                type="text"
+                                                                placeholder={t('Value')}
+                                                                className="h-9"
+                                                                value={attributesByDbId[dbId]?.__newValue || ''}
+                                                                onChange={e => setAttributesByDbId(prev => ({
+                                                                    ...prev,
+                                                                    [dbId]: {
+                                                                        ...prev[dbId],
+                                                                        __newValue: e.target.value
+                                                                    }
+                                                                }))}
+                                                            />
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-9 px-3 hover:bg-green-600/30 hover:border-green-700"
+                                                                title={t('Add attribute')}
+                                                                onClick={() => {
+                                                                    const key = attributesByDbId[dbId]?.__newKey?.trim();
+                                                                    const value = attributesByDbId[dbId]?.__newValue;
+                                                                    if (!key) return;
+                                                                    setAttributesByDbId(prev => {
+                                                                        const { __newKey, __newValue, ...rest } = prev[dbId] || {};
+                                                                        return {
+                                                                            ...prev,
+                                                                            [dbId]: {
+                                                                                ...rest,
+                                                                                [key]: value,
+                                                                            }
+                                                                        };
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <PlusCircle />
+                                                            </Button>
+                                                        </div>
+                                                        
+                                                        {/* Champ caché pour envoyer le JSON de chaque dbId au backend */}
+                                                        <input type="hidden" name={`attributes[${dbId}]`} value={JSON.stringify(Object.fromEntries(attrs))} />
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })}
                                     </div>
                                 )}
 
