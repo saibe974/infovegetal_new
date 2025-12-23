@@ -32,8 +32,7 @@ Route::middleware('auth')->group(function () {
         ]);
     })->name('appearance.edit');
 
-    Route::get('admin/users/{user}/two-factor', function (Request $request, TwoFactorAuthenticationController $controller) {
-        return $controller->show($request);
-    })->name('two-factor.show');
+    Route::get('admin/users/{user}/two-factor', [TwoFactorAuthenticationController::class, 'show'])
+        ->name('two-factor.show');
    
 });

@@ -263,9 +263,9 @@ export default function SearchSelect({
                         setOpen(true);
                         // Keep filters open for short queries (<=2 chars) so
                         // the initial list remains visible while typing.
-                        if (hasFilters && v && v.trim() !== '' && v.trim().length >= minQueryLength) {
-                            setOpenFilters(false);
-                        }
+                        // if (hasFilters && v && v.trim() !== '' && v.trim().length >= minQueryLength) {
+                        //     setOpenFilters(false);
+                        // }
                     }}
                     onFocus={(e) => {
                         if (hasFilters) {
