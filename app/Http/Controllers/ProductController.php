@@ -84,7 +84,7 @@ class ProductController extends Controller
 
         
 
-        $products = $query->paginate(12);
+        $products = $query->paginate(24);
         $user = $request->user();
         if ($user && !$user->hasRole('admin')) {
             // Charger les pivots db_products_users pour l'utilisateur

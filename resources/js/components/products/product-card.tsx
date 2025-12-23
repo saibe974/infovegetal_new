@@ -40,7 +40,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
         <Link
             key={product.id}
             href={'/products/' + product.id}
-            className="no-underline group hover:scale-102 transition-transform duration-300"
+            className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
             <Card className={`relative flex flex-col p-4 gap-4 ${className ?? ""}`}>

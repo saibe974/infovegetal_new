@@ -317,7 +317,7 @@ export default function SearchSelect({
                     <button
                         type="button"
                         onClick={handleClear}
-                        className="text-muted-foreground hover:text-foreground px-1"
+                        className="text-muted-foreground hover:text-destructive px-1"
                     >
                         <X size={16} />
                     </button>
