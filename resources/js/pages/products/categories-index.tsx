@@ -12,8 +12,10 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
 import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
+import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 
 type Props = {
     collection: PaginatedCollection<ProductCategory>;
@@ -38,6 +40,13 @@ export default withAppLayout(
         const { t } = useI18n();
         const [pending, setPending] = useState<ProductCategory[] | null>(null);
         const [saving, setSaving] = useState(false);
+
+
+        const [viewMode, setViewMode] = useState<ViewMode>(() => {
+            if (typeof window === 'undefined') return 'tree';
+            const views = JSON.parse(localStorage.getItem('views') || '{}');
+            return (views.categories || 'tree') as ViewMode;
+        });
 
         const page = usePage<{ searchPropositions?: string[] }>();
         const initialSearchPropositions = page.props.searchPropositions ?? [];
@@ -138,93 +147,6 @@ export default withAppLayout(
                 });
             }
         };
-
-        // Rendu personnalisé de chaque item
-        const renderItem = (props: RenderItemProps<ProductCategory>) => {
-            const {
-                item,
-                depth,
-                isExpanded,
-                toggleExpand,
-                isDragging,
-                insertLine, // 'before' | 'after' | null
-                isInsideTarget, // true = intention “inside”
-                isOver, // survol (optionnel pour un léger highlight)
-                setNodeRef,
-                attributes,
-                listeners,
-            } = props;
-
-            const hasValidId = !!item && typeof (item as any).id === 'number' && Number.isFinite((item as any).id);
-            const displayName = (item as any)?.name ?? '(sans nom)';
-            // Le serveur retourne déjà has_children
-            const hasChildren = (item as any).has_children === true;
-            return (
-                <div
-                    ref={setNodeRef}
-                    className={[
-                        'relative flex items-center gap-2 px-3 py-2 text-sm',
-                        'border-b border-border/30 transition-colors',
-                        !isDragging ? 'hover:bg-muted/50' : '',
-                        isOver ? 'bg-muted/20' : '',
-                        isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
-                        isDragging ? 'opacity-50' : '',
-                        item.id === 1 ? 'bg-muted' : '',
-                    ].join(' ')}
-                    style={{
-                        marginLeft: depth * 24,
-                    }}
-                >
-                    <div className='h-6 w-6'>
-                        {!isDragging && hasChildren && (
-                            <button
-                                type="button"
-                                onClick={toggleExpand}
-                                className="h-full w-full flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
-                                aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                            >
-                                {
-                                    isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
-                                }
-                            </button>
-                        )}
-                    </div>
-
-                    <div
-                        {...listeners}
-                        {...attributes}
-                        className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
-                        aria-label="Drag"
-                    >
-                        <GripVertical size={14} />
-                    </div>
-
-                    <span className="truncate font-medium flex-1 flex items-center gap-2">
-                        {displayName} {loadingItems.has(item.id) && <Loader2Icon size={15} className='animate-spin' />}
-                    </span>
-
-                    <div className="flex gap-2 justify-end flex-shrink-0">
-                        {hasValidId && !isDragging && (
-                            <>
-                                <Button asChild size="icon" variant="outline">
-                                    <Link href={categoryProducts.edit((item as any).id)}>
-                                        <EditIcon size={16} />
-                                    </Link>
-                                </Button>
-                                {item.id !== 1 && (
-                                    <Button asChild size="icon" variant="destructive-outline">
-                                        <Link href={categoryProducts.destroy((item as any).id)} onBefore={() => confirm('Are you sure?')}>
-                                            <TrashIcon size={16} />
-                                        </Link>
-                                    </Button>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
 
         const handleTreeChange = (items: ProductCategory[], reason?: 'drag' | 'expand' | 'collapse') => {
             // Ignorer les changements d'expand/collapse (ne pas tracker comme "pending")
@@ -330,10 +252,49 @@ export default withAppLayout(
             router.reload();
         };
 
+        // Rendu personnalisé de chaque item
+        const renderItem = (props: RenderItemProps<ProductCategory>) => {
+            const {
+                item,
+                depth,
+                isExpanded,
+                toggleExpand,
+                isDragging,
+                insertLine, // 'before' | 'after' | null
+                isInsideTarget, // true = intention “inside”
+                isOver, // survol (optionnel pour un léger highlight)
+                setNodeRef,
+                attributes,
+                listeners,
+            } = props;
+
+            // Le serveur retourne déjà has_children
+            const hasChildren = (item as any).has_children === true;
+
+            // console.log(item)
+            return (
+                <SortableTreeItem
+                    props={props}
+                    hasChildren={hasChildren}
+                    isLoading={loadingItems.has(item.id)}
+                    canEdit={true}
+                    onEdit={() => { }}
+                    canDelete={item.id !== 1}
+                    onDelete={() => { }}
+                />
+            );
+        };
+
         return (
             <>
                 <Head title={t('Categories')} />
                 <StickyBar className="mb-4">
+                    {/* <ViewModeToggle
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        pageKey="categories"
+                        modes={['table', 'tree']}
+                    /> */}
                     <SearchSelect
                         value={search}
                         onChange={handleSearch}
@@ -416,6 +377,7 @@ export default withAppLayout(
                             loadChildren={loadChildren}
                             onChange={handleTreeChange}
                             renderItem={renderItem}
+                            storageKey="categories"
                         />
                     </div>
 

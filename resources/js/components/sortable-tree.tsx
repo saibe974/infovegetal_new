@@ -56,6 +56,8 @@ export type SortableTreeProps<T extends Record<string, any>> = {
 
     onChange?: (next: T[], reason?: 'drag' | 'expand' | 'collapse') => void;
     renderItem: (props: RenderItemProps<T>) => React.ReactNode;
+    
+    storageKey?: string; // Clé pour le localStorage (ex: "categories", "users")
 };
 
 type DropIntent =
@@ -144,9 +146,22 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     const insideDelayMs = props.insideDelayMs ?? 750;
     const edgeRatio = props.edgeRatio ?? 0.25;
     const expandOnInside = props.expandOnInside ?? true;
+    const storageKey = props.storageKey;
 
     const [items, setItems] = useState<T[]>([]);
-    const [expanded, setExpanded] = useState<Set<Id>>(new Set());
+    const [expanded, setExpanded] = useState<Set<Id>>(() => {
+        if (typeof window === 'undefined' || !storageKey) return new Set();
+        try {
+            const stored = localStorage.getItem(`sortableTree:${storageKey}:expanded`);
+            if (stored) {
+                const arr = JSON.parse(stored);
+                return new Set(arr);
+            }
+        } catch (e) {
+            console.warn('Failed to load expanded state from localStorage:', e);
+        }
+        return new Set();
+    });
     const [loading, setLoading] = useState<Set<Id>>(new Set());
 
     const [activeId, setActiveId] = useState<Id | null>(null);
@@ -186,6 +201,67 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         const id = getId(it);
         return items.some((x) => getParent(x) === id);
     };
+
+    // Sauvegarder dans le localStorage quand expanded change
+    useEffect(() => {
+        if (typeof window === 'undefined' || !storageKey) return;
+        try {
+            localStorage.setItem(`sortableTree:${storageKey}:expanded`, JSON.stringify(Array.from(expanded)));
+        } catch (e) {
+            console.warn('Failed to save expanded state to localStorage:', e);
+        }
+    }, [expanded, storageKey]);
+
+    // Charger les enfants des items expanded au chargement initial
+    useEffect(() => {
+        if (!props.loadChildren || expanded.size === 0) return;
+        
+        const loadMissingChildren = async () => {
+            for (const expandedId of expanded) {
+                const parent = idMap.get(expandedId);
+                if (!parent) continue;
+                
+                // Vérifier si cet item a déjà des enfants dans items
+                const hasLoadedChildren = items.some((x) => getParent(x) === expandedId);
+                if (hasLoadedChildren) continue;
+                
+                // Si pas d'enfants, les charger
+                setLoading((s) => new Set(s).add(expandedId));
+                try {
+                    const parentDepth = getDepth(parent);
+                    if (!props.loadChildren) continue;
+                    const children = await props.loadChildren(parent);
+
+                    setItems((prev) => {
+                        const existing = new Set(prev.map((p) => getId(p)));
+
+                        const normalized = children
+                            .filter((c) => !existing.has(getId(c)))
+                            .map((c) => {
+                                const withParent = setField(c, parentKey, expandedId);
+                                const d = getField<T, number>(withParent, depthKey, NaN);
+                                return Number.isFinite(d) ? withParent : setField(withParent, depthKey, parentDepth + 1);
+                            });
+
+                        const idx = prev.findIndex((x) => getId(x) === expandedId);
+                        if (idx === -1) return [...prev, ...normalized];
+
+                        return [...prev.slice(0, idx + 1), ...normalized, ...prev.slice(idx + 1)];
+                    });
+                } catch (e) {
+                    console.error('Failed to load children for', expandedId, e);
+                } finally {
+                    setLoading((s) => {
+                        const n = new Set(s);
+                        n.delete(expandedId);
+                        return n;
+                    });
+                }
+            }
+        };
+
+        void loadMissingChildren();
+    }, [expanded, items.length]);
 
     // --- visibilité ---
     const isVisible = (it: T): boolean => {
