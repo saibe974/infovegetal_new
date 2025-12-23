@@ -25,6 +25,7 @@ type Props = {
     handleRetryImport: () => void;
     uploadId: string | null;
     onStartImport?: (settings: { dbProductsId: number }) => void;
+    dbProductsId?: number;
 };
 
 export function ProductsImportTreatment({
@@ -35,10 +36,19 @@ export function ProductsImportTreatment({
     handleRetryImport,
     uploadId,
     onStartImport,
+    dbProductsId,
 }: Props) {
     const [dbProducts, setDbProducts] = useState<DbProduct[]>([]);
     const [selectedDbProductId, setSelectedDbProductId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+
+
+    // Si dbProductsId est fourni, lancer directement le traitement
+    useEffect(() => {
+        if (dbProductsId && importStatus === 'idle' && onStartImport) {
+            onStartImport({ dbProductsId });
+        }
+    }, [dbProductsId, importStatus, onStartImport]);
 
     useEffect(() => {
         // Charger la liste des bases produits disponibles

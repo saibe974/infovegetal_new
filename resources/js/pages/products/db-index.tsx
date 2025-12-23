@@ -12,6 +12,8 @@ import SearchSelect from '@/components/app/search-select';
 import dbProducts from '@/routes/db-products';
 import { useI18n } from '@/lib/i18n';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
+import ProductsImportTreatment from '@/components/products/import';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -146,6 +148,19 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
+                                        <CsvUploadFilePond
+                                            title={`Mettre à jour la base de données ${item.name}`}
+                                            uploadUrl='/upload'
+                                            importProcessUrl={products.admin.import.process.url()}
+                                            importProcessChunkUrl={products.admin.import.process_chunk.url()}
+                                            importCancelUrl={products.admin.import.cancel.url()}
+                                            importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                                            postTreatmentComponent={ProductsImportTreatment}
+                                            postTreatmentProps={{ dbProductsId: item.id }}
+                                            successRedirectUrl={products.index().url}
+                                            buttonLabel=''
+                                        />
+
                                         <Button asChild size="icon" variant="outline">
                                             <Link href={dbProducts.edit(item.id).url}>
                                                 <EditIcon size={16} />

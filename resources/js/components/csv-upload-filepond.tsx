@@ -46,7 +46,7 @@ type CsvUploadConfig = {
 
 type CsvUploadFilePondProps = {
     title: string;
-    description: string;
+    description?: string;
     uploadUrl: string;
     successRedirectUrl?: string;
     importProcessUrl?: string;
@@ -59,6 +59,7 @@ type CsvUploadFilePondProps = {
     buttonLabel?: string;
     buttonClassName?: string;
     postTreatmentComponent?: React.ComponentType<any>;
+    postTreatmentProps?: Record<string, any>;
 
 };
 
@@ -102,6 +103,7 @@ export function CsvUploadFilePond({
     buttonLabel,
     buttonClassName,
     postTreatmentComponent,
+    postTreatmentProps,
 }: CsvUploadFilePondProps) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<any[]>([]);
@@ -718,6 +720,7 @@ export function CsvUploadFilePond({
 
                             {importProcessUrl && postTreatmentComponent && (
                                 React.createElement(postTreatmentComponent, {
+                                    ...postTreatmentProps,
                                     importStatus,
                                     importError,
                                     progressInfo,
