@@ -115,6 +115,7 @@ class ProductController extends Controller
             'filters' => [
                 'active' => $activeFilter,
                 'category' => $categoryId,
+                'dbProductId' => $dbProductId,
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()

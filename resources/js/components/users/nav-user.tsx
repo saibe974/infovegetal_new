@@ -39,7 +39,7 @@ export function NavUser() {
                                 }`}
                             data-test="sidebar-menu-button"
                         >
-                            <UserInfo user={currentUser} showRoles={true} />
+                            <UserInfo user={currentUser} showRoles={isImpersonating ? true : false} />
                             {isImpersonating && (
                                 <UserCheck size={16} className="ml-1 text-amber-500" />
                             )}

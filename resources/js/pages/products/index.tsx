@@ -92,7 +92,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.dbProductId !== null ? { name: 'dbProductId', label: dbProducts.find(db => db.id === filtersState.dbProductId)?.name || '' } : null,
-    ].filter(Boolean) as { name: string; label: string }[];
+    ].filter((item): item is { name: string; label: string } => Boolean(item && item.label));
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
         if (typeof window === 'undefined') return 'table';
@@ -209,6 +209,13 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
     const uniqueCount = Array.from(new Set(collection.data.map((p: Product) => p.id))).length;
 
+    console.log('Debug filters:', { 
+        filtersState, 
+        dbProducts, 
+        incomingFilters,
+        filtersActive 
+    })
+
     return (
         <>
             <Head title="Products" />
@@ -240,7 +247,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'dbProductId')}
                 // clearAllFilters={clearAllFilters}
                 />
                 {/* </div> */}

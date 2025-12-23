@@ -23,7 +23,7 @@ interface UserMenuContentProps {
 export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
     const { auth } = usePage<SharedData>().props;
-    const [showImpersonate, setShowImpersonate] = useState(false);
+    // const [showImpersonate, setShowImpersonate] = useState(false);
     const isCurrentUserAdmin = isAdmin(auth.user);
 
     const handleLogout = () => {
@@ -48,27 +48,31 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {isCurrentUserAdmin && (
-                <>
-                    {showImpersonate ? (
-                        <ImpersonateSelect
-                            users={users}
-                            onClose={() => setShowImpersonate(false)}
-                        />
-                    ) : (
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem
-                                onClick={() => setShowImpersonate(true)}
-                                onSelect={(e) => {
-                                    e.preventDefault();
-                                }}
-                            >
-                                <UserCheck className="mr-2 size-4" />
-                                Impersonate user
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                    )}
-                    <DropdownMenuSeparator />
-                </>
+                // <>
+                //     {showImpersonate ? (
+                //         <ImpersonateSelect
+                //             users={users}
+                //             onClose={() => setShowImpersonate(false)}
+                //         />
+                //     ) : (
+                //         <DropdownMenuGroup>
+                //             <DropdownMenuItem
+                //                 onClick={() => setShowImpersonate(true)}
+                //                 onSelect={(e) => {
+                //                     e.preventDefault();
+                //                 }}
+                //             >
+                //                 <UserCheck className="mr-2 size-4" />
+                //                 Impersonate user
+                //             </DropdownMenuItem>
+                //         </DropdownMenuGroup>
+                //     )}
+                //     <DropdownMenuSeparator />
+                // </>
+                <ImpersonateSelect
+                    users={users}
+                    // onClose={() => setShowImpersonate(false)}
+                />
             )}
             {isImpersonating && (
                 <>
