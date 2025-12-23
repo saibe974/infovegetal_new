@@ -1,14 +1,37 @@
-import { List, LayoutGrid } from 'lucide-react';
+import { List, LayoutGrid, Network, LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { Button } from './button';
+import { useI18n } from '@/lib/i18n';
 
-interface ViewModeToggleProps {
-    viewMode: 'table' | 'grid';
-    onViewModeChange: (mode: 'table' | 'grid') => void;
-    pageKey: string;
+export type ViewMode = 'table' | 'grid' | 'tree';
+
+interface ViewModeConfig {
+    mode: ViewMode;
+    icon: LucideIcon;
+    title: string;
 }
 
-export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewModeToggleProps) {
+const defaultViewModes: ViewModeConfig[] = [
+    { mode: 'table', icon: List, title: 'Afficher en tableau' },
+    { mode: 'grid', icon: LayoutGrid, title: 'Afficher en grille' },
+    { mode: 'tree', icon: Network, title: 'Afficher en arbre' },
+];
+
+interface ViewModeToggleProps {
+    viewMode: ViewMode;
+    onViewModeChange: (mode: ViewMode) => void;
+    pageKey: string;
+    modes?: ViewMode[]; // Modes disponibles (par défaut: tous)
+}
+
+export function ViewModeToggle({
+    viewMode,
+    onViewModeChange,
+    pageKey,
+    modes = ['table', 'grid']
+}: ViewModeToggleProps) {
+    const { t } = useI18n();
+
     // Sauvegarder à chaque changement dans un objet "views"
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -21,40 +44,32 @@ export function ViewModeToggle({ viewMode, onViewModeChange, pageKey }: ViewMode
         }
     }, [viewMode, pageKey]);
 
+    // Filtrer les configurations selon les modes demandés
+    const availableModes = defaultViewModes.filter(config => modes.includes(config.mode));
+
+    // Ne rien afficher si un seul mode disponible
+    if (availableModes.length <= 1) return null;
+
     return (
         <div className="flex gap-2">
-            <Button
-                // type="button"
-
-                aria-pressed={viewMode === 'table'}
-                onClick={() => onViewModeChange('table')}
-                variant={'outline'}
-                className={`
-                    p-2 rounded-md transition border ${viewMode === 'table'
-                        ? 'bg-accent'
-                        : 'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'
-                    }
-                `}
-                title="Afficher en tableau"
-            >
-                <List />
-            </Button>
-
-            <Button
-                type="button"
-                aria-pressed={viewMode === 'grid'}
-                onClick={() => onViewModeChange('grid')}
-                className={`
-                    p-2 rounded-md transition border ${viewMode === 'grid'
-                        ? 'bg-accent'
-                        : 'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'
-                    }
-                `}
-                variant={'outline'}
-                title="Afficher en grille"
-            >
-                <LayoutGrid />
-            </Button>
+            {availableModes.map(({ mode, icon: Icon, title }) => (
+                <Button
+                    key={mode}
+                    type="button"
+                    aria-pressed={viewMode === mode}
+                    onClick={() => onViewModeChange(mode)}
+                    variant="outline"
+                    className={`
+                        p-2 rounded-md transition border ${viewMode === mode
+                            ? 'bg-accent'
+                            : 'hover:bg-accent hover:text-inherit text-black/40 dark:text-white/40 dark:hover:text-inherit'
+                        }
+                    `}
+                    title={t(title)}
+                >
+                    <Icon />
+                </Button>
+            ))}
         </div>
     );
 }
