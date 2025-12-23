@@ -43,7 +43,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
             className="no-underline group hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
-            <Card className={`relative h-4xl flex flex-col p-4 gap-4 ${className ?? ""}`}>
+            <Card className={`relative flex flex-col p-4 gap-4 ${className ?? ""}`}>
                 <div className="absolute top-3 left-3">
                     <span
                         className={
