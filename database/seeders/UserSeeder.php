@@ -23,19 +23,23 @@ class UserSeeder extends Seeder
 
 
         /* Créer un utilisateur développeur */
-        // $dev = User::firstOrCreate(
-        //     ['email' => 'dev@dev.com'],
-        //     [
-        //         'name' => 'Developer',
-        //         'password' => Hash::make('dev1234'),
-        //         'email_verified_at' => now(),
-        //     ]
-        // );
+        $dev = User::firstOrCreate(
+            ['email' => 'dev@dev.com'],
+            [
+                'name' => 'Developer',
+                'password' => Hash::make('dev1234'),
+                'email_verified_at' => now(),
+            ]
+        );
 
-        // // Assigner le rôle de dev
-        // if (!$dev->hasRole('dev')) {
-        //     $dev->assignRole('dev');
-        // }
+        // Assigner le rôle de dev
+        if (!$dev->hasRole('dev')) {
+            $dev->assignRole('dev');
+        }
+        // Assigner le rôle d'admin aussi'
+        if (!$dev->hasRole('admin')) {
+            $dev->assignRole('admin');
+        }
         
 
 
@@ -59,12 +63,11 @@ class UserSeeder extends Seeder
             ['email' => 'client@client.com'],
             [
                 'name' => 'Client',
-                'password' => Hash::make('client123'),
+                'password' => Hash::make('client1234'),
                 'email_verified_at' => now(),
             ]
         );
 
-        // Assigner le rôle client
         if (!$clientUser->hasRole('client')) {
             $clientUser->assignRole('client');
         }
@@ -75,12 +78,11 @@ class UserSeeder extends Seeder
             ['email' => 'guest@guest.com'],
             [
                 'name' => 'Guest',
-                'password' => Hash::make('guest123'),
+                'password' => Hash::make('guest1234'),
                 'email_verified_at' => now(),
             ]
         );
 
-        // Assigner le rôle guest
         if (!$guest->hasRole('guest')) {
             $guest->assignRole('guest');
         }

@@ -124,7 +124,7 @@ class DbProductsSeeder extends Seeder
         DbProducts::firstOrCreate(
             ['name' => 'Peplant'],
             [
-                'description' => 'Peplant : bases belges',
+                'description' => 'bases belges',
                 'champs' => [
                     "ref" => "ref_peplant",
                     "barcode" => "sku",
@@ -189,7 +189,7 @@ class DbProductsSeeder extends Seeder
         DbProducts::firstOrCreate(
             ['name' => 'DDK'],
             [
-                'description' => 'DDK : bases néerlandaises',
+                'description' => 'bases néerlandaises, hamiplant',
                 'champs' => [
                     "code" => "ref",
                     "images" => "img_link",
