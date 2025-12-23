@@ -50,9 +50,16 @@ class ProductController extends Controller
             }
         }
 
+
         $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
         if ($categoryId) {
             $query->where('category_products_id', $categoryId);
+        }
+
+        // Ajout du filtre dbProductId
+        $dbProductId = $request->filled('dbProductId') ? (int) $request->input('dbProductId') : null;
+        if ($dbProductId) {
+            $query->where('db_products_id', $dbProductId);
         }
 
         if ($search) {
@@ -74,6 +81,8 @@ class ProductController extends Controller
                 });
             });
         }
+
+        
 
         $products = $query->paginate(12);
         $user = $request->user();
@@ -99,6 +108,7 @@ class ProductController extends Controller
             }
         }
         
+        $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description'])->orderBy('name')->get();
         return Inertia::render('products/index', [
             'q' => $search,
             'collection' => Inertia::scroll(fn() => ProductResource::collection($products)),
@@ -112,6 +122,7 @@ class ProductController extends Controller
                     ->withDepth()
                     ->get(['id', 'name', 'parent_id', 'lft', 'rgt'])
             )->resolve(),
+            'dbProducts' => $dbProducts,
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
 

@@ -36,6 +36,17 @@ export interface ProductCategory {
     [key: string]: unknown; // This allows for additional properties...
 }
 
+export interface dbProduct {
+    id: number;
+    name: string;
+    description: string | null;
+    champs: Record<string, any> | null;
+    categories: Record<string, any> | null;
+    traitement: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Product {
     id: number;
     name: string;
@@ -44,6 +55,7 @@ export interface Product {
     price: number;
     active: boolean;
     category?: ProductCategory | null;
+    dbProduct?: dbProduct | null;
     attributes: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;

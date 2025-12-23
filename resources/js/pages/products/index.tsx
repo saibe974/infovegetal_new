@@ -31,30 +31,36 @@ const breadcrumbs: BreadcrumbItem[] = [
 type FiltersState = {
     active: 'all' | 'active' | 'inactive';
     category: number | null;
+    dbProductId: number | null;
 };
 
 type RawFilters = {
     active: boolean | null;
     category: number | null;
+    dbProductId?: number | null;
 };
+
+import { dbProduct } from '@/types';
 
 type Props = {
     collection: PaginatedCollection<Product>;
     q: string | null;
     filters?: RawFilters;
     categories?: ProductCategory[];
+    dbProducts?: dbProduct[];
 };
 
 const normalizeFilters = (raw?: RawFilters): FiltersState => ({
     active: raw?.active === true ? 'active' : raw?.active === false ? 'inactive' : 'all',
     category: raw?.category ?? null,
+    dbProductId: raw?.dbProductId ?? null,
 });
 
 
 export default withAppLayout(breadcrumbs, (props: any) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [] }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], dbProducts = [] }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -75,7 +81,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
     useEffect(() => {
         setFiltersState(normalizeFilters(incomingFilters));
-    }, [incomingFilters?.active, incomingFilters?.category]);
+    }, [incomingFilters?.active, incomingFilters?.category, incomingFilters?.dbProductId]);
 
     const getCategoryName = (categoryId: number | null) => {
         const category = categories.find((cat) => cat.id === categoryId);
@@ -85,6 +91,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
     const filtersActive = [
         filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
+        filtersState.dbProductId !== null ? { name: 'dbProductId', label: dbProducts.find(db => db.id === filtersState.dbProductId)?.name || '' } : null,
     ].filter(Boolean) as { name: string; label: string }[];
 
     const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
@@ -111,6 +118,10 @@ export default withAppLayout(breadcrumbs, (props: any) => {
             params.category = nextFilters.category;
         }
 
+        if (nextFilters.dbProductId) {
+            params.dbProductId = nextFilters.dbProductId;
+        }
+
         return params;
     };
 
@@ -123,12 +134,14 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category') => {
+    const removeFilter = (key: 'active' | 'category' | 'dbProductId') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
         } else if (key === 'category') {
             nextFilters.category = null;
+        } else if (key === 'dbProductId') {
+            nextFilters.dbProductId = null;
         }
         applyFilters(nextFilters);
     }
@@ -137,6 +150,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         applyFilters({
             active: 'all',
             category: null,
+            dbProductId: null,
         });
     }
 
@@ -207,26 +221,28 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                     pageKey="products"
                 />
                 {/* <div className="w-200 flex-1"> */}
-                    <SearchSelect
-                        value={search}
-                        onChange={handleSearch}
-                        onSubmit={onSelect}
-                        propositions={searchPropositionsState}
-                        loading={fetching}
-                        count={collection.meta.total}
-                        query={q ?? ''}
-                        filters={(
-                            <ProductsFilters
-                                categories={categories}
-                                active={filtersState.active}
-                                categoryId={filtersState.category}
-                                onApply={applyFilters}
-                            />
-                        )}
-                        filtersActive={filtersActive}
-                        removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
-                        // clearAllFilters={clearAllFilters}
-                    />
+                <SearchSelect
+                    value={search}
+                    onChange={handleSearch}
+                    onSubmit={onSelect}
+                    propositions={searchPropositionsState}
+                    loading={fetching}
+                    count={collection.meta.total}
+                    query={q ?? ''}
+                    filters={(
+                        <ProductsFilters
+                            categories={categories}
+                            dbProducts={dbProducts}
+                            active={filtersState.active}
+                            categoryId={filtersState.category}
+                            dbProductId={filtersState.dbProductId}
+                            onApply={applyFilters}
+                        />
+                    )}
+                    filtersActive={filtersActive}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
+                // clearAllFilters={clearAllFilters}
+                />
                 {/* </div> */}
 
                 {canImportExport && (
