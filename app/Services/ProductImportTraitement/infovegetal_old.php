@@ -58,7 +58,6 @@ function importProducts_infovegetal_old($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
-		
     ];
     return $newRow;
 }

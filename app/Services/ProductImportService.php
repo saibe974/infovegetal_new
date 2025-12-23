@@ -205,7 +205,9 @@ class ProductImportService
                             'currentIndex' => $currentIndex,
                             'validCategoryIds' => $validCategoryIds,
                             'defaultsMapCategories' => $defaultsMapCategories,
+                            'db_products_id' => $dbProductsId,
                         ), $resolve);
+                        
 
                         if(isset($newRow['error'])):
                             $errors++;

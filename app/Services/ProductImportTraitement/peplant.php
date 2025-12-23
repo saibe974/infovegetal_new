@@ -87,7 +87,7 @@ function importProducts_peplant($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
-        'db_products_id' => 22, // peplant
+        'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
     ];
     return $newRow;
 }

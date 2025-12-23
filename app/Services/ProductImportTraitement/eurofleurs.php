@@ -96,7 +96,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
-        'db_products_id' => 21, // eurofleurs
+        'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
     ];
     return $newRow;
 }
