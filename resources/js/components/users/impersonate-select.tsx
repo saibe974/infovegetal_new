@@ -100,9 +100,11 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
                             handleSelect(match);
                         }
                     }}
-                    propositions={search.trim().length >= 3 ? filteredUsers.map((u: User) => `${u.name}`) : []}
-                    filters={<UserListFilters />}
+                    propositions={filteredUsers.map((u: User) => `${u.name}`)}
+                    // filters={<UserListFilters />}
                     placeholder={t('Search user to impersonate') || 'Search user...'}
+                    minQueryLength={0}
+                    search={false}
                 />
             </div>
         </DropdownMenu.Sub>

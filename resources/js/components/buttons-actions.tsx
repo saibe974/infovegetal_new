@@ -49,7 +49,7 @@ export function ButtonsActions({
             }
 
             {onSave &&
-                <Button onClick={onSave} title={t('Save')} disabled={saving} size={'icon'}>
+                <Button onClick={onSave} title={t('Save')} disabled={saving} size={'icon'} className="bg-green-700 hover:bg-green-800 text-white">
                     {saving ?
                         <>
                             <Loader2Icon className="animate-spin" />
@@ -65,7 +65,7 @@ export function ButtonsActions({
             }
 
             {onAdd &&
-                <Button onClick={onAdd} title={t('Add')} disabled={saving} size={'icon'}>
+                <Button onClick={onAdd} title={t('Add')} disabled={saving} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
                     <CirclePlus />
                 </Button>
             }

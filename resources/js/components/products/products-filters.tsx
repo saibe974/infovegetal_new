@@ -81,18 +81,18 @@ export function ProductsFilters({
                     type="single"
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className="w-full flex flex-wrap"
                     spacing={2}
                     value={localActive}
                     onValueChange={(val) => setLocalActive((val as FilterActive) || 'all')}
                 >
-                    <ToggleGroupItem value="all" className="flex-1">
+                    <ToggleGroupItem value="all" className="lg:flex-1">
                         {t('All')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="active" className="flex-1">
+                    <ToggleGroupItem value="active" className="lg:flex-1">
                         <CheckIcon className="w-4 h-4 text-green-600 dark:text-main-green" /> {t('Active')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="inactive" className="flex-1">
+                    <ToggleGroupItem value="inactive" className="lg:flex-1">
                         <XIcon className="w-4 h-4 text-destructive" /> {t('Inactive')}
                     </ToggleGroupItem>
                 </ToggleGroup>

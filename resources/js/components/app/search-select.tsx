@@ -317,7 +317,7 @@ export default function SearchSelect({
                     <button
                         type="button"
                         onClick={handleClear}
-                        className="text-muted-foreground hover:text-foreground px-1"
+                        className="text-muted-foreground hover:text-destructive px-1"
                     >
                         <X size={16} />
                     </button>
@@ -350,18 +350,18 @@ export default function SearchSelect({
                         e.stopPropagation();
                         lastMouseDownInsideRef.current = true;
                     }}
-                    className="absolute top-full left-0 w-full mt-1 py-4 px-2 border bg-popover rounded-md shadow-lg z-50 overflow-hidden"
+                    className="absolute top-full left-0 w-full mt-1 py-4 px-2 border bg-popover rounded-md shadow-lg z-50 max-h-120 overflow-y-auto"
                 >
                     <div className={cn(
-                        "flex",
-                        open && value.length >= minQueryLength ? "flex-row" : "flex-col"
+                        "flex flex-col md:flex-row gap-4",
+                        open && value.length >= minQueryLength ? "md:flex-row" : "flex-col"
                     )}>
 
                         {/* Propositions */}
                         {open && value.length >= minQueryLength && (
                             <div className={cn(
                                 "px-4",
-                                openFilters && renderedFilters ? "w-1/2 border-r border-r-accent" : "w-full"
+                                openFilters && renderedFilters ? "md:w-1/2 md:border-r md:border-r-accent" : "w-full"
                             )}>
                                 <Heading title={t('Propositions')} />
                                 {loading ? (
@@ -395,7 +395,7 @@ export default function SearchSelect({
                         {openFilters && renderedFilters && (
                             <div className={cn(
                                 "px-4",
-                                open && value.length >= minQueryLength ? "w-1/2" : "w-full"
+                                open && value.length >= minQueryLength ? "md:w-1/2" : "w-full"
                             )}>
                                 <Heading title={t('Filters')} />
                                 {renderedFilters}

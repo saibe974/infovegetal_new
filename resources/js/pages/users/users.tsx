@@ -36,8 +36,9 @@ import usersRoutes from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
+import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
+import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
 
@@ -114,10 +115,10 @@ export default withAppLayout(
         const [fetching, setFetching] = useState(false);
         const [search, setSearch] = useState('');
 
-        const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+        const [viewMode, setViewMode] = useState<ViewMode>(() => {
             if (typeof window === 'undefined') return 'table';
             const views = JSON.parse(localStorage.getItem('views') || '{}');
-            return views.users === 'grid' ? 'grid' : 'table';
+            return (views.users || 'table') as ViewMode;
         });
 
         const handleSearch = (s: string) => {
@@ -315,13 +316,15 @@ export default withAppLayout(
             const hasValidId = !!item && typeof (item as any).id === 'number' && Number.isFinite((item as any).id);
             const displayName = (item as any)?.name ?? '(sans nom)';
 
+            // console.log(item)
+
             return (
                 <div
                     ref={setNodeRef}
                     className={[
                         'relative flex items-center gap-2 px-3 py-2 text-sm',
                         'border-b border-border/30 transition-colors',
-                        !isDragging ? 'hover:bg-slate-700/30 dark:hover:bg-slate-700/30' : '',
+                        !isDragging ? 'hover:bg-muted/50' : '',
                         isOver ? 'bg-muted/20' : '',
                         isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
                         isDragging ? 'opacity-50' : '',
@@ -398,6 +401,7 @@ export default withAppLayout(
                         viewMode={viewMode}
                         onViewModeChange={setViewMode}
                         pageKey="users"
+                        modes={['table', 'grid', 'tree']}
                     />
                     <div className="w-200 left-0 top-1 mr-2">
                         <SearchSelect
@@ -442,30 +446,24 @@ export default withAppLayout(
                     )}
                 </StickyBar>
 
-                {q ? (
-                    <div>
-                        {viewMode === 'table' ? (
-                            <UsersTable
-                                users={users}
-                                roles={roles}
-                                auth={auth}
-                                canEdit={canEdit}
-                                canDelete={canDelete}
-                                canPreview={canPreview}
-                            />
-                        ) : (
-                            <div>
-                                <UsersCardsList
-                                    users={users}
-                                    roles={roles}
-                                    auth={auth}
-                                    canEdit={canEdit}
-                                    canDelete={canDelete}
-                                    canChangeRole={canPreview}
-                                />
-                            </div>
-                        )}
-                    </div>
+                {viewMode === 'table' ? (
+                    <UsersTable
+                        users={users}
+                        roles={roles}
+                        auth={auth}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canPreview={canPreview}
+                    />
+                ) : viewMode === 'grid' ? (
+                    <UsersCardsList
+                        users={users}
+                        roles={roles}
+                        auth={auth}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                        canChangeRole={canPreview}
+                    />
                 ) : (
                     <div className="space-y-2">
                         <div className="border rounded-md overflow-hidden">

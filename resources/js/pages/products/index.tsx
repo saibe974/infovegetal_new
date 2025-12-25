@@ -17,7 +17,7 @@ import { useSidebar } from '@/components/ui/sidebar';
 import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { ViewModeToggle } from '@/components/ui/view-mode-toggle';
+import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import { ProductsFilters } from '@/components/products/products-filters';
 import { ButtonsActions } from '@/components/buttons-actions';
 
@@ -92,12 +92,12 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.dbProductId !== null ? { name: 'dbProductId', label: dbProducts.find(db => db.id === filtersState.dbProductId)?.name || '' } : null,
-    ].filter(Boolean) as { name: string; label: string }[];
+    ].filter((item): item is { name: string; label: string } => Boolean(item && item.label));
 
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
         if (typeof window === 'undefined') return 'table';
         const views = JSON.parse(localStorage.getItem('views') || '{}');
-        return views.products === 'grid' ? 'grid' : 'table';
+        return (views.products || 'table') as ViewMode;
     });
 
     const buildQueryParams = (nextFilters: FiltersState, searchOverride: string | null = q ?? '') => {
@@ -209,6 +209,13 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
     const uniqueCount = Array.from(new Set(collection.data.map((p: Product) => p.id))).length;
 
+    // console.log('Debug filters:', { 
+    //     filtersState, 
+    //     dbProducts, 
+    //     incomingFilters,
+    //     filtersActive 
+    // })
+
     return (
         <>
             <Head title="Products" />
@@ -219,6 +226,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     pageKey="products"
+                    modes={['table', 'grid']}
                 />
                 {/* <div className="w-200 flex-1"> */}
                 <SearchSelect
@@ -240,7 +248,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category')}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'dbProductId')}
                 // clearAllFilters={clearAllFilters}
                 />
                 {/* </div> */}
