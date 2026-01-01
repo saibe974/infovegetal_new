@@ -26,6 +26,12 @@ Route::prefix('products')->name('products.')->group(function () {
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
+        // Routes du panier (cart)
+        Route::prefix('cart')->name('cart.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\CartController::class, 'index'])->name('index');
+            Route::post('/add', [\App\Http\Controllers\CartController::class, 'addProduct'])->name('add');
+            Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
+        });
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');

@@ -6,6 +6,7 @@ import { RightSidebar } from '@/components/app/right-sidebar';
 import { CartSidebarHeader } from '@/components/cart/cart-sidebar-header';
 import { ImpersonationBanner } from '@/components/users/impersonation-banner';
 import { SidebarProvider } from '@/components/ui/sidebar';
+import { CartProvider } from '@/components/cart/cart.context';
 import { type BreadcrumbItem } from '@/types';
 import { type PropsWithChildren } from 'react';
 
@@ -14,9 +15,10 @@ export default function AppSidebarLayout({
     breadcrumbs = [],
 }: PropsWithChildren<{ breadcrumbs?: BreadcrumbItem[] }>) {
     return (
-        <>
+        <CartProvider>
             <AppShell variant="sidebar">
                 <AppSidebar />
+
                 <AppContent variant="sidebar" className="overflow-x-hidden pt-14">
                     <ImpersonationBanner />
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
@@ -28,11 +30,10 @@ export default function AppSidebarLayout({
                     variant='inset'
                     header={<CartSidebarHeader />}
                 >
-
                 </RightSidebar>
 
             </AppShell>
-        </>
+        </CartProvider>
     );
 }
 

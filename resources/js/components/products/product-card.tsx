@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Link, router } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon } from "lucide-react";
 import { type Product } from "@/types";
+import { CartContext } from "@/components/cart/cart.context";
 
 type Props = {
     product: Product;
@@ -34,6 +35,11 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                 method: 'delete',
             });
         }
+    };
+
+    const { addToCart } = useContext(CartContext);
+    const handleAddToCart = (id: number) => {
+        addToCart(product, 1);
     };
 
     return (
@@ -110,10 +116,11 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                             e.preventDefault();
                             e.stopPropagation();
                             // TODO: action d'ajout au panier
+                            handleAddToCart(product.id);
                         }}
                         className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
                     >
-                        {t('Ajouter au panier')}
+                        {t('Add to Cart')}
                     </Button>
                 </CardFooter>
             </Card>
