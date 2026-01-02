@@ -22,11 +22,36 @@ use League\Csv\Reader;
 class ProductController extends Controller
 {
     /**
+     * Sauvegarde le panier en session pour le filtrage.
+     */
+    public function saveCartToSession(Request $request)
+    {
+        $data = $request->validate([
+            'cart_ids' => 'array',
+            'cart_ids.*' => 'integer|min:1',
+        ]);
+
+        // Sauvegarder les IDs du panier en session
+        $request->session()->put('cart_filter_ids', $data['cart_ids'] ?? []);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
         $query = Product::with(['category','tags', 'dbProduct'])->orderFromRequest($request);
+
+        // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
+        if ($request->get('cart') === '1') {
+            $cartIds = $request->session()->get('cart_filter_ids', []);
+            if (!empty($cartIds) && is_array($cartIds)) {
+                $query->whereIn('id', $cartIds);
+            }
+        }
+
         $search = $request->get('q');
 
         $activeInput = $request->get('active');

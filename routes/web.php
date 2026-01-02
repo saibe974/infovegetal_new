@@ -23,6 +23,11 @@ Route::prefix('products')->name('products.')->group(function () {
     Route::get('/{product}', [\App\Http\Controllers\ProductController::class, 'show'])->name('show');
 });
 
+// Route pour sauvegarder le panier en session (authentifiée)
+Route::post('/products/save-cart-filter', [\App\Http\Controllers\ProductController::class, 'saveCartToSession'])
+    ->middleware(['auth'])
+    ->name('products.save-cart-filter');
+
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -31,6 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/', [\App\Http\Controllers\CartController::class, 'index'])->name('index');
             Route::post('/add', [\App\Http\Controllers\CartController::class, 'addProduct'])->name('add');
             Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
+            Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');
         });
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');

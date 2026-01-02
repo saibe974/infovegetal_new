@@ -20,6 +20,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import { ProductsFilters } from '@/components/products/products-filters';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { useCart } from '@/components/cart/use-cart';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -40,6 +41,8 @@ type RawFilters = {
     dbProductId?: number | null;
 };
 
+type CartFilter = { cart?: string };
+
 import { dbProduct } from '@/types';
 
 type Props = {
@@ -50,10 +53,11 @@ type Props = {
     dbProducts?: dbProduct[];
 };
 
-const normalizeFilters = (raw?: RawFilters): FiltersState => ({
+const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersState & CartFilter => ({
     active: raw?.active === true ? 'active' : raw?.active === false ? 'inactive' : 'all',
     category: raw?.category ?? null,
     dbProductId: raw?.dbProductId ?? null,
+    cart: cartFilter?.cart,
 });
 
 
@@ -77,11 +81,19 @@ export default withAppLayout(breadcrumbs, (props: any) => {
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
-    const [filtersState, setFiltersState] = useState<FiltersState>(() => normalizeFilters(incomingFilters));
+    // Le panier est maintenant géré via la session côté serveur
+    const location = typeof window !== 'undefined' ? window.location : { search: '' };
+    const urlParams = new URLSearchParams(location.search);
+    const cartParam = urlParams.get('cart') === '1';
+
+    const [filtersState, setFiltersState] = useState<FiltersState & CartFilter>(() => normalizeFilters(incomingFilters, { cart: cartParam ? '1' : undefined }));
+
+    // Récupérer le contexte du panier pour afficher le badge
+    const { items: cartItems, clearCart } = useCart();
 
     useEffect(() => {
-        setFiltersState(normalizeFilters(incomingFilters));
-    }, [incomingFilters?.active, incomingFilters?.category, incomingFilters?.dbProductId]);
+        setFiltersState(normalizeFilters(incomingFilters, { cart: cartParam ? '1' : undefined }));
+    }, [incomingFilters?.active, incomingFilters?.category, incomingFilters?.dbProductId, cartParam]);
 
     const getCategoryName = (categoryId: number | null) => {
         const category = categories.find((cat) => cat.id === categoryId);
@@ -92,6 +104,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.dbProductId !== null ? { name: 'dbProductId', label: dbProducts.find(db => db.id === filtersState.dbProductId)?.name || '' } : null,
+        filtersState.cart ? { name: 'cart', label: `Panier (${cartItems.length})` } : null,
     ].filter((item): item is { name: string; label: string } => Boolean(item && item.label));
 
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -100,7 +113,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         return (views.products || 'table') as ViewMode;
     });
 
-    const buildQueryParams = (nextFilters: FiltersState, searchOverride: string | null = q ?? '') => {
+    const buildQueryParams = (nextFilters: FiltersState & CartFilter, searchOverride: string | null = q ?? '') => {
         const params: Record<string, any> = {};
         const qValue = (searchOverride ?? '').trim();
 
@@ -122,6 +135,10 @@ export default withAppLayout(breadcrumbs, (props: any) => {
             params.dbProductId = nextFilters.dbProductId;
         }
 
+        if (nextFilters.cart) {
+            params.cart = 1;
+        }
+
         return params;
     };
 
@@ -134,7 +151,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'dbProductId') => {
+    const removeFilter = (key: 'active' | 'category' | 'dbProductId' | 'cart') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
@@ -142,11 +159,34 @@ export default withAppLayout(breadcrumbs, (props: any) => {
             nextFilters.category = null;
         } else if (key === 'dbProductId') {
             nextFilters.dbProductId = null;
+        } else if (key === 'cart') {
+            nextFilters.cart = undefined;
+            // Seulement effacer le filtre session, pas le panier lui-même
+            fetch('/products/save-cart-filter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ cart_ids: [] }),
+            }).catch(err => console.error('Erreur clear cart:', err));
         }
         applyFilters(nextFilters);
     }
 
     const clearAllFilters = () => {
+        // Effacer aussi le panier de la session et côté client
+        clearCart();
+        fetch('/products/save-cart-filter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ cart_ids: [] }),
+        }).catch(err => console.error('Erreur clear cart:', err));
         applyFilters({
             active: 'all',
             category: null,

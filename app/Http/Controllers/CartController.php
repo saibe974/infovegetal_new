@@ -40,6 +40,35 @@ class CartController extends Controller
         return response()->json(['message' => 'Produit retiré du panier']);
     }
 
+    public function save(Request $request)
+    {
+        $data = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        // Créer ou récupérer le panier de l'utilisateur
+        $cart = Auth::user()->cart()->firstOrCreate([]);
+
+        // Préparer les données pour synchroniser les produits
+        $syncData = [];
+        foreach ($data['items'] as $item) {
+            $syncData[$item['id']] = ['quantity' => $item['quantity']];
+        }
+
+        // Synchroniser les produits du panier
+        $cart->products()->sync($syncData);
+
+        // Nettoyer la session du filtre panier
+        $request->session()->forget('cart_filter_ids');
+
+        return response()->json([
+            'status' => 'ok',
+            'message' => __('Panier enregistré avec succès'),
+        ]);
+    }
+
     public function show(Cart $cart)
     {
         return response()->json($cart->load('products'));

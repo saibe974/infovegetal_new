@@ -20,6 +20,11 @@ function importProducts_infovegetal_old($params = array(), $resolve)
     ], $params);    
 
     extract($params);
+
+    $db = trim((string) ($resolve($mapped, $defaultsMap, 'db_products_id') ?? ''));
+    // if ($db === '13') {
+    //     return ['skip' => true];
+    // }
    
     $sku = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
@@ -47,8 +52,13 @@ function importProducts_infovegetal_old($params = array(), $resolve)
         $productCategoryId = 51;
     }
 
-    
-
+    $dbProductId = null;
+    switch ($db*1) {
+        case 3: $dbProductId = 5; break;
+        case 2: $dbProductId = 4; break;
+        case 12: $dbProductId = 3; break;
+        case 13: $dbProductId = 3; break;
+    }
 
     $newRow = [
         'sku' => $sku,
@@ -58,6 +68,7 @@ function importProducts_infovegetal_old($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
+        'db_products_id' => $dbProductId,
     ];
     return $newRow;
 }

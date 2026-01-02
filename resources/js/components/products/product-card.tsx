@@ -1,10 +1,10 @@
 import React, { useContext } from "react";
-import { Link, router } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon } from "lucide-react";
-import { type Product } from "@/types";
+import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
 
 type Props = {
@@ -18,6 +18,10 @@ type Props = {
 
 export function ProductCard({ product, canEdit = false, canDelete = false, editProduct, deleteProduct, className }: Props) {
     const { t } = useI18n();
+
+    const { auth } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
 
     const name = String(product?.name ?? "");
     const description = String(product?.description ?? "");
@@ -111,17 +115,19 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         )}
                     </div>
 
-                    <Button
-                        onClick={(e: React.MouseEvent) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            // TODO: action d'ajout au panier
-                            handleAddToCart(product.id);
-                        }}
-                        className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
-                    >
-                        {t('Add to Cart')}
-                    </Button>
+                    {isAuthenticated &&
+                        <Button
+                            onClick={(e: React.MouseEvent) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleAddToCart(product.id);
+                            }}
+                            className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
+                        >
+                            {t('Add to Cart')}
+                        </Button>
+                    }
+
                 </CardFooter>
             </Card>
         </Link>
