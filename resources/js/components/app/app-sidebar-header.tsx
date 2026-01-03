@@ -7,11 +7,11 @@ import { useI18n } from '@/lib/i18n';
 import { dashboard, home, login, register } from '@/routes';
 import products from '@/routes/products';
 import SearchSelect from '@/components/app/search-select';
-import { useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { SelectWithItems } from '../ui/select-with-items';
 import { SelectLang } from '../ui/selectLang';
 import AppearanceToggleDropdown from '../appearance-dropdown';
-import { ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
+import {  ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
 import { AlignJustify } from 'lucide-react'; // optionnel : icône pour le trigger
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from '../ui/navigation-menu';
@@ -19,6 +19,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dr
 import BasicSticky from 'react-sticky-el';
 import { useSidebar } from '@/components/ui/sidebar';
 import { ProductsFilters } from '../products/products-filters';
+import { CartContext } from '../cart/cart.context';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+
 
 
 export function AppSidebarHeader({
@@ -40,6 +44,8 @@ export function AppSidebarHeader({
     const [search, setSearch] = useState('');
 
     const isHomePage = usePage().component === 'home';
+
+    const { items } = useContext(CartContext);
 
     // calcul dynamique de la largeur du header en fonction de l'état du sidebar "main"
     const mainOpen = isOpenId('main');
@@ -139,14 +145,14 @@ export function AppSidebarHeader({
                             count={collection?.meta.total ?? 0}
                             query={''}
                             search={true}
-                            // filters={(
-                            //     <ProductsFilters
-                            //         categories={[]}
-                            //         active={'all'}
-                            //         categoryId={1}
-                            //         onApply={() => { }}
-                            //     />
-                            // )}
+                        // filters={(
+                        //     <ProductsFilters
+                        //         categories={[]}
+                        //         active={'all'}
+                        //         categoryId={1}
+                        //         onApply={() => { }}
+                        //     />
+                        // )}
                         />
                     </div>
                 )}
@@ -182,8 +188,18 @@ export function AppSidebarHeader({
                             </DropdownMenu>
                         )}
                         <div>
-                            <div className="w-full flex items-center justify-between gap-4">
+                            <div className="w-full flex items-center justify-between gap-4 relative">
                                 <SidebarTrigger className="" targetId='right' icon={ShoppingCart} />
+                                <Badge
+                                    // variant={"destructive"}
+                                    className={cn(
+                                        "absolute -top-1 -right-1 text-xs bg-red-600 text-white font-extralight size-4",
+                                        items.length > 9 ? " px-2" : " px-1.5",
+                                        items.length === 0 && "hidden"
+                                    )}
+                                >
+                                    {items.length}
+                                </Badge>
                             </div>
                         </div>
 

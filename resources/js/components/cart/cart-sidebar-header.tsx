@@ -164,7 +164,7 @@ export function CartSidebarHeader() {
                 )}
             </div>
 
-            <div className="flex flex-col gap-3 mt-4 flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 scrollbar-thumb-rounded-full">
+            <div className="flex flex-col gap-3 mt-4 flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 scrollbar-thumb-rounded-full pt-3">
                 {items.length === 0 && (
                     <div className="text-center text-muted-foreground text-sm py-8">
                         Panier vide

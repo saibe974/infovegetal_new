@@ -38,6 +38,15 @@ export function CartItem({ product, quantity }: CartItemProps) {
                         alt={product.name} 
                         className="size-15 object-cover rounded"
                     />
+                    <Badge
+                        // variant={''}
+                        className={cn(
+                            "absolute -top-1 -right-1 text-xs",
+                            quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                        )}
+                    >
+                        {quantity}
+                    </Badge>
                 </div>
 
                 {/* Infos produit */}
@@ -76,7 +85,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                             </Button>
                         </div>
                         
-                        <div className="font-semibold text-sm">
+                        <div className="font-semibold text-sm text-nowrap">
                             {total} €
                         </div>
                     </div>
