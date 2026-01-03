@@ -44,7 +44,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                     <Badge
                         // variant={''}
                         className={cn(
-                            "absolute -top-1 -right-1 text-xs",
+                            "absolute -top-1 -right-1 text-xs rounded-full",
                             quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
                         )}
                     >
@@ -74,9 +74,19 @@ export function CartItem({ product, quantity }: CartItemProps) {
                             >
                                 <Minus className="size-3" />
                             </Button>
-                            <span className="min-w-[1.25rem] text-center text-xs font-medium">
+                            {/* <span className="min-w-[1.25rem] text-center text-xs font-medium">
                                 {quantity}
-                            </span>
+                            </span> */}
+                            <input
+                                type="text"
+                                min={1}
+                                value={quantity}
+                                onChange={(e) => {
+                                    const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
+                                    updateQuantity(product.id, newQuantity);
+                                }}
+                                className="w-[1.25rem] text-center text-xs font-medium bg-transparent outline-none"
+                            />
                             <Button
                                 variant="ghost"
                                 size="icon"
