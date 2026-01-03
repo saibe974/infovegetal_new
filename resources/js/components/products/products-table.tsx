@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useContext } from "react";
 import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EditIcon, TrashIcon } from 'lucide-react';
-import { type Product, PaginatedCollection } from '@/types';
+import { CirclePlus, EditIcon, TrashIcon } from 'lucide-react';
+import { type Product, PaginatedCollection, SharedData } from '@/types';
+import { useI18n } from "@/lib/i18n";
+import { CartContext } from "../cart/cart.context";
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -14,6 +16,10 @@ type Props = {
 };
 
 export default function ProductsTable({ collection, canEdit = false, canDelete = false }: Props) {
+    const { t } = useI18n();
+    const { auth } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
 
     const goToProductPage = (id: number) => {
         canEdit ? window.location.href = `/admin/products/${id}/edit` :
@@ -32,17 +38,20 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
         }
     }
 
+    const { addToCart } = useContext(CartContext);
+
     return (
         <Table>
             <TableHeader>
                 <TableRow>
                     <SortableTableHead field='id'>ID</SortableTableHead>
                     <TableHead></TableHead>
-                    <SortableTableHead field='name'>Name</SortableTableHead>
-                    <SortableTableHead field='category_products_id'>Category</SortableTableHead>
-                    <TableHead>Description</TableHead>
-                    <SortableTableHead field='price'>Price</SortableTableHead>
-                    {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
+                    <SortableTableHead field='name'>{t('Name')}</SortableTableHead>
+                    <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead>
+                    <TableHead>{t('Description')}</TableHead>
+                    <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
+                    {(canEdit || canDelete) && <TableHead className="text-end">{t('Actions')}</TableHead>}
+                    {isAuthenticated && <TableHead className="text-end">{t('Add to cart')}</TableHead>}
                 </TableRow>
             </TableHeader>
             <TableBody className="">
@@ -93,6 +102,22 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                         </Button>
                                     )}
                                 </div>
+                            </TableCell>
+                        )}
+                        {isAuthenticated && (
+                            <TableCell className="text-end">
+                                <Button
+                                    title={t('Add to cart')}
+                                    variant={'outline'}
+                                    size={'icon'}
+                                    className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        addToCart(item, 1);
+                                    }}
+                                >
+                                    <CirclePlus />
+                                </Button>
                             </TableCell>
                         )}
                     </TableRow>

@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n';
 
 export type CartItemProps = {
     product: Product;
@@ -13,6 +14,7 @@ export type CartItemProps = {
 };
 
 export function CartItem({ product, quantity }: CartItemProps) {
+    const { t } = useI18n();
     const { removeFromCart, updateQuantity } = useContext(CartContext);
     
    const total = (parseFloat(String(product.price)) * quantity).toFixed(2);
@@ -24,7 +26,8 @@ export function CartItem({ product, quantity }: CartItemProps) {
                 variant="ghost"
                 size="icon"
                 className="absolute top-0 right-0 size-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                aria-label="Retirer du panier"
+                aria-label={t('Retirer du panier')}
+                title={t('Retirer du panier')}
                 onClick={() => removeFromCart(product.id)}
             >
                 <Trash2 className="size-3.5" />

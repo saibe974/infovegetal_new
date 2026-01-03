@@ -8,8 +8,10 @@ import {
 import { CartContext } from "./cart.context";
 import { router } from "@inertiajs/react";
 import { CartItem } from "./cart-item";
+import { useI18n } from "@/lib/i18n";
 
 export function CartSidebarHeader() {
+    const { t } = useI18n();
     const { items, clearCart } = useContext(CartContext);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -90,7 +92,7 @@ export function CartSidebarHeader() {
         <div className="flex flex-col h-screen">
             <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Vider le panier">
+                    <SidebarMenuButton asChild title={t("Vider le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -102,7 +104,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Insérer dans le panier">
+                    <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -113,7 +115,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Voir le panier">
+                    <SidebarMenuButton asChild title={t("Voir le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -125,7 +127,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Sauvegarder le panier">
+                    <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted disabled:opacity-50"
@@ -138,7 +140,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Valider le panier">
+                    <SidebarMenuButton asChild title={t("Valider le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
