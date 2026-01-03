@@ -1,7 +1,11 @@
 import React, { useContext } from 'react';
 import { type Product } from '@/types';
 import { CartContext } from './cart.context';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Minus, Plus } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export type CartItemProps = {
     product: Product;
@@ -10,44 +14,74 @@ export type CartItemProps = {
 
 export function CartItem({ product, quantity }: CartItemProps) {
     const { removeFromCart, updateQuantity } = useContext(CartContext);
+    
+   const total = (parseFloat(String(product.price)) * quantity).toFixed(2);
+    
     return (
-        <div className="flex items-center gap-2 p-2 border-b">
-            <img src={product.img_link ?? '/placeholder.png'} alt={product.name} className="w-12 h-12 object-cover rounded" />
-            <div className="flex-1">
-                <div className="font-semibold max-w-10  whitespace-nowrap overflow-hidden text-ellipsis">{product.name}</div>
-                <div className="text-xs text-gray-500">{product.price} €</div>
-            </div>
-            <div className="flex items-center gap-1">
-                <button
-                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                    aria-label="Diminuer la quantité"
-                    onClick={() => updateQuantity(product.id, quantity - 1)}
-                    disabled={quantity <= 1}
-                >
-                    -
-                </button>
-                <input
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={e => updateQuantity(product.id, Number(e.target.value))}
-                    className="w-10 text-center border rounded"
-                />
-                <button
-                    className="px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
-                    aria-label="Augmenter la quantité"
-                    onClick={() => updateQuantity(product.id, quantity + 1)}
-                >
-                    +
-                </button>
-            </div>
-            <button
-                className="ml-2 p-1 rounded hover:bg-destructive/10"
+        <div className="group relative border-b pb-3 last:border-b-0">
+            {/* Bouton supprimer en haut à droite */}
+            <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-0 right-0 size-6 text-destructive hover:text-destructive hover:bg-destructive/10"
                 aria-label="Retirer du panier"
                 onClick={() => removeFromCart(product.id)}
             >
-                <Trash2 className="size-4 text-destructive" />
-            </button>
+                <Trash2 className="size-3.5" />
+            </Button>
+
+            <div className="flex gap-2.5">
+                {/* Image produit */}
+                <div className="relative shrink-0">
+                    <img 
+                        src={product.img_link ?? '/placeholder.png'} 
+                        alt={product.name} 
+                        className="size-15 object-cover rounded"
+                    />
+                </div>
+
+                {/* Infos produit */}
+                <div className="flex-1 min-w-0 pr-6">
+                    <h4 className="font-medium text-sm leading-tight line-clamp-2 mb-1">
+                        {product.name}
+                    </h4>
+                    <div className="text-xs text-muted-foreground mb-2">
+                        {product.price} €
+                    </div>
+                    
+                    {/* Contrôles quantité + Total */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-0.5 bg-muted rounded p-0.5">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-5 hover:bg-background"
+                                aria-label="Diminuer la quantité"
+                                onClick={() => updateQuantity(product.id, quantity - 1)}
+                                disabled={quantity <= 1}
+                            >
+                                <Minus className="size-3" />
+                            </Button>
+                            <span className="min-w-[1.25rem] text-center text-xs font-medium">
+                                {quantity}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-5 hover:bg-background"
+                                aria-label="Augmenter la quantité"
+                                onClick={() => updateQuantity(product.id, quantity + 1)}
+                            >
+                                <Plus className="size-3" />
+                            </Button>
+                        </div>
+                        
+                        <div className="font-semibold text-sm">
+                            {total} €
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

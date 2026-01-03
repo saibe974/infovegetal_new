@@ -150,13 +150,13 @@ export function CartSidebarHeader() {
             </SidebarMenu>
 
             <div className="flex-shrink-0">
-                <div className="my-2">Total : {total} €</div>
+                <div className="my-2">Total : {total.toFixed(2)} €</div>
 
                 {saveMessage && (
                     <div
                         className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                                ? "bg-red-100 text-red-700"
-                                : "bg-green-100 text-green-700"
+                                ? " text-destructive border border-destructive"
+                                : " text-green-600 border border-green-600"
                             }`}
                     >
                         {saveMessage}
@@ -164,9 +164,9 @@ export function CartSidebarHeader() {
                 )}
             </div>
 
-            <div className="flex flex-col gap-2 mt-4 flex-1 overflow-y-auto min-h-0">
+            <div className="flex flex-col gap-3 mt-4 flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 scrollbar-thumb-rounded-full">
                 {items.length === 0 && (
-                    <div className="text-center">
+                    <div className="text-center text-muted-foreground text-sm py-8">
                         Panier vide
                     </div>
                 )}
