@@ -43,6 +43,7 @@ export function CartSidebarHeader() {
     const handleSaveCart = async () => {
         if (items.length === 0) {
             setSaveMessage("Le panier est vide");
+            setTimeout(() => setSaveMessage(null), 3000);
             return;
         }
 

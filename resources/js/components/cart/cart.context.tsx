@@ -68,6 +68,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return [];
     });
 
+    const [pendingProductId, setPendingProductId] = useState<number | null>(null);
+
+    // Vérifier s'il y a une intention d'ajout au panier après connexion
+    useEffect(() => {
+        if (userId && typeof window !== 'undefined') {
+            const pendingAdd = sessionStorage.getItem('pendingCartAdd');
+            if (pendingAdd) {
+                const { productId } = JSON.parse(pendingAdd);
+                setPendingProductId(productId);
+                sessionStorage.removeItem('pendingCartAdd');
+            }
+        }
+    }, [userId]);
+
+    // Récupérer le produit et l'ajouter au panier
+    useEffect(() => {
+        if (pendingProductId && userId) {
+            // Récupérer les infos du produit depuis le serveur
+            fetch(`/api/products/${pendingProductId}`)
+                .then(res => res.json())
+                .then(product => {
+                    addToCart(product, 1);
+                    setPendingProductId(null);
+                })
+                .catch(err => {
+                    console.error('Erreur lors de la récupération du produit:', err);
+                    setPendingProductId(null);
+                });
+        }
+    }, [pendingProductId, userId]);
+
     useEffect(() => {
         localStorage.setItem(getCartKey(), JSON.stringify(items));
 

@@ -115,18 +115,24 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         )}
                     </div>
 
-                    {isAuthenticated &&
-                        <Button
-                            onClick={(e: React.MouseEvent) => {
-                                e.preventDefault();
-                                e.stopPropagation();
+                    {/* {isAuthenticated && */}
+                    <Button
+                        onClick={(e: React.MouseEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isAuthenticated) {
                                 handleAddToCart(product.id);
-                            }}
-                            className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
-                        >
-                            {t('Add to Cart')}
-                        </Button>
-                    }
+                            } else {
+                                // Stocker l'intention d'ajout au panier avant redirection
+                                sessionStorage.setItem('pendingCartAdd', JSON.stringify({ productId: product.id, quantity: 1 }));
+                                router.visit('/login');
+                            }
+                        }}
+                        className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
+                    >
+                        {t('Add to Cart')}
+                    </Button>
+                    {/* } */}
 
                 </CardFooter>
             </Card>

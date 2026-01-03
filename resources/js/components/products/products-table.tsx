@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CirclePlus, EditIcon, TrashIcon } from 'lucide-react';
@@ -51,7 +51,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <TableHead>{t('Description')}</TableHead>
                     <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end">{t('Actions')}</TableHead>}
-                    {isAuthenticated && <TableHead className="text-end">{t('Add to cart')}</TableHead>}
+                    <TableHead className="text-end">{t('Add to cart')}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody className="">
@@ -104,22 +104,28 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 </div>
                             </TableCell>
                         )}
-                        {isAuthenticated && (
-                            <TableCell className="text-end">
-                                <Button
-                                    title={t('Add to cart')}
-                                    variant={'outline'}
-                                    size={'icon'}
-                                    className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.stopPropagation();
+                        {/* {isAuthenticated && ( */}
+                        <TableCell className="text-end">
+                            <Button
+                                title={t('Add to cart')}
+                                variant={'outline'}
+                                size={'icon'}
+                                className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
+                                onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    if (isAuthenticated) {
                                         addToCart(item, 1);
-                                    }}
-                                >
-                                    <CirclePlus />
-                                </Button>
-                            </TableCell>
-                        )}
+                                    } else {
+                                        // Stocker l'intention d'ajout au panier avant redirection
+                                        sessionStorage.setItem('pendingCartAdd', JSON.stringify({ productId: item.id, quantity: 1 }));
+                                        router.visit('/login');
+                                    }
+                                }}
+                            >
+                                <CirclePlus />
+                            </Button>
+                        </TableCell>
+                        {/* )} */}
                     </TableRow>
                 ))}
             </TableBody>
