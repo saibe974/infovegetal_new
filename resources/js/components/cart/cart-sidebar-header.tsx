@@ -150,7 +150,7 @@ export function CartSidebarHeader() {
             </SidebarMenu>
 
             <div className="flex-shrink-0">
-                <div>total : {total} €</div>
+                <div className="my-2">Total : {total} €</div>
 
                 {saveMessage && (
                     <div
@@ -166,7 +166,7 @@ export function CartSidebarHeader() {
 
             <div className="flex flex-col gap-2 mt-4 flex-1 overflow-y-auto min-h-0">
                 {items.length === 0 && (
-                    <div className="text-center text-muted">
+                    <div className="text-center">
                         Panier vide
                     </div>
                 )}
