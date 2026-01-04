@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { CheckCircle, Eye, PlusCircle, Save, Trash2 } from "lucide-react";
+import { CheckCircleIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import {
     SidebarMenu,
     SidebarMenuButton,
@@ -17,7 +17,7 @@ export function CartSidebarHeader() {
     const total = items.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
         0
-    );
+    ).toFixed(2);
 
     const getFiltersUrl = () => {
         const location =
@@ -96,7 +96,7 @@ export function CartSidebarHeader() {
                             className="p-2 rounded hover:bg-muted"
                             onClick={clearCart}
                         >
-                            <Trash2 className="size-5 text-destructive" />
+                            <Trash2Icon className="size-5 text-destructive" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -107,7 +107,7 @@ export function CartSidebarHeader() {
                             type="button"
                             className="p-2 rounded hover:bg-muted"
                         >
-                            <PlusCircle className="size-5" />
+                            <PlusCircleIcon className="size-5" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -119,7 +119,7 @@ export function CartSidebarHeader() {
                             className="p-2 rounded hover:bg-muted"
                             onClick={() => router.visit(getFiltersUrl())}
                         >
-                            <Eye className="size-5" />
+                            <EyeIcon className="size-5" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -132,7 +132,7 @@ export function CartSidebarHeader() {
                             onClick={handleSaveCart}
                             disabled={isSaving}
                         >
-                            <Save className="size-5 text-primary" />
+                            <SaveIcon className="size-5 text-primary" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -143,7 +143,7 @@ export function CartSidebarHeader() {
                             type="button"
                             className="p-2 rounded hover:bg-muted"
                         >
-                            <CheckCircle className="size-5 text-green-600" />
+                            <CheckCircleIcon className="size-5 text-green-600" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -155,8 +155,8 @@ export function CartSidebarHeader() {
                 {saveMessage && (
                     <div
                         className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                                ? "bg-red-100 text-red-700"
-                                : "bg-green-100 text-green-700"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-green-100 text-green-700"
                             }`}
                     >
                         {saveMessage}
