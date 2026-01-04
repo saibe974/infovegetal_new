@@ -14,7 +14,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
         <div className="flex items-center gap-2 p-2 border-b">
             <img src={product.img_link ?? '/placeholder.png'} alt={product.name} className="w-12 h-12 object-cover rounded" />
             <div className="flex-1">
-                <div className="font-semibold">{product.name}</div>
+                <div className="font-semibold max-w-10  whitespace-nowrap overflow-hidden text-ellipsis">{product.name}</div>
                 <div className="text-xs text-gray-500">{product.price} €</div>
             </div>
             <div className="flex items-center gap-1">
