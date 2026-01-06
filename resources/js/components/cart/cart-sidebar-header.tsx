@@ -27,7 +27,7 @@ export function CartSidebarHeader() {
     const total = items.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
         0
-    ).toFixed(2);
+    );
 
     const getFiltersUrl = () => {
         const location =
@@ -97,6 +97,65 @@ export function CartSidebarHeader() {
         }
     };
 
+    const handleGeneratePdf = async () => {
+        if (items.length === 0) {
+            setSaveMessage("Le panier est vide");
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        setIsSaving(true);
+        setSaveMessage(null);
+
+        try {
+            const csrfToken = (
+                document.querySelector(
+                    'meta[name="csrf-token"]'
+                ) as HTMLMetaElement
+            )?.content;
+
+            const response = await fetch("/cart/generate-pdf", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken || "",
+                },
+                body: JSON.stringify({
+                    items: items.map((item) => ({
+                        id: item.product.id,
+                        quantity: item.quantity,
+                    })),
+                }),
+            });
+
+            if (response.ok) {
+                // Créer un blob à partir de la réponse
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `panier-${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                setSaveMessage("PDF généré avec succès");
+                setTimeout(() => setSaveMessage(null), 3000);
+            } else {
+                const data = await response.json();
+                setSaveMessage(
+                    data.message || "Erreur lors de la génération du PDF"
+                );
+            }
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            setSaveMessage("Erreur lors de la génération du PDF");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen">
             <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
@@ -152,7 +211,9 @@ export function CartSidebarHeader() {
                     <SidebarMenuButton asChild title={t("Valider le panier")}>
                         <button
                             type="button"
-                            className="p-2 rounded hover:bg-muted"
+                            className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                            onClick={handleGeneratePdf}
+                            disabled={isSaving}
                         >
                             <CheckCircleIcon className="size-5 text-green-600" />
                         </button>
@@ -161,7 +222,7 @@ export function CartSidebarHeader() {
             </SidebarMenu>
 
             <div className="flex-shrink-0">
-                <div className="my-2">Total : {total.toFixed(2)} €</div>
+                <div className="my-2">Total : {total?.toFixed(2) ?? 0} €</div>
 
                 {saveMessage && (
                     <div

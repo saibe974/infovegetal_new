@@ -42,6 +42,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/add', [\App\Http\Controllers\CartController::class, 'addProduct'])->name('add');
             Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
             Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');
+            Route::post('/generate-pdf', [\App\Http\Controllers\CartController::class, 'generatePdf'])->name('generate-pdf');
         });
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
