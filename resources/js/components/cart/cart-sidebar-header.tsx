@@ -6,10 +6,20 @@ import {
     SidebarMenuItem,
 } from "../ui/sidebar";
 import { CartContext } from "./cart.context";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import { CartItem } from "./cart-item";
+import { useI18n } from "@/lib/i18n";
+import { SharedData } from "@/types";
+import { Button } from "../ui/button";
+import HeadingSmall from "../heading-small";
 
 export function CartSidebarHeader() {
+    const { t } = useI18n();
+
+    const { auth } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
+
     const { items, clearCart } = useContext(CartContext);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -41,6 +51,7 @@ export function CartSidebarHeader() {
     const handleSaveCart = async () => {
         if (items.length === 0) {
             setSaveMessage("Le panier est vide");
+            setTimeout(() => setSaveMessage(null), 3000);
             return;
         }
 
@@ -90,7 +101,7 @@ export function CartSidebarHeader() {
         <div className="flex flex-col h-screen">
             <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Vider le panier">
+                    <SidebarMenuButton asChild title={t("Vider le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -102,7 +113,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Insérer dans le panier">
+                    <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -113,7 +124,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Voir le panier">
+                    <SidebarMenuButton asChild title={t("Voir le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -125,7 +136,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Sauvegarder le panier">
+                    <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted disabled:opacity-50"
@@ -138,7 +149,7 @@ export function CartSidebarHeader() {
                 </SidebarMenuItem>
 
                 <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title="Valider le panier">
+                    <SidebarMenuButton asChild title={t("Valider le panier")}>
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted"
@@ -150,13 +161,13 @@ export function CartSidebarHeader() {
             </SidebarMenu>
 
             <div className="flex-shrink-0">
-                <div className="my-2">Total : {total} €</div>
+                <div className="my-2">Total : {total.toFixed(2)} €</div>
 
                 {saveMessage && (
                     <div
                         className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
+                            ? " text-destructive border border-destructive"
+                            : " text-green-600 border border-green-600"
                             }`}
                     >
                         {saveMessage}
@@ -164,20 +175,50 @@ export function CartSidebarHeader() {
                 )}
             </div>
 
-            <div className="flex flex-col gap-2 mt-4 flex-1 overflow-y-auto min-h-0">
-                {items.length === 0 && (
-                    <div className="text-center">
-                        Panier vide
+            <div className="flex flex-col gap-3 mt-4 flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 scrollbar-thumb-rounded-full pt-3">
+                {!isAuthenticated ? (
+                    <div className="flex flex-col items-center justify-center gap-4 p-6 text-center">
+                        <div className="text-muted-foreground">
+                            <HeadingSmall
+                                title={t("Connectez-vous ou inscrivez-vous")}
+                                description={t(
+                                    "pour ajouter des produits au panier"
+                                )}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-2 w-full">
+                            <Button
+                                onClick={() => router.visit('/login')}
+                                className=""
+                            >
+                                {t("Log in")}
+                            </Button>
+                            <Button
+                                variant={'secondary'}
+                                onClick={() => router.visit('/register')}
+                                className=""
+                            >
+                                {t("Register")}
+                            </Button>
+                        </div>
                     </div>
-                )}
+                ) : (
+                    <>
+                        {items.length === 0 && (
+                            <div className="text-center text-muted-foreground text-sm py-8">
+                                {t("Panier vide")}
+                            </div>
+                        )}
 
-                {items.map((item) => (
-                    <CartItem
-                        key={item.product.id}
-                        product={item.product}
-                        quantity={item.quantity}
-                    />
-                ))}
+                        {items.map((item) => (
+                            <CartItem
+                                key={item.product.id}
+                                product={item.product}
+                                quantity={item.quantity}
+                            />
+                        ))}
+                    </>
+                )}
             </div>
         </div>
     );
