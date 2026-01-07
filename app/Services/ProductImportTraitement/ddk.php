@@ -23,37 +23,100 @@ function importProducts_ddk($params = array(), $resolve)
 
     extract($params);
 
-    // Récupérer code et producteur depuis le CSV
-    $barcode = trim((string) ($mapped['codebarre'] ?? ''));
-    $code = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
-    $producteur = trim((string) ($resolve($mapped, $defaultsMap, 'producteur') ?? ''));
+    // Helpers de parsing
+    $parsePrice = function ($value) {
+        if ($value === null) {
+            return null;
+        }
+        $search = array(',', ' ', '€', "\xc2\xa0");
+        $replace = array('.', '', '', '');
+        $val = str_replace($search, $replace, (string) $value);
+        return is_numeric($val) ? (float) $val : null;
+    };
 
-    // Construire le SKU au format : code_producteur
+    $parseQuantity = function ($value) {
+        if ($value === null) {
+            return null;
+        }
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+        $val = (string) $value;
+        // Format "X x Y" : extraction simple du nombre
+        $numbers = [];
+        preg_match_all('/\d+/', $val, $numbers);
+        if (empty($numbers[0])) {
+            return null;
+        }
+        // Retourner le premier nombre trouvé
+        return (int) $numbers[0][0];
+    };
+
+    // Pour cond (qte-plaque = "1 x 18"): prendre le 2e nombre (18)
+    $parseCondition = function ($value) {
+        if ($value === null) {
+            return null;
+        }
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+        $val = (string) $value;
+        $numbers = [];
+        preg_match_all('/\d+/', $val, $numbers);
+        if (count($numbers[0]) < 2) {
+            // Si pas de format "X x Y", retourner le 1er nombre
+            return !empty($numbers[0]) ? (int) $numbers[0][0] : null;
+        }
+        // Retourner le 2e nombre
+        return (int) $numbers[0][1];
+    };
+
+    // Pour floor et roll (qte-etage = "5 x 18", qte-cc = "55 x 18"): prendre le 1er nombre
+    $parseFirstNumber = function ($value) {
+        if ($value === null) {
+            return null;
+        }
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+        $val = (string) $value;
+        $numbers = [];
+        preg_match_all('/\d+/', $val, $numbers);
+        return !empty($numbers[0]) ? (int) $numbers[0][0] : null;
+    };
+
+    // Récupérer code et producteur depuis le CSV
+    $ean13 = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
+    $producteur = trim((string) ($resolve($mapped, $defaultsMap, 'producteur_name') ?? ''));
+
+    if ($ean13 === '' || $ref === '') {
+        return ['error' => 'Missing ean13 or ref', 'row' => $mapped];
+    }
+
+    // Construire le SKU au format : ean13_ref
     $skuParts = [];
 
-    if ($barcode !== '') {
-        $skuParts[] = $barcode;
+    if ($ean13 !== '') {
+        $skuParts[] = $ean13;
     }
 
-    if ($code !== '') {
-        $skuParts[] = $code;
-    }
-
-    if ($producteur !== '') {
-        $skuParts[] = $producteur;
+    if ($ref !== '') {
+        $skuParts[] = $ref;
     }
 
     $sku = implode('_', $skuParts);
 
     // Traiter la description pour extraire le nom latin
     $description = trim((string) ($resolve($mapped, $defaultsMap, 'description') ?? ''));
+    $description = mb_strtolower($description);
     
     // Extraire le nom latin à partir de la description (comme format_rem de l'ancien système)
     $name = $description;
     if ($description !== '') {
         $parts = explode(' ', $description);
         $firstPart = explode('.', $parts[0]);
-        $latin = strtolower(trim($firstPart[0]));
+        $latin = trim($firstPart[0]);
         
         // Gestion des cas spéciaux et abréviations
         if ($latin == 'arr' || $latin == 'arrangement') {
@@ -82,25 +145,35 @@ function importProducts_ddk($params = array(), $resolve)
         $name = trim($latin);
     }
 
-    if ($sku === '' || $name === '') {
-        return ['error' => 'Missing sku or name', 'row' => $mapped];
-    }
+   
 
     $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
     $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
 
     // Récupérer les champs DDK spécifiques
     $pot = $resolve($mapped, $defaultsMap, 'pot');
-    $hauteur = $resolve($mapped, $defaultsMap, 'hauteur');
-    $qte_plaque = $resolve($mapped, $defaultsMap, 'qte_plaque');
-    $qte_etage = $resolve($mapped, $defaultsMap, 'qte_etage');
-    $qte_cc = $resolve($mapped, $defaultsMap, 'qte_cc');
+    $hauteur = $resolve($mapped, $defaultsMap, 'height');
+    
+    // Parsing spécifique pour cond/floor/roll
+    // cond (qte-plaque = "1 x 18"): nombre de produits par carton → 18 (2e nombre)
+    // floor (qte-etage = "5 x 18"): nombre de cartons par étage → 5 (1er nombre)
+    // roll (qte-cc = "55 x 18"): nombre total de cartons par roll → 55 (1er nombre)
+    //   calculé comme: roll_total_cartons / floor_cartons = 55 / 5 = 11 étages par roll
+    $condRaw = $resolve($mapped, $defaultsMap, 'cond');
+    $floorRaw = $resolve($mapped, $defaultsMap, 'floor');
+    $rollRaw = $resolve($mapped, $defaultsMap, 'roll');
+    
+    $cond = $parseCondition($condRaw);  // Prendre le 2e nombre pour "1 x 18" → 18
+    $floorValue = $parseFirstNumber($floorRaw); // Prendre le 1er nombre pour "5 x 18" → 5
+    $rollTotalCartons = $parseFirstNumber($rollRaw); // Prendre le 1er nombre pour "55 x 18" → 55
+    
+    // roll = nombre total de cartons par roll / nombre de cartons par étage
+    $roll = ($floorValue && $rollTotalCartons) ? (int) ($rollTotalCartons / $floorValue) : null;
+    $floor = $floorValue;
 
-    $priceVal = $resolve($mapped, $defaultsMap, 'price');
-    $search = array(',', ' ', '€', "\xc2\xa0");
-    $replace = array('.', '', '', '');
-    $priceVal = str_replace($search, $replace, (string) $priceVal);
-    $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
+    $price = $parsePrice($resolve($mapped, $defaultsMap, 'price')) ?? 0;
+    $priceFloor = $parsePrice($resolve($mapped, $defaultsMap, 'price_floor'));
+    $priceRoll = $parsePrice($resolve($mapped, $defaultsMap, 'price_roll'));
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;
@@ -115,6 +188,24 @@ function importProducts_ddk($params = array(), $resolve)
         $productCategoryId = 51;
     }
 
+    // Récupérer et traiter le producteur
+    $producerId = null;
+    if ($producteur !== '') {
+        // Chercher ou créer le producteur
+        try {
+            $producerModel = \App\Models\Producer::firstOrCreate(
+                ['name' => $producteur],
+                ['name' => $producteur]
+            );
+            $producerId = $producerModel->id;
+        } catch (\Throwable $e) {
+            // Si la table n'existe pas encore, laisser null
+        }
+    }
+
+    // Traiter le conditionnement : stocker directement les valeurs dans products
+    // Plus besoin de créer un modèle Conditionnement externe
+
     $newRow = [
         'sku' => $sku,
         'name' => $name,
@@ -124,6 +215,17 @@ function importProducts_ddk($params = array(), $resolve)
         'active' => $active,
         'category_products_id' => $productCategoryId,
         'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
+        'ref' => $ref,
+        'ean13' => $ean13,
+        'pot' => $pot ? (int) $pot : null,
+        'height' => $hauteur ? (string) $hauteur : null,
+        'price_floor' => $priceFloor,
+        'price_roll' => $priceRoll,
+        'producer_id' => $producerId,
+        'cond' => $cond,
+        'floor' => $floor,
+        'roll' => $roll,
     ];
+
     return $newRow;
 }

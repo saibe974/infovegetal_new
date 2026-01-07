@@ -204,7 +204,7 @@ export function CsvUploadFilePond({
                 return;
             }
 
-            console.log('[Import] Starting import for ID:', id);
+            // console.log('[Import] Starting import for ID:', id);
             setImportError(null);
             setProgressInfo(null);
             setDisplayProgress(0);
@@ -237,7 +237,7 @@ export function CsvUploadFilePond({
                     body: JSON.stringify(body),
                 });
 
-                console.log('[Import] Response :', response);
+                // console.log('[Import] Response :', response);
 
                 if (!response.ok) {
                     throw new Error(
@@ -247,18 +247,18 @@ export function CsvUploadFilePond({
 
                 const payload = await response.json().catch(() => null);
 
-                console.log('[Import] Response payload:', payload);
+                // console.log('[Import] Response payload:', payload);
 
                 if (payload && typeof payload === 'object') {
                     setProgressInfo(payload as ImportProgressPayload);
                     const status = String(payload.status ?? '').toLowerCase();
-                    console.log('[Import] Status from response:', status);
+                    // console.log('[Import] Status from response:', status);
                     if (status === 'done') {
-                        console.log('[Import] Completed immediately');
+                        // console.log('[Import] Completed immediately');
                         stopProgressPolling();
                         setImportStatus('finished');
                     } else if (status === 'error') {
-                        console.log('[Import] Error in response');
+                        // console.log('[Import] Error in response');
                         stopProgressPolling();
                         setImportStatus('error');
                         setImportError(
@@ -267,31 +267,31 @@ export function CsvUploadFilePond({
                                 : 'Import process failed',
                         );
                     } else if (status === 'cancelled') {
-                        console.log('[Import] Cancelled in response');
+                        // console.log('[Import] Cancelled in response');
                         stopProgressPolling();
                         setImportStatus('cancelled');
                     } else if (status === 'cancelling') {
-                        console.log('[Import] Cancellation requested');
+                        // console.log('[Import] Cancellation requested');
                         shouldPollRef.current = true;
                         setImportStatus('cancelling');
                     } else {
-                        console.log(
-                            '[Import] Still processing, polling will continue',
-                        );
+                        // console.log(
+                        //     '[Import] Still processing, polling will continue',
+                        // );
                         shouldPollRef.current = true;
                         setImportStatus('processing');
                     }
                 } else {
-                    console.log(
-                        '[Import] Empty response, assuming processing',
-                    );
+                    // console.log(
+                    //     '[Import] Empty response, assuming processing',
+                    // );
                     shouldPollRef.current = true;
                     setImportStatus('processing');
                 }
 
                 onImportQueued?.(id);
             } catch (error) {
-                console.error('Failed to start import:', error);
+                // console.error('Failed to start import:', error);
                 setImportStatus('error');
                 setImportError(
                     error instanceof Error
@@ -412,21 +412,20 @@ export function CsvUploadFilePond({
         const shouldPoll =
             importStatus === 'processing' || importStatus === 'cancelling';
         if (!shouldPoll) {
-            console.log('[Polling] Stopped: status is', importStatus);
+            // console.log('[Polling] Stopped: status is', importStatus);
             stopProgressPolling();
             return;
         }
 
         if (!shouldPollRef.current) {
-            console.log(
-                '[Polling] Waiting for import response before starting, shouldPollRef=',
-                shouldPollRef.current,
-            );
+            // console.log(
+            //     '[Polling] Waiting for import response before starting, shouldPollRef=',
+            //     shouldPollRef.current,
+            // );
             // return;
         }
 
-        console.log('[Polling] Starting for upload ID:', uploadId);
-
+        // console.log('[Polling] Starting for upload ID:', uploadId);
         let cancelled = false;
         const progressUrl = importProgressUrl!;
 
@@ -435,7 +434,7 @@ export function CsvUploadFilePond({
                 window.clearInterval(progressPollRef.current);
                 progressPollRef.current = null;
             }
-            console.log('[Polling][Fetch] fetching progress for', uploadId);
+            // console.log('[Polling][Fetch] fetching progress for', uploadId);
             try {
                 const response = await fetch(progressUrl(uploadId), {
                     headers: { Accept: 'application/json' },
@@ -481,10 +480,10 @@ export function CsvUploadFilePond({
                             },
                             body: JSON.stringify({ id: uploadId }),
                         });
-                        console.log(
-                            '[Import][Chunk] response status=',
-                            resp.status,
-                        );
+                        // console.log(
+                        //     '[Import][Chunk] response status=',
+                        //     resp.status,
+                        // );
                     } catch (e) {
                         console.error(
                             '[Import][Chunk] Failed to request next import chunk:',

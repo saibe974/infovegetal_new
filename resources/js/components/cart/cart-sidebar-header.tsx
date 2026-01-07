@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { CheckCircleIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import {
     SidebarMenu,
     SidebarMenuButton,
@@ -177,7 +177,7 @@ export function CartSidebarHeader() {
                             type="button"
                             className="p-2 rounded hover:bg-muted"
                         >
-                            <PlusCircleIcon className="size-5" />
+                            <DownloadIcon className="size-5" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>

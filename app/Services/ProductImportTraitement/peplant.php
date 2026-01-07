@@ -23,61 +23,84 @@ function importProducts_peplant($params = array(), $resolve)
 
     extract($params);
 
-    // Récupérer barcode, ref et leverancier depuis le CSV
-    // Note: barcode est mappé vers 'sku' pour le split, donc on accède directement à $mapped['barcode']
-    $barcode = trim((string) ($mapped['barcode'] ?? ''));
-    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref_peplant') ?? ''));
-    $leverancier = trim((string) ($resolve($mapped, $defaultsMap, 'leverancier_peplant') ?? '1000'));
+    // Helpers
+    $parsePrice = function ($value) {
+        $search = array(',', ' ', '€', "\xc2\xa0");
+        $replace = array('.', '', '', '');
+        $val = str_replace($search, $replace, (string) ($value ?? ''));
+        return (isset($val) && is_numeric($val)) ? (float) $val : null;
+    };
 
-    // Construire le SKU au format : barcode_ref_leverancier
-    $skuParts = [];
+    // EMBALLAGE format attendu: "cond*floor*roll" (ex: "4*21*1")
+    $parseEmballage = function ($value) {
+        if ($value === null) {
+            return [null, null, null];
+        }
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [null, null, null];
+        }
+        $parts = preg_split('/\*/', $raw);
+        $nums = array_map(function ($p) {
+            $p = trim($p);
+            return ($p !== '' && is_numeric($p)) ? (int) $p : null;
+        }, $parts);
+        // Normaliser à 3 éléments
+        $cond = $nums[0] ?? null;
+        $floor = $nums[1] ?? null;
+        $roll = $nums[2] ?? null;
+        return [$cond, $floor, $roll];
+    };
 
-    if ($barcode !== '') {
-        $skuParts[] = $barcode;
+    // Champs de base
+    $ean13 = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
+
+    if ($ean13 === '' || $ref === '') {
+        return ['error' => 'Missing ean13 or ref', 'row' => $mapped];
     }
 
-    if ($ref !== '') {
-        $skuParts[] = $ref;
-    }
-
-    if ($leverancier !== '') {
-        $skuParts[] = $leverancier;
-    }
-
-    $sku = implode('_', $skuParts);
+    $sku = $ean13 . '_' . $ref;
 
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
-    $name = mb_strtolower($name); // Convertir en minuscules
-    $name = preg_replace('/\s+/', ' ', $name); // Nettoyer les espaces multiples
+    $name = mb_strtolower($name);
+    $name = preg_replace('/\s+/', ' ', $name);
 
-    if ($sku === '' || $name === '') {
-        return ['error' => 'Missing sku or name', 'row' => $mapped];
-    }
+  
 
     $description = $resolve($mapped, $defaultsMap, 'description');
     $description = $description !== null ? trim((string) $description) : null;
+    $description = mb_strtolower($description);
 
     $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
     $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
 
-    $priceVal = $resolve($mapped, $defaultsMap, 'price');
-    $search = array(',', ' ', '€', "\xc2\xa0");
-    $replace = array('.', '', '', '');
-    $priceVal = str_replace($search, $replace, (string) $priceVal);
-    $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
-
-    $activeVal = $resolve($mapped, $defaultsMap, 'active');
-    $active = isset($activeVal) ? (int) $activeVal : 1;
-
-    // Résoudre la catégorie via slug dans defaultsMapCategories
+    // Catégorie via slug
     $catVal = $resolve($mapped, $defaultsMap, 'category_products_name');
     $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger();
     $catSlug = $slugger->slug((string)$catVal)->lower()->toString();
     $productCategoryId = isset($defaultsMapCategories[$catSlug]) ? (int) $defaultsMapCategories[$catSlug] : 51;
-
     if (!in_array($productCategoryId, $validCategoryIds, true)) {
         $productCategoryId = 51;
     }
+
+    // Prix
+    $price = $parsePrice($resolve($mapped, $defaultsMap, 'price')) ?? 0;
+    $priceFloor = $parsePrice($resolve($mapped, $defaultsMap, 'prix_etage'));
+    $priceRoll = $parsePrice($resolve($mapped, $defaultsMap, 'prix_roll'));
+    $pricePromo = $parsePrice($resolve($mapped, $defaultsMap, 'prix_promo'));
+
+    // Quantités cond/floor/roll depuis EMBALLAGE
+    list($cond, $floor, $roll) = $parseEmballage($resolve($mapped, $defaultsMap, 'cond'));
+
+    // Autres champs
+    $pot = $resolve($mapped, $defaultsMap, 'pot');
+    $pot = $pot !== null ? (is_numeric($pot) ? (int) $pot : null) : null;
+    $height = $resolve($mapped, $defaultsMap, 'haut');
+    $height = $height !== null ? trim((string) $height) : null;
+
+    $activeVal = $resolve($mapped, $defaultsMap, 'active');
+    $active = isset($activeVal) ? (int) $activeVal : 1;
 
     $newRow = [
         'sku' => $sku,
@@ -88,6 +111,17 @@ function importProducts_peplant($params = array(), $resolve)
         'active' => $active,
         'category_products_id' => $productCategoryId,
         'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
+        // Nouveaux champs
+        'ean13' => $ean13,
+        'ref' => $ref,
+        'pot' => $pot,
+        'height' => $height,
+        'price_floor' => $priceFloor,
+        'price_roll' => $priceRoll,
+        'price_promo' => $pricePromo,
+        'cond' => $cond,
+        'floor' => $floor,
+        'roll' => $roll,
     ];
     return $newRow;
 }
