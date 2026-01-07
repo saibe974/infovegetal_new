@@ -50,8 +50,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead>
                     <TableHead>{t('Description')}</TableHead>
                     <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
-                    {(canEdit || canDelete) && <TableHead className="text-end">{t('Actions')}</TableHead>}
                     <TableHead className="text-end">{t('Add to cart')}</TableHead>
+                    {(canEdit || canDelete) && <TableHead className="text-end">{t('Actions')}</TableHead>}
+
                 </TableRow>
             </TableHeader>
             <TableBody className="">
@@ -80,6 +81,28 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             </div>
                         </TableCell>
                         <TableCell>{item.price} €</TableCell>
+                        {/* {isAuthenticated && ( */}
+                        <TableCell className="text-end">
+                            <Button
+                                title={t('Add to cart')}
+                                variant={'outline'}
+                                size={'icon'}
+                                className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
+                                onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    if (isAuthenticated) {
+                                        addToCart(item, 1);
+                                    } else {
+                                        // Stocker l'intention d'ajout au panier avant redirection
+                                        sessionStorage.setItem('pendingCartAdd', JSON.stringify({ productId: item.id, quantity: 1 }));
+                                        router.visit('/login');
+                                    }
+                                }}
+                            >
+                                <CirclePlus />
+                            </Button>
+                        </TableCell>
+                        {/* )} */}
                         {(canEdit || canDelete) && (
                             <TableCell>
                                 <div className="flex gap-2 justify-end" onClick={e => e.stopPropagation()}>
@@ -104,28 +127,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 </div>
                             </TableCell>
                         )}
-                        {/* {isAuthenticated && ( */}
-                        <TableCell className="text-end">
-                            <Button
-                                title={t('Add to cart')}
-                                variant={'outline'}
-                                size={'icon'}
-                                className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    if (isAuthenticated) {
-                                        addToCart(item, 1);
-                                    } else {
-                                        // Stocker l'intention d'ajout au panier avant redirection
-                                        sessionStorage.setItem('pendingCartAdd', JSON.stringify({ productId: item.id, quantity: 1 }));
-                                        router.visit('/login');
-                                    }
-                                }}
-                            >
-                                <CirclePlus />
-                            </Button>
-                        </TableCell>
-                        {/* )} */}
+
                     </TableRow>
                 ))}
             </TableBody>
