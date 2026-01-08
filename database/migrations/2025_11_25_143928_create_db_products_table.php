@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('db_products', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->tinyText('description')->nullable();
+            $table->string('description')->nullable();
             $table->json('champs')->nullable();
             $table->json('categories')->nullable();
             $table->timestamps();

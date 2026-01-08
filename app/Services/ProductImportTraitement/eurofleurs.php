@@ -23,70 +23,88 @@ function importProducts_eurofleurs($params = array(), $resolve)
 
     extract($params);
 
-    // Récupérer EAN depuis le CSV (s'il existe dans le mapping)
-    $ean = trim((string) ($resolve($mapped, $defaultsMap, 'ean') ?? ''));
+    // Helpers
+    $parsePrice = function ($value) {
+        $search = array(',', ' ', '€', "\xc2\xa0");
+        $replace = array('.', '', '', '');
+        $val = str_replace($search, $replace, (string) ($value ?? ''));
+        return (isset($val) && is_numeric($val)) ? (float) $val : null;
+    };
 
-    // Si l'EAN est absent ou égal à '-', on le génère à partir de l'id
-    if ($ean === '' || $ean === '-') {
+    // EAN13 (générer si manquant)
+    $ean13 = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
+    if ($ean13 === '' || $ean13 === '-') {
         $idVal = $resolve($mapped, $defaultsMap, 'id');
         if ($idVal !== null) {
             $generatedEan = generateEAN13FromId($idVal);
             if ($generatedEan !== null) {
-                $ean = $generatedEan;
+                $ean13 = $generatedEan;
             }
         }
     }
 
-    // Récupérer la "ref" logique (dans ton defaultsMap: "ref" => "id")
+    // ref (depuis id)
     $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
 
-    // Construire le SKU au format : ean_ref_21000
-    // - si pas d'EAN ou pas de ref, on évite de mettre des "__"
-    $skuParts = [];
-
-    if ($ean !== '' && $ean !== '-') {
-        $skuParts[] = $ean;
+    // SKU = ean13_ref
+    if ($ean13 === '' || $ref === '') {
+        return ['error' => 'Missing ean13 or ref', 'row' => $mapped];
     }
+    $sku = $ean13 . '_' . $ref;
 
-    if ($ref !== '') {
-        $skuParts[] = $ref;
-    }
-
-    $skuParts[] = '21000';
-
-    $sku = implode('_', $skuParts);
-
+    // Texte
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
-
-    if ($sku === '' || $name === '') {
-        return ['error' => 'Missing sku or name', 'row' => $mapped];
-    }
+    $name = mb_strtolower($name);
 
     $description = $resolve($mapped, $defaultsMap, 'description');
     $description = $description !== null ? trim((string) $description) : null;
+    $description = $description !== null ? mb_strtolower($description) : null;
 
+    // Média
     $imgLink = $resolve($mapped, $defaultsMap, 'img_link');
     $imgLink = $imgLink !== null ? trim((string) $imgLink) : null;
 
-    $priceVal = $resolve($mapped, $defaultsMap, 'price');
-    $search = array(',', ' ', '€', "\xc2\xa0");
-    $replace = array('.', '', '', '');
-    $priceVal = str_replace($search, $replace, (floatval($priceVal)));
-    $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
-
-    $activeVal = $resolve($mapped, $defaultsMap, 'active');
-    $active = isset($activeVal) ? (int) $activeVal : 1;
-
-    // Résoudre la catégorie via slug dans defaultsMapCategories
-    // Utiliser la clé alignée avec les seeders: 'category_products_name'
+    // Catégorie
     $catVal = $resolve($mapped, $defaultsMap, 'category_products_name');
     $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger();
     $catSlug = $slugger->slug((string)$catVal)->lower()->toString();
     $productCategoryId = isset($defaultsMapCategories[$catSlug]) ? (int) $defaultsMapCategories[$catSlug] : 51;
-
     if (!in_array($productCategoryId, $validCategoryIds, true)) {
         $productCategoryId = 51;
     }
+
+    // Prix
+    $price = $parsePrice($resolve($mapped, $defaultsMap, 'price')) ?? 0;            // prix_plaque
+    $priceFloor = $parsePrice($resolve($mapped, $defaultsMap, 'price_floor'));     // prix_etage
+    $priceRoll = $parsePrice($resolve($mapped, $defaultsMap, 'price_roll'));       // prix_cc
+    $pricePromo = $parsePrice($resolve($mapped, $defaultsMap, 'price_promo'));
+
+    // Quantités
+    $cond = $resolve($mapped, $defaultsMap, 'cond');   // pcs_pal
+    $cond = ($cond !== null && $cond !== '' && is_numeric($cond)) ? (int) $cond : null;
+    $floor = $resolve($mapped, $defaultsMap, 'floor'); // pal_par_etage
+    $floor = ($floor !== null && $floor !== '' && is_numeric($floor)) ? (int) $floor : null;
+    $roll = $resolve($mapped, $defaultsMap, 'roll');   // pal_par_cc
+    $roll = ($roll !== null && $roll !== '' && is_numeric($roll)) ? (int) $roll : null;
+
+    // Autres champs
+    $potRaw = $resolve($mapped, $defaultsMap, 'pot');
+    if ($potRaw !== null) {
+        $potStr = str_replace([',', ' '], ['.', ''], (string) $potRaw);
+        $pot = is_numeric($potStr) ? (int) round((float) $potStr) : null;
+    } else {
+        $pot = null;
+    }
+    $height = $resolve($mapped, $defaultsMap, 'height');
+    $height = $height !== null ? trim((string) $height) : null;
+
+    $producerId = $resolve($mapped, $defaultsMap, 'producer_id');
+    $producerId = ($producerId !== null && is_numeric($producerId)) ? (int) $producerId : null;
+    $tvaId = $resolve($mapped, $defaultsMap, 'tva_id');
+    $tvaId = ($tvaId !== null && is_numeric($tvaId)) ? (int) $tvaId : null;
+
+    $activeVal = $resolve($mapped, $defaultsMap, 'active');
+    $active = isset($activeVal) ? (int) $activeVal : 1;
 
     $newRow = [
         'sku' => $sku,
@@ -97,6 +115,18 @@ function importProducts_eurofleurs($params = array(), $resolve)
         'active' => $active,
         'category_products_id' => $productCategoryId,
         'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
+        'ref' => $ref,
+        'ean13' => $ean13,
+        'pot' => $pot,
+        'height' => $height,
+        'price_floor' => $priceFloor,
+        'price_roll' => $priceRoll,
+        'price_promo' => $pricePromo,
+        'producer_id' => $producerId,
+        'tva_id' => $tvaId,
+        'cond' => $cond,
+        'floor' => $floor,
+        'roll' => $roll,
     ];
     return $newRow;
 }

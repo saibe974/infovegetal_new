@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { CheckCircle, Eye, PlusCircle, Save, Trash2 } from "lucide-react";
+import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import {
     SidebarMenu,
     SidebarMenuButton,
@@ -97,6 +97,65 @@ export function CartSidebarHeader() {
         }
     };
 
+    const handleGeneratePdf = async () => {
+        if (items.length === 0) {
+            setSaveMessage("Le panier est vide");
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        setIsSaving(true);
+        setSaveMessage(null);
+
+        try {
+            const csrfToken = (
+                document.querySelector(
+                    'meta[name="csrf-token"]'
+                ) as HTMLMetaElement
+            )?.content;
+
+            const response = await fetch("/cart/generate-pdf", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken || "",
+                },
+                body: JSON.stringify({
+                    items: items.map((item) => ({
+                        id: item.product.id,
+                        quantity: item.quantity,
+                    })),
+                }),
+            });
+
+            if (response.ok) {
+                // Créer un blob à partir de la réponse
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `panier-${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                setSaveMessage("PDF généré avec succès");
+                setTimeout(() => setSaveMessage(null), 3000);
+            } else {
+                const data = await response.json();
+                setSaveMessage(
+                    data.message || "Erreur lors de la génération du PDF"
+                );
+            }
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            setSaveMessage("Erreur lors de la génération du PDF");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen">
             <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
@@ -107,7 +166,7 @@ export function CartSidebarHeader() {
                             className="p-2 rounded hover:bg-muted"
                             onClick={clearCart}
                         >
-                            <Trash2 className="size-5 text-destructive" />
+                            <Trash2Icon className="size-5 text-destructive" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -118,7 +177,7 @@ export function CartSidebarHeader() {
                             type="button"
                             className="p-2 rounded hover:bg-muted"
                         >
-                            <PlusCircle className="size-5" />
+                            <DownloadIcon className="size-5" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -130,7 +189,7 @@ export function CartSidebarHeader() {
                             className="p-2 rounded hover:bg-muted"
                             onClick={() => router.visit(getFiltersUrl())}
                         >
-                            <Eye className="size-5" />
+                            <EyeIcon className="size-5" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -143,7 +202,7 @@ export function CartSidebarHeader() {
                             onClick={handleSaveCart}
                             disabled={isSaving}
                         >
-                            <Save className="size-5 text-primary" />
+                            <SaveIcon className="size-5 text-primary" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -152,16 +211,18 @@ export function CartSidebarHeader() {
                     <SidebarMenuButton asChild title={t("Valider le panier")}>
                         <button
                             type="button"
-                            className="p-2 rounded hover:bg-muted"
+                            className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                            onClick={handleGeneratePdf}
+                            disabled={isSaving}
                         >
-                            <CheckCircle className="size-5 text-green-600" />
+                            <CheckCircleIcon className="size-5 text-green-600" />
                         </button>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
 
             <div className="flex-shrink-0">
-                <div className="my-2">Total : {total.toFixed(2)} €</div>
+                <div className="my-2">Total : {total?.toFixed(2) ?? 0} €</div>
 
                 {saveMessage && (
                     <div

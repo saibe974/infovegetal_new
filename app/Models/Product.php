@@ -21,6 +21,18 @@ class Product extends Model
         'attributes',
         'category_products_id',
         'db_products_id',
+        'ref',
+        'ean13',
+        'pot',
+        'hight',
+        'price_floor',
+        'price_roll',
+        'price_promo',
+        'producer_id',
+        'tva_id',
+        'cond',
+        'floor',
+        'roll',
     ];
 
     protected $sortable = [
@@ -33,12 +45,30 @@ class Product extends Model
         'updated_at',
         'category_products_id',
         'db_products_id',
+        'ref',
+        'ean13',
+        'pot',
+        'height',
+        'price_floor',
+        'price_roll',
+        'price_promo',
+        'producer_id',
+        'cond',
+        'floor',
+        'roll',
     ];
 
     protected $casts = [
         'attributes' => 'array',
         'active' => 'boolean',
         'price' => 'decimal:2',
+        'price_floor' => 'decimal:2',
+        'price_roll' => 'decimal:2',
+        'price_promo' => 'decimal:2',
+        'pot' => 'decimal:2',
+        'cond' => 'integer',
+        'floor' => 'integer',
+        'roll' => 'integer',
         'created_at' => 'immutable_datetime',
         'updated_at' => 'immutable_datetime',
         'deleted_at' => 'immutable_datetime',
@@ -48,6 +78,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(CategoryProducts::class, 'category_products_id');
+    }
+
+    public function producer()
+    {
+        return $this->belongsTo(Producer::class, 'producer_id');
     }
 
     public function tags()

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cart;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class CartController extends Controller
 {
@@ -96,5 +98,46 @@ class CartController extends Controller
     public function destroy(Cart $cart)
     {
         //
+    }
+
+    /**
+     * Generate PDF from cart items
+     */
+    public function generatePdf(Request $request)
+    {
+        $data = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        // Récupérer les produits avec leurs détails
+        $productIds = collect($data['items'])->pluck('id')->toArray();
+        $products = Product::with(['category', 'tags'])->whereIn('id', $productIds)->get()->keyBy('id');
+
+        // Construire les items avec les produits complets
+        $items = collect($data['items'])->map(function ($item) use ($products) {
+            return [
+                'product' => $products[$item['id']],
+                'quantity' => $item['quantity'],
+            ];
+        });
+
+        // Calculer le total
+        $total = $items->sum(function ($item) {
+            return $item['product']->price * $item['quantity'];
+        });
+
+        $user = Auth::user();
+
+        // Générer le PDF avec Spatie
+        return Pdf::view('pdf.cart', [
+            'items' => $items,
+            'total' => $total,
+            'user' => $user,
+        ])
+            ->format('a4')
+            ->name('panier-' . now()->format('Y-m-d-His') . '.pdf')
+            ->download();
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Route;
 use League\Csv\Reader;
 use League\Csv\Writer;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -152,7 +153,7 @@ class ProductImportService
                         if (file_exists($traitementPath)) {
                             $traitement = $dbp->traitement;
                             require_once $traitementPath;
-                            Log::info("[Import][$id] Traitement loaded: {$dbp->traitement}");
+                            // Log::info("[Import][$id] Traitement loaded: {$dbp->traitement}");
                         } else {
                             Log::warning("[Import][$id] Traitement file not found: {$traitementPath}");
                         }
@@ -266,6 +267,18 @@ class ProductImportService
                             'active' => $active,
                             'category_products_id' => $productCategoryId,
                             'db_products_id' => $dbProductsId,
+                            'ref' => null,
+                            'ean13' => null,
+                            'pot' => null,
+                            'height' => null,
+                            'price_floor' => null,
+                            'price_roll' => null,
+                            'price_promo' => null,
+                            'producer_id' => null,
+                            'tva_id' => null,
+                            'cond' => null,
+                            'floor' => null,
+                            'roll' => null,
                         ];
                     endif;
 
@@ -313,13 +326,23 @@ class ProductImportService
 
             // Upsert par lots de 100 pour éviter les problèmes de contraintes
             if (!empty($upsertRows)) {
+                // Colonnes à mettre à jour selon la source (traitement)
+                $defaultUpdateColumns = ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id', 'ref', 'ean13', 'pot', 'height', 'price_floor', 'price_roll', 'price_promo', 'producer_id', 'tva_id', 'cond', 'floor', 'roll'];
+                $updateColumns = $defaultUpdateColumns;
+
+                // Spécifique à infovegetal_old: n'update que category_products_id et img_link si le produit existe déjà
+                if (isset($traitement) && $traitement === 'infovegetal_old') {
+                    $updateColumns = ['category_products_id', 'img_link'];
+                }
+
                 $chunks = array_chunk($upsertRows, 100);
                 foreach ($chunks as $chunk) {
-                    Product::withoutEvents(function () use ($chunk, $id) {
+                    $columnsToUpdate = $updateColumns; // capturer pour la closure
+                    Product::withoutEvents(function () use ($chunk, $id, $columnsToUpdate) {
                         Product::upsert(
                             $chunk,
                             ['sku'],
-                            ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id']
+                            $columnsToUpdate
                         );
                     });
                 }
@@ -339,7 +362,9 @@ class ProductImportService
                 'processed' => $processed,
                 'total' => $total,
                 'errors' => $errors,
-                'report' => ($errors > 0 && file_exists($reportPath) ? route('products.import.report', ['id' => $id]) : null),
+                'report' => ($errors > 0 && file_exists($reportPath) && Route::has('products.import.report')
+                    ? route('products.import.report', ['id' => $id])
+                    : null),
                 'path' => $relativePath,
                 'next_offset' => $chunkIndex + 1,
                 'has_more' => ($chunkIndex + 1) < (int)($state['chunks_count'] ?? 1),

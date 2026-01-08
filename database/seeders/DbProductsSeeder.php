@@ -30,15 +30,28 @@ class DbProductsSeeder extends Seeder
                     'bc-ref' => 'sku',
                     'latin' => 'name',
                     'rem' => 'description',
-                    'prix' => 'price',
                     'img' => 'img_link',
-                    'fam' => 'category_products_id'
+                    'fam' => 'category_products_id',
+                    'ref' => 'ref',
+                    'barcode' => 'ean13',
+                    'pot' => 'pot',
+                    'haut' => 'height',
+                    'prix' => 'price',
+                    'prix-etage' => 'price_floor',
+                    'prix-roll' => 'price_roll',
+                    'prix-promo' => 'price_promo',
+                    'id-producteur' => 'producer_id',
+                    'code-tva' => 'tva_id',
+                    'cond' => 'cond',
+                    'etage' => 'floor',
+                    'roll' => 'roll',
                 ],
                 'categories' => [],
                 'traitement' => 'infovegetal_old',
             ]
         );
 
+        //{"prix_etage":"prix_etage","prix_cc":"prix_roll","groupe":"fam","prix_plaque":"prix"}
 
         DbProducts::firstOrCreate(
             ['name' => 'Eurofleurs'],
@@ -46,11 +59,22 @@ class DbProductsSeeder extends Seeder
                 'description' => 'Bases Eurofleurs',
                 'champs' => [
                     'id' => 'sku',
+                    'ean' => 'ean13',
                     'article' => 'name',
                     'remarque' => 'description',
                     'prix-plaque' => 'price',
                     'image' => 'img_link',
-                    'groupe' => 'category_products_name'
+                    'groupe' => 'category_products_name',
+                    'pot' => 'pot',
+                    'hauteur' => 'height',
+                    'prix-etage' => 'price_floor',
+                    'prix-roll' => 'price_roll',
+                    'prix-promo' => 'price_promo',
+                    'producteur-id' => 'producer_id',
+                    'code-tva' => 'tva_id',
+                    'pcs-pal' => 'cond',
+                    'pal-par-etage' => 'floor',
+                    'pal-par-cc' => 'roll',
                 ],
                 'categories' => [
                     "noel" => "51",
@@ -126,8 +150,8 @@ class DbProductsSeeder extends Seeder
             [
                 'description' => 'bases belges',
                 'champs' => [
-                    "ref" => "ref_peplant",
-                    "barcode" => "sku",
+                    "ref" => "sku",
+                    "barcode" => "ean13",
                     "leverancier" => "leverancier_peplant",
                     "min" => "contrainte_producteur",
                     "omschrijving-foto" => "name",
@@ -142,7 +166,7 @@ class DbProductsSeeder extends Seeder
                     "prix-etage" => "prix_etage",
                     "prix-cc" => "prix_roll",
                     "promo" => "prix_promo",
-                    "unite-carton" => "unite",
+                    "unite-carton" => "minimum",
                     "tags" => "tags"
                 ],
                 'categories' => [
@@ -191,21 +215,21 @@ class DbProductsSeeder extends Seeder
             [
                 'description' => 'bases néerlandaises, hamiplant',
                 'champs' => [
-                    "code" => "ref",
-                    "images" => "img_link",
-                    "description" => "description",
-                    "diametre-de-pot" => "pot",
-                    "hauteur" => "hauteur",
-                    "qte-plaque" => "qte_plaque",
-                    "qte-etage" => "qte_etage",
-                    "qte-cc" => "qte_cc",
-                    "prix-plaque" => "price",
-                    "prix-etage" => "prix_etage",
-                    "prix-cc" => "prix_cc",
-                    "conditionnement" => "conditionnement",
-                    "mini-de-conditionnement" => "mini_conditionnement",
-                    "codebarre" => "sku",
-                    "producteur" => "producteur"
+                    'code' => 'sku',
+                    'images' => 'img_link',
+                    'description' => 'description',
+                    'diametre-de-pot' => 'pot',
+                    'hauteur' => 'height',
+                    'qte-plaque' => 'cond',
+                    'qte-etage' => 'floor',
+                    'qte-cc' => 'roll',
+                    'prix-plaque' => 'price',
+                    'prix-etage' => 'price_floor',
+                    'prix-cc' => 'price_roll',
+                    'mini-de-conditionnement' => 'minimum',
+                    'codebarre' => 'ean13',
+                    'producteur' => 'producteur_name',
+                    'cde-producteur' => 'producteur_code'
                 ],
                 'categories' => [
                     "plantes-fleuries" => "10",
