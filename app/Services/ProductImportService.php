@@ -162,6 +162,7 @@ class ProductImportService
                     Log::warning('Unable to load DbProducts defaults: ' . $e->getMessage());
                 }
             }
+
             $resolve = function (array $mapped, ?array $defaultsMap, string $targetKey) {
                 if (is_array($defaultsMap)) {
                     // Mapping : source -> cible
@@ -332,7 +333,7 @@ class ProductImportService
 
                 // Spécifique à infovegetal_old: n'update que category_products_id et img_link si le produit existe déjà
                 if (isset($traitement) && $traitement === 'infovegetal_old') {
-                    $updateColumns = ['category_products_id', 'img_link'];
+                    $updateColumns = ['name', 'description', 'category_products_id', 'img_link'];
                 }
 
                 $chunks = array_chunk($upsertRows, 100);

@@ -103,7 +103,12 @@ Route::middleware(['role:admin'])->group(function () {
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->name('users.editDb');
     
-
+    // CSV import/export endpoints for users
+    Route::post('admin/users/import/process', [UserManagementController::class, 'process'])->name('users.import.process');
+    Route::post('admin/users/import/process-chunk', [UserManagementController::class, 'processChunk'])->name('users.import.process_chunk');
+    Route::post('admin/users/import/cancel', [UserManagementController::class, 'cancel'])->name('users.import.cancel');
+    Route::get('admin/users/import/progress/{id}', [UserManagementController::class, 'progress'])->name('users.import.progress');
+    Route::get('admin/users/import/report/{id}', [UserManagementController::class, 'report'])->name('users.import.report');
 
     // Route d'impersonation - take (nécessite admin)
     Route::get('/impersonate/take/{id}/{guardName?}',

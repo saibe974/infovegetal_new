@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\UserImportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate as FacadesGate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -435,5 +439,195 @@ class UserManagementController extends Controller
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,
         ]);
+    }
+
+    /**
+     * Import users process - handle initial upload.
+     */
+    public function process(Request $request, UserImportService $importService)
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+        
+        
+
+        $data = $request->validate(['id' => 'required|string']);
+        $id = $data['id'];
+
+        
+
+        $state = Cache::get("import:$id", []);
+        Log::info("ok " . json_encode($state));
+        if (!$state || empty($state['path'])) {
+            return response()->json(['message' => 'Import inconnu'], 404);
+        }
+    Log::info("ok " . $state['path']);
+        $path = $state['path'];
+        $fullPath = Storage::path($path);
+
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
+        }
+
+        $relativePath = $path;
+
+        $this->updateImportState($id, [
+            'status' => 'processing',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 0,
+            'current' => null,
+            'report' => null,
+            'path' => $relativePath,
+            'next_offset' => 0,
+            'has_more' => true,
+        ]);
+
+        Log::info("User import started synchronously for ID: $id");
+
+        // Premier chunk synchronisé via le service (chunk index 0)
+        $importService->run($id, $fullPath, $relativePath);
+
+        // on renvoie l'état final du cache
+        $final = Cache::get("import:$id") ?? [
+            'status' => 'done',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 100,
+        ];
+
+        return response()->json($final);
+    }
+
+    /**
+     * Import users process chunk - continue processing.
+     */
+    public function processChunk(Request $request, UserImportService $importService)
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $data = $request->validate([
+            'id' => 'required|string',
+        ]);
+
+        $id = $data['id'];
+
+        $state = Cache::get("import:$id");
+        if (!$state || empty($state['path'])) {
+            return response()->json(['message' => 'Import inconnu'], 404);
+        }
+
+        $path = $state['path'];
+        $fullPath = Storage::path($path);
+
+        if (!is_string($fullPath) || !is_file($fullPath)) {
+            return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
+        }
+
+        $relativePath = $path;
+        $chunkIndex = isset($state['next_offset']) ? (int) $state['next_offset'] : 0;
+
+        Log::info("User import chunk requested for ID: $id at chunk index $chunkIndex");
+
+        $importService->runChunk($id, $relativePath, $chunkIndex);
+
+        $final = Cache::get("import:$id") ?? [
+            'status' => 'done',
+            'processed' => 0,
+            'total' => 0,
+            'errors' => 0,
+            'progress' => 100,
+        ];
+
+        return response()->json($final);
+    }
+
+    /**
+     * Get import progress.
+     */
+    public function progress(string $id)
+    {
+        $progress = Cache::get("import:$id");
+
+        if (!$progress) {
+            return response()->json(['status' => 'waiting', 'progress' => 0]);
+        }
+
+        return response()->json([
+            'status' => $progress['status'] ?? 'processing',
+            'processed' => $progress['processed'] ?? 0,
+            'total' => $progress['total'] ?? 0,
+            'errors' => $progress['errors'] ?? 0,
+            'current' => $progress['current'] ?? null,
+            'progress' => $progress['progress'] ?? null,
+            'report' => $progress['report'] ?? null,
+            'next_offset' => $progress['next_offset'] ?? null,
+            'has_more' => $progress['has_more'] ?? false,
+        ]);
+    }
+
+    /**
+     * Cancel import.
+     */
+    public function cancel(Request $request)
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $data = $request->validate([
+            'id' => ['required', 'string'],
+        ]);
+        $id = $data['id'];
+        Cache::put("import:$id:cancel", true, now()->addHour());
+        $state = Cache::get("import:$id", []);
+        Cache::put("import:$id", array_merge($state, [ 'status' => 'cancelling' ]), now()->addHour());
+        return response()->json(['status' => 'cancelling']);
+    }
+
+    /**
+     * Download import report.
+     */
+    public function report(string $id)
+    {
+        $reportPath = 'imports/reports/' . $id . '.csv';
+        if (!Storage::exists($reportPath)) {
+            return response()->json(['message' => 'Rapport introuvable'], 404);
+        }
+
+        $full = Storage::path($reportPath);
+        $filename = 'users_import_report_' . $id . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($full) {
+            $h = fopen($full, 'r');
+            while (!feof($h)) {
+                echo fread($h, 8192);
+            }
+            fclose($h);
+        };
+
+        return new StreamedResponse($callback, 200, $headers);
+    }
+
+    /**
+     * Update import state in cache (helper).
+     */
+    private function updateImportState(string $id, array $state): void
+    {
+        $current = Cache::get("import:$id", []);
+        $merged = array_merge($current, $state);
+        Cache::put("import:$id", $merged, now()->addHour());
     }
 }

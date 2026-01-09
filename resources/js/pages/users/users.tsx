@@ -35,6 +35,7 @@ import { ProductsCardsList } from '@/components/products/products-cards-list';
 import usersRoutes from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
+import UsersImportTreatment from '@/components/users/import';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
@@ -388,7 +389,7 @@ export default withAppLayout(
                 </div>
             );
         };
-
+        console.log(usersRoutes.import.process.url())
         return (
             <div>
                 <Head title="Users" />
@@ -414,16 +415,6 @@ export default withAppLayout(
                     </div>
 
                     {canImportExport && (
-                        // <div className="ml-auto flex items-center gap-2">
-                        //     <CsvUploadFilePond
-                        //         title="Upload CSV"
-                        //         description="Uploadez un fichier CSV"
-                        //         uploadUrl="/upload"
-                        //         successRedirectUrl={products.index().url}
-                        //         buttonLabel=""
-                        //     />
-                        //     <DownloadCsvButton />
-                        // </div>
                         <ButtonsActions
                             cancel={hasChanges ? cancel : undefined}
                             save={hasChanges ? save : undefined}
@@ -432,8 +423,13 @@ export default withAppLayout(
                                 <CsvUploadFilePond
                                     title="Upload CSV"
                                     description="Uploadez un fichier CSV"
-                                    uploadUrl="/admin/users/import"
-                                    successRedirectUrl={products.index().url}
+                                    uploadUrl="/upload"
+                                    importProcessUrl={usersRoutes.import.process.url()}
+                                    importProcessChunkUrl={usersRoutes.import.process_chunk.url()}
+                                    importCancelUrl={usersRoutes.import.cancel.url()}
+                                    importProgressUrl={(id) => usersRoutes.import.progress.url({ id })}
+                                    postTreatmentComponent={UsersImportTreatment}
+                                    successRedirectUrl={usersRoutes.index().url}
                                     buttonLabel=""
                                 />
                             }

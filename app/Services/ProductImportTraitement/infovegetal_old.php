@@ -51,6 +51,10 @@ function importProducts_infovegetal_old($params = array(), $resolve)
 
     $priceVal = $resolve($mapped, $defaultsMap, 'price');
     $price = (isset($priceVal) && is_numeric($priceVal)) ? (float) $priceVal : 0;
+    $priceFloorVal = $resolve($mapped, $defaultsMap, 'price_floor');
+    $priceFloor = (isset($priceFloorVal) && is_numeric($priceFloorVal)) ? (float) $priceFloorVal : 0;
+    $priceRollVal = $resolve($mapped, $defaultsMap, 'price_roll');
+    $priceRoll = (isset($priceRollVal) && is_numeric($priceRollVal)) ? (float) $priceRollVal : 0;
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;
@@ -81,15 +85,15 @@ function importProducts_infovegetal_old($params = array(), $resolve)
         'category_products_id' => $productCategoryId,
         'db_products_id' => $dbProductId,
         'ref' => $ref,
-        'ean13' => null,
-        'pot' => null,
-        'height' => null,
-        'price_floor' => null,
-        'price_roll' => null,
-        'producer_id' => null,
-        'cond' => null,
-        'floor' => null,
-        'roll' => null,
+        'ean13' => $ean13,
+        'pot' =>  $resolve($mapped, $defaultsMap, 'pot') ?? null,
+        'height' => $resolve($mapped, $defaultsMap, 'height') ?? null,
+        'price_floor' => $priceFloor,
+        'price_roll' => $priceRoll,
+        // 'producer_id' => $resolve($mapped, $defaultsMap, 'producer_id') ?? null,
+        'cond' => $resolve($mapped, $defaultsMap, 'cond') ?? null,
+        'floor' => $resolve($mapped, $defaultsMap, 'floor') ?? null,
+        'roll' => $resolve($mapped, $defaultsMap, 'roll') ?? null,
     ];
     return $newRow;
 }
