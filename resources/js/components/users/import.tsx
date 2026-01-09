@@ -17,7 +17,7 @@ type Props = {
     displayProgress: number;
     handleRetryImport: () => void;
     uploadId: string | null;
-    onStartImport?: () => void;
+    onStartImport?: (settings?: { strategy?: string }) => void;
 };
 
 export function UsersImportTreatment({
@@ -29,10 +29,11 @@ export function UsersImportTreatment({
     uploadId,
     onStartImport,
 }: Props) {
+    const [strategy, setStrategy] = useState<'basique' | 'old_DB'>('basique');
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (onStartImport) {
-            onStartImport();
+            onStartImport({ strategy });
         }
     };
 
@@ -43,6 +44,20 @@ export function UsersImportTreatment({
                     <p className="text-sm text-muted-foreground">
                         L'import va créer ou mettre à jour les utilisateurs en fonction de leur email.
                     </p>
+                    <div className="space-y-2">
+                        <label className="block text-sm font-medium">Mode d'import</label>
+                        <select
+                            className="w-full rounded border px-2 py-1 text-sm"
+                            value={strategy}
+                            onChange={(e) => setStrategy(e.target.value as 'basique' | 'old_DB')}
+                        >
+                            <option value="basique">basique</option>
+                            <option value="old_DB">old_DB</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                            Choisissez "old_DB" pour appliquer le traitement spécial hérité de l’ancienne base.
+                        </p>
+                    </div>
                     <button
                         type="submit"
                         className="w-full inline-flex items-center justify-center border px-4 py-2 rounded text-sm bg-primary text-primary-foreground hover:bg-primary/90"

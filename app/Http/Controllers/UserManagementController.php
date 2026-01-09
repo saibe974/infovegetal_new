@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserImportService;
 use Illuminate\Http\RedirectResponse;
@@ -33,12 +34,37 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $users = User::with(['roles', 'permissions'])->get();
+        $query = User::with(['roles', 'permissions']);
+        
+        $search = $request->get('q');
+        if ($search) {
+            $normalized = trim($search);
+            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
+                // Si un seul terme numérique, tenter l'ID exact
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                // Et toujours proposer une recherche sur le nom qui contient tous les termes
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $t) {
+                        $qq->where('name', 'like', '%' . $t . '%');
+                    }
+                });
+            });
+        }
+
+        $users = $query->paginate(24);
         $roles = Role::with('permissions:id,name')->get(['id', 'name']);
 
         return Inertia::render('users/users', [
-            'users' => $users,
+            'q' => $search,
+            'collection' => Inertia::scroll(fn() => UserResource::collection($users)),
             'roles' => $roles,
+            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
     }
 
@@ -453,8 +479,12 @@ class UserManagementController extends Controller
         
         
 
-        $data = $request->validate(['id' => 'required|string']);
+        $data = $request->validate([
+            'id' => 'required|string',
+            'strategy' => ['nullable', 'in:basique,old_DB'],
+        ]);
         $id = $data['id'];
+        $strategy = $data['strategy'] ?? null;
 
         
 
@@ -484,6 +514,7 @@ class UserManagementController extends Controller
             'path' => $relativePath,
             'next_offset' => 0,
             'has_more' => true,
+            'strategy' => $strategy,
         ]);
 
         Log::info("User import started synchronously for ID: $id");
@@ -629,5 +660,80 @@ class UserManagementController extends Controller
         $current = Cache::get("import:$id", []);
         $merged = array_merge($current, $state);
         Cache::put("import:$id", $merged, now()->addHour());
+    }
+
+    /**
+     * Génère les propositions de recherche triées selon la logique.
+     */
+    private function getSearchPropositions($query, ?string $search)
+    {
+        if (empty($search)) {
+            return [];
+        }
+        
+        $lowerSearch = mb_strtolower($search);
+
+        // Récupération des noms distincts - réinitialiser le ORDER BY pour éviter les conflits
+        $clonedQuery = clone $query;
+        $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
+        
+        $propositions = $clonedQuery
+            ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
+            ->groupBy('name')
+            ->pluck('name');
+
+        // --- 🧹 Nettoyage et déduplication ---
+        $clean = function (string $str): string {
+            $str = mb_strtolower($str);
+            // garde uniquement lettres, espaces et tirets (supprime chiffres, /, etc.)
+            $str = preg_replace('/[^\p{L}\s-]/u', ' ', $str);
+            // espaces multiples → un seul
+            $str = trim(preg_replace('/\s+/', ' ', $str));
+            return $str;
+        };
+
+        // Applique le nettoyage
+        $cleaned = $propositions
+            ->map(fn($name) => $clean($name))
+            ->filter(fn($name) => !empty($name))
+            ->unique()
+            ->values();
+
+        // --- 🔢 Tri selon priorités ---
+        $items = $cleaned->all();
+
+        usort($items, function ($a, $b) use ($lowerSearch) {
+            // Priorité :
+            // 1 = mot unique (sans espace ni tiret) qui commence par le terme
+            // 2 = commence par le terme
+            // 3 = contient le terme ailleurs
+            // 4 = autres
+            $pa = (
+                !preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
+            ) ? 1 : (
+                str_starts_with($a, $lowerSearch) ? 2 : (
+                str_contains($a, $lowerSearch) ? 3 : 4
+            ));
+
+            $pb = (
+                !preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
+            ) ? 1 : (
+                str_starts_with($b, $lowerSearch) ? 2 : (
+                str_contains($b, $lowerSearch) ? 3 : 4
+            ));
+
+            if ($pa !== $pb) return $pa <=> $pb;
+
+            // Second critère : longueur
+            $la = mb_strlen($a);
+            $lb = mb_strlen($b);
+            if ($la !== $lb) return $la <=> $lb;
+
+            // Troisième : ordre alphabétique
+            return strnatcmp($a, $b);
+        });
+
+        // Prend les 7 premiers
+        return $items;
     }
 }

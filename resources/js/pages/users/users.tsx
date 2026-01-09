@@ -51,9 +51,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface UsersPageProps {
-    users: User[];
+    collection: {
+        data: User[];
+        next_page_url?: string | null;
+    };
     roles: Array<{ id: number; name: string }>;
     q?: string | null;
+    searchPropositions?: string[];
 }
 
 
@@ -61,13 +65,21 @@ interface UsersPageProps {
 export default withAppLayout(
     breadcrumbs,
     true,
-    ({ users, roles, q }: UsersPageProps) => {
+    ({ collection, roles, q, searchPropositions = [] }: UsersPageProps) => {
 
         // console.log(users)
         const { t } = useI18n();
         type TreeUser = User & { depth: number; parent_id: number | null };
         const [pending, setPending] = useState<TreeUser[] | null>(null);
         const [saving, setSaving] = useState(false);
+        const [allUsers, setAllUsers] = useState<User[]>(collection?.data || []);
+        const [search, setSearch] = useState(q || '');
+        const [fetching, setFetching] = useState(false);
+        const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
+
+        useEffect(() => {
+            setAllUsers(collection?.data || []);
+        }, [collection]);
 
         const { auth, locale } = usePage<SharedData>().props;
         const user = auth?.user;
@@ -109,12 +121,8 @@ export default withAppLayout(
         const canDelete = isAdmin(user) || hasPermission(user, 'delete users');
         const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users');
 
-        const page = usePage<{ searchPropositions?: string[] }>();
-        const searchPropositions = page.props.searchPropositions ?? [];
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-        const [fetching, setFetching] = useState(false);
-        const [search, setSearch] = useState('');
 
         const [viewMode, setViewMode] = useState<ViewMode>(() => {
             if (typeof window === 'undefined') return 'table';
@@ -131,14 +139,15 @@ export default withAppLayout(
                 return;
             }
             setFetching(true);
-            timerRef.current = setTimeout(() => {
-                router.reload({
-                    only: ['searchPropositions'],
-                    data: { q: s },
-                    onSuccess: () => setFetching(false),
-                    // preserveState: true,
-                })
-            }, 300)
+            timerRef.current = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/search-propositions?context=users&q=${encodeURIComponent(s)}&limit=10`);
+                    const json = await res.json();
+                    setSearchPropositions((json.propositions || []) as string[]);
+                } finally {
+                    setFetching(false);
+                }
+            }, 300);
         }
 
         // @ts-ignore
@@ -158,10 +167,13 @@ export default withAppLayout(
                 return;
             }
 
+            // Validation: navigation complète pour réactualiser la page
             setSearch('');
-            router.reload({
-                data: { q: trimmed },
-            })
+            router.get(window.location.pathname, { q: trimmed }, {
+                preserveState: false,
+                replace: true,
+                preserveScroll: false,
+            });
 
             // console.log("selected:", trimmed);
         };
@@ -193,7 +205,7 @@ export default withAppLayout(
 
         // Construire une liste plate pour le SortableTree avec calcul de depth basé sur parent_id
         const allItems = useMemo<TreeUser[]>(() => {
-            const safeUsers = Array.isArray(users) ? users : [];
+            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
 
             // Créer un map id -> user pour accès rapide
             const userMap = new Map<number, any>();
@@ -225,7 +237,7 @@ export default withAppLayout(
                     depth,
                 };
             });
-        }, [users]);
+        }, [allUsers]);
 
         const hasChanges = useMemo(() => {
             if (!pending) return false;
@@ -307,7 +319,7 @@ export default withAppLayout(
                 toggleExpand,
                 isDragging,
                 insertLine, // 'before' | 'after' | null
-                isInsideTarget, // true = intention “inside”
+                isInsideTarget, // true = intention "inside"
                 isOver, // survol (optionnel pour un léger highlight)
                 setNodeRef,
                 attributes,
@@ -389,7 +401,8 @@ export default withAppLayout(
                 </div>
             );
         };
-        console.log(usersRoutes.import.process.url())
+
+        // console.log(usersRoutes.import.process.url())
         return (
             <div>
                 <Head title="Users" />
@@ -409,8 +422,11 @@ export default withAppLayout(
                             value={search}
                             onChange={handleSearch}
                             onSubmit={onSelect}
-                            propositions={searchPropositions}
+                            propositions={searchPropositionsState}
                             loading={fetching}
+                            count={(collection as any)?.meta?.total ?? collection?.data?.length ?? 0}
+                            query={q ?? ''}
+                            minQueryLength={2}
                         />
                     </div>
 
@@ -443,23 +459,27 @@ export default withAppLayout(
                 </StickyBar>
 
                 {viewMode === 'table' ? (
-                    <UsersTable
-                        users={users}
-                        roles={roles}
-                        auth={auth}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canPreview={canPreview}
-                    />
+                    <InfiniteScroll data="collection" className=''>
+                        <UsersTable
+                            users={allUsers}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canPreview={canPreview}
+                        />
+                    </InfiniteScroll>
                 ) : viewMode === 'grid' ? (
-                    <UsersCardsList
-                        users={users}
-                        roles={roles}
-                        auth={auth}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canChangeRole={canPreview}
-                    />
+                    <InfiniteScroll data="collection" className=''>
+                        <UsersCardsList
+                            users={allUsers}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canChangeRole={canPreview}
+                        />
+                    </InfiniteScroll>
                 ) : (
                     <div className="space-y-2">
                         <div className="border rounded-md overflow-hidden">

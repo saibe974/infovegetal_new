@@ -16,6 +16,9 @@ class UserImportService
 {
     public function run(string $id, string $fullPath, string $relativePath, int $limit = 4000): void
     {
+        // Augmenter la limite de temps pour les imports volumineux
+        set_time_limit(300); // 5 minutes
+        
         // Première étape : découper le fichier CSV source en fichiers temporaires de données
         $this->splitIntoTempFiles($id, $fullPath, $limit);
 
@@ -24,6 +27,9 @@ class UserImportService
 
     public function runChunk(string $id, string $relativePath, int $chunkIndex): void
     {
+        // Réinitialiser la limite de temps pour chaque chunk
+        set_time_limit(300);
+        
         try {
             $normalizeKey = function ($value): string {
                 $string = (string) $value;
@@ -110,6 +116,9 @@ class UserImportService
                 }
             }
 
+            // Récupérer la stratégie d'import
+            $strategy = $state['strategy'] ?? 'basique';
+
             foreach ($reader->getRecords() as $row) {
                 if (Cache::get("import:$id:cancel", false)) {
                     $cancelled = true;
@@ -126,10 +135,26 @@ class UserImportService
                         continue;
                     }
 
-                    $email = trim((string) ($mapped['email'] ?? ''));
-                    $name = trim((string) ($mapped['name'] ?? ''));
-                    $password = trim((string) ($mapped['password'] ?? null));
-                    $roles = trim((string) ($mapped['roles'] ?? ''));
+                    // Traitement différent selon la stratégie
+                    if ($strategy === 'old_DB') {
+                        // Ancienne base de données: colonnes nom, mail (multiple séparés par ;), pass
+                        $name = trim((string) ($mapped['nom'] ?? ''));
+                        $mailField = trim((string) ($mapped['mail'] ?? ''));
+                        $passwordRaw = trim((string) ($mapped['pass'] ?? ''));
+                        
+                        // Extraire le premier email de la liste séparée par ;
+                        $emails = array_filter(array_map('trim', explode(';', $mailField)));
+                        $email = !empty($emails) ? $emails[0] : '';
+                        
+                        $password = $passwordRaw; // Sera haché dans batchUpsertUsers
+                        $roles = ''; // Pas de rôles dans l'ancienne base
+                    } else {
+                        // Import basique standard
+                        $email = trim((string) ($mapped['email'] ?? ''));
+                        $name = trim((string) ($mapped['name'] ?? ''));
+                        $password = trim((string) ($mapped['password'] ?? null));
+                        $roles = trim((string) ($mapped['roles'] ?? ''));
+                    }
 
                     $currentSnapshot = [
                         'line' => $processed + $errors + 1,
@@ -178,8 +203,8 @@ class UserImportService
                     $this->writeReportLine($reportHandle, $processed + $errors, $e->getMessage(), $row, $mapped);
                     $currentSnapshot = [
                         'line' => $processed + $errors,
-                        'email' => $mapped['email'] ?? null,
-                        'name' => $mapped['name'] ?? null,
+                        'email' => $mapped['email'] ?? $mapped['mail'] ?? null,
+                        'name' => $mapped['name'] ?? $mapped['nom'] ?? null,
                     ];
                     $updateProgress($currentSnapshot);
                 }
@@ -292,19 +317,20 @@ class UserImportService
                 $password = $row['password'];
                 $rolesStr = $row['roles'];
 
-                // Upsert utilisateur
+                // Préparer le password haché (générer un aléatoire si vide)
+                $hashedPassword = !empty($password) 
+                    ? bcrypt($password) 
+                    : bcrypt(\Illuminate\Support\Str::random(32));
+
+                // Upsert utilisateur avec password
                 $user = User::updateOrCreate(
                     ['email' => $email],
                     [
                         'name' => $name,
+                        'password' => $hashedPassword,
                         'email_verified_at' => now(),
                     ]
                 );
-
-                // Si nouveau user et password fourni, updater le password
-                if ($password && $user->wasRecentlyCreated) {
-                    $user->update(['password' => bcrypt($password)]);
-                }
 
                 // Assigner les rôles
                 if (!empty($rolesStr)) {

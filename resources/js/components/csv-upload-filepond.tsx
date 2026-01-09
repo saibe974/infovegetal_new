@@ -199,7 +199,7 @@ export function CsvUploadFilePond({
     const csrfToken = getCsrfToken() || '';
 
     const startImport = useCallback(
-        async (id: string, settings?: { dbProductsId?: number }) => {
+        async (id: string, settings?: { dbProductsId?: number; strategy?: string }) => {
             if (!importProcessUrl) {
                 return;
             }
@@ -224,6 +224,9 @@ export function CsvUploadFilePond({
                 // Ajouter les paramètres supplémentaires si fournis
                 if (settings?.dbProductsId) {
                     body.db_products_id = settings.dbProductsId;
+                }
+                if (settings?.strategy) {
+                    body.strategy = settings.strategy;
                 }
 
                 const response = await fetch(importProcessUrl, {
