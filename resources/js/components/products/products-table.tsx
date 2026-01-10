@@ -4,7 +4,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CirclePlus, EditIcon, TrashIcon } from 'lucide-react';
+import { Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon } from 'lucide-react';
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
@@ -48,9 +48,17 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <TableHead></TableHead>
                     <SortableTableHead field='name'>{t('Name')}</SortableTableHead>
                     <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead>
-                    <TableHead>{t('Description')}</TableHead>
-                    <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
-                    <TableHead className="text-end">{t('Add to cart')}</TableHead>
+                    <TableHead className="flex items-center">
+                        <CircleSlash2 className="size-3 mr-1" />{t('Pot')} / <MoveVertical className="size-3" />{t('Height')}
+                    </TableHead>
+                    {isAuthenticated && (
+                        <>
+
+                            <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
+                            <TableHead className="text-end">{t('Add to cart')}</TableHead>
+                        </>
+                    )}
+
                     {(canEdit || canDelete) && <TableHead className="text-end">{t('Actions')}</TableHead>}
 
                 </TableRow>
@@ -62,47 +70,83 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                         <TableCell>
                             {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
                         </TableCell>
-                        <TableCell className='group group-hover:underline underline-offset-2'>
-                            {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                        <TableCell className='flex flex-col gap-1 justify-center'>
+                            <span className="group group-hover:underline underline-offset-2">
+                                {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                                {item.description ? item.description : ''}
+                            </span>
                         </TableCell>
-                        <TableCell>{item.category ? item.category.name : ''}</TableCell>
+                        <TableCell>{item.category ? item.category.name.charAt(0).toUpperCase() + item.category.name.slice(1) : ''}</TableCell>
                         <TableCell>
                             <div className="space-y-2">
-                                <div>{item.description}</div>
-                                {item.tags && item.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 pt-1">
-                                        {item.tags.map((tag: any) => (
-                                            <Badge key={tag.id} variant="secondary">
-                                                {tag.name}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                )}
+                                {item?.pot ? (
+                                    <p className=" flex gap-1" title={t('Diameter of the pot')}>
+                                        <span><CircleSlash2 className="size-4" /></span>
+                                        <span>{String(item.pot)} cm</span>
+                                    </p>
+                                ) : null}
+
+
+                                {item?.height ? (
+                                    <p className="flex" title={t('Height')}>
+                                        <span><MoveVertical className="size-4" /></span>
+                                        <span>{String(item.height)} cm</span>
+                                    </p>
+                                ) : null}
                             </div>
                         </TableCell>
-                        <TableCell>{item.price} €</TableCell>
-                        {/* {isAuthenticated && ( */}
-                        <TableCell className="text-end">
-                            <Button
-                                title={t('Add to cart')}
-                                variant={'outline'}
-                                size={'icon'}
-                                className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
-                                onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    if (isAuthenticated) {
-                                        addToCart(item, 1);
-                                    } else {
-                                        // Stocker l'intention d'ajout au panier avant redirection
-                                        sessionStorage.setItem('pendingCartAdd', JSON.stringify({ productId: item.id, quantity: 1 }));
-                                        router.visit('/login');
-                                    }
-                                }}
-                            >
-                                <CirclePlus />
-                            </Button>
-                        </TableCell>
-                        {/* )} */}
+                        {isAuthenticated && (
+                            <>
+                                <TableCell>
+                                    {item?.price && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Box className="size-4 text-main-purple dark:text-main-green" />
+                                            <span className="font-semibold">{item.price} €</span>
+                                            <span className="text-xs text-gray-500">{t('(par carton)')}</span>
+                                        </div>
+                                    )}
+                                    {item?.price_floor ? (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Layers className="size-4 text-main-purple dark:text-main-green" />
+                                            <span className="font-semibold">{String(item.price_floor)} €</span>
+                                            <span className="text-xs text-gray-500">{t('(par étage)')}</span>
+                                        </div>
+                                    ) : null}
+                                    {item?.price_roll ? (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Container className="size-4 text-main-purple dark:text-main-green" />
+                                            {item?.price_promo ? (
+                                                <>
+                                                    <span className="font-semibold line-through text-gray-400">{String(item.price_roll)} €</span>
+                                                    <span className="font-bold text-red-600">{String(item.price_promo)} €</span>
+                                                </>
+                                            ) : (
+                                                <span className="font-semibold">{String(item.price_roll)} €</span>
+                                            )}
+                                            <span className="text-xs text-gray-500">{t('(par roll)')}</span>
+                                        </div>
+                                    ) : null}
+                                </TableCell>
+
+                                <TableCell className="text-end">
+                                    <Button
+                                        title={t('Add to cart')}
+                                        variant={'outline'}
+                                        size={'icon'}
+                                        className="text-green-700 hover:text-green-700 hover:bg-green-700/30 border-green-700 dark:text-green-500 dark:hover:text-green-500 dark:hover:bg-green-500/30 dark:border-green-500"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            addToCart(item, 1);
+
+                                        }}
+                                    >
+                                        <CirclePlus />
+                                    </Button>
+                                </TableCell>
+                            </>
+                        )}
                         {(canEdit || canDelete) && (
                             <TableCell>
                                 <div className="flex gap-2 justify-end" onClick={e => e.stopPropagation()}>
