@@ -216,7 +216,7 @@ export function NavFooterExtended({
                                                         <SidebarMenuButton tooltip={!isOpenId('main') ? sub.title : undefined} asChild>
                                                             {renderLink(sub.href, (
                                                                 <>
-                                                                    {sub.icon && <Icon iconNode={sub.icon} className="h-4 w-4" />}
+                                                                    {sub.icon && <Icon iconNode={sub.icon} className="h-4 w-4 group-data-[collapsible=icon]:size-3.5" />}
                                                                     <span>{sub.title}</span>
                                                                 </>
                                                             ), sub.target)}
