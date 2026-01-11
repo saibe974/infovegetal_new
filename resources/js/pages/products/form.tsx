@@ -60,8 +60,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         <Form {...action} className="space-y-6 p-0 m-0">
             {({ errors, processing }) => (
                 <>
-                    <StickyBar className="w-full">
-                        <div className='flex items-center justify-between w-full'>
+                    <StickyBar className="w-full" borderBottom={false}>
+                        <div className='flex items-center justify-between w-full py-2'>
                             <div className="flex items-center gap-2">
                                 <Link href="#"
                                     onClick={(e) => { e.preventDefault(); window.history.back(); }}

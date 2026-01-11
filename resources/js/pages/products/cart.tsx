@@ -222,7 +222,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             const barHeight = stickyBar.getBoundingClientRect().height;
             const total = headerHeight + barHeight;
             
-            console.log('header height:', headerHeight, 'bar height:', barHeight, 'total:', total);
+            // console.log('header height:', headerHeight, 'bar height:', barHeight, 'total:', total);
             return total;
         };
 
@@ -263,7 +263,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                 borderBottom={false}
                 className='mb-4 sticky-bar-cart'
             >
-                <div className='flex items-center justify-between w-full'>
+                <div className='flex items-center justify-between w-full py-2'>
                     <div className="flex items-center gap-3">
                         <Link
                             href="#"

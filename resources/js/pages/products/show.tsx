@@ -12,6 +12,7 @@ import { useContext, useState, useRef } from 'react';
 import { addCartonIcon, addEtageIcon, addRollIcon } from '@/lib/icon';
 import { Input } from '@/components/ui/input';
 import { Lens } from '@/components/ui/lens';
+import { useSidebar } from '@/components/ui/sidebar';
 
 type Props = {
     product: Product;
@@ -28,6 +29,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const { t } = useI18n();
     const { addToCart } = useContext(CartContext);
     const [quantity, setQuantity] = useState(1);
+    const { toggleSidebar, isOpenId } = useSidebar();
 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -35,6 +37,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
     const handleAddToCart = () => {
         addToCart(product, quantity);
+        !isOpenId('right') && toggleSidebar('right');
     };
 
 

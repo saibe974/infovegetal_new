@@ -7,6 +7,7 @@ import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, M
 import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
+import { useSidebar } from "../ui/sidebar";
 
 type Props = {
     product: Product;
@@ -19,6 +20,8 @@ type Props = {
 
 export function ProductCard({ product, canEdit = false, canDelete = false, editProduct, deleteProduct, className }: Props) {
     const { t } = useI18n();
+
+    const { toggleSidebar, isOpenId } = useSidebar()
 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -45,6 +48,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
     const { addToCart } = useContext(CartContext);
     const handleAddToCart = (id: number) => {
         addToCart(product, 1);
+        isOpenId('right') && toggleSidebar('right');
     };
 
     // console.log(product)

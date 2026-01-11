@@ -1,9 +1,13 @@
 import React, { useContext, useState } from "react";
 import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import {
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from "../ui/sidebar";
 import { CartContext } from "./cart.context";
 import { router, usePage } from "@inertiajs/react";
@@ -15,6 +19,8 @@ import HeadingSmall from "../heading-small";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
+
+    const { toggleSidebar } = useSidebar();
 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -158,85 +164,88 @@ export function CartSidebarHeader() {
 
     return (
         <div className="flex flex-col h-screen">
-            <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
-                <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title={t("Vider le panier")}>
-                        <button
-                            type="button"
-                            className="p-2 rounded hover:bg-muted"
-                            onClick={clearCart}
+            <SidebarHeader>
+                <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
+                    <SidebarMenuItem className="w-fit">
+                        <SidebarMenuButton asChild title={t("Vider le panier")}>
+                            <button
+                                type="button"
+                                className="p-2 rounded hover:bg-muted"
+                                onClick={clearCart}
+                            >
+                                <Trash2Icon className="size-5 text-destructive" />
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem className="w-fit">
+                        <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
+                            <button
+                                type="button"
+                                className="p-2 rounded hover:bg-muted"
+                            >
+                                <DownloadIcon className="size-5" />
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem className="w-fit">
+                        <SidebarMenuButton asChild title={t("Voir le panier")}>
+                            <button
+                                type="button"
+                                className="p-2 rounded hover:bg-muted"
+                                onClick={() => router.visit(getFiltersUrl())}
+                            >
+                                <EyeIcon className="size-5" />
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem className="w-fit">
+                        <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
+                            <button
+                                type="button"
+                                className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                                onClick={handleSaveCart}
+                                disabled={isSaving}
+                            >
+                                <SaveIcon className="size-5 text-primary" />
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem className="w-fit">
+                        <SidebarMenuButton asChild title={t("Valider le panier")}>
+                            <button
+                                type="button"
+                                className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                                onClick={() => router.visit('/cart/checkout')}
+                                disabled={isSaving}
+                            >
+                                <CheckCircleIcon className="size-5 text-green-600" />
+                            </button>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+
+
+                <div className="flex-shrink-0">
+                    <div className="my-2">Total : {total?.toFixed(2) ?? 0} €</div>
+
+                    {saveMessage && (
+                        <div
+                            className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
+                                ? " text-destructive border border-destructive"
+                                : " text-green-600 border border-green-600"
+                                }`}
                         >
-                            <Trash2Icon className="size-5 text-destructive" />
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                            {saveMessage}
+                        </div>
+                    )}
+                </div>
+            </SidebarHeader>
 
-                <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
-                        <button
-                            type="button"
-                            className="p-2 rounded hover:bg-muted"
-                        >
-                            <DownloadIcon className="size-5" />
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title={t("Voir le panier")}>
-                        <button
-                            type="button"
-                            className="p-2 rounded hover:bg-muted"
-                            onClick={() => router.visit(getFiltersUrl())}
-                        >
-                            <EyeIcon className="size-5" />
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
-                        <button
-                            type="button"
-                            className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                            onClick={handleSaveCart}
-                            disabled={isSaving}
-                        >
-                            <SaveIcon className="size-5 text-primary" />
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem className="w-fit">
-                    <SidebarMenuButton asChild title={t("Valider le panier")}>
-                        <button
-                            type="button"
-                            className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                            onClick={() => router.visit('/cart/checkout')}
-                            disabled={isSaving}
-                        >
-                            <CheckCircleIcon className="size-5 text-green-600" />
-                        </button>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
-
-            <div className="flex-shrink-0">
-                <div className="my-2">Total : {total?.toFixed(2) ?? 0} €</div>
-
-                {saveMessage && (
-                    <div
-                        className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                            ? " text-destructive border border-destructive"
-                            : " text-green-600 border border-green-600"
-                            }`}
-                    >
-                        {saveMessage}
-                    </div>
-                )}
-            </div>
-
-            <div className="flex flex-col gap-3 mt-4 flex-1 overflow-y-auto min-h-0 pr-1 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/40 scrollbar-thumb-rounded-full pt-3">
+            <SidebarContent className="flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
                 {!isAuthenticated ? (
                     <div className="flex flex-col items-center justify-center gap-4 p-6 text-center">
                         <div className="text-muted-foreground">
@@ -279,17 +288,24 @@ export function CartSidebarHeader() {
                             />
                         ))}
 
-                        {/* {items.length > 0 && (
-                            <Button
-                                // onClick={}
-                                className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover w-50 absolute bottom-2 left-1/2 transform -translate-x-1/2 mb-4"
-                            >
-                                {t('Valider le panier')}
-                            </Button>
-                        )} */}
+
                     </div>
                 )}
-            </div>
+            </SidebarContent>
+
+            {items.length > 0 && (
+                <SidebarFooter className="pb-6">
+                    <Button
+                        onClick={() => {
+                            router.visit('/cart/checkout');
+                            toggleSidebar('right');
+                        }}
+                        className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover "
+                    >
+                        {t('Valider le panier')}
+                    </Button>
+                </SidebarFooter>
+            )}
         </div>
     );
 }
