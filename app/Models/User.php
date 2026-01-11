@@ -31,6 +31,11 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        '_lft',
+        '_rgt',
+        'parent_id',
+        'old_id',
+        'old_parent_id',
     ];
 
     /**

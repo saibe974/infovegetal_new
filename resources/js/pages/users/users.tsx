@@ -297,6 +297,9 @@ export default withAppLayout(
 
                 toast.success(t('Hierarchy saved successfully'));
                 setPending(null);
+
+                // Refetch users to update the tree with fresh nested set values
+                router.reload({ preserveState: false });
             } catch (e) {
                 console.error(e);
                 toast.error(t('Error while saving'));
