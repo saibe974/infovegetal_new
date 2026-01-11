@@ -19,6 +19,7 @@ import { useContext, useEffect, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import BasicSticky from 'react-sticky-el';
 
 type Props = Record<string, never>;
 
@@ -208,6 +209,51 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             setIsSaving(false);
         }
     };
+    const [topOffset, setTopOffset] = useState<number>(0);
+
+    useEffect(() => {
+        const getHeight = () => {
+            const header = document.querySelector('.top-sticky') as HTMLElement | null;
+            const stickyBar = document.querySelector('.sticky-bar-cart') as HTMLElement | null;
+            
+            if (!header || !stickyBar) return 0;
+            
+            const headerHeight = header.getBoundingClientRect().height;
+            const barHeight = stickyBar.getBoundingClientRect().height;
+            const total = headerHeight + barHeight;
+            
+            console.log('header height:', headerHeight, 'bar height:', barHeight, 'total:', total);
+            return total;
+        };
+
+        const update = () => {
+            const height = getHeight();
+            if (height > 0) {
+                setTopOffset(height);
+            }
+        };
+
+        // Attendre que le rendu soit complet et que le layout soit stable
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                update();
+                // Vérifier à nouveau après un délai
+                setTimeout(update, 200);
+            }, 50);
+        });
+
+        // Mettre à jour sur resize
+        const handleResize = () => {
+            requestAnimationFrame(update);
+        };
+        window.addEventListener('resize', handleResize);
+
+    
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
 
     return (
         <div className="">
@@ -348,96 +394,100 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                     </CardContent>
                 </Card>
 
-
-                <Card
-                    className="h-fit sidebar"
+                <BasicSticky
+                    topOffset={-topOffset}
+                    stickyStyle={{ top: topOffset,}}
                 >
-                    <CardHeader>
-                        <CardTitle>{t('Récapitulatif')}</CardTitle>
-                        {saveMessage && (
-                            <div
-                                className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                                    ? " text-destructive border border-destructive"
-                                    : " text-green-600 border border-green-600"
-                                    }`}
-                            >
-                                {saveMessage}
-                            </div>
-                        )}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between text-sm">
-                            <span>{t('Total produits')}</span>
-                            <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('Pays de livraison')}</label>
-                            <Select value={country} onValueChange={(value) => setCountry(value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={t('Sélectionner un pays')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {countries.map((countryOption) => (
-                                        <SelectItem key={countryOption.value} value={countryOption.value}>
-                                            {countryOption.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('Taxe transport')}</label>
-                            <Select
-                                value={String(transportTax)}
-                                onValueChange={(value) => setTransportTax(Number(value))}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder={t('Sélectionner une taxe')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {transportTaxOptions.map((option) => (
-                                        <SelectItem key={option.value} value={String(option.value)}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
-                            <Input
-                                type="date"
-                                value={deliveryDate}
-                                onChange={(e) => setDeliveryDate(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="rounded-lg border p-3 space-y-2">
+                    <Card
+                        className="h-fit sidebar"
+                    >
+                        <CardHeader>
+                            <CardTitle>{t('Récapitulatif')}</CardTitle>
+                            {saveMessage && (
+                                <div
+                                    className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
+                                        ? " text-destructive border border-destructive"
+                                        : " text-green-600 border border-green-600"
+                                        }`}
+                                >
+                                    {saveMessage}
+                                </div>
+                            )}
+                        </CardHeader>
+                        <CardContent className="space-y-4">
                             <div className="flex items-center justify-between text-sm">
-                                <span>{t('Total livraison TTC')}</span>
-                                <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
+                                <span>{t('Total produits')}</span>
+                                <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
                             </div>
-                            <div className="flex items-center justify-between text-base font-semibold">
-                                <span>{t('Total produits + taxes TTC')}</span>
-                                <span>{formatCurrency(orderTotal)}</span>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('Pays de livraison')}</label>
+                                <Select value={country} onValueChange={(value) => setCountry(value)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('Sélectionner un pays')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {countries.map((countryOption) => (
+                                            <SelectItem key={countryOption.value} value={countryOption.value}>
+                                                {countryOption.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('Taxe transport')}</label>
+                                <Select
+                                    value={String(transportTax)}
+                                    onValueChange={(value) => setTransportTax(Number(value))}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={t('Sélectionner une taxe')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {transportTaxOptions.map((option) => (
+                                            <SelectItem key={option.value} value={String(option.value)}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
+                                <Input
+                                    type="date"
+                                    value={deliveryDate}
+                                    onChange={(e) => setDeliveryDate(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="rounded-lg border p-3 space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span>{t('Total livraison TTC')}</span>
+                                    <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-base font-semibold">
+                                    <span>{t('Total produits + taxes TTC')}</span>
+                                    <span>{formatCurrency(orderTotal)}</span>
+                                </div>
+                            </div>
 
 
 
-                        <Button
-                            className="w-full bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover"
-                            size="lg"
-                            disabled={items.length === 0 || isSaving}
-                            onClick={handleGeneratePdf}
-                        >
-                            {t('Commander')}
-                        </Button>
-                    </CardContent>
-                </Card>
+                            <Button
+                                className="w-full bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover"
+                                size="lg"
+                                disabled={items.length === 0 || isSaving}
+                                onClick={handleGeneratePdf}
+                            >
+                                {t('Commander')}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </BasicSticky>
             </div>
         </div>
     );
