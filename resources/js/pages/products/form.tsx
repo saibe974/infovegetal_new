@@ -54,7 +54,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         ? products.admin.update.form({ product: product.id })
         : products.admin.store.form();
 
-    console.log(product)
+    // console.log(product)
 
     return (
         <Form {...action} className="space-y-4">

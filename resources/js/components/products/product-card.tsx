@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Box, Layers, Container } from "lucide-react";
 import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
+import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 
 type Props = {
     product: Product;
@@ -46,7 +47,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
         addToCart(product, 1);
     };
 
-    console.log(product)
+    // console.log(product)
 
     return (
         <Link
@@ -119,21 +120,27 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     <div className="flex flex-col gap-2">
                         {product?.price && (
                             <div className="flex items-center gap-2 text-sm">
-                                <Box className="size-4 text-main-purple dark:text-main-green" />
+                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                    <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                </span>
                                 <span className="font-semibold">{product.price} €</span>
                                 <span className="text-xs text-gray-500">{t('(par carton)')}</span>
                             </div>
                         )}
                         {product?.price_floor ? (
                             <div className="flex items-center gap-2 text-sm">
-                                <Layers className="size-4 text-main-purple dark:text-main-green" />
+                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                    <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                </span>
                                 <span className="font-semibold">{String(product.price_floor)} €</span>
                                 <span className="text-xs text-gray-500">{t('(par étage)')}</span>
                             </div>
                         ) : null}
                         {product?.price_roll ? (
                             <div className="flex items-center gap-2 text-sm">
-                                <Container className="size-4 text-main-purple dark:text-main-green" />
+                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                    <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                </span>
                                 {product?.price_promo ? (
                                     <>
                                         <span className="font-semibold line-through text-gray-400">{String(product.price_roll)} €</span>

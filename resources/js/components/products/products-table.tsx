@@ -8,6 +8,7 @@ import { Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertica
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
+import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -102,21 +103,27 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 <TableCell>
                                     {item?.price && (
                                         <div className="flex items-center gap-2 text-sm">
-                                            <Box className="size-4 text-main-purple dark:text-main-green" />
+                                            <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                                <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                            </span>
                                             <span className="font-semibold">{item.price} €</span>
                                             <span className="text-xs text-gray-500">{t('(par carton)')}</span>
                                         </div>
                                     )}
                                     {item?.price_floor ? (
                                         <div className="flex items-center gap-2 text-sm">
-                                            <Layers className="size-4 text-main-purple dark:text-main-green" />
+                                            <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                                <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                            </span>
                                             <span className="font-semibold">{String(item.price_floor)} €</span>
                                             <span className="text-xs text-gray-500">{t('(par étage)')}</span>
                                         </div>
                                     ) : null}
                                     {item?.price_roll ? (
                                         <div className="flex items-center gap-2 text-sm">
-                                            <Container className="size-4 text-main-purple dark:text-main-green" />
+                                            <span className="text-main-purple dark:text-main-green w-6 h-7">
+                                                <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                            </span>
                                             {item?.price_promo ? (
                                                 <>
                                                     <span className="font-semibold line-through text-gray-400">{String(item.price_roll)} €</span>
