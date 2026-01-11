@@ -15,10 +15,13 @@ import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import type { BreadcrumbItem, ProductDetailed } from '@/types';
 import { Form, Head, Link } from '@inertiajs/react';
-import { ArrowLeftCircle, LinkIcon, SaveIcon } from 'lucide-react';
+import { ArrowLeftCircle, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import SearchSelect from '@/components/app/search-select';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
+import { StickyBar } from '@/components/ui/sticky-bar';
 // import { StepsField } from '@/components/forms/steps-field';
 // import { useState } from 'react';
 
@@ -39,9 +42,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
-    // console.log(product);
-    // console.log(Routing);
-
+    const { t } = useI18n();
     const [tag, setTag] = useState('')
     const [tags, setTags] = useState((product as any).tags.map((t: any) => t.name) || [])
 
@@ -49,89 +50,165 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         setTag(t)
     }
 
-
     const action = product.id
         ? products.admin.update.form({ product: product.id })
         : products.admin.store.form();
 
-    // console.log(product)
+    console.log(product)
 
     return (
-        <Form {...action} className="space-y-4">
-            {({ errors, processing, progress }) => (
+        <Form {...action} className="space-y-6">
+            {({ errors, processing }) => (
                 <>
-
-                    <div className="flex items-center py-2 gap-2 justify-between">
-                        <div className="flex items-center gap-2">
-                            <Link href="#"
-                                onClick={(e) => { e.preventDefault(); window.history.back(); }}
-                                className='hover:text-gray-500 transition-colors duration-200'
-                            >
-                                <ArrowLeftCircle size={35} />
-                            </Link>
-                            <h2>
-                                Editer un produit
-                            </h2>
+                    <StickyBar className="">
+                        <div className='flex items-center py-2 gap-3 justify-between w-full'>
+                            <div className="flex items-center gap-2">
+                                <Link href="#"
+                                    onClick={(e) => { e.preventDefault(); window.history.back(); }}
+                                    className='hover:text-gray-500 transition-colors duration-200'
+                                >
+                                    <ArrowLeftCircle size={35} />
+                                </Link>
+                                <h2 className="text-xl font-semibold">Editer un produit</h2>
+                            </div>
+                            <Button disabled={processing}>
+                                <SaveIcon className="mr-2 h-4 w-4" /> Enregistrer
+                            </Button>
                         </div>
-                        <Button disabled={processing}>
-                            <SaveIcon /> Enregistrer
-                        </Button>
-                    </div>
+                    </StickyBar>
 
+                    <div className="grid items-start gap-8 xl:grid-cols-[2fr_1fr]">
+                        <main className="space-y-6">
+                            <Card className="p-4">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <FormField label="Nom" htmlFor="name" error={errors['name']}>
+                                        <Input
+                                            id="name"
+                                            name="name"
+                                            defaultValue={product.name}
+                                            aria-invalid={!!errors['name']}
+                                        />
+                                    </FormField>
 
-                    <div className="grid items-start gap-8 md:grid-cols-[1fr_350px]">
-                        <main className="space-y-4">
-                            <FormField
-                                label="Nom"
-                                htmlFor="name"
-                                error={errors['name']}>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    defaultValue={product.name}
-                                    aria-invalid={!!errors['name']} />
-                            </FormField>
+                                    <FormField label="SKU" htmlFor="sku" error={errors['sku']}>
+                                        <Input
+                                            id="sku"
+                                            name="sku"
+                                            defaultValue={String(product.sku ?? '')}
+                                            aria-invalid={!!errors['sku']}
+                                        />
+                                    </FormField>
 
-                            <FormField
-                                label="Tags"
-                                htmlFor="tags"
-                                error={errors['tags']}>
-                                {/* <Input
-                                    id="tags"
-                                    name="tags"
-                                    defaultValue={(Array.isArray((product as any).tags) ? (product as any).tags.map((t: any) => t.name).join(', ') : '')}
-                                    placeholder="ex: vivace, pot, promotion"
-                                /> */}
-                                <SearchSelect
-                                    value={tag}
-                                    onChange={writeTags}
-                                    onSubmit={() => { }}
-                                    placeholder=''
-                                    selection={tags}
-                                    filters={false}
-                                    search={false}
-                                />
+                                    <FormField label="Référence" htmlFor="ref" error={errors['ref']}>
+                                        <Input
+                                            id="ref"
+                                            name="ref"
+                                            defaultValue={String(product.ref ?? '')}
+                                            aria-invalid={!!errors['ref']}
+                                        />
+                                    </FormField>
 
+                                    <FormField label="Code EAN13" htmlFor="ean13" error={errors['ean13']}>
+                                        <Input
+                                            id="ean13"
+                                            name="ean13"
+                                            defaultValue={String(product.ean13 ?? '')}
+                                            aria-invalid={!!errors['ean13']}
+                                        />
+                                    </FormField>
+                                </div>
 
-                            </FormField>
+                                <FormField label="Description" htmlFor="description" error={errors['description']}>
+                                    <textarea
+                                        id="description"
+                                        name="description"
+                                        rows={3}
+                                        defaultValue={product.description || ''}
+                                        aria-invalid={!!errors['description']}
+                                        placeholder="Décrivez brièvement le produit"
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    />
+                                </FormField>
+
+                                <FormField label="Tags" error={errors['tags']}>
+                                    <SearchSelect
+                                        value={tag}
+                                        onChange={writeTags}
+                                        onSubmit={() => { }}
+                                        placeholder=''
+                                        selection={tags}
+                                        filters={false}
+                                        search={false}
+                                    />
+                                </FormField>
+                            </Card>
+
+                            <Card className="p-4 space-y-4">
+                                <h3 className="text-sm font-semibold text-muted-foreground">Dimensions & conditionnement</h3>
+                                <div className="grid gap-4 md:grid-cols-3">
+                                    <FormField label="Pot (cm)" htmlFor="pot" error={errors['pot']}>
+                                        <Input id="pot" name="pot" defaultValue={String(product.pot ?? '')} aria-invalid={!!errors['pot']} />
+                                    </FormField>
+                                    <FormField label="Hauteur (cm)" htmlFor="height" error={errors['height']}>
+                                        <Input id="height" name="height" defaultValue={String(product.height ?? '')} aria-invalid={!!errors['height']} />
+                                    </FormField>
+                                    <FormField label="Conditionnement" htmlFor="cond" error={errors['cond']}>
+                                        <Input id="cond" name="cond" defaultValue={String(product.cond ?? '')} aria-invalid={!!errors['cond']} />
+                                    </FormField>
+                                    <FormField label="Unités / palette" htmlFor="floor" error={errors['floor']}>
+                                        <Input id="floor" name="floor" defaultValue={String(product.floor ?? '')} aria-invalid={!!errors['floor']} />
+                                    </FormField>
+                                    <FormField label="Unités / roll" htmlFor="roll" error={errors['roll']}>
+                                        <Input id="roll" name="roll" defaultValue={String(product.roll ?? '')} aria-invalid={!!errors['roll']} />
+                                    </FormField>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 space-y-4">
+                                <h3 className="text-sm font-semibold text-muted-foreground">Tarification</h3>
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                    <FormField label="Prix" htmlFor="price" error={errors['price']}>
+                                        <Input id="price" name="price" defaultValue={String(product.price ?? '')} aria-invalid={!!errors['price']} />
+                                    </FormField>
+                                    <FormField label="Prix plancher" htmlFor="price_floor" error={errors['price_floor']}>
+                                        <Input id="price_floor" name="price_floor" defaultValue={String(product.price_floor ?? '')} aria-invalid={!!errors['price_floor']} />
+                                    </FormField>
+                                    <FormField label="Prix promo" htmlFor="price_promo" error={errors['price_promo']}>
+                                        <Input id="price_promo" name="price_promo" defaultValue={String(product.price_promo ?? '')} aria-invalid={!!errors['price_promo']} />
+                                    </FormField>
+                                    <FormField label="Prix roll" htmlFor="price_roll" error={errors['price_roll']}>
+                                        <Input id="price_roll" name="price_roll" defaultValue={String(product.price_roll ?? '')} aria-invalid={!!errors['price_roll']} />
+                                    </FormField>
+                                </div>
+                            </Card>
                         </main>
-                        <Card>
-                            {/* <ImageInput
-                                id="img_link"
-                                progress={progress?.progress}
-                                className="aspect-video"
-                                name="img_link"
-                                aria-invalid={!!errors['img_link']}
-                                defaultValue={product.img_link}
-                            /> */}
-                            <img src={product.img_link} className="object-cover" />
-                        </Card>
-                    </div>
 
+                        <aside className="space-y-4">
+                            <Card className="overflow-hidden">
+                                <div className="aspect-[4/3] bg-muted flex items-center justify-center">
+                                    <img src={product.img_link} alt={product.name} className="h-full w-full object-contain" />
+                                </div>
+                                <div className="p-4 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Statut</span>
+                                        <Badge variant={product.active ? 'default' : 'destructive'}>
+                                            {product.active ? 'Actif' : 'Inactif'}
+                                        </Badge>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">Catégorie ID : {String(product.category_products_id ?? 'N/A')}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Créé le {product.created_at}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Maj le {product.updated_at}
+                                    </div>
+                                </div>
+                            </Card>
+                        </aside>
+                    </div>
                 </>
             )}
         </Form>
-
     );
 });
 

@@ -1,10 +1,10 @@
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { type BreadcrumbItem, Product } from '@/types';
+import { type BreadcrumbItem, Product, SharedData } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { ArrowLeftCircle, MoveVertical, CircleSlash2, ShoppingCart, Minus, Plus } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
@@ -29,12 +29,16 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const { addToCart } = useContext(CartContext);
     const [quantity, setQuantity] = useState(1);
 
+    const { auth } = usePage<SharedData>().props;
+    const user = auth?.user;
+    const isAuthenticated = !!user;
+
     const handleAddToCart = () => {
         addToCart(product, quantity);
     };
 
 
-    console.log(product);
+    // console.log(product);
 
     return (
         <div className="space-y-6">
@@ -152,44 +156,46 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                         </CardContent>
 
-                        <CardFooter className='w-full flex items-center justify-between gap-4 pt-6 mt-auto'>
-                            <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                        {isAuthenticated && (
+                            <CardFooter className='w-full flex items-center justify-between gap-4 pt-6 mt-auto'>
+                                <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 hover:bg-background"
+                                        aria-label="Diminuer la quantité"
+                                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                        disabled={quantity <= 1}
+                                    >
+                                        <Minus className="h-4 w-4" />
+                                    </Button>
+                                    <Input
+                                        id="quantity"
+                                        type="text"
+                                        min="1"
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-16 h-8 text-center bg-transparent border-0 focus-visible:ring-0 p-0 font-semibold"
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 hover:bg-background"
+                                        aria-label="Augmenter la quantité"
+                                        onClick={() => setQuantity(quantity + 1)}
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-background"
-                                    aria-label="Diminuer la quantité"
-                                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                    disabled={quantity <= 1}
+                                    onClick={handleAddToCart}
+                                    className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover flex-1 h-10"
                                 >
-                                    <Minus className="h-4 w-4" />
+                                    <ShoppingCart className="mr-2 h-4 w-4" />
+                                    {t('Add to Cart')}
                                 </Button>
-                                <Input
-                                    id="quantity"
-                                    type="text"
-                                    min="1"
-                                    value={quantity}
-                                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-16 h-8 text-center bg-transparent border-0 focus-visible:ring-0 p-0 font-semibold"
-                                />
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-background"
-                                    aria-label="Augmenter la quantité"
-                                    onClick={() => setQuantity(quantity + 1)}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <Button
-                                onClick={handleAddToCart}
-                                className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover flex-1 h-10"
-                            >
-                                <ShoppingCart className="mr-2 h-4 w-4" />
-                                {t('Add to Cart')}
-                            </Button>
-                        </CardFooter>
+                            </CardFooter>
+                        )}
                     </Card>
 
                 </div>
