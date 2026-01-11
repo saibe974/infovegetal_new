@@ -23,8 +23,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
     const isAuthenticated = !!user;
 
     const goToProductPage = (id: number) => {
-        canEdit ? window.location.href = `/admin/products/${id}/edit` :
-            window.location.href = `/products/${id}`;
+        window.location.href = `/products/${id}`;
     }
 
     const handleEditClick = (e: React.MouseEvent, id: number) => {

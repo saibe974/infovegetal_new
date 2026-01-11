@@ -54,14 +54,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         ? products.admin.update.form({ product: product.id })
         : products.admin.store.form();
 
-    console.log(product)
+    // console.log(product)
 
     return (
-        <Form {...action} className="space-y-6">
+        <Form {...action} className="space-y-6 p-0 m-0">
             {({ errors, processing }) => (
                 <>
-                    <StickyBar className="">
-                        <div className='flex items-center py-2 gap-3 justify-between w-full'>
+                    <StickyBar className="w-full">
+                        <div className='flex items-center justify-between w-full'>
                             <div className="flex items-center gap-2">
                                 <Link href="#"
                                     onClick={(e) => { e.preventDefault(); window.history.back(); }}
@@ -69,10 +69,10 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                 >
                                     <ArrowLeftCircle size={35} />
                                 </Link>
-                                <h2 className="text-xl font-semibold">Editer un produit</h2>
+                                <h2 className="text-xl font-semibold">{t('Edit a product')}</h2>
                             </div>
                             <Button disabled={processing}>
-                                <SaveIcon className="mr-2 h-4 w-4" /> Enregistrer
+                                <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
                             </Button>
                         </div>
                     </StickyBar>
@@ -81,7 +81,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                         <main className="space-y-6">
                             <Card className="p-4">
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    <FormField label="Nom" htmlFor="name" error={errors['name']}>
+                                    <FormField label={t('Name')} htmlFor="name" error={errors['name']}>
                                         <Input
                                             id="name"
                                             name="name"
@@ -90,7 +90,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         />
                                     </FormField>
 
-                                    <FormField label="SKU" htmlFor="sku" error={errors['sku']}>
+                                    <FormField label={t('SKU')} htmlFor="sku" error={errors['sku']}>
                                         <Input
                                             id="sku"
                                             name="sku"
@@ -99,7 +99,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         />
                                     </FormField>
 
-                                    <FormField label="Référence" htmlFor="ref" error={errors['ref']}>
+                                    <FormField label={t('Reference')} htmlFor="ref" error={errors['ref']}>
                                         <Input
                                             id="ref"
                                             name="ref"
@@ -108,7 +108,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         />
                                     </FormField>
 
-                                    <FormField label="Code EAN13" htmlFor="ean13" error={errors['ean13']}>
+                                    <FormField label={t('EAN13 Code')} htmlFor="ean13" error={errors['ean13']}>
                                         <Input
                                             id="ean13"
                                             name="ean13"
@@ -118,7 +118,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     </FormField>
                                 </div>
 
-                                <FormField label="Description" htmlFor="description" error={errors['description']}>
+                                <FormField label={t('Description')} htmlFor="description" error={errors['description']}>
                                     <textarea
                                         id="description"
                                         name="description"
@@ -130,7 +130,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     />
                                 </FormField>
 
-                                <FormField label="Tags" error={errors['tags']}>
+                                <FormField label={t('Tags')} error={errors['tags']}>
                                     <SearchSelect
                                         value={tag}
                                         onChange={writeTags}
@@ -144,39 +144,39 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             </Card>
 
                             <Card className="p-4 space-y-4">
-                                <h3 className="text-sm font-semibold text-muted-foreground">Dimensions & conditionnement</h3>
+                                <h3 className="text-sm font-semibold text-muted-foreground">{t('Dimensions & packaging')}</h3>
                                 <div className="grid gap-4 md:grid-cols-3">
-                                    <FormField label="Pot (cm)" htmlFor="pot" error={errors['pot']}>
+                                    <FormField label={t('Pot (cm)')} htmlFor="pot" error={errors['pot']}>
                                         <Input id="pot" name="pot" defaultValue={String(product.pot ?? '')} aria-invalid={!!errors['pot']} />
                                     </FormField>
-                                    <FormField label="Hauteur (cm)" htmlFor="height" error={errors['height']}>
+                                    <FormField label={t('Height (cm)')} htmlFor="height" error={errors['height']}>
                                         <Input id="height" name="height" defaultValue={String(product.height ?? '')} aria-invalid={!!errors['height']} />
                                     </FormField>
-                                    <FormField label="Conditionnement" htmlFor="cond" error={errors['cond']}>
+                                    <FormField label={t('Packaging')} htmlFor="cond" error={errors['cond']}>
                                         <Input id="cond" name="cond" defaultValue={String(product.cond ?? '')} aria-invalid={!!errors['cond']} />
                                     </FormField>
-                                    <FormField label="Unités / palette" htmlFor="floor" error={errors['floor']}>
+                                    <FormField label={t('Units per pallet')} htmlFor="floor" error={errors['floor']}>
                                         <Input id="floor" name="floor" defaultValue={String(product.floor ?? '')} aria-invalid={!!errors['floor']} />
                                     </FormField>
-                                    <FormField label="Unités / roll" htmlFor="roll" error={errors['roll']}>
+                                    <FormField label={t('Units per roll')} htmlFor="roll" error={errors['roll']}>
                                         <Input id="roll" name="roll" defaultValue={String(product.roll ?? '')} aria-invalid={!!errors['roll']} />
                                     </FormField>
                                 </div>
                             </Card>
 
                             <Card className="p-4 space-y-4">
-                                <h3 className="text-sm font-semibold text-muted-foreground">Tarification</h3>
+                                <h3 className="text-sm font-semibold text-muted-foreground">{t('Pricing')}</h3>
                                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                    <FormField label="Prix" htmlFor="price" error={errors['price']}>
+                                    <FormField label={t('Price')} htmlFor="price" error={errors['price']}>
                                         <Input id="price" name="price" defaultValue={String(product.price ?? '')} aria-invalid={!!errors['price']} />
                                     </FormField>
-                                    <FormField label="Prix plancher" htmlFor="price_floor" error={errors['price_floor']}>
+                                    <FormField label={t('Floor price')} htmlFor="price_floor" error={errors['price_floor']}>
                                         <Input id="price_floor" name="price_floor" defaultValue={String(product.price_floor ?? '')} aria-invalid={!!errors['price_floor']} />
                                     </FormField>
-                                    <FormField label="Prix promo" htmlFor="price_promo" error={errors['price_promo']}>
+                                    <FormField label={t('Promo price')} htmlFor="price_promo" error={errors['price_promo']}>
                                         <Input id="price_promo" name="price_promo" defaultValue={String(product.price_promo ?? '')} aria-invalid={!!errors['price_promo']} />
                                     </FormField>
-                                    <FormField label="Prix roll" htmlFor="price_roll" error={errors['price_roll']}>
+                                    <FormField label={t('Roll price')} htmlFor="price_roll" error={errors['price_roll']}>
                                         <Input id="price_roll" name="price_roll" defaultValue={String(product.price_roll ?? '')} aria-invalid={!!errors['price_roll']} />
                                     </FormField>
                                 </div>
@@ -190,17 +190,17 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                 </div>
                                 <div className="p-4 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Statut</span>
+                                        <span className="text-sm text-muted-foreground">{t('Status')}</span>
                                         <Badge variant={product.active ? 'default' : 'destructive'}>
-                                            {product.active ? 'Actif' : 'Inactif'}
+                                            {product.active ? t('Active') : t('Inactive')}
                                         </Badge>
                                     </div>
-                                    <div className="text-sm text-muted-foreground">Catégorie ID : {String(product.category_products_id ?? 'N/A')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('Category ID')} : {String(product.category_products_id ?? t('N/A'))}</div>
                                     <div className="text-xs text-muted-foreground">
-                                        Créé le {product.created_at}
+                                        {t('Created at')} {product.created_at}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                        Maj le {product.updated_at}
+                                        {t('Updated at')} {product.updated_at}
                                     </div>
                                 </div>
                             </Card>

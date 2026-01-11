@@ -39,6 +39,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Routes du panier (cart)
         Route::prefix('cart')->name('cart.')->group(function () {
             Route::get('/', [\App\Http\Controllers\CartController::class, 'index'])->name('index');
+            Route::get('/checkout', [\App\Http\Controllers\CartController::class, 'checkout'])->name('checkout');
             Route::post('/add', [\App\Http\Controllers\CartController::class, 'addProduct'])->name('add');
             Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
             Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');

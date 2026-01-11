@@ -212,7 +212,7 @@ export function CartSidebarHeader() {
                         <button
                             type="button"
                             className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                            onClick={handleGeneratePdf}
+                            onClick={() => router.visit('/cart/checkout')}
                             disabled={isSaving}
                         >
                             <CheckCircleIcon className="size-5 text-green-600" />
@@ -264,7 +264,7 @@ export function CartSidebarHeader() {
                         </div>
                     </div>
                 ) : (
-                    <>
+                    <div className="realative ">
                         {items.length === 0 && (
                             <div className="text-center text-muted-foreground text-sm py-8">
                                 {t("Panier vide")}
@@ -278,7 +278,16 @@ export function CartSidebarHeader() {
                                 quantity={item.quantity}
                             />
                         ))}
-                    </>
+
+                        {/* {items.length > 0 && (
+                            <Button
+                                // onClick={}
+                                className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover w-50 absolute bottom-2 left-1/2 transform -translate-x-1/2 mb-4"
+                            >
+                                {t('Valider le panier')}
+                            </Button>
+                        )} */}
+                    </div>
                 )}
             </div>
         </div>
