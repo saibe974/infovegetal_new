@@ -48,7 +48,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
     const { addToCart } = useContext(CartContext);
     const handleAddToCart = (id: number) => {
         addToCart(product, 1);
-        isOpenId('right') && toggleSidebar('right');
+        !isOpenId('right') && toggleSidebar('right');
     };
 
     // console.log(product)

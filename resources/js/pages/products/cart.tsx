@@ -470,7 +470,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                     <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-base font-semibold">
-                                    <span>{t('Total produits + taxes TTC')}</span>
+                                    <span>{t('Total')}</span>
                                     <span>{formatCurrency(orderTotal)}</span>
                                 </div>
                             </div>

@@ -42,6 +42,10 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
         }
     };
 
+    const goToUserPage = (id: number) => {
+        window.location.href = `/admin/users/${id}`;
+    }
+
     return (
         <Table>
             <TableHeader>
@@ -56,7 +60,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
             </TableHeader>
             <TableBody>
                 {users.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} className="cursor-pointer hover:bg-muted" onClick={() => goToUserPage(user.id!)}>
                         <TableCell className="font-medium">
                             {user.name}
                         </TableCell>

@@ -273,7 +273,7 @@ export function CartSidebarHeader() {
                         </div>
                     </div>
                 ) : (
-                    <div className="realative ">
+                    <div className="my-2 ">
                         {items.length === 0 && (
                             <div className="text-center text-muted-foreground text-sm py-8">
                                 {t("Panier vide")}

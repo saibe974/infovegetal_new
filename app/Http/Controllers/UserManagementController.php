@@ -38,6 +38,30 @@ class UserManagementController extends Controller
         ]);
     }
 
+    public function show(Request $request, User $user): Response
+    {
+        // Vérifier que l'utilisateur est admin
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $user->load(['roles.permissions']);
+        
+        // Charger le parent si parent_id existe
+        if ($user->parent_id) {
+            $user->setAttribute('parent', User::find($user->parent_id));
+        }
+        
+        // Extraire les permissions des rôles (role_has_permissions)
+        $permissions = $user->roles->flatMap(fn($role) => $role->permissions)->unique('id')->values();
+        $user->setAttribute('permissions', $permissions);
+
+        return Inertia::render('users/show', [
+            'user' => $user,
+        ]);
+    }
+
+
     public function edit(Request $request, User $user): Response
     {
         // Autorisation: seul l'utilisateur lui-même ou un admin peut éditer

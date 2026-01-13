@@ -229,7 +229,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         <h3 className="text-sm font-semibold mb-3">{t('Caractéristiques produit')}</h3>
                                         <div className="space-y-3">
                                             {product.pot ? (
-                                                <div className="flex items-start gap-2">
+                                                <div className="flex items-center gap-2">
                                                     <CircleSlash2 className="size-5 text-main-purple dark:text-main-green mt-0.5" />
                                                     <div>
                                                         <div className="text-xs font-medium text-muted-foreground">{t('Diameter of the pot')}</div>
@@ -238,7 +238,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 </div>
                                             ) : null}
                                             {product.height ? (
-                                                <div className="flex items-start gap-2">
+                                                <div className="flex items-center gap-2">
                                                     <MoveVertical className="size-5 text-main-purple dark:text-main-green mt-0.5" />
                                                     <div>
                                                         <div className="text-xs font-medium text-muted-foreground">{t('Height')}</div>

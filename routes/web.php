@@ -94,6 +94,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['role:admin'])->group(function () {
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 
+    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
     Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users/store', [UserManagementController::class, 'store'])->name('users.store');

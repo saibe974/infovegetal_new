@@ -9,6 +9,7 @@ import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
+import { useSidebar } from "../ui/sidebar";
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -39,6 +40,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
     }
 
     const { addToCart } = useContext(CartContext);
+     const { toggleSidebar, isOpenId } = useSidebar()
 
     return (
         <Table>
@@ -145,7 +147,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                         onClick={(e: React.MouseEvent) => {
                                             e.stopPropagation();
                                             addToCart(item, 1);
-
+                                            !isOpenId('right') && toggleSidebar('right');
                                         }}
                                     >
                                         <CirclePlus />
