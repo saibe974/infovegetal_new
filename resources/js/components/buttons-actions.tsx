@@ -1,4 +1,4 @@
-import { CirclePlus, DownloadIcon, Loader2Icon, RotateCcw, SaveIcon, UploadIcon } from "lucide-react";
+import { CirclePlus, DownloadIcon, Loader2Icon, RotateCcw, SaveIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { useI18n } from "@/lib/i18n";
 import { on } from "events";
@@ -10,6 +10,7 @@ type Props = {
     save?: () => void;
     cancel?: () => void;
     add?: () => void;
+    delete?: () => void;
     saving?: boolean;
     className?: string;
 };
@@ -20,6 +21,7 @@ export function ButtonsActions({
     save: onSave,
     cancel: onCancel,
     add: onAdd,
+    delete: onDelete,
     saving,
     className,
 }: Props) {
@@ -45,6 +47,12 @@ export function ButtonsActions({
                     <a href={typeof onExport === 'string' ? onExport : undefined}>
                         <UploadIcon />
                     </a>
+                </Button>
+            }
+
+            {onDelete &&
+                <Button onClick={onDelete} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
+                    <TrashIcon />
                 </Button>
             }
 

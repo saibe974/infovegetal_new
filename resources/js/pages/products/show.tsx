@@ -67,9 +67,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
             </div>
 
             <div className=" flex flex-col gap-6">
-                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center">
+                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center md:w-2/3 md:mx-auto">
                     {/* {product.img_link && ( */}
-                    <Card className='lg:w-1/3 lg:h-150'>
+                    <Card className='lg:w-1/2 lg:h-150'>
                         <CardContent
                             className="h-full flex items-center justify-center relative overflow-hidden"
 
@@ -93,7 +93,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                     </Card>
                     {/* )} */}
 
-                    <Card className="lg:w-1/3 relative">
+                    <Card className="lg:w-1/2 relative">
                         <CardHeader>
                             <CardTitle>
                                 <h2 className='capitalize text-xl'>{product.name}</h2>
@@ -203,7 +203,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-6 md:w-2/3 md:mx-auto">
                     <Card className=''>
                         <CardHeader>
                             <CardTitle>{t('Informations produit')}</CardTitle>
