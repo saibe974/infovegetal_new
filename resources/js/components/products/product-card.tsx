@@ -311,7 +311,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                 {product?.price_promo ? (
                                     <>
                                         <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                                        <span className="font-bold text-red-300 dark:text-red-500">{String(product.price_promo)} €</span>
+                                        <span className="font-bold text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
                                     </>
                                 ) : (
                                     <span className="font-semibold">{String(product.price_roll)} €</span>
