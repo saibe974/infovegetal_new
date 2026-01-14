@@ -73,7 +73,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                         <CardContent
                             className="h-full flex items-center justify-center relative overflow-hidden"
 
-                        >
+                        >{product.img_link ?
                             <Lens
                                 zoomFactor={2.5}
                                 lensSize={200}
@@ -89,6 +89,15 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                 />
                             </Lens>
+                            : (
+                                <img
+                                    src="/placeholder.png"
+                                    alt={product.name}
+                                    className="h-full w-auto object-contain select-none"
+                                    draggable={false}
+                                />
+                            )
+                            }
                         </CardContent>
                     </Card>
                     {/* )} */}

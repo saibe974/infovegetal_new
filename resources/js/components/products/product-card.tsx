@@ -8,6 +8,7 @@ import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
+import { cn } from "@/lib/utils";
 
 type Props = {
     product: Product;
@@ -46,8 +47,8 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
     };
 
     const { addToCart } = useContext(CartContext);
-    const handleAddToCart = (id: number) => {
-        addToCart(product, 1);
+    const handleAddToCart = (id: number, quantity: number) => {
+        addToCart(product, quantity);
         !isOpenId('right') && toggleSidebar('right');
     };
 
@@ -60,7 +61,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
-            <Card className={`relative flex flex-col p-4 gap-4 ${className ?? ""}`}>
+            <Card className={`relative flex flex-col h-full p-4 gap-3 ${className ?? ""}`}>
                 <div className="absolute top-3 left-3">
                     <span
                         className={
@@ -84,127 +85,244 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     </span>
                     <p>
                         {product?.category ? (
-                            <span className="text-xs font-medium italic text-gray-500">
+                            <span className="text-sm font-light italic ">
                                 {product.category.name.charAt(0).toUpperCase() + product.category.name.slice(1)}
+                            </span>
+                        ) : null}
+                    </p>
+
+                    <p>
+                        {product?.ref ? (
+                            <span className="text-xs font-medium italic text-gray-500">
+                                {t('Ref')}: {String(product.ref)}
                             </span>
                         ) : null}
                     </p>
                 </CardTitle>
 
-                <CardContent className="p-0 max-w-[16rem] flex flex-col gap-5 ">
+                <CardContent className="p-0 flex flex-col gap-5 ">
                     <p className="font-light text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                         {description.charAt(0).toUpperCase() + description.slice(1)}
                     </p>
 
-                    <div className="flex items-center text-xs font-light italic">
-                        {product?.pot ? (
-                            <p className=" flex gap-1" title={t('Diameter of the pot')}>
-                                <span><CircleSlash2 className="size-4" /></span>
-                                <span>{String(product.pot)} cm</span>
-                            </p>
-                        ) : null}
+                    <div className="flex items-center">
+                        <div className="flex items-center text-xs font-light italic w-full">
+                            {product?.pot ? (
+                                <p className=" flex gap-1" title={t('Diameter of the pot')}>
+                                    <span><CircleSlash2 className="size-3" /></span>
+                                    <span>{String(product.pot)} cm</span>
+                                </p>
+                            ) : null}
 
-                        {product?.height && product?.pot ? (
-                            <span className="mx-2">-</span>
-                        ) : null}
+                            {product?.height && product?.pot ? (
+                                <span className="mx-2">-</span>
+                            ) : null}
 
-                        {product?.height ? (
-                            <p className="flex" title={t('Height')}>
-                                <span><MoveVertical className="size-4" /></span>
-                                <span>{String(product.height)} cm</span>
-                            </p>
-                        ) : null}
+                            {product?.height ? (
+                                <p className="flex" title={t('Height')}>
+                                    <span><MoveVertical className="size-4" /></span>
+                                    <span>{String(product.height)} cm</span>
+                                </p>
+                            ) : null}
+                        </div>
+
+                        <div className="w-full flex justify-end gap-2 p-0">
+                            {canEdit && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2"
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleEdit(product.id);
+                                    }}
+                                >
+                                    <EditIcon size={14} />
+                                </Button>
+                            )}
+                            {canDelete && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive-outline"
+                                    className="h-8 px-2"
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleDelete(product.id);
+                                    }}
+                                >
+                                    <TrashIcon size={14} />
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
+
+                    {/* <div className="flex-1" /> */}
+
+
+                    <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
                 </CardContent>
 
-                <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
+                {isAuthenticated && (
+                    // <CardFooter className="flex flex-col md:flex-row md:justify-around p-0 gap-2 w-full">
+                    //     {product?.price && (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
+                    //                 "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
+                    //                 "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, Number(product.cond))
+                    //             }}
+                    //             title={t('Add a tray')}
+                    //         >
+                    //             <span className="font-semibold">{product.price} €</span>
+                    //             <div className="flex items-center">
+                    //                 <span className="w-6 h-6">
+                    //                     <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                    //                 </span>
+                    //                 <span className="text-xs font-light">X {String(product.cond)}</span>
+                    //             </div>
+                    //         </button>
+                    //     )}
+                    //     {product?.price_floor ? (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
+                    //                 "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
+                    //                 "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
+                    //             }}
+                    //             title={t('Add a floor')}
+                    //         >
+                    //             <span className="font-semibold">{String(product.price_floor)} €</span>
+                    //             <div className="flex items-center">
+                    //                 <span className="w-6 h-6">
+                    //                     <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                    //                 </span>
+                    //                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                    //             </div>
+                    //         </button>
+                    //     ) : null}
+                    //     {product?.price_roll ? (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
+                    //                 "bg-main-purple hover:bg-main-purple-hover text-white",
+                    //                 "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
+                    //             }}
+                    //             title={t('Add a roll')}
+                    //         >
 
-                {isAuthenticated &&
-                    <div className="flex flex-col gap-2">
+                    //             {product?.price_promo ? (
+                    //                 <div className="flex items-center">
+                    //                     <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
+                    //                     <span className="font-bold text-red-300 dark:text-red-500">{String(product.price_promo)} €</span>
+                    //                 </div>
+                    //             ) : (
+                    //                 <span className="font-semibold">{String(product.price_roll)} €</span>
+                    //             )}
+                    //             <div className="flex items-center">
+                    //                 <span className="w-6 h-6">
+                    //                     <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                    //                 </span>
+                    //                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
+                    //             </div>
+                    //         </button>
+                    //     ) : null}
+                    // </CardFooter>
+
+                    <CardFooter className="flex flex-col p-0 gap-2 w-full">
                         {product?.price && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                            <button
+                                className={cn(
+                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
+                                    "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
+                                )}
+                                onClick={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAddToCart(product.id, Number(product.cond) || 1)
+                                }}
+                                title={t('Add a tray')}
+                            >
+                                <span className="w-6 h-6">
                                     <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
                                 </span>
                                 <span className="font-semibold">{product.price} €</span>
-                                <span className="text-xs text-gray-500">{t('(par carton)')}</span>
-                            </div>
+                                <span className="text-xs font-light">X {String(product.cond)}</span>
+                            </button>
                         )}
                         {product?.price_floor ? (
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                            <button
+                                className={cn(
+                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
+                                    "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
+                                )}
+                                onClick={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
+                                }}
+                                title={t('Add a floor')}
+                            >
+                                <span className="w-6 h-6">
                                     <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
                                 </span>
                                 <span className="font-semibold">{String(product.price_floor)} €</span>
-                                <span className="text-xs text-gray-500">{t('(par étage)')}</span>
-                            </div>
-                        ) : null}
+
+                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                            </button>
+                        ) : <div className="h-10"/>}
                         {product?.price_roll ? (
-                            <div className="flex items-center gap-2 text-sm">
-                                <span className="text-main-purple dark:text-main-green w-6 h-7">
+                            <button
+                                className={cn(
+                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "bg-main-purple hover:bg-main-purple-hover text-white",
+                                    "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
+                                )}
+                                onClick={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
+                                }}
+                                title={t('Add a roll')}
+                            >
+                                <span className="w-6 h-6">
                                     <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
                                 </span>
+
                                 {product?.price_promo ? (
                                     <>
-                                        <span className="font-semibold line-through text-gray-400">{String(product.price_roll)} €</span>
-                                        <span className="font-bold text-red-600">{String(product.price_promo)} €</span>
+                                        <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
+                                        <span className="font-bold text-red-300 dark:text-red-500">{String(product.price_promo)} €</span>
                                     </>
                                 ) : (
                                     <span className="font-semibold">{String(product.price_roll)} €</span>
                                 )}
-                                <span className="text-xs text-gray-500">{t('(par roll)')}</span>
-                            </div>
-                        ) : null}
-                    </div>
-                }
 
-                <CardFooter className="w-full flex justify-between p-0">
-                    <div className="flex gap-2">
-                        {canEdit && (
-                            <Button
-                                size="icon"
-                                variant="outline"
-                                onClick={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleEdit(product.id);
-                                }}
-                            >
-                                <EditIcon size={16} />
-                            </Button>
-                        )}
-                        {canDelete && (
-                            <Button
-                                size="icon"
-                                variant="destructive-outline"
-                                onClick={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleDelete(product.id);
-                                }}
-                            >
-                                <TrashIcon size={16} />
-                            </Button>
-                        )}
-                    </div>
+                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
 
-                    {isAuthenticated &&
-                        <Button
-                            onClick={(e: React.MouseEvent) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-
-                                handleAddToCart(product.id);
-
-                            }}
-                            className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover hover:scale-105 transition-transform duration-300"
-                        >
-                            {t('Add to Cart')}
-                        </Button>
-                    }
-
-                </CardFooter>
+                            </button>
+                        ) : <div className="h-10"/>}
+                    </CardFooter>
+                )}
             </Card>
         </Link>
     );
