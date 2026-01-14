@@ -46,7 +46,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
         <Table>
             <TableHeader>
                 <TableRow>
-                    <SortableTableHead field='id'>ID</SortableTableHead>
+                    <SortableTableHead field='ref'>Ref</SortableTableHead>
                     <TableHead></TableHead>
                     <SortableTableHead field='name'>{t('Name')}</SortableTableHead>
                     <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead>
@@ -68,17 +68,19 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
             <TableBody className="">
                 {collection.data.map((item) => (
                     <TableRow key={item.id} className="group hover:cursor-pointer" onClick={() => goToProductPage(item.id)}>
-                        <TableCell>{item.id}</TableCell>
+                        <TableCell>{String(item.ref)}</TableCell>
                         <TableCell>
                             {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
                         </TableCell>
-                        <TableCell className='flex flex-col gap-1 justify-center'>
-                            <span className="group group-hover:underline underline-offset-2">
-                                {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                                {item.description ? item.description : ''}
-                            </span>
+                        <TableCell className=''>
+                            <div className="flex flex-col justify-center gap-1">
+                                <span className="group group-hover:underline underline-offset-2">
+                                    {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+                                </span>
+                                <span className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {item.description ? item.description : ''}
+                                </span>
+                            </div>
                         </TableCell>
                         <TableCell>{item.category ? item.category.name.charAt(0).toUpperCase() + item.category.name.slice(1) : ''}</TableCell>
                         <TableCell>
@@ -139,7 +141,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                     <div className="flex flex-col gap-1">
                                         {item?.price && (
                                             <button
-                                                className="text-sm flex items-center justify-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond));
@@ -147,7 +149,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a tray')}
                                             >
-                                                <span className="w-6 h-6 mr-1 text-main-purple dark:text-main-green">
+                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                     <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
                                                 </span>
                                                 <span className=" mr-1">X {Number(item.cond)}</span>
@@ -155,7 +157,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                         )}
                                         {item?.price_floor ? (
                                             <button
-                                                className="text-sm flex items-center justify-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor));
@@ -163,7 +165,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a floor')}
                                             >
-                                                <span className="w-6 h-6 mr-1 text-main-purple dark:text-main-green">
+                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                     <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
                                                 </span>
                                                 <span className=" mr-1">X {Number(item.cond) * Number(item.floor)}</span>
@@ -171,7 +173,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                         ) : null}
                                         {item?.price_roll ? (
                                             <button
-                                                className="text-sm flex items-center justify-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor) * Number(item.roll));
@@ -179,7 +181,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a roll')}
                                             >
-                                                <span className="w-6 h-6 mr-1 text-main-purple dark:text-main-green">
+                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                     <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
                                                 </span>
                                                 <span className="mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
