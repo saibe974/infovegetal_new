@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 type ImportProgressPayload = {
@@ -36,7 +36,32 @@ export function UsersImportTreatment({
             onStartImport({ strategy });
         }
     };
+    const effectiveProgress = (() => {
+        const fromProp = Number.isFinite(displayProgress) ? displayProgress : 0;
+        const fromInfo = Number.isFinite(progressInfo?.progress as number) ? (progressInfo?.progress as number) : 0;
+        // Si la prop est 0 mais l'API remonte une progression, on l'utilise en repli
+        const base = fromProp > 0 ? fromProp : fromInfo;
+        // Si status fini/annulé, forcer 100 ou 0 cohérent
+        if (importStatus === 'finished') return 100;
+        if (importStatus === 'cancelled') return Math.min(base, 100);
+        return Math.min(base, 100);
+    })();
 
+    useEffect(() => {
+        console.log('[UsersImportTreatment] status=', importStatus, 'uploadId=', uploadId);
+    }, [importStatus, uploadId]);
+
+    useEffect(() => {
+        console.log('[UsersImportTreatment] progress update:', {
+            displayProgress,
+            backendProgress: progressInfo?.progress ?? null,
+            effectiveProgress,
+            processed: progressInfo?.processed ?? null,
+            total: progressInfo?.total ?? null,
+            errors: progressInfo?.errors ?? null,
+            status: progressInfo?.status ?? null,
+        });
+    }, [displayProgress, progressInfo?.progress, progressInfo?.processed, progressInfo?.total, progressInfo?.errors, effectiveProgress]);
     return (
         <>
             {importStatus === 'idle' && (
@@ -78,7 +103,7 @@ export function UsersImportTreatment({
                     <div className="w-full h-2 rounded bg-muted">
                         <div
                             className="h-2 rounded bg-primary transition-all"
-                            style={{ width: `${Math.min(displayProgress, 100)}%` }}
+                            style={{ width: `${effectiveProgress}%` }}
                         />
                     </div>
                     <p className="text-xs text-muted-foreground">

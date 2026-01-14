@@ -12,6 +12,8 @@ use League\Csv\Writer;
 use Symfony\Component\String\Slugger\AsciiSlugger;
 use Spatie\Permission\Models\Role;
 
+use function Illuminate\Log\log;
+
 class UserImportService
 {
     public function run(string $id, string $fullPath, string $relativePath, int $limit = 4000): void
@@ -21,8 +23,8 @@ class UserImportService
         
         // Première étape : découper le fichier CSV source en fichiers temporaires de données
         $this->splitIntoTempFiles($id, $fullPath, $limit);
-
-        $this->runChunk($id, $relativePath, 0);
+        // Ne pas traiter le premier chunk ici pour permettre au polling de piloter les chunks
+        // Le contrôleur initialisera next_offset et has_more et le front déclenchera processChunk
     }
 
     public function runChunk(string $id, string $relativePath, int $chunkIndex): void
@@ -85,9 +87,7 @@ class UserImportService
                     return;
                 }
 
-                if ($completed % 500 !== 0 && $completed !== $total) {
-                    return;
-                }
+                // Mettre à jour à chaque ligne pour remonter la progression en continu
 
                 Log::info("User import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
 
@@ -243,12 +243,15 @@ class UserImportService
             $nextDataFile = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $nextChunk . '.csv';
             $hasMore = is_file($nextDataFile);
 
+            $finalProgress = $total > 0 ? (int) ceil((($processed + $errors) / $total) * 100) : 100;
+            $finalProgress = min(100, max(0, $finalProgress));
+
             $finalState = [
                 'status' => $cancelled ? 'cancelled' : ($hasMore ? 'processing' : 'done'),
                 'processed' => $processed,
                 'total' => $total,
                 'errors' => $errors,
-                'progress' => $total > 0 ? (int) floor((($processed + $errors) / $total) * 100) : 100,
+                'progress' => $hasMore ? $finalProgress : 100,
                 'next_offset' => $nextChunk,
                 'has_more' => $hasMore,
                 'path' => $relativePath,
@@ -430,6 +433,7 @@ class UserImportService
     {
         $current = Cache::get("import:$id", []);
         $merged = array_merge($current, $state);
+        Log::info("maj progress");
         Cache::put("import:$id", $merged, now()->addHour());
     }
 

@@ -493,7 +493,8 @@ class UserManagementController extends Controller
         if (!$state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
-    Log::info("ok " . $state['path']);
+
+        // Log::info("ok " . $state['path']);
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
@@ -517,18 +518,27 @@ class UserManagementController extends Controller
             'strategy' => $strategy,
         ]);
 
-        Log::info("User import started synchronously for ID: $id");
+        // Log::info("User import started synchronously for ID: $id");
 
-        // Premier chunk synchronisé via le service (chunk index 0)
+        // Découper uniquement (le service ne traite plus le premier chunk synchronement)
         $importService->run($id, $fullPath, $relativePath);
 
-        // on renvoie l'état final du cache
+        // Vérifier la présence du premier chunk et ajuster l'état initial
+        $tmpDir = Storage::path('imports/tmp/' . $id);
+        $firstChunk = $tmpDir . DIRECTORY_SEPARATOR . 'data_0.csv';
+        $hasFirst = is_file($firstChunk);
+        $this->updateImportState($id, [
+            'next_offset' => 0,
+            'has_more' => $hasFirst,
+        ]);
+
+        // on renvoie l'état courant du cache
         $final = Cache::get("import:$id") ?? [
-            'status' => 'done',
+            'status' => 'processing',
             'processed' => 0,
             'total' => 0,
             'errors' => 0,
-            'progress' => 100,
+            'progress' => 0,
         ];
 
         return response()->json($final);
