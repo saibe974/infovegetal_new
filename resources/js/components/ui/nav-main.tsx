@@ -175,7 +175,9 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                         className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out mt-2 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
                                         style={{ maxHeight: isOpen ? heights[item.title] ?? 400 : 0 }}
                                     >
-                                        <SidebarMenuSub>
+                                        <SidebarMenuSub
+                                        // className='group-data-[collapsible=icon]:hidden'
+                                        >
                                             {item.subItems.map((subItem) => (
                                                 <SidebarMenuItem key={subItem.title}>
                                                     <SidebarMenuButton
@@ -186,7 +188,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                                         tooltip={!isOpenId('main') ? { children: subItem.title } : undefined}
                                                     >
                                                         <Link href={subItem.href} prefetch>
-                                                            {subItem.icon && <subItem.icon />}
+                                                            {subItem.icon && <subItem.icon className='group-data-[collapsible=icon]:size-3.5'/>}
                                                             <span>{subItem.title}</span>
                                                         </Link>
                                                     </SidebarMenuButton>

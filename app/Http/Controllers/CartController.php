@@ -6,6 +6,7 @@ use App\Models\Cart;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Spatie\LaravelPdf\Facades\Pdf;
 
 class CartController extends Controller
@@ -14,6 +15,11 @@ class CartController extends Controller
     {
         $cart = Auth::user()->cart()->with('products')->firstOrCreate([]);
         return response()->json($cart->load('products'));
+    }
+
+    public function checkout()
+    {
+        return Inertia::render('products/cart') ;
     }
 
     public function addProduct(Request $request)

@@ -311,6 +311,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
                             />
                         }
                         export={'/admin/products/export'}
+                        add={() => { }}
                     />
                 )}
             </StickyBar>

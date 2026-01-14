@@ -369,7 +369,9 @@ export default withAppLayout(
                         <GripVertical size={14} />
                     </div>
 
-                    <span className="truncate font-medium flex-1">{displayName}</span>
+                    <Link href={'/admin/users/' + (item as any).id} className="truncate font-medium flex-1 hover:cursor-pointer hover:underline">
+                        {displayName}
+                    </Link>
 
                     <div className="flex gap-2 justify-end flex-shrink-0">
                         {hasValidId && !isDragging && (
