@@ -32,7 +32,7 @@ export function ProductsCardsList({ limit = null, products, canEdit = false, can
     }
 
     return (
-        <div className="flex gap-10 flex-wrap items-center justify-center max-w-full">
+        <div className="flex gap-10 flex-wrap justify-center max-w-full">
             {productsToShow.map((product) => (
                 <ProductCard
                     key={product.id}

@@ -61,7 +61,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
-            <Card className={`relative flex flex-col h-full p-4 gap-3 ${className ?? ""}`}>
+            <Card className={`relative flex flex-col p-4 gap-3 h-full ${className ?? ""}`}>
                 <div className="absolute top-3 left-3">
                     <span
                         className={
@@ -79,7 +79,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     <img src={img} alt={name} className="w-full max-w-100 h-80 object-cover rounded" />
                 </CardHeader>
 
-                <CardTitle className="">
+                <CardTitle>
                     <span className="text-lg font-semibold  whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
                         {name.charAt(0).toUpperCase() + name.slice(1)}
                     </span>
@@ -100,7 +100,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     </p>
                 </CardTitle>
 
-                <CardContent className="p-0 flex flex-col gap-5 ">
+                <CardContent className="p-0 flex flex-col justify-between gap-5 flex-1">
                     <p className="font-light text-sm whitespace-nowrap overflow-hidden text-ellipsis">
                         {description.charAt(0).toUpperCase() + description.slice(1)}
                     </p>
@@ -125,44 +125,45 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                 </p>
                             ) : null}
                         </div>
-
-                        <div className="w-full flex justify-end gap-2 p-0">
-                            {canEdit && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 px-2"
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleEdit(product.id);
-                                    }}
-                                >
-                                    <EditIcon size={14} />
-                                </Button>
-                            )}
-                            {canDelete && (
-                                <Button
-                                    size="sm"
-                                    variant="destructive-outline"
-                                    className="h-8 px-2"
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleDelete(product.id);
-                                    }}
-                                >
-                                    <TrashIcon size={14} />
-                                </Button>
-                            )}
-                        </div>
+                        {(canEdit || canDelete) && (
+                            <div className="w-full flex justify-end gap-2 p-0">
+                                {canEdit && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 px-2"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleEdit(product.id);
+                                        }}
+                                    >
+                                        <EditIcon size={14} />
+                                    </Button>
+                                )}
+                                {canDelete && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive-outline"
+                                        className="h-8 px-2"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDelete(product.id);
+                                        }}
+                                    >
+                                        <TrashIcon size={14} />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
 
                     {/* <div className="flex-1" /> */}
 
 
-                    <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
+                    <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
                 </CardContent>
 
                 {isAuthenticated && (
@@ -246,7 +247,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     //     ) : null}
                     // </CardFooter>
 
-                    <CardFooter className="flex flex-col p-0 gap-2 w-full">
+                    <CardFooter className="flex flex-col p-0 gap-2 w-full flex-1">
                         {product?.price && (
                             <button
                                 className={cn(
@@ -289,7 +290,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
 
                                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
                             </button>
-                        ) : <div className="h-10"/>}
+                        ) : <div className="h-10" />}
                         {product?.price_roll ? (
                             <button
                                 className={cn(
@@ -320,7 +321,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
 
                             </button>
-                        ) : <div className="h-10"/>}
+                        ) : <div className="h-10" />}
                     </CardFooter>
                 )}
             </Card>
