@@ -355,7 +355,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
             {uniqueCount < collection.meta.total &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
-                    <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
+                    <Loader2Icon size={50} className='animate-spin text-brand-main' />
                 </div>
             }
         </>

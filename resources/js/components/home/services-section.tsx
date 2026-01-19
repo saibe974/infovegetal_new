@@ -117,7 +117,7 @@ export default function servicesSection({ active }: { active: boolean }) {
                             {activeId === item.id && (
                                 <div className="absolute inset-0 pointer-events-none">
                                     {/* SVG de fond avec opacité réduite */}
-                                    <div className="w-full h-full opacity-30 text-main-purple dark:text-main-green">
+                                    <div className="w-full h-full opacity-30 text-brand-main">
                                         <AnimatedSVG svg={activeItem.svg} />
                                     </div>
                                     {/* calque de gradient entre le SVG et le texte (clair en light, sombre en dark) */}

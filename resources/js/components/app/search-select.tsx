@@ -221,7 +221,7 @@ export default function SearchSelect({
                 {filtersActive?.map((filter) => (
                     <span
                         key={filter.name}
-                        className="flex items-center gap-1 bg-main-green dark:bg-main-green text-black text-sm px-2 py-0.5 rounded-xl"
+                        className="flex items-center gap-1 bg-brand-main text-white dark:text-black text-sm px-2 py-0.5 rounded-xl"
                     >
                         {filter.label}
                         <X

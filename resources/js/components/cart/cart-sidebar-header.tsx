@@ -300,7 +300,7 @@ export function CartSidebarHeader() {
                             router.visit('/cart/checkout');
                             toggleSidebar('right');
                         }}
-                        className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover "
+                        className="bg-brand-main hover:bg-brand-main-hover"
                     >
                         {t('Valider le panier')}
                     </Button>

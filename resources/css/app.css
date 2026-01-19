@@ -115,6 +115,13 @@
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+
+  --brand-main: #9C0060;
+  --brand-main-hover: #830452;
+
+  --brand-secondary: #84439F;
+
+  --brand-tertiary: #3B6CC9;
 }
 
 .dark {
@@ -168,6 +175,14 @@
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  --brand-main: #C6E300;
+
+  --brand-main-hover: #A3C700;
+
+  --brand-secondary: #5CCE55;
+
+  --brand-tertiary: #00B07D;
 }
 
 @theme inline {
@@ -222,11 +237,13 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 
-  --color-main-green: #C6E300;
-  --color-main-purple: #9C0060;
+  --color-brand-main: var(--brand-main);
 
-  --color-main-green-hover: #A3C700;
-  --color-main-purple-hover: #830452;
+  --color-brand-main-hover: var(--brand-main-hover);
+
+  --color-brand-secondary: var(--brand-secondary);
+  
+  --color-brand-tertiary: var(--brand-tertiary);
 }
 
 @layer base {
