@@ -313,7 +313,7 @@ export default function SearchSelect({
                 />
 
                 {/* Bouton clear */}
-                {((filtersActive && filtersActive.length > 0) || selected.length > 0 || value) && (
+                {( selected.length > 0 || value) && (
                     <button
                         type="button"
                         onClick={handleClear}

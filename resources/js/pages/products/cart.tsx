@@ -20,6 +20,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import BasicSticky from 'react-sticky-el';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 type Props = Record<string, never>;
 
@@ -215,13 +216,13 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
         const getHeight = () => {
             const header = document.querySelector('.top-sticky') as HTMLElement | null;
             const stickyBar = document.querySelector('.sticky-bar-cart') as HTMLElement | null;
-            
+
             if (!header || !stickyBar) return 0;
-            
+
             const headerHeight = header.getBoundingClientRect().height;
             const barHeight = stickyBar.getBoundingClientRect().height;
             const total = headerHeight + barHeight;
-            
+
             // console.log('header height:', headerHeight, 'bar height:', barHeight, 'total:', total);
             return total;
         };
@@ -248,7 +249,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
         };
         window.addEventListener('resize', handleResize);
 
-    
+
 
         return () => {
             window.removeEventListener('resize', handleResize);
@@ -279,15 +280,19 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                     </div>
 
                     {items.length > 0 && (
-                        <div className='space-x-2'>
+                        // <div className='space-x-2'>
 
-                            <Button variant="default" onClick={handleSaveCart} className="" size="sm" disabled={isSaving}>
-                                {t('Save')} <SaveIcon className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" onClick={clearCart} className="text-destructive" size="sm" disabled={isSaving}>
-                                {t('Clear')}<Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
+                        //     <Button variant="default" onClick={handleSaveCart} className="" size="sm" disabled={isSaving}>
+                        //         {t('Save')} <SaveIcon className="h-4 w-4" />
+                        //     </Button>
+                        //     <Button variant="ghost" onClick={clearCart} className="text-destructive" size="sm" disabled={isSaving}>
+                        //         {t('Clear')}<Trash2 className="h-4 w-4" />
+                        //     </Button>
+                        // </div>
+                        <ButtonsActions
+                            save={handleSaveCart}
+                            delete={clearCart}
+                        />
                     )}
                 </div>
             </StickyBar>
@@ -396,7 +401,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
                 <BasicSticky
                     topOffset={-topOffset}
-                    stickyStyle={{ top: topOffset,}}
+                    stickyStyle={{ top: topOffset, }}
                 >
                     <Card
                         className="h-fit sidebar"

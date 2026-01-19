@@ -105,95 +105,95 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
             </div>
 
             {/* User Info */}
-            {/* <div className='md:max-w-4xl md:mx-auto flex flex-col gap-5'> */}
-            <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Mail size={20} />
-                    {t('User Information')}
-                </h2>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-sm text-gray-500">{t('Email')}</p>
-                        <p className="font-medium">{user.email}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">{t('User ID')}</p>
-                        <p className="font-medium">#{user.id}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">{t('Created')}</p>
-                        <p className="font-medium text-sm">{formatDate(user.created_at)}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">{t('Updated')}</p>
-                        <p className="font-medium text-sm">{formatDate(user.updated_at)}</p>
-                    </div>
-
-                    <div className="">
-                        <p className="text-sm text-gray-500">{t('Email Verified At')}</p>
-                        {user.email_verified_at ? (
-                            <p className="font-medium text-sm">
-                                {formatDate(user.email_verified_at)}
-                            </p>
-                        ) : (
-                            <Badge variant="destructive">{t('Not Verified')}</Badge>
-                        )
-                        }
-                    </div>
-
-                    {user.parent ? (
-                        <div className="">
-                            <p className="text-sm text-gray-500">{t('Parent User')}</p>
-                            <Link
-                                href={users.show((user.parent as User).id).url}
-                                className="font-medium text-blue-500 hover:text-blue-700 hover:underline"
-                            >
-                                {(user.parent as User).name}
-                            </Link>
+            <div className='md:w-2/3 md:mx-auto flex flex-col gap-5'>
+                <Card className="p-6">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Mail size={20} />
+                        {t('User Information')}
+                    </h2>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-sm text-gray-500">{t('Email')}</p>
+                            <p className="font-medium">{user.email}</p>
                         </div>
-                    ) : null}
+                        <div>
+                            <p className="text-sm text-gray-500">{t('User ID')}</p>
+                            <p className="font-medium">#{user.id}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-500">{t('Created')}</p>
+                            <p className="font-medium text-sm">{formatDate(user.created_at)}</p>
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-500">{t('Updated')}</p>
+                            <p className="font-medium text-sm">{formatDate(user.updated_at)}</p>
+                        </div>
 
-                </div>
-            </Card>
+                        <div className="">
+                            <p className="text-sm text-gray-500">{t('Email Verified At')}</p>
+                            {user.email_verified_at ? (
+                                <p className="font-medium text-sm">
+                                    {formatDate(user.email_verified_at)}
+                                </p>
+                            ) : (
+                                <Badge variant="destructive">{t('Not Verified')}</Badge>
+                            )
+                            }
+                        </div>
 
-            {/* Roles */}
-            <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Shield size={20} />
-                    {t('Roles')} ({user.roles?.length || 0})
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                    {user.roles && user.roles.length > 0 ? (
-                        user.roles.map((role: any) => (
-                            <Badge key={role.id} variant="secondary" className="bg-blue-100 text-blue-800">
-                                {role.name}
-                            </Badge>
-                        ))
-                    ) : (
-                        <p className="text-gray-500 text-sm">{t('No roles assigned')}</p>
-                    )}
-                </div>
-            </Card>
+                        {user.parent ? (
+                            <div className="">
+                                <p className="text-sm text-gray-500">{t('Parent User')}</p>
+                                <Link
+                                    href={users.show((user.parent as User).id).url}
+                                    className="font-medium text-blue-500 hover:text-blue-700 hover:underline"
+                                >
+                                    {(user.parent as User).name}
+                                </Link>
+                            </div>
+                        ) : null}
 
-            {/* Permissions */}
-            <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Lock size={20} />
-                    {t('Permissions')} ({user.permissions?.length || 0})
-                </h2>
-                <div className="flex flex-wrap gap-2 max-h-96 overflow-y-auto">
-                    {user.permissions && user.permissions.length > 0 ? (
-                        user.permissions.map((perm: any) => (
-                            <Badge key={perm.id} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                {perm.name}
-                            </Badge>
-                        ))
-                    ) : (
-                        <p className="text-gray-500 text-sm">{t('No permissions assigned')}</p>
-                    )}
-                </div>
-            </Card>
-            {/* </div> */}
+                    </div>
+                </Card>
+
+                {/* Roles */}
+                <Card className="p-6">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Shield size={20} />
+                        {t('Roles')} ({user.roles?.length || 0})
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                        {user.roles && user.roles.length > 0 ? (
+                            user.roles.map((role: any) => (
+                                <Badge key={role.id} variant="secondary" className="bg-blue-100 text-blue-800">
+                                    {role.name}
+                                </Badge>
+                            ))
+                        ) : (
+                            <p className="text-gray-500 text-sm">{t('No roles assigned')}</p>
+                        )}
+                    </div>
+                </Card>
+
+                {/* Permissions */}
+                <Card className="p-6">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <Lock size={20} />
+                        {t('Permissions')} ({user.permissions?.length || 0})
+                    </h2>
+                    <div className="flex flex-wrap gap-2 max-h-96 overflow-y-auto">
+                        {user.permissions && user.permissions.length > 0 ? (
+                            user.permissions.map((perm: any) => (
+                                <Badge key={perm.id} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                    {perm.name}
+                                </Badge>
+                            ))
+                        ) : (
+                            <p className="text-gray-500 text-sm">{t('No permissions assigned')}</p>
+                        )}
+                    </div>
+                </Card>
+            </div>
         </div>
     );
 });

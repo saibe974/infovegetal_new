@@ -67,13 +67,13 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
             </div>
 
             <div className=" flex flex-col gap-6">
-                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center">
+                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center md:w-2/3 md:mx-auto">
                     {/* {product.img_link && ( */}
-                    <Card className='lg:w-1/3 lg:h-150'>
+                    <Card className='lg:w-1/2 lg:h-150'>
                         <CardContent
                             className="h-full flex items-center justify-center relative overflow-hidden"
 
-                        >
+                        >{product.img_link ?
                             <Lens
                                 zoomFactor={2.5}
                                 lensSize={200}
@@ -89,11 +89,20 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                 />
                             </Lens>
+                            : (
+                                <img
+                                    src="/placeholder.png"
+                                    alt={product.name}
+                                    className="h-full w-auto object-contain select-none"
+                                    draggable={false}
+                                />
+                            )
+                            }
                         </CardContent>
                     </Card>
                     {/* )} */}
 
-                    <Card className="lg:w-1/3 relative">
+                    <Card className="lg:w-1/2 relative">
                         <CardHeader>
                             <CardTitle>
                                 <h2 className='capitalize text-xl'>{product.name}</h2>
@@ -104,7 +113,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                 )}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6 ">
+                        <CardContent className="space-y-6 w-full">
                             <p className=" capitalize">
                                 {product.description || t('Aucune description disponible')}
                             </p>
@@ -115,7 +124,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     </span>
                                     <div className="flex-1">
                                         <div className="text-xl font-bold">{product.price} €</div>
-                                        <div className="text-xs text-muted-foreground">{t('(par carton)')}</div>
+                                        <div className="text-xs text-muted-foreground">X {Number(product.cond)}</div>
                                     </div>
                                 </div>
                             )}
@@ -126,7 +135,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     </span>
                                     <div className="flex-1">
                                         <div className="text-xl font-semibold">{String(product.price_floor)} €</div>
-                                        <div className="text-xs text-muted-foreground">{t('(par étage)')}</div>
+                                        <div className="text-xs text-muted-foreground">X {Number(product.cond) * Number(product.floor)}</div>
                                     </div>
                                 </div>
                             ) : null}
@@ -144,12 +153,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 <div className="text-2xl font-bold text-red-600">
                                                     {String(product.price_promo)} €
                                                 </div>
-                                                <div className="text-xs text-muted-foreground">{t('(par roll)')}</div>
+                                                <div className="text-xs text-muted-foreground">X {Number(product.cond) * Number(product.roll)}</div>
                                             </div>
                                         ) : (
                                             <div>
                                                 <div className="text-xl font-semibold">{String(product.price_roll)} €</div>
-                                                <div className="text-xs text-muted-foreground">{t('(par roll)')}</div>
+                                                <div className="text-xs text-muted-foreground">X {Number(product.cond) * Number(product.roll)}</div>
                                             </div>
                                         )}
                                     </div>
@@ -160,8 +169,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                         </CardContent>
 
                         {isAuthenticated && (
-                            <CardFooter className='w-full flex items-center justify-between gap-4 pt-6 mt-auto'>
-                                <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                            <CardFooter className='w-full flex flex-col gap-3 pt-6 mt-auto'>
+                                {/* <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -189,24 +198,83 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     >
                                         <Plus className="h-4 w-4" />
                                     </Button>
+                                </div> */}
+
+
+                                <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
+
+                                <div className="flex flex-col gap-2 w-full md:w-2/3">
+                                    {product?.price && (
+                                        <button
+                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black font-semibold"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                addToCart(product, Number(product.cond));
+                                            }}
+                                            title={t('Add a tray')}
+                                        >
+                                            <span className="w-6 h-6">
+                                                <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                            </span>
+                                            <span>{product.price} €</span>
+                                            <span className="text-xs font-light">X {String(product.cond)}</span>
+                                        </button>
+                                    )}
+                                    {product?.price_floor ? (
+                                        <button
+                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-[#84439f] hover:bg-[#84439f]/90 text-white dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black font-semibold"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                addToCart(product, Number(product.cond) * Number(product.floor));
+                                                !isOpenId('right') && toggleSidebar('right');
+                                            }}
+                                            title={t('Add a floor')}
+                                        >
+                                            <span className="w-6 h-6">
+                                                <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                            </span>
+                                            <span>{String(product.price_floor)} €</span>
+                                            <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                                        </button>
+                                    ) : null}
+                                    {product?.price_roll ? (
+                                        <button
+                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-main-purple hover:bg-main-purple-hover text-white dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover font-semibold"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                addToCart(product, Number(product.cond) * Number(product.floor) * Number(product.roll));
+                                                !isOpenId('right') && toggleSidebar('right');
+                                            }}
+                                            title={t('Add a roll')}
+                                        >
+                                            <span className="w-6 h-6">
+                                                <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                            </span>
+                                            {product?.price_promo ? (
+                                                <>
+                                                    <span className="line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
+                                                    <span className="text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
+                                                </>
+                                            ) : (
+                                                <span>{String(product.price_roll)} €</span>
+                                            )}
+                                            <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
+                                        </button>
+                                    ) : null}
                                 </div>
-                                <Button
-                                    onClick={handleAddToCart}
-                                    className="bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover flex-1 h-10"
-                                >
-                                    <ShoppingCart className="mr-2 h-4 w-4" />
-                                    {t('Add to Cart')}
-                                </Button>
                             </CardFooter>
                         )}
                     </Card>
 
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-6 md:w-2/3 md:mx-auto">
                     <Card className=''>
                         <CardHeader>
-                            <CardTitle>{t('Informations produit')}</CardTitle>
+                            <CardTitle>{t('Product Information')}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid md:grid-cols-2 gap-6">
@@ -226,7 +294,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                     )}
 
                                     <div>
-                                        <h3 className="text-sm font-semibold mb-3">{t('Caractéristiques produit')}</h3>
+                                        <h3 className="text-sm font-semibold mb-3">{t('Product Characteristics')}</h3>
                                         <div className="space-y-3">
                                             {product.pot ? (
                                                 <div className="flex items-center gap-2">
@@ -246,7 +314,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                     </div>
                                                 </div>
                                             ) : null}
-                                            {product.cond !== null && product.cond !== undefined && (
+                                            {/* {product.cond !== null && product.cond !== undefined && (
                                                 <div>
                                                     <div className="text-xs font-medium text-muted-foreground">{t('Conditionnement')}</div>
                                                     <div className="text-base font-semibold">{String(product.cond)}</div>
@@ -263,14 +331,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                     <div className="text-xs font-medium text-muted-foreground">{t('Unités par roll')}</div>
                                                     <div className="text-base font-semibold">{String(product.roll)}</div>
                                                 </div>
-                                            )}
+                                            )} */}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Colonne droite: Références */}
                                 <div>
-                                    <h3 className="text-sm font-semibold mb-3">{t('Références')}</h3>
+                                    <h3 className="text-sm font-semibold mb-3">{t('References')}</h3>
                                     <div className="space-y-3">
                                         <div>
                                             <div className="text-xs font-medium text-muted-foreground mb-1">SKU</div>
@@ -281,7 +349,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                         {product.ref ? (
                                             <div>
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('Référence')}</div>
+                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('RReference')}</div>
                                                 <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
                                                     {String(product.ref)}
                                                 </div>
@@ -290,7 +358,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                         {product.ean13 ? (
                                             <div>
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('Code EAN13')}</div>
+                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('EAN13 Code')}</div>
                                                 <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
                                                     {String(product.ean13)}
                                                 </div>
@@ -298,7 +366,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         ) : null}
 
                                         <div>
-                                            <div className="text-xs font-medium text-muted-foreground mb-1">{t('ID Produit')}</div>
+                                            <div className="text-xs font-medium text-muted-foreground mb-1">{t('Product ID')}</div>
                                             <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
                                                 #{product.id}
                                             </div>
