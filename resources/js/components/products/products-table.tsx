@@ -44,6 +44,8 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
 
     return (
         <Table>
+
+
             <TableHeader>
                 <TableRow>
                     <SortableTableHead field='ref'>Ref</SortableTableHead>
@@ -55,9 +57,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     </TableHead>
                     {isAuthenticated && (
                         <>
-
                             <SortableTableHead field='price'>{t('Price')}</SortableTableHead>
-                            <TableHead className="text-center">{t('Add to cart')}</TableHead>
                         </>
                     )}
 
@@ -65,6 +65,8 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
 
                 </TableRow>
             </TableHeader>
+
+
             <TableBody className="">
                 {collection.data.map((item) => (
                     <TableRow key={item.id} className="group hover:cursor-pointer" onClick={() => goToProductPage(item.id)}>
@@ -103,45 +105,11 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                         </TableCell>
                         {isAuthenticated && (
                             <>
-                                <TableCell className="space-y-2">
-                                    {item?.price && (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <span className="text-main-purple dark:text-main-green w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                            </span>
-                                            <span className="font-semibold">{item.price} €</span>
-                                        </div>
-                                    )}
-                                    {item?.price_floor ? (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <span className="text-main-purple dark:text-main-green w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                            </span>
-                                            <span className="font-semibold">{String(item.price_floor)} €</span>
-                                        </div>
-                                    ) : null}
-                                    {item?.price_roll ? (
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <span className="text-main-purple dark:text-main-green w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                            </span>
-                                            {item?.price_promo ? (
-                                                <>
-                                                    <span className="font-semibold line-through text-gray-400">{String(item.price_roll)} €</span>
-                                                    <span className="font-bold text-red-600">{String(item.price_promo)} €</span>
-                                                </>
-                                            ) : (
-                                                <span className="font-semibold">{String(item.price_roll)} €</span>
-                                            )}
-                                        </div>
-                                    ) : null}
-                                </TableCell>
-
                                 <TableCell className="text-end">
-                                    <div className="flex flex-col gap-1">
+                                    <div className="flex gap-1">
                                         {item?.price && (
                                             <button
-                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond));
@@ -149,15 +117,20 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a tray')}
                                             >
-                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
-                                                    <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                                </span>
-                                                <span className=" mr-1">X {Number(item.cond)}</span>
+                                                <div className="w-1/2 flex justify-center">
+                                                    <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
+                                                        <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                                    </span>
+                                                </div>
+                                                <div className="w-1/2 flex flex-col items-center">
+                                                    <span className="font-semibold">{item.price} €</span>
+                                                    <span className="text-xs font-light mr-1">X {Number(item.cond)}</span>
+                                                </div>
                                             </button>
                                         )}
                                         {item?.price_floor ? (
                                             <button
-                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor));
@@ -165,15 +138,20 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a floor')}
                                             >
-                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
-                                                    <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                                </span>
-                                                <span className=" mr-1">X {Number(item.cond) * Number(item.floor)}</span>
+                                                <div className="w-1/2 flex justify-center">
+                                                    <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
+                                                        <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                                    </span>
+                                                </div>
+                                                <div className="w-1/2 flex flex-col items-center">
+                                                    <span className="font-semibold">{item.price_floor} €</span>
+                                                    <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor)}</span>
+                                                </div>
                                             </button>
                                         ) : null}
                                         {item?.price_roll ? (
                                             <button
-                                                className="text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor) * Number(item.roll));
@@ -181,10 +159,15 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a roll')}
                                             >
-                                                <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
-                                                    <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                                </span>
-                                                <span className="mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
+                                                <div className="w-1/2 flex justify-center">
+                                                    <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
+                                                        <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                                    </span>
+                                                </div>
+                                                <div className="w-1/2 flex flex-col items-center">
+                                                    <span className="font-semibold">{item.price_roll} €</span>
+                                                    <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
+                                                </div>
                                             </button>
                                         ) : null}
                                     </div>
