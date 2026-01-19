@@ -67,7 +67,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
             </div>
 
             <div className=" flex flex-col gap-6">
-                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center md:w-2/3 md:mx-auto">
+                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center w-full max-w-[1200px] md:mx-auto">
                     {/* {product.img_link && ( */}
                     <Card className='lg:w-1/2 lg:h-150'>
                         <CardContent
@@ -271,7 +271,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                 </div>
 
-                <div className="space-y-6 md:w-2/3 md:mx-auto">
+                <div className="space-y-6 w-full max-w-[1200px] md:mx-auto">
                     <Card className=''>
                         <CardHeader>
                             <CardTitle>{t('Product Information')}</CardTitle>

@@ -105,7 +105,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
             </div>
 
             {/* User Info */}
-            <div className='md:w-2/3 md:mx-auto flex flex-col gap-5'>
+            <div className='w-full max-w-[1200px] md:mx-auto flex flex-col gap-5'>
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <Mail size={20} />
