@@ -67,7 +67,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     <div className="absolute top-6 -left-10 w-40">
                         <div className="gap-1 bg-red-600 text-white inline-flex items-center justify-center px-4 py-2 text-sm font-semibold shadow-lg -rotate-45 w-full">
                             <BadgeEuro className="w-5 h-5" />
-                            <span>PROMO</span>
+                            <span>{t('SALE')}</span>
                         </div>
                     </div>
                 ) : null}
@@ -81,7 +81,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         aria-hidden="true"
                     >
                         {product?.active ? <CheckIcon className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
-                        {product?.active ? "En stock" : "Rupture"}
+                        {product?.active ? t("In stock") : t("Out of stock")}
                     </span>
                 </div>
 
@@ -147,6 +147,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                             e.stopPropagation();
                                             handleEdit(product.id);
                                         }}
+                                        title={t('Edit product')}
                                     >
                                         <EditIcon size={14} />
                                     </Button>
@@ -161,6 +162,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                             e.stopPropagation();
                                             handleDelete(product.id);
                                         }}
+                                        title={t('Delete product')}
                                     >
                                         <TrashIcon size={14} />
                                     </Button>
@@ -258,83 +260,6 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                             </button>
                         ) : null}
                     </CardFooter>
-
-                    // <CardFooter className="flex flex-col p-0 gap-2 w-full flex-1">
-                    //     {product?.price && (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
-                    //                 "dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, Number(product.cond) || 1)
-                    //             }}
-                    //             title={t('Add a tray')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                    //             </span>
-                    //             <span className="font-semibold">{product.price} €</span>
-                    //             <span className="text-xs font-light">X {String(product.cond)}</span>
-                    //         </button>
-                    //     )}
-                    //     {product?.price_floor ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
-                    //                 "dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
-                    //             }}
-                    //             title={t('Add a floor')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                    //             </span>
-                    //             <span className="font-semibold">{String(product.price_floor)} €</span>
-
-                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
-                    //         </button>
-                    //     ) : <div className="h-10" />}
-                    //     {product?.price_roll ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-brand-main hover:bg-brand-main-hover text-white",
-                    //                 "dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
-                    //             }}
-                    //             title={t('Add a roll')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                    //             </span>
-
-                    //             {product?.price_promo ? (
-                    //                 <>
-                    //                     <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                    //                     <span className="font-bold text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
-                    //                 </>
-                    //             ) : (
-                    //                 <span className="font-semibold">{String(product.price_roll)} €</span>
-                    //             )}
-
-                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-
-                    //         </button>
-                    //     ) : <div className="h-10" />}
-                    // </CardFooter>
                 )}
             </Card>
         </Link>
