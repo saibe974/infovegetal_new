@@ -35,7 +35,10 @@ export default withAppLayout(
             { title: t('Categories'), href: categoryProducts.index().url },
         ];
     },
-    true,
+    (props: Props) => {
+        const uniqueCount = Array.from(new Set(props.collection.data.map((c: ProductCategory) => c.id))).length;
+        return uniqueCount < props.collection.meta.total;
+    },
     ({ collection, q, children }: Props) => {
         const { t } = useI18n();
         const [pending, setPending] = useState<ProductCategory[] | null>(null);
@@ -361,7 +364,7 @@ export default withAppLayout(
 
                         {collection.meta.current_page < collection.meta.last_page && (
                             <div className="w-full h-50 flex items-center justify-center mt-4">
-                                <Loader2Icon size={50} className="animate-spin text-main-purple dark:text-main-green" />
+                                <Loader2Icon size={50} className="animate-spin text-brand-main" />
                             </div>
                         )}
                     </>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,11 +30,11 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $users = User::with(['roles', 'permissions'])->get();
+        $users = User::with(['roles', 'permissions'])->paginate(15);
         $roles = Role::with('permissions:id,name')->get(['id', 'name']);
 
         return Inertia::render('users/users', [
-            'users' => $users,
+            'users' => Inertia::scroll(fn() => UserResource::collection($users)),
             'roles' => $roles,
         ]);
     }

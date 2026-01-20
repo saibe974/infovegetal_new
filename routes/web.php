@@ -94,15 +94,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['role:admin'])->group(function () {
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 
-    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
-    Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
+    // Routes statiques d'abord (avant les routes avec {user})
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users/store', [UserManagementController::class, 'store'])->name('users.store');
+    Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
+    Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
+    
+    // Routes avec {user} après
+    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
+    Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
     Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
     Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->name('users.db');
     Route::post('admin/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');
-    Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
-    Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->name('users.editDb');
     
 

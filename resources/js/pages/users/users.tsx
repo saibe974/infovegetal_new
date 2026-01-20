@@ -1,4 +1,4 @@
-import { type BreadcrumbItem, type SharedData, type User } from '@/types';
+import { PaginatedCollection, type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import HeadingSmall from '@/components/heading-small';
@@ -50,7 +50,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface UsersPageProps {
-    users: User[];
+    users: PaginatedCollection<User>;
     roles: Array<{ id: number; name: string }>;
     q?: string | null;
 }
@@ -59,10 +59,13 @@ interface UsersPageProps {
 
 export default withAppLayout(
     breadcrumbs,
-    true,
+    (props: UsersPageProps) => {
+        const uniqueCount = Array.from(new Set(props.users.data.map((u: User) => u.id))).length;
+        return uniqueCount < props.users.meta.total;
+    },
     ({ users, roles, q }: UsersPageProps) => {
 
-        // console.log(users)
+        console.log(users)
         const { t } = useI18n();
         type TreeUser = User & { depth: number; parent_id: number | null };
         const [pending, setPending] = useState<TreeUser[] | null>(null);
@@ -192,7 +195,7 @@ export default withAppLayout(
 
         // Construire une liste plate pour le SortableTree avec calcul de depth basé sur parent_id
         const allItems = useMemo<TreeUser[]>(() => {
-            const safeUsers = Array.isArray(users) ? users : [];
+            const safeUsers = Array.isArray(users.data) ? users.data : [];
 
             // Créer un map id -> user pour accès rapide
             const userMap = new Map<number, any>();
@@ -318,6 +321,8 @@ export default withAppLayout(
 
             // console.log(item)
 
+
+
             return (
                 <div
                     ref={setNodeRef}
@@ -391,6 +396,8 @@ export default withAppLayout(
             );
         };
 
+        const uniqueCount = Array.from(new Set(users.data.map((u: User) => u.id))).length;
+
         return (
             <div>
                 <Head title="Users" />
@@ -449,23 +456,27 @@ export default withAppLayout(
                 </StickyBar>
 
                 {viewMode === 'table' ? (
-                    <UsersTable
-                        users={users}
-                        roles={roles}
-                        auth={auth}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canPreview={canPreview}
-                    />
+                    <InfiniteScroll data="users" preserveUrl>
+                        <UsersTable
+                            users={Array.from(new Map(users.data.map((u) => [u.id, u])).values())}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canPreview={canPreview}
+                        />
+                    </InfiniteScroll>
                 ) : viewMode === 'grid' ? (
-                    <UsersCardsList
-                        users={users}
-                        roles={roles}
-                        auth={auth}
-                        canEdit={canEdit}
-                        canDelete={canDelete}
-                        canChangeRole={canPreview}
-                    />
+                    <InfiniteScroll data="users" preserveUrl>
+                        <UsersCardsList
+                            users={Array.from(new Map(users.data.map((u) => [u.id, u])).values())}
+                            roles={roles}
+                            auth={auth}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canChangeRole={canPreview}
+                        />
+                    </InfiniteScroll>
                 ) : (
                     <div className="space-y-2">
                         <div className="border rounded-md overflow-hidden">
@@ -481,6 +492,12 @@ export default withAppLayout(
                         </div>
                     </div>
                 )}
+
+                {uniqueCount < users.meta.total &&
+                    <div className='w-full h-50 flex items-center justify-center mt-4'>
+                        <Loader2Icon size={50} className='animate-spin text-brand-main' />
+                    </div>
+                }
             </div>
 
         );
