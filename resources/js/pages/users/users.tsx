@@ -65,7 +65,7 @@ export default withAppLayout(
     },
     ({ users, roles, q }: UsersPageProps) => {
 
-        console.log(users)
+        // console.log(users)
         const { t } = useI18n();
         type TreeUser = User & { depth: number; parent_id: number | null };
         const [pending, setPending] = useState<TreeUser[] | null>(null);

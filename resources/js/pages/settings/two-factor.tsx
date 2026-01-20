@@ -3,6 +3,7 @@ import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
 import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -47,7 +48,7 @@ export default function TwoFactor({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('Two-Factor Authentication')} />
             <SettingsLayout>
-                <div className="space-y-6">
+                <Card className="p-6">
                     <HeadingSmall
                         title={t('Two-Factor Authentication')}
                         description={t('Manage your two-factor authentication settings')}
@@ -127,7 +128,7 @@ export default function TwoFactor({
                         fetchSetupData={fetchSetupData}
                         errors={errors}
                     />
-                </div>
+                </Card>
             </SettingsLayout>
         </AppLayout>
     );

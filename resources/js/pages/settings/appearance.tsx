@@ -9,6 +9,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit as editAppearance } from '@/routes/appearance';
 import { usePage } from '@inertiajs/react';
+import { Card } from '@/components/ui/card';
 
 export default function Appearance() {
     const { t } = useI18n();
@@ -29,13 +30,13 @@ export default function Appearance() {
             <Head title={t('Appearance settings')} />
 
             <SettingsLayout>
-                <div className="space-y-6">
+                <Card className="p-6">
                     <HeadingSmall
                         title={t('Appearance settings')}
                         description={t("Update your account's appearance settings")}
                     />
-                    <AppearanceTabs />
-                </div>
+                    <AppearanceTabs className='w-fit'/>
+                </Card>
             </SettingsLayout>
         </AppLayout>
     );

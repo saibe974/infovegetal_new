@@ -30,7 +30,7 @@ export function Breadcrumbs({
                                 <Fragment key={index}>
                                     <BreadcrumbItem>
                                         {isLast ? (
-                                            <BreadcrumbPage className='text-xl'>
+                                            <BreadcrumbPage className='text-sm sm:text-xl'>
                                                 {t(item.title)}
                                             </BreadcrumbPage>
                                         ) : (

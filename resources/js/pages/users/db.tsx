@@ -6,7 +6,7 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { SelectWithItems } from '@/components/ui/select-with-items';
-import { type SharedData, type User } from '@/types';
+import { BreadcrumbItem, type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { toast } from 'sonner';
 import { FormField } from '@/components/ui/form-field';
@@ -44,12 +44,19 @@ export default function UserDbPage() {
         // no-op for now
     }, [selectedIds]);
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: t('User database association'),
+            href: '#',
+        },
+    ];
+
     return (
-        <AppLayout breadcrumbs={[] as any}>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('User database association')} />
 
             <SettingsLayout>
-                <div className="space-y-6">
+                <Card className="p-6">
                     {/* <HeadingSmall
                         title={t('Associate DB product')}
                         description={t('Link a DB product to this user')}
@@ -84,9 +91,9 @@ export default function UserDbPage() {
                                         {selectedIds.map((dbId) => {
                                             const db = (dbProducts as any[]).find((d) => d.id === dbId);
                                             const attrs = Object.entries(attributesByDbId[dbId] || {}).filter(([k]) => !k.startsWith('__'));
-                                            
+
                                             return (
-                                                <Card key={dbId}>
+                                                <Card className='' key={dbId}>
                                                     <CardHeader>
                                                         <CardTitle className="text-base">{db ? db.name : dbId}</CardTitle>
                                                     </CardHeader>
@@ -113,7 +120,7 @@ export default function UserDbPage() {
                                                                 ))}
                                                             </div>
                                                         )}
-                                                        
+
                                                         {/* Formulaire d'ajout */}
                                                         <div className="flex items-center gap-2 pt-2 border-t">
                                                             <Input
@@ -166,7 +173,7 @@ export default function UserDbPage() {
                                                                 <PlusCircle />
                                                             </Button>
                                                         </div>
-                                                        
+
                                                         {/* Champ caché pour envoyer le JSON de chaque dbId au backend */}
                                                         <input type="hidden" name={`attributes[${dbId}]`} value={JSON.stringify(Object.fromEntries(attrs))} />
                                                     </CardContent>
@@ -185,10 +192,10 @@ export default function UserDbPage() {
 
                         <div className="flex items-center gap-4">
                             <Button disabled={processing} type="submit">{t('Save')}</Button>
-                            <Link href="/users" className="text-sm text-muted-foreground">{t('Back to users')}</Link>
+                            {/* <Link href="/users" className="text-sm text-muted-foreground">{t('Back to users')}</Link> */}
                         </div>
                     </Form>
-                </div>
+                </Card>
             </SettingsLayout>
         </AppLayout>
     );

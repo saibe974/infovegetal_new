@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit, update } from '@/routes/password';
 import { usePage } from '@inertiajs/react';
+import { Card } from '@/components/ui/card';
 
 export default function Password() {
     const { t } = useI18n();
@@ -34,7 +35,7 @@ export default function Password() {
             <Head title={t('Password settings')} />
 
             <SettingsLayout>
-                <div className="space-y-6">
+                <Card className="p-6">
                     {/* <HeadingSmall
                         title={t('Update password')}
                         description={t('Ensure your account is using a long, random password to stay secure')}
@@ -144,7 +145,7 @@ export default function Password() {
                             </>
                         )}
                     </Form>
-                </div>
+                </Card>
             </SettingsLayout>
         </AppLayout>
     );
