@@ -329,6 +329,7 @@ export function CsvUploadFilePond({
         }
 
         setIsCancellingImport(true);
+        setFiles([]);
         try {
             const response = await fetch(importCancelUrl, {
                 method: 'POST',
@@ -638,7 +639,7 @@ export function CsvUploadFilePond({
         return rawResponse || response;
     };
 
-    console.log(uploadComplete)
+    // console.log(files)
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -676,7 +677,7 @@ export function CsvUploadFilePond({
                 </DialogHeader>
 
                 <div className="space-y-3">
-                    {importStatus !== 'processing' && (
+                    {importStatus !== 'processing' && importStatus !== 'cancelling' && (
                         <FilePond
                             ref={pondRef}
                             files={files}
