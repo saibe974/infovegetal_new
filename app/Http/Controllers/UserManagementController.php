@@ -60,7 +60,7 @@ class UserManagementController extends Controller
         $users = $query->orderBy('_lft', 'asc')->paginate(24);
         $roles = Role::with('permissions:id,name')->get(['id', 'name']);
 
-        return Inertia::render('users/users', [
+        return Inertia::render('users/index', [
             'q' => $search,
             'collection' => Inertia::scroll(fn() => UserResource::collection($users)),
             'roles' => $roles,
