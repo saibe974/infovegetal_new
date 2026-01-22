@@ -493,7 +493,7 @@ export default withAppLayout(
                     </div>
                 )}
 
-                {uniqueCount < users.meta.total &&
+                {uniqueCount < users.meta.total && (viewMode === 'table' || viewMode === 'grid') &&
                     <div className='w-full h-50 flex items-center justify-center mt-4'>
                         <Loader2Icon size={50} className='animate-spin text-brand-main' />
                     </div>

@@ -71,7 +71,7 @@ export default withAppLayout(breadcrumbs, false, ({ collection, }: Props) => {
                 <ProductsCarousel products={seasonProducts} />
 
                 <Link href='/products'>
-                    <Button className='w-40 underline bg-main-green hover:bg-main-green-hover dark:bg-main-purple dark:hover:bg-main-purple-hover text-black dark:text-white transition-all duration-75'>
+                    <Button className='w-40 underline bg-brand-main hover:bg-brand-main-hover  transition-all duration-75'>
                         {t('Tout afficher')}
                     </Button>
                 </Link>

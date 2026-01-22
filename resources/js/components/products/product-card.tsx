@@ -66,8 +66,8 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                 {product?.price_promo ? (
                     <div className="absolute top-6 -left-10 w-40">
                         <div className="gap-1 bg-red-600 text-white inline-flex items-center justify-center px-4 py-2 text-sm font-semibold shadow-lg -rotate-45 w-full">
-                            <BadgeEuro className="w-5 h-5" />
-                            <span>{t('SALE')}</span>
+                            <Zap className="w-5 h-5" />
+                            <span>{t('PROMO')}</span>
                         </div>
                     </div>
                 ) : null}
@@ -93,13 +93,13 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     <span className="text-lg font-semibold  whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
                         {name.charAt(0).toUpperCase() + name.slice(1)}
                     </span>
-                    <p>
+                    {/* <p>
                         {product?.category ? (
                             <span className="text-sm font-light italic ">
                                 {product.category.name.charAt(0).toUpperCase() + product.category.name.slice(1)}
                             </span>
                         ) : null}
-                    </p>
+                    </p> */}
 
                     <p>
                         {product?.ref ? (
@@ -183,7 +183,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         {product?.price && (
                             <button
                                 className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-2",
+                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
                                     "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
                                     "dark:text-black",
                                 )}
@@ -207,7 +207,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         {product?.price_floor ? (
                             <button
                                 className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-2",
+                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
                                     "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
                                     "dark:text-black",
                                 )}
@@ -231,7 +231,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                         {product?.price_roll ? (
                             <button
                                 className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-2",
+                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
                                     "bg-brand-main hover:bg-brand-main-hover text-white",
                                     "dark:text-black",
                                 )}
