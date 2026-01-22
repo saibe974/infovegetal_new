@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
-use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserImportService;
 use Illuminate\Http\RedirectResponse;

@@ -332,7 +332,7 @@ export default withAppLayout(
                 setPending(null);
 
                 // Refetch users to update the tree with fresh nested set values
-                router.reload({ preserveState: false });
+                // router.reload({ preserveState: false });
             } catch (e) {
                 console.error(e);
                 toast.error(t('Error while saving'));
@@ -539,11 +539,6 @@ export default withAppLayout(
                     </div>
                 )}
 
-                {uniqueCount < users.meta.total && (viewMode === 'table' || viewMode === 'grid') &&
-                    <div className='w-full h-50 flex items-center justify-center mt-4'>
-                        <Loader2Icon size={50} className='animate-spin text-brand-main' />
-                    </div>
-                }
             </div>
 
         );
