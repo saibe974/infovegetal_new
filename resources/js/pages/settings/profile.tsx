@@ -3,6 +3,7 @@ import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
+import { Mail, Shield, Lock, AlertCircle } from 'lucide-react';
 
 import DeleteUser from '@/components/users/delete-user';
 import HeadingSmall from '@/components/heading-small';
@@ -12,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectWithItems } from '@/components/ui/select-with-items';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -41,6 +43,8 @@ export default function Profile({
             href: edit(targetUser!.id).url,
         },
     ];
+
+    // console.log(editingUser);
 
 
     // All possible roles/permissions provided by controller
@@ -98,13 +102,35 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    {/* <HeadingSmall
-                        title={t('Profile information')}
-                        description={t('Update your name and email address')}
-                    /> */}
+                    {/* Vérification d'email non vérifiée */}
+                    {mustVerifyEmail &&
+                        (targetUser as any)?.email_verified_at === null && (
+                            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 flex-shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-sm text-amber-900">
+                                        {t('The user email address is unverified.')}{' '}
+                                        {/* Only allow resend for own profile */}
+                                        {!editingUser && (
+                                            <Link
+                                                href={send()}
+                                                as="button"
+                                                className="font-medium underline hover:no-underline"
+                                            >
+                                                {t('Click here to resend the verification email.')}
+                                            </Link>
+                                        )}
+                                    </p>
+                                    {status ===
+                                        'verification-link-sent' && (
+                                            <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
+                                        )}
+                                </div>
+                            </div>
+                        )}
 
-                    <form
-                        className="space-y-6"
+                    <Form
+                    className='space-y-6'
                         onSubmit={(e) => {
                             e.preventDefault();
 
@@ -133,7 +159,14 @@ export default function Profile({
                             }
                         }}
                     >
-                        <>
+
+                        {/* Informations Personnelles */}
+                        <Card className="p-6">
+                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Mail size={20} />
+                                {t('Profile information')}
+                            </h2>
+
                             {/* When editing another user, spoof PUT for RESTful update (kept for compatibility) */}
                             {editingUser && <input type="hidden" name="_method" value="PUT" />}
 
@@ -176,119 +209,113 @@ export default function Profile({
                                 />
                             </div>
 
-                            {/* Section Rôles */}
-                            <div className="grid gap-2">
-                                <Label>{t('Roles')}</Label>
-                                <div>
-                                    <SearchSelect
-                                        value={roleSearch}
-                                        onChange={(v) => setRoleSearch(v)}
-                                        onSubmit={(s) => {
-                                            const names = s && s.trim() ? s.trim().split(/\s+/) : [];
-                                            const ids = (names || []).map((name) => {
-                                                const found = (allRoles as any[]).find((r) => r.name === name);
-                                                return found ? found.id : null;
-                                            }).filter((v) => v !== null) as number[];
-                                            setSelectedRoleIds(ids);
-                                        }}
-                                        propositions={((allRoles as any[]) || []).map((r) => r.name)}
-                                        selection={(selectedRoleIds || []).map((id: number) => {
-                                            const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
-                                            return r ? { value: r.name, label: r.name } : { value: String(id), label: String(id) };
-                                        })}
-                                        loading={false}
-                                        minQueryLength={0}
-                                    />
+                        </Card>
 
-                                    {/* Hidden inputs to submit role ids */}
-                                    {selectedRoleIds.map((id: number) => (
-                                        <input key={id} type="hidden" name="roles[]" value={id} />
-                                    ))}
-                                </div>
-                                <p className="text-sm text-muted-foreground">{t('Current roles in the system')}</p>
-                            </div>
+                        {/* Section Rôles */}
+                        <Card className="p-6">
+                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <Shield size={20} />
+                                {t('Roles')} ({selectedRoleIds.length || 0})
+                            </h2>
 
-                            {/* Section Permissions (affiché si l'éditeur est admin) */}
-                            {isAdmin(auth.user) && (
-                                <div className="grid gap-2">
-                                    <Label>{t('Permissions')}</Label>
-                                    <div>
-                                        <SearchSelect
-                                            value={permissionSearch}
-                                            onChange={(v) => setPermissionSearch(v)}
-                                            onSubmit={(s) => {
-                                                const names = s && s.trim() ? s.trim().split(/\s+/) : [];
-                                                const ids = (names || []).map((name) => {
-                                                    const found = (allPermissions as any[]).find((p) => p.name === name);
-                                                    return found ? found.id : null;
-                                                }).filter((v) => v !== null) as number[];
-                                                setSelectedPermissionIds(ids);
-                                            }}
-                                            propositions={mergedPermissionPropositions}
-                                            selection={(selectedPermissionIds || []).map((id: number) => {
-                                                const p = (allPermissions as any[]).find((x) => x.id === id) || (targetUser?.permissions ?? []).find((x: any) => x.id === id);
-                                                return p ? { value: p.name, label: p.name } : { value: String(id), label: String(id) };
-                                            })}
-                                            loading={false}
-                                            minQueryLength={0}
-                                        />
+                            <SearchSelect
+                                value={roleSearch}
+                                onChange={(v) => setRoleSearch(v)}
+                                onSubmit={(s) => {
+                                    const names = s && s.trim() ? s.trim().split(/\s+/) : [];
+                                    const ids = (names || []).map((name) => {
+                                        const found = (allRoles as any[]).find((r) => r.name === name);
+                                        return found ? found.id : null;
+                                    }).filter((v) => v !== null) as number[];
+                                    setSelectedRoleIds(ids);
+                                }}
+                                propositions={((allRoles as any[]) || []).map((r) => r.name)}
+                                selection={(selectedRoleIds || []).map((id: number) => {
+                                    const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
+                                    return r ? { value: r.name, label: r.name } : { value: String(id), label: String(id) };
+                                })}
+                                loading={false}
+                                minQueryLength={0}
+                            />
 
-                                        {/* Hidden inputs to submit permission ids */}
-                                        {selectedPermissionIds.map((id: number) => (
-                                            <input key={id} type="hidden" name="permissions[]" value={id} />
-                                        ))}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{t('Permissions for this user')}</p>
+                            {/* Hidden inputs to submit role ids */}
+                            {selectedRoleIds.map((id: number) => (
+                                <input key={id} type="hidden" name="roles[]" value={id} />
+                            ))}
 
-                                    {/* Visual summary: badges for inherited vs explicit permissions
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {displayedPermissionIds.map((id) => {
-                                            const perm = (allPermissions as any[]).find((p) => p.id === id) || (targetUser?.permissions ?? []).find((p: any) => p.id === id);
-                                            if (!perm) return null;
-                                            const inherited = (inheritedPermissionIds || []).includes(id);
-                                            const explicit = (selectedPermissionIds || []).includes(id);
-                                            // inherited only -> slightly transparent; explicit -> normal; both -> highlight
-                                            const extraClass = inherited && !explicit ? 'opacity-70' : inherited && explicit ? 'ring-1 ring-accent/40' : '';
-                                            return (
-                                                <Badge key={id} className={`${extraClass}`}>{perm.name}{inherited && !explicit ? ' · inherited' : ''}</Badge>
-                                            );
-                                        })}
-                                    </div> */}
-                                </div>
-                            )}
-
-                            {mustVerifyEmail &&
-                                (targetUser as any)?.email_verified_at === null && (
-                                    <div>
-                                        <p className="-mt-4 text-sm text-muted-foreground">
-                                            {t('The user email address is unverified.')}{' '}
-                                            {/* Only allow resend for own profile */}
-                                            {!editingUser && (
-                                                <Link
-                                                    href={send()}
-                                                    as="button"
-                                                    className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                                >
-                                                    {t('Click here to resend the verification email.')}
-                                                </Link>
-                                            )}
-                                        </p>
-
-                                        {status ===
-                                            'verification-link-sent' && (
-                                                <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
-                                            )}
-                                    </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {selectedRoleIds.length > 0 ? (
+                                    selectedRoleIds.map((id: number) => {
+                                        const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
+                                        return r ? (
+                                            <Badge key={id} variant="secondary" className="bg-blue-100 text-blue-800">
+                                                {r.name}
+                                            </Badge>
+                                        ) : null;
+                                    })
+                                ) : (
+                                    <p className="text-gray-500 text-sm">{t('No roles assigned')}</p>
                                 )}
-
-                            <div className="flex items-center gap-4">
-                                <Button type="submit">{t('Save')}</Button>
                             </div>
-                        </>
-                    </form>
-                </div>
+                        </Card>
 
-                <DeleteUser />
+                        {/* Section Permissions (affiché si l'éditeur est admin) */}
+                        {isAdmin(auth.user) && (
+                            <Card className="p-6">
+                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                    <Lock size={20} />
+                                    {t('Permissions')} ({selectedPermissionIds.length || 0})
+                                </h2>
+
+                                <SearchSelect
+                                    value={permissionSearch}
+                                    onChange={(v) => setPermissionSearch(v)}
+                                    onSubmit={(s) => {
+                                        const names = s && s.trim() ? s.trim().split(/\s+/) : [];
+                                        const ids = (names || []).map((name) => {
+                                            const found = (allPermissions as any[]).find((p) => p.name === name);
+                                            return found ? found.id : null;
+                                        }).filter((v) => v !== null) as number[];
+                                        setSelectedPermissionIds(ids);
+                                    }}
+                                    propositions={mergedPermissionPropositions}
+                                    selection={(selectedPermissionIds || []).map((id: number) => {
+                                        const p = (allPermissions as any[]).find((x) => x.id === id) || (targetUser?.permissions ?? []).find((x: any) => x.id === id);
+                                        return p ? { value: p.name, label: p.name } : { value: String(id), label: String(id) };
+                                    })}
+                                    loading={false}
+                                    minQueryLength={0}
+                                />
+
+                                {/* Hidden inputs to submit permission ids */}
+                                {selectedPermissionIds.map((id: number) => (
+                                    <input key={id} type="hidden" name="permissions[]" value={id} />
+                                ))}
+
+                                <div className="mt-4 flex flex-wrap gap-2 max-h-96 overflow-y-auto">
+                                    {selectedPermissionIds.length > 0 ? (
+                                        selectedPermissionIds.map((id: number) => {
+                                            const p = (allPermissions as any[]).find((x) => x.id === id) || (targetUser?.permissions ?? []).find((x: any) => x.id === id);
+                                            return p ? (
+                                                <Badge key={id} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                    {p.name}
+                                                </Badge>
+                                            ) : null;
+                                        })
+                                    ) : (
+                                        <p className="text-gray-500 text-sm">{t('No permissions assigned')}</p>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
+                        <div className="flex items-center gap-4 pt-4">
+                            <Button type="submit">{t('Save')}</Button>
+                        </div>
+                    </Form>
+
+                    {/* Delete User */}
+                    <DeleteUser />
+                </div>
             </SettingsLayout>
         </AppLayout>
     );

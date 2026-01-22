@@ -61,7 +61,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 });
 
 
-export default withAppLayout(breadcrumbs, (props: any) => {
+export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
 }, ({ collection, q, filters: incomingFilters, categories = [], dbProducts = [] }: Props) => {
@@ -355,7 +355,7 @@ export default withAppLayout(breadcrumbs, (props: any) => {
 
             {uniqueCount < collection.meta.total &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
-                    <Loader2Icon size={50} className='animate-spin text-main-purple dark:text-main-green' />
+                    <Loader2Icon size={50} className='animate-spin text-brand-main' />
                 </div>
             }
         </>

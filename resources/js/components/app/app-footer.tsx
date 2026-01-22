@@ -52,10 +52,10 @@ export function AppFooter({ hideOnInfiniteScroll = false }: AppFooterProps) {
 
     return (
         <footer className={cn(
-            "w-full mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6",
+            "w-[calc(100%-1rem)] lg:w-[calc(100%-2rem)] mx-auto mt-10 border-t-3 border-black/30 dark:border-accent flex flex-col items-center py-6",
             hideOnInfiniteScroll && "hidden"
         )}>
-            <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-20 md:gap-0 items-center">
+            <div className="flex flex-col md:flex-row w-full justify-center mb-5 px-2 lg:px-10 gap-10 md:gap-0 items-center">
 
                 <div className="md:flex-1 items-start flex justify-center">
                     <a href="/" className="flex items-center gap-3">
@@ -112,7 +112,7 @@ export function AppFooter({ hideOnInfiniteScroll = false }: AppFooterProps) {
             </div>
             <div className="flex flex-col items-center w-fit gap-3">
 
-                <p className="text-sm font-light">Copyright © 2025 All rights reserved | by Devali</p>
+                <p className="text-sm font-light">Copyright © 2026 All rights reserved | by Devali</p>
             </div>
         </footer>
     );

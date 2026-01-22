@@ -1,4 +1,4 @@
-import { type BreadcrumbItem, type SharedData, type User } from '@/types';
+import { PaginatedCollection, type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import HeadingSmall from '@/components/heading-small';
@@ -367,6 +367,8 @@ export default withAppLayout(
 
             // console.log(item)
 
+
+
             return (
                 <div
                     ref={setNodeRef}
@@ -536,6 +538,12 @@ export default withAppLayout(
                         </div>
                     </div>
                 )}
+
+                {uniqueCount < users.meta.total && (viewMode === 'table' || viewMode === 'grid') &&
+                    <div className='w-full h-50 flex items-center justify-center mt-4'>
+                        <Loader2Icon size={50} className='animate-spin text-brand-main' />
+                    </div>
+                }
             </div>
 
         );

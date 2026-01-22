@@ -52,11 +52,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
             });
         }
     };
-    console.log(user)
+    // console.log(user)
     return (
         <div className="space-y-6">
+            <Head title={t(`Profile ${user.name}`)} />
             {/* Header */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-4 py-2">
                 <div className="flex items-center gap-4">
                     <Link href="#"
                         onClick={(e) => { e.preventDefault(); window.history.back(); }}
@@ -71,9 +72,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
                 </div>
                 <div className='flex gap-3 items-center'>
                     {user.email_verified_at ? (
-                        <Badge variant="default" className="bg-green-500 h-fit">{t('Email Verified')}</Badge>
+                        <Badge variant="default" className="bg-green-500 h-fit hidden sm:block">{t('Email Verified')}</Badge>
                     ) : (
-                        <Badge variant="destructive" className="h-fit">{t('Not Verified')}</Badge>
+                        <Badge variant="destructive" className="h-fit hidden sm:block">{t('Not Verified')}</Badge>
                     )}
                     <div className="flex gap-3">
                         {canEdit && (
@@ -105,7 +106,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
             </div>
 
             {/* User Info */}
-            <div className='md:w-2/3 md:mx-auto flex flex-col gap-5'>
+            <div className='w-full max-w-[1200px] md:mx-auto flex flex-col gap-5'>
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                         <Mail size={20} />

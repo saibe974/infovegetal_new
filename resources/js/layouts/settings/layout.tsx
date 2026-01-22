@@ -10,6 +10,10 @@ import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { isAdmin } from '@/lib/roles';
+import { ArrowLeftCircle, Menu } from 'lucide-react';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // sidebarNavItems are built inside the component to access `auth` for user-specific routes
 
@@ -68,30 +72,75 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         // });
     }
 
+    const isMobile = useIsMobile();
+
     return (
-        <div className="px-4 py-6">
-            <Heading
-                title={editingUser ? editingUser.name : 'Settings'}
-                description={editingUser ? `Manage settings for ${editingUser.name}` : 'Manage your profile and account settings'}
-            />
+        <div className="p-2 lg:p-4 space-y-6">
+            {/* Header */}
+            <StickyBar
+                className='mb-4 w-full'
+                borderBottom={false}
+            >
+                <div className='flex w-full items-center justify-between'>
+                    <div className="flex items-center gap-4 ">
+                        <Link href="#"
+                            onClick={(e) => { e.preventDefault(); window.history.back(); }}
+                            className='hover:text-gray-500 transition-colors duration-200'
+                        >
+                            <ArrowLeftCircle size={35} />
+                        </Link>
+                        <div className='flex flex-col'>
+                            <h1 className='text-3xl font-bold capitalize'>{editingUser ? editingUser.name : 'Settings'}</h1>
+                            <p className="text-gray-500">
+                                {editingUser ? `Manage settings for ${editingUser.name}` : 'Manage your profile and account settings'}
+                            </p>
+                        </div>
+                    </div>
 
-            {/* {editingUser && (
-                <div className="mt-2 flex items-center gap-2">
-                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">{`Editing user`}</span>
-                    <span className="text-sm text-muted-foreground">{editingUser.email}</span>
-                </div>
-            )} */}
+                    <div className='md:hidden'>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Menu size={30} />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                className="min-w-80 rounded-lg overflow-visible flex flex-col gap-1"
+                                align="end"
+                                side={'bottom'}
+                            >
+                                {sidebarNavItems.map((item, index) => (
+                                    <Button
+                                        key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
+                                        size="sm"
+                                        variant="ghost"
+                                        asChild
+                                        className={cn(' justify-start w-full', {
+                                            'bg-accent':
+                                                currentPath ===
+                                                (typeof item.href === 'string'
+                                                    ? item.href
+                                                    : item.href.url),
+                                        })}
+                                    >
+                                        <Link href={item.href}>
+                                            {item.icon && (
+                                                <item.icon className="h-4 w-4" />
+                                            )}
+                                            {item.title}
+                                        </Link>
+                                    </Button>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav className="flex flex-col space-y-1 space-x-0">
+                    <nav className="hidden md:flex gap-2">
                         {sidebarNavItems.map((item, index) => (
                             <Button
                                 key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
                                 size="sm"
                                 variant="ghost"
                                 asChild
-                                className={cn('w-full justify-start', {
+                                className={cn(' justify-start', {
                                     'bg-muted':
                                         currentPath ===
                                         (typeof item.href === 'string'
@@ -108,15 +157,18 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                             </Button>
                         ))}
                     </nav>
-                </aside>
-
-                <Separator className="my-6 lg:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
-                        {children}
-                    </section>
                 </div>
+            </StickyBar>
+
+            {/* {editingUser && (
+                <div className="mt-2 flex items-center gap-2">
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">{`Editing user`}</span>
+                    <span className="text-sm text-muted-foreground">{editingUser.email}</span>
+                </div>
+            )} */}
+
+            <div className="flex-1 w-full max-w-[1200px] mx-auto">
+                {children}
             </div>
         </div>
     );

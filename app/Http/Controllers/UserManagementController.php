@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserImportService;
 use Illuminate\Http\RedirectResponse;
@@ -99,12 +100,16 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
+        // Charger les rôles avec leurs permissions (role_has_permissions)
+        $user->load('roles.permissions');
+        $permissions = $user->roles->flatMap(fn($role) => $role->permissions)->unique('id')->values();
+
         return Inertia::render('settings/profile', [
             // Indiquer si la cible supporte la vérification d'email
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             // Fournir l'utilisateur à éditer (peut être différent de l'utilisateur connecté)
-            'editingUser' => $user->load(['roles', 'permissions']),
+            'editingUser' => $user->setAttribute('permissions', $permissions),
             'isEditingOther' => $request->user()->id !== $user->id,
             // Provide lists for roles and permissions to populate selects
             'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),

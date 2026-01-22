@@ -328,6 +328,7 @@ export function CsvUploadFilePond({
         }
 
         setIsCancellingImport(true);
+        setFiles([]);
         try {
             const response = await fetch(importCancelUrl, {
                 method: 'POST',
@@ -658,6 +659,7 @@ export function CsvUploadFilePond({
         return rawResponse || response;
     };
 
+    // console.log(files)
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -695,7 +697,7 @@ export function CsvUploadFilePond({
                 </DialogHeader>
 
                 <div className="space-y-3">
-                    {!uploadComplete ? (
+                    {importStatus !== 'processing' && importStatus !== 'cancelling' && (
                         <FilePond
                             ref={pondRef}
                             files={files}
@@ -731,12 +733,9 @@ export function CsvUploadFilePond({
                             // acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
                             credits={false}
                         />
-                    ) : (
-                        <div className="text-center py-8 space-y-3">
-                            <p className="text-green-600 font-medium">
-                                ✓ Fichier uploadé avec succès
-                            </p>
-
+                    )}
+                    {uploadComplete && (
+                        <div className="text-center py-4 space-y-3">
                             {importProcessUrl && postTreatmentComponent && (
                                 React.createElement(postTreatmentComponent, {
                                     ...postTreatmentProps,

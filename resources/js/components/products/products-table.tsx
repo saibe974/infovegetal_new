@@ -4,7 +4,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon } from 'lucide-react';
+import { BadgeEuro, Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon } from 'lucide-react';
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
@@ -71,8 +71,18 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                 {collection.data.map((item) => (
                     <TableRow key={item.id} className="group hover:cursor-pointer" onClick={() => goToProductPage(item.id)}>
                         <TableCell>{String(item.ref)}</TableCell>
-                        <TableCell>
-                            {item.img_link ? <img src={item.img_link} className="w-20 object-cover" alt={item.name} /> : <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />}
+                        <TableCell className="relative">
+                            {item.img_link ? (
+                                <img src={item.img_link} className="w-20 object-cover" alt={item.name} />
+                            ) : (
+                                <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />
+                            )
+                            }
+                            {item?.price_promo ? (
+                                <span className="absolute left-2 top-0 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold">
+                                    <BadgeEuro className="w-5 h-5" />
+                                </span>
+                            ) : null}
                         </TableCell>
                         <TableCell className=''>
                             <div className="flex flex-col justify-center gap-1">
@@ -109,7 +119,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                     <div className="flex gap-1">
                                         {item?.price && (
                                             <button
-                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-tertiary hover:bg-brand-tertiary/90 text-white dark:text-black"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond));
@@ -117,7 +127,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a tray')}
                                             >
-                                                <div className="w-1/2 flex justify-center">
+                                                <div className="w-1/3 flex justify-center">
                                                     <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                         <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
                                                     </span>
@@ -130,7 +140,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                         )}
                                         {item?.price_floor ? (
                                             <button
-                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-secondary hover:bg-brand-secondary/90 text-white dark:text-black"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor));
@@ -138,20 +148,20 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a floor')}
                                             >
-                                                <div className="w-1/2 flex justify-center">
+                                                <div className="w-1/3 flex justify-center">
                                                     <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                         <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
                                                     </span>
                                                 </div>
                                                 <div className="w-1/2 flex flex-col items-center">
-                                                    <span className="font-semibold">{item.price_floor} €</span>
+                                                    <span className="font-semibold">{String(item.price_floor)} €</span>
                                                     <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor)}</span>
                                                 </div>
                                             </button>
                                         ) : null}
                                         {item?.price_roll ? (
                                             <button
-                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 hover:bg-main-purple/10 dark:hover:bg-main-green/10 w-2/3 mx-auto"
+                                                className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-main hover:bg-brand-main-hover text-white dark:text-black"
                                                 onClick={(e: React.MouseEvent) => {
                                                     e.stopPropagation();
                                                     addToCart(item, Number(item.cond) * Number(item.floor) * Number(item.roll));
@@ -159,14 +169,26 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                 }}
                                                 title={t('Add a roll')}
                                             >
-                                                <div className="w-1/2 flex justify-center">
+                                                <div className="w-1/3 flex justify-center">
                                                     <span className="w-6 h-6 mx-1 text-main-purple dark:text-main-green">
                                                         <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
                                                     </span>
                                                 </div>
                                                 <div className="w-1/2 flex flex-col items-center">
-                                                    <span className="font-semibold">{item.price_roll} €</span>
-                                                    <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
+                                                    {item?.price_promo ? (
+                                                        <>
+                                                            {/* <span className="font-thin line-through opacity-75 text-[10px]">{String(item.price_roll)} €</span> */}
+                                                            <span className="font-bold text-red-300 dark:text-red-600">{String(item.price_promo)} €</span>
+                                                            <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
+                                                        </>
+
+                                                    ) : (
+                                                        <>
+                                                            <span className="font-semibold">{String(item.price_roll)} €</span>
+                                                            <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
+                                                        </>
+                                                    )}
+
                                                 </div>
                                             </button>
                                         ) : null}
@@ -200,8 +222,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                         )}
 
                     </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+                ))
+                }
+            </TableBody >
+        </Table >
     );
 }

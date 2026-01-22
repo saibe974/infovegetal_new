@@ -13,6 +13,7 @@ import { addCartonIcon, addEtageIcon, addRollIcon } from '@/lib/icon';
 import { Input } from '@/components/ui/input';
 import { Lens } from '@/components/ui/lens';
 import { useSidebar } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
 
 type Props = {
     product: Product;
@@ -67,7 +68,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
             </div>
 
             <div className=" flex flex-col gap-6">
-                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center md:w-2/3 md:mx-auto">
+                <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center w-full max-w-[1200px] md:mx-auto">
                     {/* {product.img_link && ( */}
                     <Card className='lg:w-1/2 lg:h-150'>
                         <CardContent
@@ -117,9 +118,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             <p className=" capitalize">
                                 {product.description || t('Aucune description disponible')}
                             </p>
-                            {product.price && (
+                            {/* {product.price && (
                                 <div className="flex items-center gap-3 pb-3 border-b">
-                                    <span className="text-main-purple dark:text-main-green w-7 h-7 flex-shrink-0">
+                                    <span className="text-brand-tertiary w-7 h-7 flex-shrink-0">
                                         <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
                                     </span>
                                     <div className="flex-1">
@@ -130,7 +131,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             )}
                             {product.price_floor ? (
                                 <div className="flex items-center gap-3 pb-3 border-b">
-                                    <span className="text-main-purple dark:text-main-green w-7 h-7 flex-shrink-0">
+                                    <span className="text-brand-secondary w-7 h-7 flex-shrink-0">
                                         <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
                                     </span>
                                     <div className="flex-1">
@@ -141,7 +142,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             ) : null}
                             {product.price_roll ? (
                                 <div className="flex items-center gap-3">
-                                    <span className="text-main-purple dark:text-main-green w-7 h-7 flex-shrink-0">
+                                    <span className="text-brand-main w-7 h-7 flex-shrink-0">
                                         <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
                                     </span>
                                     <div className="flex-1">
@@ -163,50 +164,24 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         )}
                                     </div>
                                 </div>
-                            ) : null}
+                            ) : null} */}
 
 
                         </CardContent>
 
                         {isAuthenticated && (
                             <CardFooter className='w-full flex flex-col gap-3 pt-6 mt-auto'>
-                                {/* <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 hover:bg-background"
-                                        aria-label="Diminuer la quantité"
-                                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                        disabled={quantity <= 1}
-                                    >
-                                        <Minus className="h-4 w-4" />
-                                    </Button>
-                                    <Input
-                                        id="quantity"
-                                        type="text"
-                                        min="1"
-                                        value={quantity}
-                                        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-16 h-8 text-center bg-transparent border-0 focus-visible:ring-0 p-0 font-semibold"
-                                    />
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 hover:bg-background"
-                                        aria-label="Augmenter la quantité"
-                                        onClick={() => setQuantity(quantity + 1)}
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </div> */}
-
-
+                    
                                 <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
 
-                                <div className="flex flex-col gap-2 w-full md:w-2/3">
+                                <div className="flex flex-row gap-2 w-full">
                                     {product?.price && (
                                         <button
-                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black font-semibold"
+                                            className={cn(
+                                                "w-1/3 flex flex-col items-center justify-center rounded-lg py-1",
+                                                "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
+                                                "dark:text-black",
+                                            )}
                                             onClick={(e: React.MouseEvent) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
@@ -214,16 +189,22 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                             }}
                                             title={t('Add a tray')}
                                         >
-                                            <span className="w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                            </span>
-                                            <span>{product.price} €</span>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-5 h-5">
+                                                    <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                                </span>
+                                                <span className="font-semibold">{product.price} €</span>
+                                            </div>
                                             <span className="text-xs font-light">X {String(product.cond)}</span>
                                         </button>
                                     )}
                                     {product?.price_floor ? (
                                         <button
-                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-[#84439f] hover:bg-[#84439f]/90 text-white dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black font-semibold"
+                                            className={cn(
+                                                "w-1/3 flex flex-col items-center justify-center rounded-lg py-1",
+                                                "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
+                                                "dark:text-black",
+                                            )}
                                             onClick={(e: React.MouseEvent) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
@@ -232,16 +213,22 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                             }}
                                             title={t('Add a floor')}
                                         >
-                                            <span className="w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                            </span>
-                                            <span>{String(product.price_floor)} €</span>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-5 h-5">
+                                                    <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                                </span>
+                                                <span className="font-semibold">{String(product.price_floor)} €</span>
+                                            </div>
                                             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
                                         </button>
                                     ) : null}
                                     {product?.price_roll ? (
                                         <button
-                                            className="w-full h-10 gap-2 flex items-center justify-center rounded-md bg-main-purple hover:bg-main-purple-hover text-white dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover font-semibold"
+                                            className={cn(
+                                                "w-1/3 flex flex-col items-center justify-center rounded-lg py-1",
+                                                "bg-brand-main hover:bg-brand-main-hover text-white",
+                                                "dark:text-black",
+                                            )}
                                             onClick={(e: React.MouseEvent) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
@@ -250,17 +237,23 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                             }}
                                             title={t('Add a roll')}
                                         >
-                                            <span className="w-6 h-6">
-                                                <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                            </span>
-                                            {product?.price_promo ? (
-                                                <>
-                                                    <span className="line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                                                    <span className="text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
-                                                </>
-                                            ) : (
-                                                <span>{String(product.price_roll)} €</span>
-                                            )}
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-5 h-5">
+                                                    <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                                </span>
+                                                {product?.price_promo ? (
+                                                    <div className="flex flex-col md:flex-row md:gap-1 items-center">
+                                                        <span className="font-semibold line-through opacity-75 text-xs leading-tight">
+                                                            {String(product.price_roll)} €
+                                                        </span>
+                                                        <span className="font-bold text-red-300 dark:text-red-600">
+                                                            {String(product.price_promo)} €
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="font-semibold">{String(product.price_roll)} €</span>
+                                                )}
+                                            </div>
                                             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
                                         </button>
                                     ) : null}
@@ -271,7 +264,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                 </div>
 
-                <div className="space-y-6 md:w-2/3 md:mx-auto">
+                <div className="space-y-6 w-full max-w-[1200px] md:mx-auto">
                     <Card className=''>
                         <CardHeader>
                             <CardTitle>{t('Product Information')}</CardTitle>

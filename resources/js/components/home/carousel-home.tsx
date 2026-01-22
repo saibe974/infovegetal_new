@@ -84,7 +84,7 @@ export function CarouselHome() {
                                                             href={overlays[index].button[0].href}
                                                             className={''}
                                                         >
-                                                            <Button className="bg-main-green text-black hover:bg-main-green-hover hover:scale-105 transition-all duration-300">
+                                                            <Button className="bg-brand-main hover:bg-brand-main-hover hover:scale-105 transition-all duration-300">
                                                                 {overlays[index].button[0].label}
                                                                 <ChevronRight className="size-4" />
                                                             </Button>
