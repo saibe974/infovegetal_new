@@ -483,7 +483,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
 
                             <Button
-                                className="w-full bg-main-purple hover:bg-main-purple-hover dark:bg-main-green dark:hover:bg-main-green-hover"
+                                className="w-full bg-brand-main hover:bg-brand-main-hover"
                                 size="lg"
                                 disabled={items.length === 0 || isSaving}
                                 onClick={handleGeneratePdf}
