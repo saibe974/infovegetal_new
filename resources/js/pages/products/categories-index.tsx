@@ -126,6 +126,17 @@ export default withAppLayout(
                 JSON.stringify(allItems.map(i => ({ id: i.id, parent_id: i.parent_id })));
         }, [pending, allItems]);
 
+        // Parents disposant d'au moins un enfant (utile pour afficher/masquer le chevron)
+        const parentsWithChildren = useMemo(() => {
+            const source = pending ?? allItems;
+            const set = new Set<number>();
+            source.forEach((it) => {
+                const pid = (it as any)?.parent_id;
+                if (pid != null) set.add(pid as number);
+            });
+            return set;
+        }, [pending, allItems]);
+
         // Lazy-load des enfants quand on expand
         const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
 
@@ -268,8 +279,8 @@ export default withAppLayout(
                 listeners,
             } = props;
 
-            // Le serveur retourne déjà has_children
-            const hasChildren = (item as any).has_children === true;
+            // Chevrons dynamiques: vrai si serveur l'indique ou si un enfant est présent dans la liste courante
+            const hasChildren = (item as any).has_children === true || parentsWithChildren.has(item.id);
 
             // console.log(item)
             return (

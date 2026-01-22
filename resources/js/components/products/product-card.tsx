@@ -167,112 +167,34 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                 </CardContent>
 
                 {isAuthenticated && (
-                    // <CardFooter className="flex flex-col md:flex-row md:justify-around p-0 gap-2 w-full">
-                    //     {product?.price && (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
-                    //                 "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
-                    //                 "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, Number(product.cond))
-                    //             }}
-                    //             title={t('Add a tray')}
-                    //         >
-                    //             <span className="font-semibold">{product.price} €</span>
-                    //             <div className="flex items-center">
-                    //                 <span className="w-6 h-6">
-                    //                     <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                    //                 </span>
-                    //                 <span className="text-xs font-light">X {String(product.cond)}</span>
-                    //             </div>
-                    //         </button>
-                    //     )}
-                    //     {product?.price_floor ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
-                    //                 "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
-                    //                 "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
-                    //             }}
-                    //             title={t('Add a floor')}
-                    //         >
-                    //             <span className="font-semibold">{String(product.price_floor)} €</span>
-                    //             <div className="flex items-center">
-                    //                 <span className="w-6 h-6">
-                    //                     <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                    //                 </span>
-                    //                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
-                    //             </div>
-                    //         </button>
-                    //     ) : null}
-                    //     {product?.price_roll ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
-                    //                 "bg-main-purple hover:bg-main-purple-hover text-white",
-                    //                 "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
-                    //             }}
-                    //             title={t('Add a roll')}
-                    //         >
-
-                    //             {product?.price_promo ? (
-                    //                 <div className="flex items-center">
-                    //                     <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                    //                     <span className="font-bold text-red-300 dark:text-red-500">{String(product.price_promo)} €</span>
-                    //                 </div>
-                    //             ) : (
-                    //                 <span className="font-semibold">{String(product.price_roll)} €</span>
-                    //             )}
-                    //             <div className="flex items-center">
-                    //                 <span className="w-6 h-6">
-                    //                     <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                    //                 </span>
-                    //                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-                    //             </div>
-                    //         </button>
-                    //     ) : null}
-                    // </CardFooter>
-
-                    <CardFooter className="flex flex-col p-0 gap-2 w-full flex-1">
+                    <CardFooter className="flex flex-col md:flex-row md:justify-around p-0 gap-2 w-full">
                         {product?.price && (
                             <button
                                 className={cn(
-                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
                                     "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
                                     "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
                                 )}
                                 onClick={(e: React.MouseEvent) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    handleAddToCart(product.id, Number(product.cond) || 1)
+                                    handleAddToCart(product.id, Number(product.cond))
                                 }}
                                 title={t('Add a tray')}
                             >
-                                <span className="w-6 h-6">
-                                    <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                </span>
                                 <span className="font-semibold">{product.price} €</span>
-                                <span className="text-xs font-light">X {String(product.cond)}</span>
+                                <div className="flex items-center">
+                                    <span className="w-6 h-6">
+                                        <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                    </span>
+                                    <span className="text-xs font-light">X {String(product.cond)}</span>
+                                </div>
                             </button>
                         )}
                         {product?.price_floor ? (
                             <button
                                 className={cn(
-                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
                                     "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
                                     "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
                                 )}
@@ -283,18 +205,19 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                 }}
                                 title={t('Add a floor')}
                             >
-                                <span className="w-6 h-6">
-                                    <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                </span>
                                 <span className="font-semibold">{String(product.price_floor)} €</span>
-
-                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                                <div className="flex items-center">
+                                    <span className="w-6 h-6">
+                                        <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                    </span>
+                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                                </div>
                             </button>
-                        ) : <div className="h-10" />}
+                        ) : null}
                         {product?.price_roll ? (
                             <button
                                 className={cn(
-                                    "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                                    "w-full md:w-1/3 md:h-18 gap-2 flex flex-col items-center justify-center rounded-xl",
                                     "bg-main-purple hover:bg-main-purple-hover text-white",
                                     "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
                                 )}
@@ -305,24 +228,101 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                 }}
                                 title={t('Add a roll')}
                             >
-                                <span className="w-6 h-6">
-                                    <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                </span>
 
                                 {product?.price_promo ? (
-                                    <>
+                                    <div className="flex items-center">
                                         <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                                        <span className="font-bold text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
-                                    </>
+                                        <span className="font-bold text-red-300 dark:text-red-500">{String(product.price_promo)} €</span>
+                                    </div>
                                 ) : (
                                     <span className="font-semibold">{String(product.price_roll)} €</span>
                                 )}
-
-                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-
+                                <div className="flex items-center">
+                                    <span className="w-6 h-6">
+                                        <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                    </span>
+                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
+                                </div>
                             </button>
-                        ) : <div className="h-10" />}
+                        ) : null}
                     </CardFooter>
+
+                    // <CardFooter className="flex flex-col p-0 gap-2 w-full flex-1">
+                    //     {product?.price && (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                    //                 "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
+                    //                 "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, Number(product.cond) || 1)
+                    //             }}
+                    //             title={t('Add a tray')}
+                    //         >
+                    //             <span className="w-6 h-6">
+                    //                 <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                    //             </span>
+                    //             <span className="font-semibold">{product.price} €</span>
+                    //             <span className="text-xs font-light">X {String(product.cond)}</span>
+                    //         </button>
+                    //     )}
+                    //     {product?.price_floor ? (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                    //                 "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
+                    //                 "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
+                    //             }}
+                    //             title={t('Add a floor')}
+                    //         >
+                    //             <span className="w-6 h-6">
+                    //                 <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                    //             </span>
+                    //             <span className="font-semibold">{String(product.price_floor)} €</span>
+
+                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                    //         </button>
+                    //     ) : <div className="h-10" />}
+                    //     {product?.price_roll ? (
+                    //         <button
+                    //             className={cn(
+                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
+                    //                 "bg-main-purple hover:bg-main-purple-hover text-white",
+                    //                 "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
+                    //             )}
+                    //             onClick={(e: React.MouseEvent) => {
+                    //                 e.preventDefault();
+                    //                 e.stopPropagation();
+                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
+                    //             }}
+                    //             title={t('Add a roll')}
+                    //         >
+                    //             <span className="w-6 h-6">
+                    //                 <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                    //             </span>
+
+                    //             {product?.price_promo ? (
+                    //                 <>
+                    //                     <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
+                    //                     <span className="font-bold text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
+                    //                 </>
+                    //             ) : (
+                    //                 <span className="font-semibold">{String(product.price_roll)} €</span>
+                    //             )}
+
+                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
+
+                    //         </button>
+                    //     ) : <div className="h-10" />}
+                    // </CardFooter>
                 )}
             </Card>
         </Link>

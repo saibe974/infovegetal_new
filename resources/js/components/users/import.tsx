@@ -47,21 +47,23 @@ export function UsersImportTreatment({
         return Math.min(base, 100);
     })();
 
-    useEffect(() => {
-        console.log('[UsersImportTreatment] status=', importStatus, 'uploadId=', uploadId);
-    }, [importStatus, uploadId]);
+    // useEffect(() => {
+    //     console.log('[UsersImportTreatment] status=', importStatus, 'uploadId=', uploadId);
+    // }, [importStatus, uploadId]);
 
-    useEffect(() => {
-        console.log('[UsersImportTreatment] progress update:', {
-            displayProgress,
-            backendProgress: progressInfo?.progress ?? null,
-            effectiveProgress,
-            processed: progressInfo?.processed ?? null,
-            total: progressInfo?.total ?? null,
-            errors: progressInfo?.errors ?? null,
-            status: progressInfo?.status ?? null,
-        });
-    }, [displayProgress, progressInfo?.progress, progressInfo?.processed, progressInfo?.total, progressInfo?.errors, effectiveProgress]);
+    // useEffect(() => {
+    //     console.log('[UsersImportTreatment] progress update:', {
+    //         displayProgress,
+    //         backendProgress: progressInfo?.progress ?? null,
+    //         effectiveProgress,
+    //         processed: progressInfo?.processed ?? null,
+    //         total: progressInfo?.total ?? null,
+    //         errors: progressInfo?.errors ?? null,
+    //         status: progressInfo?.status ?? null,
+    //     });
+    // }, [displayProgress, progressInfo?.progress, progressInfo?.processed, progressInfo?.total, progressInfo?.errors, effectiveProgress]);
+
+
     return (
         <>
             {importStatus === 'idle' && (

@@ -57,7 +57,7 @@ class UserManagementController extends Controller
             });
         }
 
-        $users = $query->paginate(24);
+        $users = $query->orderBy('_lft', 'asc')->paginate(24);
         $roles = Role::with('permissions:id,name')->get(['id', 'name']);
 
         return Inertia::render('users/users', [
@@ -350,6 +350,7 @@ class UserManagementController extends Controller
                 $node->save();
             }
 
+            // Rebuild the tree using nested set helpers (same approach as categories)
             $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
                 $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
                 $prev = null;
@@ -373,10 +374,12 @@ class UserManagementController extends Controller
 
                     $prev = $node;
 
+                    // recurse
                     $placeChildren($node->id);
                 }
             };
 
+            // Démarrer par les racines
             $placeChildren(null);
 
             return response()->json(['ok' => true]);

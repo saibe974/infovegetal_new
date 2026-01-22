@@ -247,6 +247,17 @@ export default withAppLayout(
                 JSON.stringify(pending.map(i => i.parent_id ?? null)) !== JSON.stringify(allItems.map(i => i.parent_id ?? null));
         }, [pending, allItems]);
 
+        // Map des parents qui possèdent au moins un enfant (utilisé pour afficher/masquer le chevron)
+        const parentsWithChildren = useMemo(() => {
+            const source = pending ?? allItems;
+            const set = new Set<number>();
+            source.forEach((it) => {
+                const pid = (it as any)?.parent_id;
+                if (pid != null) set.add(pid as number);
+            });
+            return set;
+        }, [pending, allItems]);
+
         const loadChildren = async (): Promise<TreeUser[]> => {
             // Pas de hiérarchie utilisateur à charger côté client pour l'instant
             return [];
@@ -254,7 +265,29 @@ export default withAppLayout(
 
         const handleTreeChange = (items: TreeUser[], reason?: 'drag' | 'expand' | 'collapse') => {
             if (reason === 'expand' || reason === 'collapse') return;
-            if (reason === 'drag') setPending(items);
+            if (reason === 'drag') {
+                // Réordonner en parcours DFS pour garantir parent avant enfants
+                const reorderedItems = (() => {
+                    const result: TreeUser[] = [];
+                    const visited = new Set<number>();
+
+                    const dfs = (parentId: number | null) => {
+                        for (const item of items) {
+                            if (visited.has(item.id)) continue;
+                            if ((item.parent_id ?? null) !== parentId) continue;
+
+                            visited.add(item.id);
+                            result.push(item);
+                            dfs(item.id);
+                        }
+                    };
+
+                    dfs(null);
+                    return result;
+                })();
+
+                setPending(reorderedItems);
+            }
         };
 
         const save = async () => {
@@ -281,7 +314,7 @@ export default withAppLayout(
 
                     return { items };
                 })();
-
+                console.log("Saving hierarchy payload:", payload);
                 const reorderUrl = '/admin/users/reorder';
                 const res = await fetch(reorderUrl, {
                     method: 'POST',
@@ -349,7 +382,7 @@ export default withAppLayout(
                         marginLeft: depth * 24,
                     }}
                 >
-                    {!isDragging && (
+                    {!isDragging && parentsWithChildren.has((item as any).id) ? (
                         <button
                             type="button"
                             onClick={toggleExpand}
@@ -358,6 +391,8 @@ export default withAppLayout(
                         >
                             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </button>
+                    ) : (
+                        <div className="h-6 w-6 flex-shrink-0" />
                     )}
 
                     <div
@@ -496,6 +531,7 @@ export default withAppLayout(
                                 loadChildren={loadChildren}
                                 onChange={handleTreeChange}
                                 renderItem={renderItem}
+                                storageKey="users"
                             />
                         </div>
                     </div>
