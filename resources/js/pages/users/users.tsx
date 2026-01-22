@@ -54,6 +54,12 @@ interface UsersPageProps {
     collection: {
         data: User[];
         next_page_url?: string | null;
+        meta: {
+            total: number;
+            per_page: number;
+            current_page: number;
+            last_page: number;
+        }
     };
     roles: Array<{ id: number; name: string }>;
     q?: string | null;
@@ -67,7 +73,7 @@ export default withAppLayout(
     true,
     ({ collection, roles, q, searchPropositions = [] }: UsersPageProps) => {
 
-        // console.log(users)
+        console.log(collection)
         const { t } = useI18n();
         type TreeUser = User & { depth: number; parent_id: number | null };
         const [pending, setPending] = useState<TreeUser[] | null>(null);
@@ -444,6 +450,8 @@ export default withAppLayout(
             );
         };
 
+        const uniqueCount = Array.from(new Set(collection.data.map((u: User) => u.id))).length;
+
         // console.log(usersRoutes.import.process.url())
         return (
             <div>
@@ -538,6 +546,12 @@ export default withAppLayout(
                         </div>
                     </div>
                 )}
+
+                {uniqueCount < collection.meta.total && (viewMode === 'table' || viewMode === 'grid') &&
+                    <div className='w-full h-50 flex items-center justify-center mt-4'>
+                        <Loader2Icon size={50} className='animate-spin text-brand-main' />
+                    </div>
+                }
 
             </div>
 
