@@ -42,13 +42,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
 
     const { auth, locale } = usePage<SharedData>().props;
     const userAuth = auth?.user;
-    const canEdit = isAdmin(userAuth) || hasPermission(userAuth, 'edit products');
-    const canDelete = isAdmin(userAuth) || hasPermission(userAuth, 'delete products');
+    const canEdit = isAdmin(userAuth) || hasPermission(userAuth, 'edit users') || hasPermission(userAuth, 'manage users');
+    const canDelete = isAdmin(userAuth) || hasPermission(userAuth, 'delete users') || hasPermission(userAuth, 'manage users');
 
     const handleDelete = (userId: number) => {
         if (confirm(t('Are you sure?'))) {
-            router.visit(`/admin/users/${userId}/destroy`, {
-                method: 'delete',
+            router.delete(`/admin/users/${userId}`, {
+                preserveScroll: true,
+                preserveState: true,
             });
         }
     };

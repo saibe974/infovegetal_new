@@ -36,8 +36,9 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
 
     const handleDelete = (userId: number) => {
         if (confirm(t('Are you sure?'))) {
-            router.visit(`/admin/users/${userId}/destroy`, {
-                method: 'delete',
+            router.delete(`/admin/users/${userId}`, {
+                preserveScroll: true,
+                preserveState: true,
             });
         }
     };

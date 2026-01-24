@@ -30,15 +30,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
     const isNew = !user || !user.id;
-    // Correction : routes pour store/update
-    const storeUrl = '/admin/users/store';
-    const updateUrl = user && user.id ? `/admin/users/${user.id}` : '';
+    // Utiliser Wayfinder pour générer action/method corrects
+    const action = isNew
+        ? users.store.form()
+        : users.update.form({ user: user.id });
     return (
-        <Form
-            className="space-y-4"
-            method={isNew ? 'post' : 'put'}
-            action={isNew ? storeUrl : updateUrl}
-        >
+        <Form {...action} className="space-y-4">
             <Head title={isNew ? 'Créer un utilisateur' : `Editer l'utilisateur #${user.id}`} />
             <div className="flex items-center py-2 gap-2 justify-between">
                 <div className="flex items-center gap-2">

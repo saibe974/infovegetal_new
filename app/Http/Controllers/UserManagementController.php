@@ -147,11 +147,15 @@ class UserManagementController extends Controller
             'permissions.*' => ['integer', 'exists:permissions,id'],
         ]);
 
-        $user = User::create([
+        // Crée le noeud racine immédiatement pour initialiser _lft/_rgt (nested set)
+        $user = new User([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
         ]);
+
+        // Positionner le nouvel utilisateur comme racine par défaut
+        $user->saveAsRoot();
 
         // Assign roles
         if (isset($validated['roles'])) {

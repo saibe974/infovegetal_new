@@ -90,9 +90,6 @@ export default withAppLayout(
         const { auth, locale } = usePage<SharedData>().props;
         const user = auth?.user;
         const isAuthenticated = !!user;
-        const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
-        const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
-        const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
         const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
         const canPreview = isDev(user) || hasPermission(user, 'preview');
 
@@ -123,9 +120,9 @@ export default withAppLayout(
             );
         }
 
-        const canEdit = isAdmin(user) || hasPermission(user, 'edit users');
-        const canDelete = isAdmin(user) || hasPermission(user, 'delete users');
-        const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users');
+        const canEdit = isAdmin(user) || hasPermission(user, 'edit users') || hasPermission(user, 'manage users');
+        const canDelete = isAdmin(user) || hasPermission(user, 'delete users') || hasPermission(user, 'manage users');
+        const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users') || hasPermission(user, 'manage users');
 
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,8 +200,10 @@ export default withAppLayout(
 
         const handleDelete = (userId: number) => {
             if (confirm(t('Are you sure?'))) {
-                router.visit(`/admin/users/${userId}/destroy`, {
-                    method: 'delete',
+                router.delete(`/admin/users/${userId}`, {
+                    preserveScroll: true,
+                    preserveState: true,
+                    onError: () => toast.error(t('Error while deleting user')),
                 });
             }
         };

@@ -148,10 +148,12 @@ export default withAppLayout(
             setLoadingItems(prev => new Set(prev).add(item.id));
             try {
                 const res = await fetch(`/category-products/children?parent_id=${item.id}`);
+                if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
                 return data.data ?? [];
             } catch (e) {
                 console.error('Failed to load children:', e);
+                toast.error('Erreur lors du chargement des enfants');
                 return [];
             } finally {
                 setLoadingItems(prev => {
@@ -320,14 +322,12 @@ export default withAppLayout(
                         query={q ?? ''}
                     />
 
-                    {/* {hasChanges && ( */}
                     <ButtonsActions
                         cancel={hasChanges ? cancel : undefined}
                         save={hasChanges ? save : undefined}
                         saving={saving}
                         add={() => { }}
                     />
-                    {/* )} */}
                 </StickyBar>
 
                 {q ? (
