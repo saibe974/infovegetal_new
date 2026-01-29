@@ -22,6 +22,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\DbProducts;
 use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
 
+use function Illuminate\Log\log;
+
 class UserManagementController extends Controller
 {
     /**
@@ -139,11 +141,11 @@ class UserManagementController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
-            'roles' => ['nullable', 'array'],
+            'roles' => ['sometimes', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
-            'permissions' => ['nullable', 'array'],
+            'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
         ]);
 

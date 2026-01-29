@@ -96,7 +96,7 @@ Route::middleware(['role:admin'])->group(function () {
 
     // Routes statiques d'abord (avant les routes avec {user})
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
-    Route::post('admin/users/store', [UserManagementController::class, 'store'])->name('users.store');
+    Route::post('admin/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     

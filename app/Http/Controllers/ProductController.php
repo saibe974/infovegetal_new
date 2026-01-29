@@ -8,6 +8,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\CategoryProducts;
 use App\Models\Product;
 use App\Services\ProductImportService;
+use App\Services\PriceCalculatorService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -111,26 +112,21 @@ class ProductController extends Controller
 
         $products = $query->paginate(24);
         $user = $request->user();
+        
+        // Calculer les prix avec marges pour les utilisateurs non-admin
         if ($user && !$user->hasRole('admin')) {
-            // Charger les pivots db_products_users pour l'utilisateur
-            $userDbProducts = $user->dbProducts()->get();
-            $pivotByDbId = [];
-            foreach ($userDbProducts as $dbProduct) {
-                $pivotByDbId[$dbProduct->id] = $dbProduct->pivot;
-            }
-            foreach ($products as $product) {
+            $priceCalculator = app(PriceCalculatorService::class);
+            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user) {
                 $dbId = $product->db_products_id;
-                if ($dbId && isset($pivotByDbId[$dbId])) {
-                    $attributes = $pivotByDbId[$dbId]->attributes;
-                    if ($attributes) {
-                        $attrs = is_array($attributes) ? $attributes : json_decode($attributes, true);
-                        if (is_array($attrs) && isset($attrs['marge'])) {
-                            $marge = (float) $attrs['marge'];
-                            $product->price = (float) $product->price + $marge;
-                        }
-                    }
+                if ($dbId) {
+                    $prices = $priceCalculator->calculatePrice($product, $user, $dbId);
+                    $product->price = $prices[0];
+                    $product->price_floor = $prices[1];
+                    $product->price_roll = $prices[2];
+                    $product->price_promo = $prices[3];
                 }
-            }
+                return $product;
+            });
         }
         
         $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description'])->orderBy('name')->get();

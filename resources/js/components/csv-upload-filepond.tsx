@@ -450,6 +450,8 @@ export function CsvUploadFilePond({
                 });
                 if (cancelled) return;
 
+                setProgressInfo(data);
+
                 const realProgress =
                     typeof data.progress === 'number'
                         ? Math.max(0, Math.min(100, data.progress))
@@ -462,8 +464,6 @@ export function CsvUploadFilePond({
 
                 lastRealProgressRef.current = realProgress;
                 lastRealProcessedRef.current = realProcessed;
-
-                setProgressInfo(data);
 
                 const status = String(data.status ?? '').toLowerCase();
 
@@ -697,7 +697,7 @@ export function CsvUploadFilePond({
                 </DialogHeader>
 
                 <div className="space-y-3">
-                    {importStatus !== 'processing' && importStatus !== 'cancelling' && (
+                    {!uploadComplete && importStatus !== 'processing' && importStatus !== 'cancelling' && (
                         <FilePond
                             ref={pondRef}
                             files={files}
