@@ -12,6 +12,7 @@ import {
 import { CartContext } from "./cart.context";
 import { router, usePage } from "@inertiajs/react";
 import { CartItem } from "./cart-item";
+import { getCartPricing } from "./cart-pricing";
 import { useI18n } from "@/lib/i18n";
 import { SharedData } from "@/types";
 import { Button } from "../ui/button";
@@ -30,10 +31,10 @@ export function CartSidebarHeader() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-    const total = items.reduce(
-        (sum, item) => sum + item.product.price * item.quantity,
-        0
-    );
+    const total = items.reduce((sum, item) => {
+        const pricing = getCartPricing(item.product, item.quantity);
+        return sum + pricing.lineTotal;
+    }, 0);
 
     const getFiltersUrl = () => {
         const location =

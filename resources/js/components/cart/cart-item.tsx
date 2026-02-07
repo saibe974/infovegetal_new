@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { getCartPricing } from './cart-pricing';
 
 export type CartItemProps = {
     product: Product;
@@ -16,9 +17,16 @@ export type CartItemProps = {
 export function CartItem({ product, quantity }: CartItemProps) {
     const { t } = useI18n();
     const { removeFromCart, updateQuantity } = useContext(CartContext);
-    
-   const total = (parseFloat(String(product.price)) * quantity).toFixed(2);
-    
+
+    const pricing = getCartPricing(product, quantity);
+    const total = pricing.lineTotal.toFixed(2);
+    const tierLabels: Record<typeof pricing.tier, string> = {
+        roll: t('Roll'),
+        floor: t('Floor'),
+        tray: t('Tray'),
+        unit: t('Unit'),
+    };
+
     return (
         <div className="group relative border-b pb-3 last:border-b-0">
             {/* Bouton supprimer en haut à droite */}
@@ -36,9 +44,9 @@ export function CartItem({ product, quantity }: CartItemProps) {
             <div className="flex gap-2.5">
                 {/* Image produit */}
                 <div className="relative shrink-0">
-                    <img 
-                        src={product.img_link ?? '/placeholder.png'} 
-                        alt={product.name} 
+                    <img
+                        src={product.img_link ?? '/placeholder.png'}
+                        alt={product.name}
                         className="size-15 object-cover rounded"
                     />
                     <Badge
@@ -58,9 +66,9 @@ export function CartItem({ product, quantity }: CartItemProps) {
                         {product.name}
                     </h4>
                     <div className="text-xs text-muted-foreground mb-2">
-                        {product.price} €
+                        {pricing.unitPrice.toFixed(2)} € / {tierLabels[pricing.tier]}
                     </div>
-                    
+
                     {/* Contrôles quantité + Total */}
                     <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-0.5 bg-muted rounded p-0.5">
@@ -97,7 +105,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                                 <Plus className="size-3" />
                             </Button>
                         </div>
-                        
+
                         <div className="font-semibold text-sm text-nowrap">
                             {total} €
                         </div>
