@@ -498,6 +498,11 @@ class ProductImportService
             foreach ($row as $key => $value) {
                 $normalizedKey = $normalizeKey($key);
                 $mapped[$normalizedKey] = is_string($value) ? trim($value) : $value;
+
+                $compactKey = str_replace('-', '', $normalizedKey);
+                if ($compactKey !== $normalizedKey && !array_key_exists($compactKey, $mapped)) {
+                    $mapped[$compactKey] = $mapped[$normalizedKey];
+                }
             }
 
             if (!$this->rowHasContent($mapped)) {
@@ -596,6 +601,11 @@ class ProductImportService
                 $mapped[$normalizedKey] = $trimmed === '' ? null : $trimmed;
             } else {
                 $mapped[$normalizedKey] = $value;
+            }
+
+            $compactKey = str_replace('-', '', $normalizedKey);
+            if ($compactKey !== $normalizedKey && !array_key_exists($compactKey, $mapped)) {
+                $mapped[$compactKey] = $mapped[$normalizedKey];
             }
         }
 

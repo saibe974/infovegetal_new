@@ -133,6 +133,16 @@ export function CsvUploadFilePond({
     const [displayProcessed, setDisplayProcessed] = useState<number>(0);
     const lastRealProcessedRef = useRef<number>(0);
 
+    const computeChunkSize = useCallback((size: number) => {
+        const kb = 1024;
+        const mb = 1024 * kb;
+
+        if (size <= 5 * mb) return 512 * kb;
+        if (size <= 20 * mb) return 1 * mb;
+        if (size <= 100 * mb) return 2 * mb;
+        return 4 * mb;
+    }, []);
+
     const stopProgressPolling = useCallback(() => {
         shouldPollRef.current = false;
         if (progressPollRef.current !== null) {
@@ -462,8 +472,11 @@ export function CsvUploadFilePond({
                         ? Math.max(0, data.processed)
                         : 0;
 
+                const realErrors =
+                    typeof data.errors === 'number' ? Math.max(0, data.errors) : 0;
+
                 lastRealProgressRef.current = realProgress;
-                lastRealProcessedRef.current = realProcessed;
+                lastRealProcessedRef.current = realProcessed + realErrors;
 
                 const status = String(data.status ?? '').toLowerCase();
 
@@ -701,7 +714,17 @@ export function CsvUploadFilePond({
                         <FilePond
                             ref={pondRef}
                             files={files}
-                            onupdatefiles={setFiles}
+                            onupdatefiles={(nextFiles) => {
+                                setFiles(nextFiles);
+                                const fileSize = nextFiles?.[0]?.file?.size;
+                                if (typeof fileSize === 'number' && fileSize > 0) {
+                                    const chunkSize = computeChunkSize(fileSize);
+                                    const pond =
+                                        pondRef.current?.pond ??
+                                        pondRef.current?.getFilePond?.();
+                                    pond?.setOptions?.({ chunkSize });
+                                }
+                            }}
                             allowMultiple={false}
                             maxFiles={1}
                             chunkUploads={true}

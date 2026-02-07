@@ -46,9 +46,9 @@ function importProducts_peplant($params = array(), $resolve)
             return ($p !== '' && is_numeric($p)) ? (int) $p : null;
         }, $parts);
         // Normaliser à 3 éléments
-        $cond = $nums[0] ?? null;
+        $cond = $nums[2] ?? null;
         $floor = $nums[1] ?? null;
-        $roll = $nums[2] ?? null;
+        $roll = $nums[0] ?? null;
         return [$cond, $floor, $roll];
     };
 
@@ -93,8 +93,20 @@ function importProducts_peplant($params = array(), $resolve)
     // Quantités cond/floor/roll depuis EMBALLAGE
     list($cond, $floor, $roll) = $parseEmballage($resolve($mapped, $defaultsMap, 'cond'));
 
+    // Pot
+    $potRaw = $resolve($mapped, $defaultsMap, 'pot');
+    if ($potRaw !== null) {
+        $potStr = str_replace([',', ' '], ['.', ''], (string) $potRaw);
+        $pot = is_numeric($potStr) ? (int) round((float) $potStr) : null;
+    } else {
+        $pot = null;
+    }
+
     // Height
-    $height = $resolve($mapped, $defaultsMap, 'height');
+    $height = $resolve($mapped, $defaultsMap, 'haut');
+    if ($height === null) {
+        $height = $resolve($mapped, $defaultsMap, 'height');
+    }
     if ($height !== null) {
         $height = trim((string) $height);
         // Valider le format x ou x-y, sinon nettoyer

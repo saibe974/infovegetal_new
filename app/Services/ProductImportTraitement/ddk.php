@@ -187,6 +187,7 @@ function importProducts_ddk($params = array(), $resolve)
     $price = $parsePrice($resolve($mapped, $defaultsMap, 'price')) ?? 0;
     $priceFloor = $parsePrice($resolve($mapped, $defaultsMap, 'price_floor'));
     $priceRoll = $parsePrice($resolve($mapped, $defaultsMap, 'price_roll'));
+    $pricePromo = $parsePrice($resolve($mapped, $defaultsMap, 'price_promo'));
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;
