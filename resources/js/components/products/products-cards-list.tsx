@@ -12,9 +12,16 @@ type Props = {
     products: Product[];
     canEdit?: boolean;
     canDelete?: boolean;
+    showStatusBadge?: boolean;
 };
 
-export function ProductsCardsList({ limit = null, products, canEdit = false, canDelete = false }: Props) {
+export function ProductsCardsList({
+    limit = null,
+    products,
+    canEdit = false,
+    canDelete = false,
+    showStatusBadge = false,
+}: Props) {
     const { t } = useI18n();
 
     const productsToShow = limit ? products.slice(0, limit) : products;
@@ -41,10 +48,11 @@ export function ProductsCardsList({ limit = null, products, canEdit = false, can
                     canDelete={canDelete}
                     editProduct={editProduct}
                     deleteProduct={deleteProduct}
+                    showStatusBadge={showStatusBadge}
                     className="w-80"
                 />
             ))}
-               
+
         </div>
     );
 }

@@ -43,7 +43,7 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category','tags', 'dbProduct'])->orderFromRequest($request);
+        $query = Product::with(['category','tags', 'dbProduct']);
 
         // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
         if ($request->get('cart') === '1') {
@@ -74,6 +74,9 @@ class ProductController extends Controller
             if ($activeFilter !== null) {
                 $query->where('active', $activeFilter);
             }
+        } else {
+            $activeFilter = true;
+            $query->where('active', true);
         }
 
 
@@ -109,6 +112,12 @@ class ProductController extends Controller
         }
 
         
+
+        if ($request->filled('sort')) {
+            $query->orderFromRequest($request);
+        } else {
+            $query->orderBy('name');
+        }
 
         $products = $query->paginate(24);
         $user = $request->user();

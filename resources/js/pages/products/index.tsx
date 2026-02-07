@@ -101,7 +101,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     }
 
     const filtersActive = [
-        filtersState.active !== 'all' ? { name: 'active', label: filtersState.active } : null,
+        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.dbProductId !== null ? { name: 'dbProductId', label: dbProducts.find(db => db.id === filtersState.dbProductId)?.name || '' } : null,
         filtersState.cart ? { name: 'cart', label: `Panier (${cartItems.length})` } : null,
@@ -348,6 +348,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                             products={Array.from(new Map(collection.data.map((p) => [p.id, p])).values())}
                             canEdit={canEdit}
                             canDelete={canDelete}
+                            showStatusBadge={filtersState.active !== 'active'}
                         />
                     )}
                 </InfiniteScroll>

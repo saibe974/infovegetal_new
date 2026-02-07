@@ -18,9 +18,18 @@ type Props = {
     editProduct?: (productId: number) => void;
     deleteProduct?: (productId: number) => void;
     className?: string;
+    showStatusBadge?: boolean;
 };
 
-export function ProductCard({ product, canEdit = false, canDelete = false, editProduct, deleteProduct, className }: Props) {
+export function ProductCard({
+    product,
+    canEdit = false,
+    canDelete = false,
+    editProduct,
+    deleteProduct,
+    className,
+    showStatusBadge = false,
+}: Props) {
     const { t } = useI18n();
 
     const { toggleSidebar, isOpenId } = useSidebar()
@@ -80,18 +89,20 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                     </div>
                 ) : null}
 
-                <div className="absolute top-3 right-3">
-                    <span
-                        className={
-                            "inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold rounded-full shadow-sm " +
-                            (product?.active ? "bg-green-600 text-white" : "bg-red-500 text-white")
-                        }
-                        aria-hidden="true"
-                    >
-                        {product?.active ? <CheckIcon className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
-                        {product?.active ? t("In stock") : t("Out of stock")}
-                    </span>
-                </div>
+                {showStatusBadge && (
+                    <div className="absolute top-3 right-3">
+                        <span
+                            className={
+                                "inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold rounded-full shadow-sm " +
+                                (product?.active ? "bg-green-600 text-white" : "bg-red-500 text-white")
+                            }
+                            aria-hidden="true"
+                        >
+                            {product?.active ? <CheckIcon className="w-4 h-4" /> : <XIcon className="w-4 h-4" />}
+                            {product?.active ? t("In stock") : t("Out of stock")}
+                        </span>
+                    </div>
+                )}
 
                 <CardHeader className="p-0 self-center">
                     <img src={img} alt={name} className="w-full max-w-100 h-80 object-cover rounded" />

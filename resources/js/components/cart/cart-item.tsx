@@ -66,7 +66,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                         {product.name}
                     </h4>
                     <div className="text-xs text-muted-foreground mb-2">
-                        {pricing.unitPrice.toFixed(2)} € / {tierLabels[pricing.tier]}
+                        {pricing.unitPrice.toFixed(2)} €
                     </div>
 
                     {/* Contrôles quantité + Total */}
