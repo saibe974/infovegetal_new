@@ -47,11 +47,13 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
         }
     };
 
-    const { addToCart } = useContext(CartContext);
+    const { addToCart, items } = useContext(CartContext);
     const handleAddToCart = (id: number, quantity: number) => {
         addToCart(product, quantity);
         !isOpenId('right') && toggleSidebar('right');
     };
+
+    const isInCart = items.some((item) => item.product.id === product.id);
 
     // console.log(product)
 
@@ -62,7 +64,13 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
-            <Card className={`relative flex flex-col p-4 gap-3 h-full overflow-hidden ${className ?? ""}`}>
+            <Card
+                className={cn(
+                    'relative flex flex-col p-4 gap-3 h-full overflow-hidden',
+                    isInCart && 'border-amber-400/70 ring-1 ring-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20',
+                    className,
+                )}
+            >
                 {product?.price_promo && Number(product.price_promo) > 0 ? (
                     <div className="absolute top-6 -left-10 w-40">
                         <div className="gap-1 bg-red-600 text-white inline-flex items-center justify-center px-4 py-2 text-sm font-semibold shadow-lg -rotate-45 w-full">
