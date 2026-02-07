@@ -93,11 +93,20 @@ function importProducts_peplant($params = array(), $resolve)
     // Quantités cond/floor/roll depuis EMBALLAGE
     list($cond, $floor, $roll) = $parseEmballage($resolve($mapped, $defaultsMap, 'cond'));
 
-    // Autres champs
-    $pot = $resolve($mapped, $defaultsMap, 'pot');
-    $pot = $pot !== null ? (is_numeric($pot) ? (int) $pot : null) : null;
-    $height = $resolve($mapped, $defaultsMap, 'haut');
-    $height = $height !== null ? trim((string) $height) : null;
+    // Height
+    $height = $resolve($mapped, $defaultsMap, 'height');
+    if ($height !== null) {
+        $height = trim((string) $height);
+        // Valider le format x ou x-y, sinon nettoyer
+        if (!preg_match('/^\d+(-\d+)?$/', $height)) {
+            // Essayer d'extraire le format valide
+            if (preg_match('/(\d+(?:-\d+)?)/', $height, $m)) {
+                $height = $m[1];
+            } else {
+                $height = null;
+            }
+        }
+    }
 
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;

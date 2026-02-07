@@ -172,6 +172,27 @@
                     "text": "TODO: 1) Investiguer la source des 30px de correction (margin, border, scrollbar?) avec DevTools. 2) Optimiser le useEffect pour éviter les recalculs continus pendant les animations de sidebars. 3) Possibilité d'utiliser le contexte useSidebar plutôt que ResizeObserver pour trigger les updates uniquement sur changement d'état."
                 }
             ]
+        },
+        {
+            "id": 10,
+            "title": "Products: refactoriser la gestion du champ height",
+            "status": "backlog",
+            "assignees": [
+                "saibe"
+            ],
+            "createdAt": "2026-02-05",
+            "messages": [
+                {
+                    "author": "copilot",
+                    "date": "2026-02-05",
+                    "text": "PROBLÈME IDENTIFIÉ: Le champ height accepte à la fois des valeurs numériques simples ('120') et des ranges avec unités ('120-140 cm', 'h 120-140 cm'). La migration définit height comme string, mais la validation initiale était configurée en 'numeric', causant des rejets silencieux lors de l'enregistrement. Correction temporaire appliquée: validation passée en 'string'."
+                },
+                {
+                    "author": "copilot",
+                    "date": "2026-02-05",
+                    "text": "TODO: 1) Décider du format standard (nombre seul vs range avec unité). 2) Si range nécessaire: ajouter une validation regex pour garantir le format (ex: /^\\d+(-\\d+)?( cm)?$/). 3) Considérer un champ dédié pour l'unité ou deux champs séparés (height_min, height_max). 4) Mettre à jour ProductImportService pour normaliser les formats d'entrée. 5) Documenter le format attendu dans l'UI (placeholder ou helper text)."
+                }
+            ]
         }
     ]
 }

@@ -365,10 +365,20 @@ class ProductController extends Controller
      */
     public function store(FormProductRequest $request)
     {
-        $product = Product::create($request->validated());
+        Log::info('[STORE] Method called - Request data:', ['data' => $request->all()]);
+        
+        $data = $request->validated();
+        $data['ref'] = $data['ref'] ?? '';
+        $data['ean13'] = $data['ean13'] ?? '';
+
+        Log::info("[STORE] Creating new product with validated data:", $data);
+
+        $product = Product::create($data);
         $this->handleFormRequest($product, $request);
 
-        return redirect()->route('products.edit', $product)->with('success', 'Produit créé');
+        Log::info("[STORE] Product created with ID: {$product->id}");
+
+        return redirect()->route('products.admin.edit', $product)->with('success', 'Produit créé');
     }
 
     /**
@@ -399,8 +409,19 @@ class ProductController extends Controller
      */
     public function update(FormProductRequest $request, Product $product)
     {
-        $product->update($request->validated());
+        Log::info('[UPDATE] Method called - Product ID: ' . $product->id . ' - Request data:', ['data' => $request->all()]);
+        
+        $data = $request->validated();
+        $data['ref'] = $data['ref'] ?? '';
+        $data['ean13'] = $data['ean13'] ?? '';
+
+        Log::info("[UPDATE] Updating product ID {$product->id} with validated data:", $data);
+        
+        $product->update($data);
         $this->handleFormRequest($product, $request);
+        
+        Log::info("[UPDATE] Product {$product->id} updated successfully");
+        
         return redirect()->back()->with('success', 'Produit mis à jour');
     }
 

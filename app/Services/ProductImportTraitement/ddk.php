@@ -152,7 +152,20 @@ function importProducts_ddk($params = array(), $resolve)
 
     // Récupérer les champs DDK spécifiques
     $pot = $resolve($mapped, $defaultsMap, 'pot');
-    $hauteur = $resolve($mapped, $defaultsMap, 'height');
+    $pot = $pot !== null ? (is_numeric($pot) ? (int) $pot : null) : null;
+    
+    $height = $resolve($mapped, $defaultsMap, 'height');
+    if ($height !== null) {
+        $height = trim((string) $height);
+        // Normaliser : extraire le format x ou x-y
+        if (is_numeric($height)) {
+            $height = (string) (int) $height;
+        } elseif (preg_match('/(\\d+(?:-\\d+)?)/', $height, $m)) {
+            $height = $m[1];
+        } else {
+            $height = null;
+        }
+    }
     
     // Parsing spécifique pour cond/floor/roll
     // cond (qte-plaque = "1 x 18"): nombre de produits par carton → 18 (2e nombre)
@@ -217,10 +230,11 @@ function importProducts_ddk($params = array(), $resolve)
         'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
         'ref' => $ref,
         'ean13' => $ean13,
-        'pot' => $pot ? (int) $pot : null,
-        'height' => $hauteur ? (string) $hauteur : null,
+        'pot' => $pot,
+        'height' => $height,
         'price_floor' => $priceFloor,
         'price_roll' => $priceRoll,
+        'price_promo' => $pricePromo,
         'producer_id' => $producerId,
         'cond' => $cond,
         'floor' => $floor,

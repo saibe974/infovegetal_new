@@ -78,7 +78,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />
                             )
                             }
-                            {item?.price_promo ? (
+                            {item?.price_promo && Number(item.price_promo) > 0 ? (
                                 <span className="absolute left-2 top-0 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold">
                                     <BadgeEuro className="w-5 h-5" />
                                 </span>
@@ -175,7 +175,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     </span>
                                                 </div>
                                                 <div className="w-1/2 flex flex-col items-center">
-                                                    {item?.price_promo ? (
+                                                    {item?.price_promo && Number(item.price_promo) > 0 ? (
                                                         <>
                                                             {/* <span className="font-thin line-through opacity-75 text-[10px]">{String(item.price_roll)} €</span> */}
                                                             <span className="font-bold text-red-300 dark:text-red-600">{String(item.price_promo)} €</span>

@@ -86,6 +86,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
     $floor = ($floor !== null && $floor !== '' && is_numeric($floor)) ? (int) $floor : null;
     $roll = $resolve($mapped, $defaultsMap, 'roll');   // pal_par_cc
     $roll = ($roll !== null && $roll !== '' && is_numeric($roll)) ? (int) $roll : null;
+    $roll = ($floor !== null && $roll !== null) ? ($roll / $floor) : $roll; // si floor et roll présents, calculer roll total
 
     // Autres champs
     $potRaw = $resolve($mapped, $defaultsMap, 'pot');
@@ -96,7 +97,29 @@ function importProducts_eurofleurs($params = array(), $resolve)
         $pot = null;
     }
     $height = $resolve($mapped, $defaultsMap, 'height');
-    $height = $height !== null ? trim((string) $height) : null;
+    if ($height === null || $height === '') {
+        // Essayer d'extraire de la remarque (format "H 120-140 cm" ou "H 30 cm")
+        $remark = $resolve($mapped, $defaultsMap, 'description');
+        if ($remark !== null) {
+            // Regex : cherche "H " suivi de chiffres, optionnellement "-" et d'autres chiffres
+            if (preg_match('/H\s+(\d+(?:-\d+)?)(?:\s*cm)?/i', (string) $remark, $matches)) {
+                $height = $matches[1];
+            }
+        }
+    }
+    // Normaliser : supprimer tout ce qui n'est pas chiffres/tirets
+    if ($height !== null) {
+        $height = trim((string) $height);
+        // Si c'est juste des chiffres et tirets, c'est bon
+        if (!preg_match('/^\d+(-\d+)?$/', $height)) {
+            // Sinon essayer d'extraire
+            if (preg_match('/(\d+(?:-\d+)?)/', $height, $m)) {
+                $height = $m[1];
+            } else {
+                $height = null;
+            }
+        }
+    }
 
     $producerId = $resolve($mapped, $defaultsMap, 'producer_id');
     $producerId = ($producerId !== null && is_numeric($producerId)) ? (int) $producerId : null;

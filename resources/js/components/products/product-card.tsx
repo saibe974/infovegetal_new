@@ -63,7 +63,7 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
             aria-label={`Voir ${name}`}
         >
             <Card className={`relative flex flex-col p-4 gap-3 h-full overflow-hidden ${className ?? ""}`}>
-                {product?.price_promo ? (
+                {product?.price_promo && Number(product.price_promo) > 0 ? (
                     <div className="absolute top-6 -left-10 w-40">
                         <div className="gap-1 bg-red-600 text-white inline-flex items-center justify-center px-4 py-2 text-sm font-semibold shadow-lg -rotate-45 w-full">
                             <Zap className="w-5 h-5" />
@@ -249,10 +249,10 @@ export function ProductCard({ product, canEdit = false, canDelete = false, editP
                                     <span
                                         className={cn(
                                             "font-semibold",
-                                            product?.price_promo ? "font-bold text-red-300 dark:text-red-600" : ""
+                                            product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
                                         )}
                                     >
-                                        {product.price_promo ? String(product.price_promo) : String(product.price_roll)} €
+                                        {product.price_promo && Number(product.price_promo) > 0 ? String(product.price_promo) : String(product.price_roll)} €
                                     </span>
                                 </div>
 

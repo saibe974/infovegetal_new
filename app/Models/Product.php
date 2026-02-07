@@ -24,7 +24,7 @@ class Product extends Model
         'ref',
         'ean13',
         'pot',
-        'hight',
+        'height',
         'price_floor',
         'price_roll',
         'price_promo',
