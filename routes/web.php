@@ -25,7 +25,7 @@ Route::prefix('products')->name('products.')->group(function () {
 
 // API publique pour récupérer un produit (pour l'ajout au panier après login)
 Route::get('/api/products/{product}', function (Product $product) {
-    return new ProductResource($product->load(['category', 'tags']));
+    return new ProductResource($product->load(['category', 'tags', 'dbProduct']));
 });
 
 // Route pour sauvegarder le panier en session (authentifiée)

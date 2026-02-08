@@ -16,6 +16,9 @@ class DbProducts extends Model
         'categories',
         'traitement',
         'mergins',
+        'country',
+        'mod_liv',
+        'mini',
     ];
 
     protected $sortable = [
@@ -30,6 +33,7 @@ class DbProducts extends Model
         'champs' => 'array',
         'categories' => 'array',
         'mergins' => 'array',
+        'mini' => 'integer',
     ];
 
     /**

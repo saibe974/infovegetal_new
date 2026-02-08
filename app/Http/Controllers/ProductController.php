@@ -199,7 +199,7 @@ class ProductController extends Controller
             'db_products_id' => $dbProductsId, // Crucial pour le mapping dans splitIntoTempFiles
         ]);
 
-        Log::info("Import started synchronously for ID: $id with db_products_id: $dbProductsId");
+        // Log::info("Import started synchronously for ID: $id with db_products_id: $dbProductsId");
 
         // Premier chunk synchronisé via le service (chunk index 0)
         $importService->run($id, $fullPath, $relativePath);
@@ -239,7 +239,7 @@ class ProductController extends Controller
         $relativePath = $path;
         $chunkIndex = isset($state['next_offset']) ? (int) $state['next_offset'] : 0;
 
-        Log::info("Import chunk requested for ID: $id at chunk index $chunkIndex");
+        // Log::info("Import chunk requested for ID: $id at chunk index $chunkIndex");
 
         $importService->runChunk($id, $relativePath, $chunkIndex);
 
@@ -374,18 +374,18 @@ class ProductController extends Controller
      */
     public function store(FormProductRequest $request)
     {
-        Log::info('[STORE] Method called - Request data:', ['data' => $request->all()]);
+        // Log::info('[STORE] Method called - Request data:', ['data' => $request->all()]);
         
         $data = $request->validated();
         $data['ref'] = $data['ref'] ?? '';
         $data['ean13'] = $data['ean13'] ?? '';
 
-        Log::info("[STORE] Creating new product with validated data:", $data);
+        // Log::info("[STORE] Creating new product with validated data:", $data);
 
         $product = Product::create($data);
         $this->handleFormRequest($product, $request);
 
-        Log::info("[STORE] Product created with ID: {$product->id}");
+        // Log::info("[STORE] Product created with ID: {$product->id}");
 
         return redirect()->route('products.admin.edit', $product)->with('success', 'Produit créé');
     }
@@ -418,18 +418,18 @@ class ProductController extends Controller
      */
     public function update(FormProductRequest $request, Product $product)
     {
-        Log::info('[UPDATE] Method called - Product ID: ' . $product->id . ' - Request data:', ['data' => $request->all()]);
+        // Log::info('[UPDATE] Method called - Product ID: ' . $product->id . ' - Request data:', ['data' => $request->all()]);
         
         $data = $request->validated();
         $data['ref'] = $data['ref'] ?? '';
         $data['ean13'] = $data['ean13'] ?? '';
 
-        Log::info("[UPDATE] Updating product ID {$product->id} with validated data:", $data);
+        // Log::info("[UPDATE] Updating product ID {$product->id} with validated data:", $data);
         
         $product->update($data);
         $this->handleFormRequest($product, $request);
         
-        Log::info("[UPDATE] Product {$product->id} updated successfully");
+        // Log::info("[UPDATE] Product {$product->id} updated successfully");
         
         return redirect()->back()->with('success', 'Produit mis à jour');
     }

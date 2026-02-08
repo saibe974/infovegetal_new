@@ -214,7 +214,7 @@ export function CsvUploadFilePond({
                 return;
             }
 
-            console.log('[UsersImport] startImport:', { id, settings });
+            // console.log('[UsersImport] startImport:', { id, settings });
             setImportError(null);
             setProgressInfo(null);
             setDisplayProgress(0);
@@ -250,7 +250,7 @@ export function CsvUploadFilePond({
                     body: JSON.stringify(body),
                 });
 
-                console.log('[UsersImport] startImport response:', response.status, response.statusText);
+                // console.log('[UsersImport] startImport response:', response.status, response.statusText);
 
                 if (!response.ok) {
                     throw new Error(
@@ -260,18 +260,18 @@ export function CsvUploadFilePond({
 
                 const payload = await response.json().catch(() => null);
 
-                console.log('[UsersImport] startImport payload:', payload);
+                // console.log('[UsersImport] startImport payload:', payload);
 
                 if (payload && typeof payload === 'object') {
                     setProgressInfo(payload as ImportProgressPayload);
                     const status = String(payload.status ?? '').toLowerCase();
-                    console.log('[UsersImport] initial status:', status);
+                    // console.log('[UsersImport] initial status:', status);
                     if (status === 'done') {
-                        console.log('[UsersImport] completed immediately');
+                        // console.log('[UsersImport] completed immediately');
                         stopProgressPolling();
                         setImportStatus('finished');
                     } else if (status === 'error') {
-                        console.log('[UsersImport] error in initial response');
+                        // console.log('[UsersImport] error in initial response');
                         stopProgressPolling();
                         setImportStatus('error');
                         setImportError(
@@ -280,20 +280,20 @@ export function CsvUploadFilePond({
                                 : 'Import process failed',
                         );
                     } else if (status === 'cancelled') {
-                        console.log('[UsersImport] cancelled in initial response');
+                        // console.log('[UsersImport] cancelled in initial response');
                         stopProgressPolling();
                         setImportStatus('cancelled');
                     } else if (status === 'cancelling') {
-                        console.log('[UsersImport] cancellation requested');
+                        // console.log('[UsersImport] cancellation requested');
                         shouldPollRef.current = true;
                         setImportStatus('cancelling');
                     } else {
-                        console.log('[UsersImport] processing, polling will continue');
+                        // console.log('[UsersImport] processing, polling will continue');
                         shouldPollRef.current = true;
                         setImportStatus('processing');
                     }
                 } else {
-                    console.log('[UsersImport] empty response, assume processing');
+                    // console.log('[UsersImport] empty response, assume processing');
                     shouldPollRef.current = true;
                     setImportStatus('processing');
                 }
@@ -414,7 +414,7 @@ export function CsvUploadFilePond({
     ]);
 
     useEffect(() => {
-        console.log('[UsersImport][Polling] useEffect, status=', importStatus);
+        // console.log('[UsersImport][Polling] useEffect, status=', importStatus);
         if (!importProgressUrl || !uploadId) {
             stopProgressPolling();
             return;
@@ -423,41 +423,41 @@ export function CsvUploadFilePond({
         const shouldPoll =
             importStatus === 'processing' || importStatus === 'cancelling';
         if (!shouldPoll) {
-            console.log('[UsersImport][Polling] stopped, status=', importStatus);
+            // console.log('[UsersImport][Polling] stopped, status=', importStatus);
             stopProgressPolling();
             return;
         }
 
-        if (!shouldPollRef.current) {
-            console.log('[UsersImport][Polling] waiting import response, shouldPollRef=', shouldPollRef.current);
-            // no early return to keep polling readiness
-        }
+        // if (!shouldPollRef.current) {
+        // console.log('[UsersImport][Polling] waiting import response, shouldPollRef=', shouldPollRef.current);
+        // no early return to keep polling readiness
+        // }
 
-        console.log('[UsersImport][Polling] start for uploadId=', uploadId);
+        // console.log('[UsersImport][Polling] start for uploadId=', uploadId);
         let cancelled = false;
         const progressUrl = importProgressUrl!;
 
         const fetchProgress = async () => {
             const url = progressUrl(uploadId);
-            console.log('[UsersImport][Polling] fetch progress for', uploadId, 'url=', url);
+            // console.log('[UsersImport][Polling] fetch progress for', uploadId, 'url=', url);
             try {
                 const response = await fetch(url, {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
-                console.log('[UsersImport][Polling] raw response:', response.status, response.statusText);
+                // console.log('[UsersImport][Polling] raw response:', response.status, response.statusText);
                 if (!response.ok) return;
 
                 const data: ImportProgressPayload = await response.json();
-                console.log('[UsersImport][Polling] payload:', {
-                    status: data?.status,
-                    processed: data?.processed,
-                    total: data?.total,
-                    errors: data?.errors,
-                    progress: data?.progress,
-                    has_more: (data as any)?.has_more,
-                    next_offset: (data as any)?.next_offset,
-                });
+                // console.log('[UsersImport][Polling] payload:', {
+                //     status: data?.status,
+                //     processed: data?.processed,
+                //     total: data?.total,
+                //     errors: data?.errors,
+                //     progress: data?.progress,
+                //     has_more: (data as any)?.has_more,
+                //     next_offset: (data as any)?.next_offset,
+                // });
                 if (cancelled) return;
 
                 setProgressInfo(data);
@@ -488,7 +488,7 @@ export function CsvUploadFilePond({
                     !isRequestingChunkRef.current
                 ) {
                     try {
-                        console.log('[UsersImport][Chunk] requesting next chunk...');
+                        // console.log('[UsersImport][Chunk] requesting next chunk...');
                         isRequestingChunkRef.current = true;
                         // Ne pas bloquer le polling: fire-and-forget avec gestion d'erreur
                         fetch(importProcessChunkUrl, {
@@ -503,7 +503,7 @@ export function CsvUploadFilePond({
                         })
                             .then(async (resp) => {
                                 const txt = await resp.text().catch(() => '');
-                                console.log('[UsersImport][Chunk] response status=', resp.status, 'body=', txt);
+                                // console.log('[UsersImport][Chunk] response status=', resp.status, 'body=', txt);
                                 if (!resp.ok) {
                                     console.error('[UsersImport][Chunk] non-OK response, will retry on next poll');
                                 }
@@ -527,11 +527,11 @@ export function CsvUploadFilePond({
                 }
 
                 if (status === 'done') {
-                    console.log('[UsersImport][Polling] status: done');
+                    // console.log('[UsersImport][Polling] status: done');
                     setImportStatus('finished');
                     stopProgressPolling();
                 } else if (status === 'error') {
-                    console.log('[UsersImport][Polling] status: error');
+                    // console.log('[UsersImport][Polling] status: error');
                     setImportStatus('error');
                     setImportError(
                         typeof data.message === 'string'
@@ -540,15 +540,15 @@ export function CsvUploadFilePond({
                     );
                     stopProgressPolling();
                 } else if (status === 'cancelled') {
-                    console.log('[UsersImport][Polling] status: cancelled');
+                    // console.log('[UsersImport][Polling] status: cancelled');
                     setImportStatus('cancelled');
                     stopProgressPolling();
                 } else if (status === 'cancelling') {
-                    console.log('[UsersImport][Polling] status: cancelling');
+                    // console.log('[UsersImport][Polling] status: cancelling');
                     setImportStatus('cancelling');
                     // Garder l’intervalle actuel, pas de recréation ici
                 } else {
-                    console.log('[UsersImport][Polling] status: processing');
+                    // console.log('[UsersImport][Polling] status: processing');
                     // Garder l’intervalle actuel, pas de recréation ici
                 }
             } catch (error) {

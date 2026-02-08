@@ -43,6 +43,9 @@ export interface dbProduct {
     champs: Record<string, any> | null;
     categories: Record<string, any> | null;
     traitement: string | null;
+    country?: string | null;
+    mod_liv?: string | null;
+    mini?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -54,6 +57,19 @@ export interface Product {
     description: string;
     price: number;
     active: boolean;
+    db_products_id?: number | null;
+    ref?: string | null;
+    ean13?: string | null;
+    pot?: number | string | null;
+    height?: string | number | null;
+    price_floor?: number | null;
+    price_roll?: number | null;
+    price_promo?: number | null;
+    producer_id?: number | null;
+    tva_id?: number | null;
+    cond?: number | null;
+    floor?: number | null;
+    roll?: number | null;
     category?: ProductCategory | null;
     dbProduct?: dbProduct | null;
     attributes: Record<string, unknown> | null;

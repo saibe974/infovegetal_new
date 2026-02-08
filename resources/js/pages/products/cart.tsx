@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { ProductRoll } from '@/components/products/product-roll';
 
 type Props = Record<string, never>;
 
@@ -298,106 +299,117 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             </StickyBar>
 
             <div className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>
-                            {t('Produits')} ({items.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {items.length === 0 && (
-                            <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
-                                <p>{t('Votre panier est vide')}</p>
-                                <Button asChild>
-                                    <Link href={products.index().url}>{t('Voir les produits')}</Link>
-                                </Button>
-                            </div>
-                        )}
-
-                        {items.map(({ product, quantity }) => {
-                            const unitPrice = getUnitPrice(product);
-                            const lineTotal = unitPrice * quantity;
-
-                            return (
-                                <div
-                                    key={product.id}
-                                    className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
-                                >
-                                    <div className="flex items-center gap-4 md:w-1/2">
-                                        <div className="h-20 w-20 rounded relative shrink-0">
-                                            <img
-                                                src={product.img_link || '/images/placeholder.png'}
-                                                alt={product.name}
-                                                className="h-full w-full object-cover"
-                                            />
-                                            <Badge
-                                                // variant={''}
-                                                className={cn(
-                                                    "absolute -top-1 -right-1 text-xs rounded-full",
-                                                    quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
-                                                )}
-                                            >
-                                                {quantity}
-                                            </Badge>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
-                                            {toText((product as any).ref) ? (
-                                                <p className="text-xs text-muted-foreground">Ref: {toText((product as any).ref)}</p>
-                                            ) : null}
-                                            <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
-                                            <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
-                                        <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                aria-label={t('Diminuer la quantité')}
-                                                onClick={() => handleQuantityChange(product.id, quantity - 1)}
-                                                disabled={quantity <= 1}
-                                            >
-                                                <Minus className="h-4 w-4" />
-                                            </Button>
-                                            <Input
-                                                type="text"
-                                                min={1}
-                                                value={quantity}
-                                                onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
-                                                className="w-16 h-8 text-center border-0"
-                                            />
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8"
-                                                aria-label={t('Augmenter la quantité')}
-                                                onClick={() => handleQuantityChange(product.id, quantity + 1)}
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-
-                                        <div className="text-right">
-                                            <p className="text-xs text-muted-foreground">{t('Total ligne')}</p>
-                                            <p className="text-lg font-semibold">{formatCurrency(lineTotal)}</p>
-                                        </div>
-
-                                        <Button
-                                            variant="ghost"
-                                            className="text-destructive"
-                                            onClick={() => removeFromCart(product.id)}
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                        </Button>
-                                    </div>
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>
+                                {t('Produits')} ({items.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {items.length === 0 && (
+                                <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
+                                    <p>{t('Votre panier est vide')}</p>
+                                    <Button asChild>
+                                        <Link href={products.index().url}>{t('Voir les produits')}</Link>
+                                    </Button>
                                 </div>
-                            );
-                        })}
-                    </CardContent>
-                </Card>
+                            )}
+
+                            {items.map(({ product, quantity }) => {
+                                const unitPrice = getUnitPrice(product);
+                                const lineTotal = unitPrice * quantity;
+
+                                return (
+                                    <div
+                                        key={product.id}
+                                        className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
+                                    >
+                                        <div className="flex items-center gap-4 md:w-1/2">
+                                            <div className="h-20 w-20 rounded relative shrink-0">
+                                                <img
+                                                    src={product.img_link || '/images/placeholder.png'}
+                                                    alt={product.name}
+                                                    className="h-full w-full object-cover"
+                                                />
+                                                <Badge
+                                                    // variant={''}
+                                                    className={cn(
+                                                        "absolute -top-1 -right-1 text-xs rounded-full",
+                                                        quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                    )}
+                                                >
+                                                    {quantity}
+                                                </Badge>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
+                                                {toText((product as any).ref) ? (
+                                                    <p className="text-xs text-muted-foreground">Ref: {toText((product as any).ref)}</p>
+                                                ) : null}
+                                                <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
+                                                <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
+                                            <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    aria-label={t('Diminuer la quantité')}
+                                                    onClick={() => handleQuantityChange(product.id, quantity - 1)}
+                                                    disabled={quantity <= 1}
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </Button>
+                                                <Input
+                                                    type="text"
+                                                    min={1}
+                                                    value={quantity}
+                                                    onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
+                                                    className="w-16 h-8 text-center border-0"
+                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    aria-label={t('Augmenter la quantité')}
+                                                    onClick={() => handleQuantityChange(product.id, quantity + 1)}
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <p className="text-xs text-muted-foreground">{t('Total ligne')}</p>
+                                                <p className="text-lg font-semibold">{formatCurrency(lineTotal)}</p>
+                                            </div>
+
+                                            <Button
+                                                variant="ghost"
+                                                className="text-destructive"
+                                                onClick={() => removeFromCart(product.id)}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t('Rolls')}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ProductRoll items={items} />
+                        </CardContent>
+                    </Card>
+                </div>
 
                 <BasicSticky
                     topOffset={-topOffset}

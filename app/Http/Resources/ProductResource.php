@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Product;
+use App\Http\Resources\DbProductsResource;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -46,7 +47,7 @@ class ProductResource extends JsonResource
             'roll' => $this->roll,
             'category' => $this->whenLoaded('category', fn () => $this->category),
             'producer' => $this->whenLoaded('producer', fn () => $this->producer),
-            'dbProduct' => $this->whenLoaded('dbProduct', fn () => $this->dbProduct),
+            'dbProduct' => DbProductsResource::make($this->whenLoaded('dbProduct')),
             'tags' => $this->whenLoaded('tags', fn () => $this->tags->map(function ($t) {
                 return [
                     'id' => $t->id,

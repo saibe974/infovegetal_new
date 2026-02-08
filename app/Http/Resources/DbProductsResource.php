@@ -23,6 +23,9 @@ class DbProductsResource extends JsonResource
             'categories' => $this->categories,
             'traitement' => $this->traitement,
             'mergins' => $this->mergins,
+            'country' => $this->country,
+            'mod_liv' => $this->mod_liv,
+            'mini' => $this->mini,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

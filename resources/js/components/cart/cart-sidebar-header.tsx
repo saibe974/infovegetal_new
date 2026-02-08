@@ -17,6 +17,7 @@ import { useI18n } from "@/lib/i18n";
 import { SharedData } from "@/types";
 import { Button } from "../ui/button";
 import HeadingSmall from "../heading-small";
+import { ProductRollMini } from "@/components/products/product-roll-mini";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
@@ -274,6 +275,12 @@ export function CartSidebarHeader() {
                                 </div>
                             )}
                         </div>
+
+                        {items.length > 0 && (
+                            <div className="mt-4">
+                                <ProductRollMini items={items} />
+                            </div>
+                        )}
                     </SidebarHeader>
 
                     <SidebarContent className="flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
