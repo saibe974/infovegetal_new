@@ -1,3 +1,4 @@
+import { DataTable } from '@/components/data-table';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -8,8 +9,9 @@ import carriers from '@/routes/carriers';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
+import type { CellContext, ColumnDef } from '@tanstack/react-table';
 
 interface ZoneTier {
     roll: string;
@@ -22,6 +24,8 @@ interface ZoneDraft {
     mini: string;
     tiers: ZoneTier[];
 }
+
+type ZoneRow = ZoneDraft & { __index: number };
 
 type Props = {
     carrier: Carrier;
@@ -40,7 +44,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const mapZones = (zones?: CarrierZone[]): ZoneDraft[] => {
     if (!zones || zones.length === 0) {
-        return [{ name: '', mini: '', tiers: [{ roll: '', price: '' }] }];
+        return [{ name: '', mini: '', tiers: [] }];
     }
 
     return zones.map((zone) => {
@@ -56,9 +60,50 @@ const mapZones = (zones?: CarrierZone[]): ZoneDraft[] => {
             id: zone.id,
             name: zone.name ?? '',
             mini: tariffs.mini ? String(tariffs.mini) : '',
-            tiers: tiers.length > 0 ? tiers : [{ roll: '', price: '' }],
+            tiers,
         };
     });
+};
+
+const getUniqueRolls = (zones: ZoneDraft[]) => {
+    const rolls = new Set<string>();
+    zones.forEach((zone) => {
+        zone.tiers.forEach((tier) => {
+            const value = tier.roll.trim();
+            if (value) {
+                rolls.add(value);
+            }
+        });
+    });
+
+    return Array.from(rolls).sort((left, right) => {
+        const leftNumber = Number(left);
+        const rightNumber = Number(right);
+        const leftIsNumber = Number.isFinite(leftNumber);
+        const rightIsNumber = Number.isFinite(rightNumber);
+
+        if (leftIsNumber && rightIsNumber) {
+            return leftNumber - rightNumber;
+        }
+
+        return left.localeCompare(right);
+    });
+};
+
+const getNextRoll = (zones: ZoneDraft[]) => {
+    const rolls = getUniqueRolls(zones);
+    const numericRolls = rolls
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value));
+    let next = numericRolls.length > 0 ? Math.max(...numericRolls) + 1 : 1;
+    let candidate = String(next);
+
+    while (rolls.includes(candidate)) {
+        next += 1;
+        candidate = String(next);
+    }
+
+    return candidate;
 };
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
@@ -72,6 +117,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         taxgo: carrier?.taxgo !== null && carrier?.taxgo !== undefined ? String(carrier.taxgo) : '',
         zones: mapZones(carrier?.zones),
     });
+    const [newRoll, setNewRoll] = useState('');
 
     const updateZone = (index: number, updates: Partial<ZoneDraft>) => {
         const next = [...data.zones];
@@ -79,38 +125,56 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         setData('zones', next);
     };
 
-    const updateTier = (zoneIndex: number, tierIndex: number, updates: Partial<ZoneTier>) => {
+    const updateTierPrice = (zoneIndex: number, roll: string, price: string) => {
         const next = [...data.zones];
         const zone = next[zoneIndex];
         const tiers = [...zone.tiers];
-        tiers[tierIndex] = { ...tiers[tierIndex], ...updates };
+        const index = tiers.findIndex((tier) => tier.roll === roll);
+        if (index >= 0) {
+            tiers[index] = { ...tiers[index], price };
+        } else {
+            tiers.push({ roll, price });
+        }
         next[zoneIndex] = { ...zone, tiers };
         setData('zones', next);
     };
 
     const addZone = () => {
-        setData('zones', [...data.zones, { name: '', mini: '', tiers: [{ roll: '', price: '' }] }]);
+        setData('zones', [...data.zones, { name: '', mini: '', tiers: [] }]);
     };
 
     const removeZone = (index: number) => {
         const next = [...data.zones];
         next.splice(index, 1);
-        setData('zones', next.length > 0 ? next : [{ name: '', mini: '', tiers: [{ roll: '', price: '' }] }]);
+        setData('zones', next.length > 0 ? next : [{ name: '', mini: '', tiers: [] }]);
     };
 
-    const addTier = (zoneIndex: number) => {
-        const next = [...data.zones];
-        const zone = next[zoneIndex];
-        next[zoneIndex] = { ...zone, tiers: [...zone.tiers, { roll: '', price: '' }] };
+    const addRoll = () => {
+        let roll = newRoll.trim();
+        const rolls = getUniqueRolls(data.zones);
+        if (!roll) {
+            roll = getNextRoll(data.zones);
+        } else if (rolls.includes(roll)) {
+            setNewRoll('');
+            return;
+        }
+
+        const next = data.zones.map((zone) => {
+            if (zone.tiers.some((tier) => tier.roll === roll)) {
+                return zone;
+            }
+            return { ...zone, tiers: [...zone.tiers, { roll, price: '' }] };
+        });
+
         setData('zones', next);
+        setNewRoll('');
     };
 
-    const removeTier = (zoneIndex: number, tierIndex: number) => {
-        const next = [...data.zones];
-        const zone = next[zoneIndex];
-        const tiers = [...zone.tiers];
-        tiers.splice(tierIndex, 1);
-        next[zoneIndex] = { ...zone, tiers: tiers.length > 0 ? tiers : [{ roll: '', price: '' }] };
+    const removeRoll = (roll: string) => {
+        const next = data.zones.map((zone) => ({
+            ...zone,
+            tiers: zone.tiers.filter((tier) => tier.roll !== roll),
+        }));
         setData('zones', next);
     };
 
@@ -135,6 +199,95 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
             };
         }),
     });
+
+    const rolls = useMemo(() => getUniqueRolls(data.zones), [data.zones]);
+    const zoneRows = useMemo<ZoneRow[]>(
+        () => data.zones.map((zone, index) => ({ ...zone, __index: index })),
+        [data.zones],
+    );
+
+    const renameRoll = (columnId: string, nextValue: string) => {
+        const oldRoll = columnId.replace(/^roll-/, '');
+        const nextRoll = nextValue.trim();
+        if (!nextRoll || nextRoll === oldRoll) {
+            return;
+        }
+
+        const existing = getUniqueRolls(data.zones);
+        if (existing.includes(nextRoll)) {
+            return;
+        }
+
+        const next = data.zones.map((zone) => ({
+            ...zone,
+            tiers: zone.tiers.map((tier) =>
+                tier.roll === oldRoll ? { ...tier, roll: nextRoll } : tier,
+            ),
+        }));
+
+        setData('zones', next);
+    };
+
+    const columns = useMemo<ColumnDef<ZoneRow>[]>(() => {
+        const rollColumns = rolls.map((roll) => ({
+            id: `roll-${roll}`,
+            header: roll,
+            cell: ({ row }: CellContext<ZoneRow, unknown>) => {
+                const zone = row.original;
+                const price = zone.tiers.find((tier) => tier.roll === roll)?.price ?? '';
+                return (
+                    <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={price}
+                        onChange={(e) => updateTierPrice(zone.__index, roll, e.target.value)}
+                    />
+                );
+            },
+        }));
+
+        return [
+            {
+                id: 'name',
+                header: t('Zones'),
+                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                    <Input
+                        value={row.original.name}
+                        onChange={(e) => updateZone(row.original.__index, { name: e.target.value })}
+                    />
+                ),
+            },
+            {
+                id: 'mini',
+                header: t('Minimum price'),
+                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                    <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={row.original.mini}
+                        onChange={(e) => updateZone(row.original.__index, { mini: e.target.value })}
+                    />
+                ),
+            },
+            ...rollColumns,
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                    <Button
+                        type="button"
+                        variant="destructive-outline"
+                        size="icon"
+                        onClick={() => removeZone(row.original.__index)}
+                    >
+                        <TrashIcon size={16} />
+                    </Button>
+                ),
+            },
+        ];
+    }, [rolls, removeZone, t, updateTierPrice, updateZone]);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -236,85 +389,46 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                     </Card>
 
                     <Card className="p-4 space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <h3 className="text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
-                            <Button type="button" variant="outline" size="sm" onClick={addZone}>
-                                <PlusIcon className="mr-2 h-4 w-4" /> {t('Add zone')}
-                            </Button>
-                        </div>
-
-                        {data.zones.map((zone, zoneIndex) => (
-                            <div key={zoneIndex} className="rounded-md border border-border p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold">{t('Zone')} {zoneIndex + 1}</h4>
-                                    <Button
-                                        type="button"
-                                        variant="destructive-outline"
-                                        size="sm"
-                                        onClick={() => removeZone(zoneIndex)}
-                                    >
-                                        <TrashIcon className="mr-2 h-4 w-4" /> {t('Remove zone')}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        value={newRoll}
+                                        onChange={(e) => setNewRoll(e.target.value)}
+                                        placeholder={t('Rolls')}
+                                        className="w-24"
+                                    />
+                                    <Button type="button" variant="outline" size="sm" onClick={addRoll}>
+                                        <PlusIcon className="mr-2 h-4 w-4" /> {t('Add tier')}
                                     </Button>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <FormField label={t('Zone name')} htmlFor={`zone-name-${zoneIndex}`}>
-                                        <Input
-                                            id={`zone-name-${zoneIndex}`}
-                                            value={zone.name}
-                                            onChange={(e) => updateZone(zoneIndex, { name: e.target.value })}
-                                        />
-                                    </FormField>
-                                    <FormField label={t('Minimum price')} htmlFor={`zone-mini-${zoneIndex}`}>
-                                        <Input
-                                            id={`zone-mini-${zoneIndex}`}
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={zone.mini}
-                                            onChange={(e) => updateZone(zoneIndex, { mini: e.target.value })}
-                                        />
-                                    </FormField>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h5 className="text-xs font-semibold text-muted-foreground">{t('Tariffs by rolls')}</h5>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => addTier(zoneIndex)}>
-                                            <PlusIcon className="mr-2 h-4 w-4" /> {t('Add tier')}
-                                        </Button>
-                                    </div>
-                                    {zone.tiers.map((tier, tierIndex) => (
-                                        <div key={`${zoneIndex}-${tierIndex}`} className="grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
-                                            <FormField label={t('Rolls')} htmlFor={`tier-roll-${zoneIndex}-${tierIndex}`}>
-                                                <Input
-                                                    id={`tier-roll-${zoneIndex}-${tierIndex}`}
-                                                    value={tier.roll}
-                                                    onChange={(e) => updateTier(zoneIndex, tierIndex, { roll: e.target.value })}
-                                                />
-                                            </FormField>
-                                            <FormField label={t('Price')} htmlFor={`tier-price-${zoneIndex}-${tierIndex}`}>
-                                                <Input
-                                                    id={`tier-price-${zoneIndex}-${tierIndex}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    value={tier.price}
-                                                    onChange={(e) => updateTier(zoneIndex, tierIndex, { price: e.target.value })}
-                                                />
-                                            </FormField>
-                                            <Button
-                                                type="button"
-                                                variant="destructive-outline"
-                                                size="icon"
-                                                onClick={() => removeTier(zoneIndex, tierIndex)}
-                                            >
-                                                <TrashIcon size={16} />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={addZone}>
+                                    <PlusIcon className="mr-2 h-4 w-4" /> {t('Add zone')}
+                                </Button>
                             </div>
-                        ))}
+                        </div>
+
+                        <DataTable
+                            columns={columns}
+                            data={zoneRows}
+                            emptyMessage={t('No zones yet')}
+                            getRowId={(row) => (row.id ? `id-${row.id}` : `new-${row.__index}`)}
+                            headerControls={(columnId) => {
+                                if (!columnId.startsWith('roll-')) {
+                                    return null;
+                                }
+                                const roll = columnId.replace(/^roll-/, '');
+
+                                return {
+                                    editable: true,
+                                    deletable: true,
+                                    value: roll,
+                                    onChange: (value) => renameRoll(columnId, value),
+                                    onDelete: () => removeRoll(roll),
+                                };
+                            }}
+                        />
                     </Card>
                 </main>
             </div>
