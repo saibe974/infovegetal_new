@@ -50,6 +50,28 @@ export interface dbProduct {
     updated_at: string;
 }
 
+export interface CarrierZone {
+    id?: number;
+    carrier_id?: number;
+    name: string;
+    tariffs?: Record<string, number | string>;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Carrier {
+    id?: number;
+    name: string;
+    country?: string | null;
+    days?: number | null;
+    minimum?: number | null;
+    taxgo?: number | null;
+    zones?: CarrierZone[];
+    zones_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface Product {
     id: number;
     name: string;

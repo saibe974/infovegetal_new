@@ -9,6 +9,7 @@ use App\Http\Resources\ProductResource;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\CarrierController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -88,6 +89,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);
+    Route::resource('carriers', CarrierController::class)->middleware(['role:admin']);
 });
 
 // Gestion des utilisateurs (admin uniquement)

@@ -741,7 +741,10 @@ export function ProductRoll({
                                             className={cn('relative', 'border-2 border-t-0 p-1', 'rounded-b-md', rollBorder, rollBg)}
                                             style={{ width: rollWidth + 12, height: rollHeight + 12 }}
                                         >
-                                            <div className="absolute left-[-9px] top-2">{getFlag(supplier.country)}</div>
+                                            <div className="absolute left-[-20px] top-2 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
+                                                {getFlag(supplier.country)}
+                                            </div>
+
                                             <div
                                                 className={cn(
                                                     'absolute right-[-14px] top-2 w-9 border border-slate-900 bg-white text-[11px] font-semibold text-center shadow-sm',
@@ -770,15 +773,15 @@ export function ProductRoll({
                                                     .map((etage, etageIndex) => {
                                                         const heightRatio = totalY ? (etage.y || 0) / totalY : 1 / roll.etages.length;
                                                         const etageHeight = Math.max(18, Math.floor(rollHeight * heightRatio));
-                                                        const isFull = etage.perte === 0;
+                                                        const isFull = etage.perte <= 5;
                                                         return (
                                                             <div
                                                                 key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}`}
                                                                 className={cn(
-                                                                    'flex border-b border-slate-900',
+                                                                    'flex items-end border-b border-slate-900',
                                                                     isFull ? 'justify-between' : 'flex-wrap-reverse'
                                                                 )}
-                                                                style={{ height: etageHeight, marginTop: '2px' }}
+                                                                style={{ marginTop: '2px' }}
                                                             >
                                                                 {etage.items.map((productId, cartonIndex) => {
                                                                     const product = productMap.get(productId);
