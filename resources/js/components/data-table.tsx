@@ -34,12 +34,42 @@ export function DataTable<TData, TValue>({
     className,
     headerControls,
 }: DataTableProps<TData, TValue>) {
+    const [headerDrafts, setHeaderDrafts] = React.useState<Record<string, string>>({});
     const table = useReactTable({
         data,
         columns,
         getRowId,
         getCoreRowModel: getCoreRowModel(),
     });
+
+    const commitHeaderValue = React.useCallback(
+        (columnId: string, control: HeaderControl | null) => {
+            if (!control?.editable || typeof control.onChange !== 'function') {
+                return;
+            }
+
+            const draft = headerDrafts[columnId] ?? '';
+            if (draft.trim() === '') {
+                setHeaderDrafts((current) => {
+                    const next = { ...current };
+                    delete next[columnId];
+                    return next;
+                });
+                return;
+            }
+
+            if (draft !== (control.value ?? '')) {
+                control.onChange(draft);
+            }
+
+            setHeaderDrafts((current) => {
+                const next = { ...current };
+                delete next[columnId];
+                return next;
+            });
+        },
+        [headerDrafts],
+    );
 
     return (
         <Table className={className}>
@@ -56,15 +86,29 @@ export function DataTable<TData, TValue>({
                                 const canEdit = !!control?.editable && typeof control.onChange === 'function';
                                 const canDelete = !!control?.deletable && typeof control.onDelete === 'function';
 
+                                const headerValue = control?.value ?? '';
+                                const draftValue = headerDrafts[header.column.id] ?? headerValue;
+
                                 return (
                                     <TableHead key={header.id}>
                                         {canEdit || canDelete ? (
                                             <div className="flex items-center gap-2">
                                                 {canEdit ? (
                                                     <Input
-                                                        value={control?.value ?? ''}
+                                                        value={draftValue}
                                                         placeholder={control?.placeholder}
-                                                        onChange={(event) => control?.onChange?.(event.target.value)}
+                                                        onChange={(event) =>
+                                                            setHeaderDrafts((current) => ({
+                                                                ...current,
+                                                                [header.column.id]: event.target.value,
+                                                            }))
+                                                        }
+                                                        onBlur={() => commitHeaderValue(header.column.id, control)}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === 'Enter') {
+                                                                event.currentTarget.blur();
+                                                            }
+                                                        }}
                                                         className="h-8 w-24"
                                                     />
                                                 ) : (

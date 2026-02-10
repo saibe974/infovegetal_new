@@ -146,7 +146,16 @@ class CarrierController extends Controller
                 continue;
             }
 
-            if ($value === null || $value === '') {
+            if (is_string($key) && str_starts_with($key, 'roll:')) {
+                $key = substr($key, 5);
+            }
+
+            if ($value === '') {
+                continue;
+            }
+
+            if ($value === null) {
+                $normalized[(string) $key] = null;
                 continue;
             }
 
@@ -173,16 +182,15 @@ class CarrierController extends Controller
                 continue;
             }
 
-            $carrier->zones()->create($payload);
-        }
-
-        if (!empty($keepIds)) {
-            $carrier->zones()->whereNotIn('id', $keepIds)->delete();
-            return;
+            $created = $carrier->zones()->create($payload);
+            $keepIds[] = (int) $created->id;
         }
 
         if (count($zones) === 0) {
             $carrier->zones()->delete();
+            return;
         }
+
+        $carrier->zones()->whereNotIn('id', $keepIds)->delete();
     }
 }

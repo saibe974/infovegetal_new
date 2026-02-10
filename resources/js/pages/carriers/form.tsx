@@ -51,10 +51,13 @@ const mapZones = (zones?: CarrierZone[]): ZoneDraft[] => {
         const tariffs = zone.tariffs ?? {};
         const tiers = Object.entries(tariffs)
             .filter(([key]) => key !== 'mini')
-            .map(([roll, price]) => ({
-                roll: String(roll),
-                price: String(price ?? ''),
-            }));
+            .map(([roll, price]) => {
+                const cleanRoll = String(roll).replace(/^roll:/, '');
+                return {
+                    roll: cleanRoll,
+                    price: String(price ?? ''),
+                };
+            });
 
         return {
             id: zone.id,
@@ -178,27 +181,36 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         setData('zones', next);
     };
 
-    const buildPayload = () => ({
-        ...data,
-        zones: data.zones.map((zone) => {
-            const tariffs: Record<string, string> = {};
-            if (zone.mini.trim() !== '') {
-                tariffs.mini = zone.mini.trim();
-            }
-            zone.tiers.forEach((tier) => {
-                const roll = tier.roll.trim();
-                const price = tier.price.trim();
-                if (roll && price) {
-                    tariffs[roll] = price;
+    const buildPayload = () => {
+        const rolls = getUniqueRolls(data.zones);
+
+        return {
+            ...data,
+            zones: data.zones.map((zone) => {
+                const tariffs: Record<string, string | null> = {};
+                if (zone.mini.trim() !== '') {
+                    tariffs.mini = zone.mini.trim();
                 }
-            });
-            return {
-                id: zone.id,
-                name: zone.name,
-                tariffs,
-            };
-        }),
-    });
+
+                rolls.forEach((roll) => {
+                    const tier = zone.tiers.find((candidate) => candidate.roll === roll);
+                    if (!tier) {
+                        tariffs[`roll:${roll}`] = null;
+                        return;
+                    }
+
+                    const price = tier.price.trim();
+                    tariffs[`roll:${roll}`] = price === '' ? null : price;
+                });
+
+                return {
+                    id: zone.id,
+                    name: zone.name,
+                    tariffs,
+                };
+            }),
+        };
+    };
 
     const rolls = useMemo(() => getUniqueRolls(data.zones), [data.zones]);
     const zoneRows = useMemo<ZoneRow[]>(
