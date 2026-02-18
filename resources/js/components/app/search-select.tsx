@@ -11,7 +11,7 @@ interface SearchBarProps {
     value: string;
     onChange: (val: string) => void;
     onSubmit: (val: string, options?: { force?: boolean }) => void;
-    propositions?: string[];
+    propositions?: (string | Option)[];
     loading?: boolean;
     // Optional total count to display next to the search button
     count?: number;
@@ -27,10 +27,10 @@ interface SearchBarProps {
     minQueryLength?: number;
 }
 
-interface Option {
+export type Option = {
     value: string;
     label: string;
-}
+};
 
 export default function SearchSelect({
     value,
@@ -67,8 +67,7 @@ export default function SearchSelect({
     const inputRef = useRef<HTMLInputElement>(null);
     const filtersRef = useRef<HTMLDivElement | null>(null);
     const lastMouseDownInsideRef = useRef(false);
-    // Resolve list of strings to display as propositions
-    const list: string[] = (propositions ?? []) as string[];
+    const listOptions = toOptions(propositions);
     // Track last submitted query to avoid duplicate submit loops
     const lastSubmittedRef = useRef<string | null>(null);
 
@@ -81,10 +80,10 @@ export default function SearchSelect({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [JSON.stringify(selection || [])]);
 
-    const handleSelect = (name: string) => {
-        const option = { value: name, label: name };
-        if (!selected.some((s) => s.value === option.value)) {
-            const newSelected = [...selected, option];
+    const handleSelectOption = (option: Option) => {
+        const selection = { value: option.value, label: option.value };
+        if (!selected.some((s) => s.value === selection.value)) {
+            const newSelected = [...selected, selection];
             setSelected(newSelected);
             // const query = newSelected.map((s) => s.value).join(" ");
             // onSubmit(query);
@@ -120,7 +119,7 @@ export default function SearchSelect({
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 
-        if (!open && e.key === "ArrowDown" && list.length > 0) {
+        if (!open && e.key === "ArrowDown" && listOptions.length > 0) {
             setOpen(true);
             setHighlightedIndex(0);
             return;
@@ -143,19 +142,19 @@ export default function SearchSelect({
         if (e.key === "ArrowDown") {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev < list.length - 1 ? prev + 1 : 0
+                prev < listOptions.length - 1 ? prev + 1 : 0
             );
         } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev > 0 ? prev - 1 : list.length - 1
+                prev > 0 ? prev - 1 : listOptions.length - 1
             );
         } else if (e.key === "Enter") {
             e.preventDefault();
-            if (highlightedIndex >= 0 && highlightedIndex < list.length) {
-                handleSelect(list[highlightedIndex]);
+            if (highlightedIndex >= 0 && highlightedIndex < listOptions.length) {
+                handleSelectOption(listOptions[highlightedIndex]);
             } else if (value.trim()) {
-                handleSelect(value);
+                handleSelectOption({ value, label: value });
             }
         } else if (e.key === "Escape") {
             setOpen(false);
@@ -164,7 +163,7 @@ export default function SearchSelect({
     };
 
     const handleSearch = () => {
-        if (value.trim()) handleSelect(value);
+        if (value.trim()) handleSelectOption({ value, label: value });
     };
 
     useEffect(() => {
@@ -386,11 +385,11 @@ export default function SearchSelect({
                                     <div className="flex justify-center items-center py-2 text-muted-foreground">
                                         <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
                                     </div>
-                                ) : list.length > 0 ? (
-                                    list.map((name: string, i: number) => (
+                                ) : listOptions.length > 0 ? (
+                                    listOptions.map((option, i: number) => (
                                         <button
-                                            key={i}
-                                            onClick={() => handleSelect(name)}
+                                            key={`${option.value}-${i}`}
+                                            onClick={() => handleSelectOption(option)}
                                             className={cn(
                                                 "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
                                                 highlightedIndex === i
@@ -398,7 +397,7 @@ export default function SearchSelect({
                                                     : "hover:bg-accent/60 hover:text-accent-foreground"
                                             )}
                                         >
-                                            {name}
+                                            {option.label}
                                         </button>
                                     ))
                                 ) : (

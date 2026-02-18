@@ -80,25 +80,47 @@ class ProductController extends Controller
             $baseQuery->where('active', true);
         }
 
-        if ($search) {
+        $applySearch = function ($q, ?string $search) {
+            if (empty($search)) {
+                return;
+            }
+
+            $refCandidate = null;
+            if (str_contains($search, ':')) {
+                $refCandidate = trim((string) strtok($search, ':'));
+                if ($refCandidate === '') {
+                    $refCandidate = null;
+                }
+            }
+
+            if ($refCandidate) {
+                $q->where('products.ref', '=', $refCandidate);
+                return;
+            }
+
             $normalized = trim($search);
             $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+            $isSingleToken = count($tokens) === 1;
 
-            $baseQuery->where(function ($q) use ($tokens, $isSingleNumeric) {
-                // Si un seul terme numérique, tenter l'ID exact
+            $q->where(function ($qq) use ($tokens, $isSingleNumeric, $isSingleToken) {
+                // Si un seul terme numerique, tenter l'ID exact
                 if ($isSingleNumeric) {
-                    $q->where('id', '=', (int) $tokens[0]);
+                    $qq->where('products.id', '=', (int) $tokens[0]);
                 }
 
                 // Et toujours proposer une recherche sur le nom qui contient tous les termes
-                $q->orWhere(function ($qq) use ($tokens) {
+                $qq->orWhere(function ($qqq) use ($tokens) {
                     foreach ($tokens as $t) {
-                        $qq->where('name', 'like', '%' . $t . '%');
+                        $qqq->where('products.name', 'like', '%' . $t . '%');
                     }
                 });
+
+                if ($isSingleToken) {
+                    $qq->orWhere('products.ref', '=', $tokens[0]);
+                }
             });
-        }
+        };
 
         $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
         $country = $request->filled('country') ? trim((string) $request->input('country')) : null;
@@ -132,7 +154,10 @@ class ProductController extends Controller
             }
         };
 
-        $categoryOptions = (clone $baseQuery)
+        $optionsBaseQuery = clone $baseQuery;
+        $applySearch($optionsBaseQuery, $search);
+
+        $categoryOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['category']))
             ->whereNotNull('category_products_id')
             ->select('category_products_id')
@@ -143,7 +168,7 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        $countryOptions = (clone $baseQuery)
+        $countryOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['country']))
             ->join('db_products', 'products.db_products_id', '=', 'db_products.id')
             ->whereNotNull('db_products.country')
@@ -155,7 +180,7 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        $potOptions = (clone $baseQuery)
+        $potOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['pot']))
             ->whereNotNull('pot')
             ->select('pot')
@@ -166,7 +191,7 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        $heightOptions = (clone $baseQuery)
+        $heightOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['height']))
             ->whereNotNull('height')
             ->select('height')
@@ -178,6 +203,7 @@ class ProductController extends Controller
             ->all();
 
         $query = (clone $baseQuery)->with(['category', 'tags', 'dbProduct']);
+        $applySearch($query, $search);
         $applyFilters($query, $filters);
 
         
@@ -313,7 +339,10 @@ class ProductController extends Controller
             'countryOptions' => $countryOptions,
             'potOptions' => $potOptions,
             'heightOptions' => $heightOptions,
-            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
+            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions(
+                tap(clone $baseQuery, fn ($q) => $applyFilters($q, $filters)),
+                $search
+            )),
         ]);
 
     }
@@ -646,9 +675,28 @@ class ProductController extends Controller
         
         $lowerSearch = mb_strtolower($search);
 
+        $applyNameSearch = function ($q, string $search) {
+            $normalized = trim($search);
+            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+            $q->where(function ($qq) use ($tokens, $isSingleNumeric) {
+                if ($isSingleNumeric) {
+                    $qq->where('products.id', '=', (int) $tokens[0]);
+                }
+
+                $qq->orWhere(function ($qqq) use ($tokens) {
+                    foreach ($tokens as $t) {
+                        $qqq->where('products.name', 'like', '%' . $t . '%');
+                    }
+                });
+            });
+        };
+
         // Récupération des noms distincts - réinitialiser le ORDER BY pour éviter les conflits
         $clonedQuery = clone $query;
         $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
+        $applyNameSearch($clonedQuery, $search);
         
         $propositions = $clonedQuery
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
@@ -672,6 +720,63 @@ class ProductController extends Controller
             ->filter(fn($name) => !empty($name))
             ->unique()
             ->values();
+
+        if ($cleaned->isEmpty()) {
+            $refQuery = clone $query;
+            $refQuery->getQuery()->orders = null;
+
+            $refSuggestions = $refQuery
+                ->whereNotNull('ref')
+                ->where('ref', '!=', '')
+                ->where('ref', 'like', '%' . $search . '%')
+                ->select(['ref', 'name', 'pot', 'height'])
+                ->distinct()
+                ->get()
+                ->map(function ($row) {
+                    $ref = trim((string) ($row->ref ?? ''));
+                    $name = trim((string) ($row->name ?? ''));
+                    $pot = trim((string) ($row->pot ?? ''));
+                    $height = trim((string) ($row->height ?? ''));
+                    if ($ref === '' || $name === '') {
+                        return null;
+                    }
+                    $extras = [];
+                    if ($pot !== '') {
+                        $extras[] = 'pot ' . $pot;
+                    }
+                    if ($height !== '') {
+                        $extras[] = 'h ' . $height;
+                    }
+
+                    $suffix = !empty($extras) ? ' (' . implode(', ', $extras) . ')' : '';
+                    return [
+                        'value' => $ref,
+                        'label' => $ref . ' : ' . $name . $suffix,
+                    ];
+                })
+                ->filter(fn ($value) => !empty($value))
+                ->unique()
+                ->values()
+                ->all();
+
+            usort($refSuggestions, function ($a, $b) use ($lowerSearch) {
+                $aLabel = mb_strtolower((string) ($a['label'] ?? ''));
+                $bLabel = mb_strtolower((string) ($b['label'] ?? ''));
+
+                $pa = str_starts_with($aLabel, $lowerSearch) ? 1 : (str_contains($aLabel, $lowerSearch) ? 2 : 3);
+                $pb = str_starts_with($bLabel, $lowerSearch) ? 1 : (str_contains($bLabel, $lowerSearch) ? 2 : 3);
+
+                if ($pa !== $pb) return $pa <=> $pb;
+
+                $la = mb_strlen($aLabel);
+                $lb = mb_strlen($bLabel);
+                if ($la !== $lb) return $la <=> $lb;
+
+                return strnatcmp($aLabel, $bLabel);
+            });
+
+            return $refSuggestions;
+        }
 
         // --- 🔢 Tri selon priorités ---
         $items = $cleaned->all();

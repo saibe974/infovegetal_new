@@ -22,22 +22,6 @@ class SearchController extends Controller
 
         if ($context === 'products') {
             $query = Product::with(['category','tags'])->orderFromRequest($request);
-
-            $normalized = trim($search);
-            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
-
-            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
-                if ($isSingleNumeric) {
-                    $q->where('id', '=', (int) $tokens[0]);
-                }
-                $q->orWhere(function ($qq) use ($tokens) {
-                    foreach ($tokens as $t) {
-                        $qq->where('name', 'like', '%' . $t . '%');
-                    }
-                });
-            });
-
             $items = ProductController::getSearchPropositions($query, $search);
             return response()->json(['propositions' => array_slice($items, 0, $limit)]);
         }

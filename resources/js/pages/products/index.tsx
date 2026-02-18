@@ -8,7 +8,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UploadIcon, EditIcon, TrashIcon, LoaderIcon, Loader2Icon } from 'lucide-react';
-import SearchSelect from '@/components/app/search-select';
+import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
@@ -84,7 +84,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
     const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
 
-    const page = usePage<{ searchPropositions?: string[] }>();
+    const page = usePage<{ searchPropositions?: Array<string | SearchOption> }>();
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,7 +242,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     }
 
     // Local state for client-fetched propositions to avoid Inertia refresh
-    const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
+    const [searchPropositionsState, setSearchPropositions] = useState<Array<string | SearchOption>>(searchPropositions ?? []);
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -257,7 +257,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             try {
                 const res = await fetch(`/search-propositions?context=products&q=${encodeURIComponent(s)}&limit=10`);
                 const json = await res.json();
-                setSearchPropositions((json.propositions || []) as string[]);
+                setSearchPropositions((json.propositions || []) as Array<string | SearchOption>);
             } finally {
                 setFetching(false);
             }
