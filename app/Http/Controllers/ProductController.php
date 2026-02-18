@@ -44,13 +44,13 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category','tags', 'dbProduct']);
+        $baseQuery = Product::query();
 
         // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
         if ($request->get('cart') === '1') {
             $cartIds = $request->session()->get('cart_filter_ids', []);
             if (!empty($cartIds) && is_array($cartIds)) {
-                $query->whereIn('id', $cartIds);
+                $baseQuery->whereIn('id', $cartIds);
             }
         }
 
@@ -62,7 +62,7 @@ class ProductController extends Controller
         $user = $request->user();
         if ($user && !$user->hasRole('admin')) {
             $allowedDbIds = $user->dbProducts()->pluck('db_products.id')->toArray();
-            $query->whereIn('db_products_id', $allowedDbIds);
+            $baseQuery->whereIn('db_products_id', $allowedDbIds);
         }
 
         if ($activeInput !== null && $activeInput !== '') {
@@ -73,23 +73,11 @@ class ProductController extends Controller
             };
 
             if ($activeFilter !== null) {
-                $query->where('active', $activeFilter);
+                $baseQuery->where('active', $activeFilter);
             }
         } else {
             $activeFilter = true;
-            $query->where('active', true);
-        }
-
-
-        $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
-        if ($categoryId) {
-            $query->where('category_products_id', $categoryId);
-        }
-
-        // Ajout du filtre dbProductId
-        $dbProductId = $request->filled('dbProductId') ? (int) $request->input('dbProductId') : null;
-        if ($dbProductId) {
-            $query->where('db_products_id', $dbProductId);
+            $baseQuery->where('active', true);
         }
 
         if ($search) {
@@ -97,7 +85,7 @@ class ProductController extends Controller
             $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
 
-            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
+            $baseQuery->where(function ($q) use ($tokens, $isSingleNumeric) {
                 // Si un seul terme numérique, tenter l'ID exact
                 if ($isSingleNumeric) {
                     $q->where('id', '=', (int) $tokens[0]);
@@ -111,6 +99,86 @@ class ProductController extends Controller
                 });
             });
         }
+
+        $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
+        $country = $request->filled('country') ? trim((string) $request->input('country')) : null;
+        $pot = $request->filled('pot') ? trim((string) $request->input('pot')) : null;
+        $height = $request->filled('height') ? trim((string) $request->input('height')) : null;
+
+        $filters = [
+            'category' => $categoryId,
+            'country' => $country,
+            'pot' => $pot,
+            'height' => $height,
+        ];
+
+        $applyFilters = function ($q, array $filters, array $skip = []) {
+            if (!in_array('category', $skip, true) && $filters['category']) {
+                $q->where('category_products_id', $filters['category']);
+            }
+
+            if (!in_array('country', $skip, true) && $filters['country']) {
+                $q->whereHas('dbProduct', function ($db) use ($filters) {
+                    $db->where('country', $filters['country']);
+                });
+            }
+
+            if (!in_array('pot', $skip, true) && $filters['pot'] !== null && $filters['pot'] !== '') {
+                $q->where('pot', $filters['pot']);
+            }
+
+            if (!in_array('height', $skip, true) && $filters['height'] !== null && $filters['height'] !== '') {
+                $q->where('height', $filters['height']);
+            }
+        };
+
+        $categoryOptions = (clone $baseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['category']))
+            ->whereNotNull('category_products_id')
+            ->select('category_products_id')
+            ->distinct()
+            ->orderBy('category_products_id')
+            ->pluck('category_products_id')
+            ->map(fn ($value) => (int) $value)
+            ->values()
+            ->all();
+
+        $countryOptions = (clone $baseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['country']))
+            ->join('db_products', 'products.db_products_id', '=', 'db_products.id')
+            ->whereNotNull('db_products.country')
+            ->select('db_products.country')
+            ->distinct()
+            ->orderBy('db_products.country')
+            ->pluck('db_products.country')
+            ->map(fn ($value) => (string) $value)
+            ->values()
+            ->all();
+
+        $potOptions = (clone $baseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['pot']))
+            ->whereNotNull('pot')
+            ->select('pot')
+            ->distinct()
+            ->orderBy('pot')
+            ->pluck('pot')
+            ->map(fn ($value) => (string) $value)
+            ->values()
+            ->all();
+
+        $heightOptions = (clone $baseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['height']))
+            ->whereNotNull('height')
+            ->select('height')
+            ->distinct()
+            ->orderBy('height')
+            ->pluck('height')
+            ->map(fn ($value) => (string) $value)
+            ->values()
+            ->all();
+
+        $query = (clone $baseQuery)->with(['category', 'tags', 'dbProduct']);
+        $applyFilters($query, $filters);
 
         
 
@@ -223,14 +291,16 @@ class ProductController extends Controller
             });
         }
         
-        $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description'])->orderBy('name')->get();
+        $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description', 'country'])->orderBy('name')->get();
         return Inertia::render('products/index', [
             'q' => $search,
             'collection' => Inertia::scroll(fn() => ProductResource::collection($products)),
             'filters' => [
                 'active' => $activeFilter,
                 'category' => $categoryId,
-                'dbProductId' => $dbProductId,
+                'country' => $country,
+                'pot' => $pot,
+                'height' => $height,
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()
@@ -239,6 +309,10 @@ class ProductController extends Controller
                     ->get(['id', 'name', 'parent_id', 'lft', 'rgt'])
             )->resolve(),
             'dbProducts' => $dbProducts,
+            'categoryOptions' => $categoryOptions,
+            'countryOptions' => $countryOptions,
+            'potOptions' => $potOptions,
+            'heightOptions' => $heightOptions,
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
         ]);
 

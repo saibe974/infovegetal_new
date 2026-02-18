@@ -15,6 +15,11 @@ export type CartShippingSummary = {
     total: number;
 };
 
+export type CartTransportContext = {
+    attrsBySupplier: Record<number, DbUserAttributes>;
+    transportBySupplier: Record<number, DbUserTransport>;
+};
+
 const toNumber = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (typeof value === 'string') {
@@ -175,4 +180,61 @@ export const calculateCartShipping = (items: CartItem[]): CartShippingSummary =>
     const total = roundCurrency(Object.values(bySupplier).reduce((sum, cost) => sum + cost, 0));
 
     return { bySupplier, total };
+};
+
+export const buildCartTransportContext = (items: CartItem[]): CartTransportContext => ({
+    attrsBySupplier: extractSupplierAttributes(items),
+    transportBySupplier: extractSupplierTransport(items),
+});
+
+export const getSupplierRollPrices = (
+    supplier: SupplierDistribution,
+    supplierAttributes: DbUserAttributes | null | undefined,
+    supplierTransport: DbUserTransport | null | undefined,
+): number[] | null => {
+    if (supplier.mod_liv !== 'roll' || supplier.rolls.length === 0 || !supplierAttributes) {
+        return null;
+    }
+
+    const priceMode = toNumber(supplierAttributes.p);
+    const rollCount = supplier.rolls.length;
+    const carrierId = toNumber(supplierAttributes.t);
+    const zoneId = toNumber(supplierAttributes.z);
+
+    if (carrierId > 0 && zoneId > 0 && supplierTransport) {
+        const baseTariff = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
+        const taxgoRate = Math.max(0, toNumber(supplierTransport.taxgo));
+        const perRollTariff = rollCount > 0 ? baseTariff / rollCount : 0;
+
+        const rollPrices = supplier.rolls.map((roll) => {
+            if (priceMode === 1) {
+                const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
+                const ratioToPay = 1 - coef / 100;
+                return roundCurrency(perRollTariff * ratioToPay * (1 + taxgoRate / 100));
+            }
+
+            return roundCurrency(perRollTariff * (1 + taxgoRate / 100));
+        });
+
+        return rollPrices;
+    }
+
+    const rollPrice = toNumber(supplierAttributes.l);
+    if (rollPrice <= 0) {
+        return null;
+    }
+
+    if (priceMode === 0) {
+        return supplier.rolls.map(() => roundCurrency(rollPrice));
+    }
+
+    if (priceMode === 1) {
+        return supplier.rolls.map((roll) => {
+            const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
+            const ratioToPay = 1 - coef / 100;
+            return roundCurrency(rollPrice * ratioToPay);
+        });
+    }
+
+    return null;
 };

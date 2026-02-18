@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
-import { calculateCartShipping } from '@/components/cart/cart-shipping';
+import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 
 type Props = Record<string, never>;
 
@@ -66,6 +66,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
     const itemsTotal = items.reduce((sum, { product, quantity }) => sum + getUnitPrice(product) * quantity, 0);
     const shipping = useMemo(() => calculateCartShipping(items), [items]);
+    const transportContext = useMemo(() => buildCartTransportContext(items), [items]);
     const deliveryTotal = shipping.total;
     const orderTotal = itemsTotal + deliveryTotal;
 
@@ -378,6 +379,15 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                             <ProductRoll
                                 items={items}
                                 getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                                getRollPrice={(supplier, roll, rollIndex) => {
+                                    const prices = getSupplierRollPrices(
+                                        supplier,
+                                        transportContext.attrsBySupplier[supplier.supplierId],
+                                        transportContext.transportBySupplier[supplier.supplierId],
+                                    );
+
+                                    return prices ? prices[rollIndex] ?? null : null;
+                                }}
                             />
                         </CardContent>
                     </Card>

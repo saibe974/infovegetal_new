@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, ReactNode, ReactElement, cloneElement, isValidElement } from "react";
+import { useState, useRef, useEffect, ReactNode, ReactElement, cloneElement, isValidElement, type ComponentType } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
 import Heading from "../heading";
+import * as Flags from "country-flag-icons/react/3x2";
 
 interface SearchBarProps {
     value: string;
@@ -20,7 +21,7 @@ interface SearchBarProps {
     filters?: ReactNode,
     search?: boolean,
     selection?: (string | Option)[]
-    filtersActive?: { name: string; label: string }[];
+    filtersActive?: { name: string; label: string; value?: string }[];
     removeFilter?: (filterName: string) => void;
     // Minimum characters required to show propositions (default: 3). Set to 0 to show on focus.
     minQueryLength?: number;
@@ -218,22 +219,39 @@ export default function SearchSelect({
                     </button>
                 )}
 
-                {filtersActive?.map((filter) => (
-                    <span
-                        key={filter.name}
-                        className="flex items-center gap-1 bg-brand-main text-white dark:text-black text-sm px-2 py-0.5 rounded-xl"
-                    >
-                        {filter.label}
-                        <X
-                            size={14}
-                            className="cursor-pointer hover:text-destructive"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                removeFilter?.(filter.name);
-                            }}
-                        />
-                    </span>
-                ))}
+                {filtersActive?.map((filter) => {
+                    const isCountry = filter.name === "country" && typeof filter.value === "string";
+                    const countryCode = filter.name === "country" && typeof filter.value === "string"
+                        ? filter.value.toUpperCase()
+                        : null;
+                    const Flag = countryCode
+                        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
+                        : undefined;
+
+                    return (
+                        <span
+                            key={filter.name}
+                            className="flex items-center gap-1 bg-brand-main text-white dark:text-black text-sm px-2 py-0.5 rounded-xl"
+                        >
+                            {isCountry && Flag ? (
+                                <>
+                                    <Flag title={filter.label} className="w-4" />
+                                    <span className="sr-only">{filter.label}</span>
+                                </>
+                            ) : (
+                                filter.label
+                            )}
+                            <X
+                                size={14}
+                                className="cursor-pointer hover:text-destructive"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeFilter?.(filter.name);
+                                }}
+                            />
+                        </span>
+                    );
+                })}
 
                 {selected.map((opt) => (
                     <span
@@ -313,7 +331,7 @@ export default function SearchSelect({
                 />
 
                 {/* Bouton clear */}
-                {( selected.length > 0 || value) && (
+                {(selected.length > 0 || value) && (
                     <button
                         type="button"
                         onClick={handleClear}

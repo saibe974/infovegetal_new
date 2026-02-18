@@ -1,21 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n";
-import Heading from "../heading";
 import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { SelectWithItems, type SelectOption } from "../ui/select-with-items";
+import { usePage } from "@inertiajs/react";
+import { SharedData } from "@/types";
+import * as Flags from "country-flag-icons/react/3x2";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
-import { dbProduct, type ProductCategory } from "@/types";
+import { type ProductCategory } from "@/types";
 import { CheckIcon, XIcon } from "lucide-react";
 
 type FilterActive = 'all' | 'active' | 'inactive';
 
 type ProductsFiltersProps = {
     categories: ProductCategory[];
-    dbProducts: dbProduct[];
+    categoryOptions: number[];
+    countryOptions: string[];
+    potOptions: string[];
+    heightOptions: string[];
     active: FilterActive;
     categoryId: number | null;
-    dbProductId?: number | null;
-    onApply: (filters: { active: FilterActive; category: number | null; dbProductId: number | null }) => void;
+    country?: string | null;
+    pot?: string | null;
+    height?: string | null;
+    onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
     onFilterAdd?: (filter: { key: string; label: string; value: string }) => void;
     closeFilters?: () => void;
 };
@@ -23,34 +31,52 @@ type ProductsFiltersProps = {
 export function ProductsFilters({
     active,
     categories,
-    dbProducts,
+    categoryOptions,
+    countryOptions,
+    potOptions,
+    heightOptions,
     categoryId,
-    dbProductId,
+    country,
+    pot,
+    height,
     onApply,
     onFilterAdd,
     closeFilters,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
+    const { locale } = usePage<SharedData>().props;
     const [localActive, setLocalActive] = useState<FilterActive>(active);
     const ALL_CATEGORIES = "all";
     const [localCategory, setLocalCategory] = useState<string>(categoryId ? String(categoryId) : ALL_CATEGORIES);
-    const ALL_DB_PRODUCTS = "all";
-    const [localDbProductId, setLocalDbProductId] = useState<string>(dbProductId ? String(dbProductId) : ALL_DB_PRODUCTS);
+    const ALL_COUNTRIES = "all";
+    const [localCountry, setLocalCountry] = useState<string>(country ? String(country) : ALL_COUNTRIES);
+    const ALL_POTS = "all";
+    const [localPot, setLocalPot] = useState<string>(pot ? String(pot) : ALL_POTS);
+    const ALL_HEIGHTS = "all";
+    const [localHeight, setLocalHeight] = useState<string>(height ? String(height) : ALL_HEIGHTS);
 
     useEffect(() => {
         setLocalActive(active);
         setLocalCategory(categoryId ? String(categoryId) : ALL_CATEGORIES);
-        setLocalDbProductId(dbProductId ? String(dbProductId) : ALL_DB_PRODUCTS);
-    }, [active, categoryId, dbProductId]);
+        setLocalCountry(country ? String(country) : ALL_COUNTRIES);
+        setLocalPot(pot ? String(pot) : ALL_POTS);
+        setLocalHeight(height ? String(height) : ALL_HEIGHTS);
+    }, [active, categoryId, country, pot, height]);
 
-    const hasFilters = localActive !== 'all' || localCategory !== ALL_CATEGORIES || localDbProductId !== ALL_DB_PRODUCTS;
+    const hasFilters = localActive !== 'all'
+        || localCategory !== ALL_CATEGORIES
+        || localCountry !== ALL_COUNTRIES
+        || localPot !== ALL_POTS
+        || localHeight !== ALL_HEIGHTS;
 
 
     const apply = () => {
         onApply({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            dbProductId: localDbProductId !== ALL_DB_PRODUCTS ? Number(localDbProductId) : null,
+            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
+            pot: localPot !== ALL_POTS ? localPot : null,
+            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
         });
         closeFilters?.();
     };
@@ -58,8 +84,10 @@ export function ProductsFilters({
     const reset = () => {
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
-        setLocalDbProductId(ALL_DB_PRODUCTS);
-        onApply({ active: 'all', category: null, dbProductId: null });
+        setLocalCountry(ALL_COUNTRIES);
+        setLocalPot(ALL_POTS);
+        setLocalHeight(ALL_HEIGHTS);
+        onApply({ active: 'all', category: null, country: null, pot: null, height: null });
         closeFilters?.();
     };
 
@@ -69,12 +97,111 @@ export function ProductsFilters({
         return `${prefix}${category.name}`;
     };
 
-    const renderDbProductLabel = (dbProduct: { id: number; name: string }) => {
-        return dbProduct.name;
-    }
+    const normalizeCountry = (value?: string | null) => {
+        const trimmed = value?.trim();
+        if (!trimmed) return null;
+        return trimmed.length === 2 ? trimmed.toUpperCase() : trimmed;
+    };
+
+    const getCountryLabel = (value: string) => {
+        const normalized = normalizeCountry(value) ?? value;
+        if (normalized.length === 2 && typeof Intl !== 'undefined' && (Intl as any).DisplayNames) {
+            const displayLocale = typeof locale === 'string' ? locale : 'fr';
+            const displayNames = new Intl.DisplayNames([displayLocale], { type: 'region' });
+            return displayNames.of(normalized) ?? normalized;
+        }
+        return normalized;
+    };
+
+    const countries = Array.from(
+        new Set(
+            (countryOptions || [])
+                .map((value) => normalizeCountry(value))
+                .filter((value): value is string => Boolean(value))
+        )
+    ).sort((a, b) => a.localeCompare(b));
+
+    const countrySelectOptions: SelectOption[] = [
+        { value: ALL_COUNTRIES, label: t('All countries') },
+        ...countries.map((code) => {
+            const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
+            return {
+                value: code,
+                label: getCountryLabel(code),
+                img: Flag ? <Flag title={getCountryLabel(code)} className="w-4 mr-2" /> : undefined,
+            };
+        }),
+    ];
 
     return (
         <div className="w-full space-y-4 text-left ">
+
+
+            <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
+                <Select value={localCategory} onValueChange={setLocalCategory}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={t('All categories')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL_CATEGORIES}>{t('All categories')}</SelectItem>
+                        {(categoryOptions.length > 0
+                            ? categories.filter((category) => categoryOptions.includes(category.id))
+                            : categories
+                        ).map((category) => (
+                            <SelectItem key={category.id} value={String(category.id)}>
+                                {renderCategoryLabel(category)}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
+                <SelectWithItems
+                    name="country"
+                    items={countrySelectOptions}
+                    defaultValue={localCountry}
+                    placeholder={t('All countries')}
+                    onValueChange={setLocalCountry}
+                />
+            </div>
+
+            <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
+                <Select value={localPot} onValueChange={setLocalPot}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={t('All pot diameters')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
+                        {(potOptions || []).map((value) => (
+                            <SelectItem key={value} value={String(value)}>
+                                {value}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
+                <Select value={localHeight} onValueChange={setLocalHeight}>
+                    <SelectTrigger>
+                        <SelectValue placeholder={t('All heights')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
+                        {(heightOptions || []).map((value) => (
+                            <SelectItem key={value} value={String(value)}>
+                                {value}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
             <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Status')}</p>
                 <ToggleGroup
@@ -96,40 +223,6 @@ export function ProductsFilters({
                         <XIcon className="w-4 h-4 text-destructive" /> {t('Inactive')}
                     </ToggleGroupItem>
                 </ToggleGroup>
-            </div>
-
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
-                <Select value={localCategory} onValueChange={setLocalCategory}>
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('All categories')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_CATEGORIES}>{t('All categories')}</SelectItem>
-                        {categories.map((category) => (
-                            <SelectItem key={category.id} value={String(category.id)}>
-                                {renderCategoryLabel(category)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Database Product')}</p>
-                <Select value={localDbProductId} onValueChange={setLocalDbProductId}>
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('All database products')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_DB_PRODUCTS}>{t('All database products')}</SelectItem>
-                        {(dbProducts || []).map((dbProduct) => (
-                            <SelectItem key={dbProduct.id} value={String(dbProduct.id)}>
-                                {renderDbProductLabel(dbProduct)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
             </div>
 
             <div className="flex justify-end gap-2">

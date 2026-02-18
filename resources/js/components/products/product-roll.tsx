@@ -111,6 +111,7 @@ type ProductRollProps = {
     height?: number;
     onDistributionChange?: (distribution: RollDistribution) => void;
     getSupplierPrice?: (supplier: SupplierDistribution) => number | null;
+    getRollPrice?: (supplier: SupplierDistribution, roll: Roll, rollIndex: number) => number | null;
 };
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -669,6 +670,7 @@ export function ProductRoll({
     height = 350,
     onDistributionChange,
     getSupplierPrice,
+    getRollPrice,
 }: ProductRollProps) {
     const distribution = useMemo(() => buildRollDistribution(items), [items]);
 
@@ -725,12 +727,16 @@ export function ProductRoll({
                             This supplier is not configured for roll delivery.
                         </div>
                     ) : (
-                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="flex flex-wrap items-start justify-center gap-6">
                             {supplier.rolls.map((roll, rollIndex) => {
                                 const totalY = roll.etages.reduce((sum, etage) => sum + (etage.y || 0), 0) || roll.etages.length;
                                 const rollWidth = Math.max(160, width);
                                 const rollHeight = Math.max(220, height);
-                                const supplierPrice = getSupplierPrice ? getSupplierPrice(supplier) : null;
+                                const rollPrice = getRollPrice
+                                    ? getRollPrice(supplier, roll, rollIndex)
+                                    : getSupplierPrice
+                                        ? getSupplierPrice(supplier)
+                                        : null;
                                 const rollBg = '';
                                 const rollBorder = 'border-[#ac9c9c]';
                                 return (
@@ -758,7 +764,7 @@ export function ProductRoll({
 
                                             <div className="absolute left-1/2 -translate-x-1/2 -top-[20px] flex items-center gap-2 text-[11px]">
                                                 <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
-                                                    {supplierPrice !== null ? formatCurrency(supplierPrice) : 'devis'}
+                                                    {rollPrice !== null ? formatCurrency(rollPrice) : 'devis'}
                                                 </span>
 
                                             </div>

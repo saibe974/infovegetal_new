@@ -51,8 +51,12 @@ export function CartSidebarHeader() {
             params.set("active", urlParams.get("active")!);
         if (urlParams.get("category"))
             params.set("category", urlParams.get("category")!);
-        if (urlParams.get("dbProductId"))
-            params.set("dbProductId", urlParams.get("dbProductId")!);
+        if (urlParams.get("country"))
+            params.set("country", urlParams.get("country")!);
+        if (urlParams.get("pot"))
+            params.set("pot", urlParams.get("pot")!);
+        if (urlParams.get("height"))
+            params.set("height", urlParams.get("height")!);
 
         params.set("cart", "1");
 
