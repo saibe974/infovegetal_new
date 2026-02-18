@@ -6,6 +6,7 @@ use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\CategoryProductsResource;
 use App\Http\Resources\ProductResource;
 use App\Models\CategoryProducts;
+use App\Models\Carrier;
 use App\Models\Product;
 use App\Services\ProductImportService;
 use App\Services\PriceCalculatorService;
@@ -122,6 +123,7 @@ class ProductController extends Controller
         $products = $query->paginate(24);
         $user = $request->user();
         $dbUserAttributesByDbId = [];
+        $dbUserTransportByDbId = [];
         
         if ($user) {
             $userDbProducts = $user->dbProducts()->get();
@@ -139,12 +141,65 @@ class ProductController extends Controller
                     $dbUserAttributesByDbId[(int) $dbProduct->id] = $decoded;
                 }
             }
+
+            $carrierIds = [];
+            $zoneIds = [];
+            foreach ($dbUserAttributesByDbId as $attrs) {
+                $carrierId = (int) ($attrs['t'] ?? 0);
+                $zoneId = (int) ($attrs['z'] ?? 0);
+
+                if ($carrierId > 0 && $zoneId > 0) {
+                    $carrierIds[] = $carrierId;
+                    $zoneIds[] = $zoneId;
+                }
+            }
+
+            if (!empty($carrierIds) && !empty($zoneIds)) {
+                $carrierIds = array_values(array_unique($carrierIds));
+                $zoneIds = array_values(array_unique($zoneIds));
+
+                $carriers = Carrier::query()
+                    ->whereIn('id', $carrierIds)
+                    ->with([
+                        'zones' => fn ($q) => $q
+                            ->whereIn('id', $zoneIds)
+                            ->select(['id', 'carrier_id', 'name', 'tariffs']),
+                    ])
+                    ->get(['id', 'taxgo']);
+
+                $zoneMap = [];
+                foreach ($carriers as $carrier) {
+                    foreach ($carrier->zones as $zone) {
+                        $zoneMap[$carrier->id . ':' . $zone->id] = [
+                            'carrier_id' => (int) $carrier->id,
+                            'zone_id' => (int) $zone->id,
+                            'zone_name' => (string) ($zone->name ?? ''),
+                            'taxgo' => (float) ($carrier->taxgo ?? 0),
+                            'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
+                        ];
+                    }
+                }
+
+                foreach ($dbUserAttributesByDbId as $dbId => $attrs) {
+                    $carrierId = (int) ($attrs['t'] ?? 0);
+                    $zoneId = (int) ($attrs['z'] ?? 0);
+
+                    if ($carrierId <= 0 || $zoneId <= 0) {
+                        continue;
+                    }
+
+                    $key = $carrierId . ':' . $zoneId;
+                    if (isset($zoneMap[$key])) {
+                        $dbUserTransportByDbId[(int) $dbId] = $zoneMap[$key];
+                    }
+                }
+            }
         }
         
         // Calculer les prix avec marges pour les utilisateurs non-admin
         if ($user && !$user->hasRole('admin')) {
             $priceCalculator = app(PriceCalculatorService::class);
-            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user, $dbUserAttributesByDbId) {
+            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user, $dbUserAttributesByDbId, $dbUserTransportByDbId) {
                 $dbId = $product->db_products_id;
                 if ($dbId) {
                     $prices = $priceCalculator->calculatePrice($product, $user, $dbId);
@@ -153,14 +208,16 @@ class ProductController extends Controller
                     $product->price_roll = $prices[2];
                     $product->price_promo = $prices[3];
                     $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
+                    $product->setAttribute('db_user_transport', $dbUserTransportByDbId[(int) $dbId] ?? null);
                 }
                 return $product;
             });
         } elseif ($user) {
-            $products->getCollection()->transform(function ($product) use ($dbUserAttributesByDbId) {
+            $products->getCollection()->transform(function ($product) use ($dbUserAttributesByDbId, $dbUserTransportByDbId) {
                 $dbId = $product->db_products_id;
                 if ($dbId) {
                     $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
+                    $product->setAttribute('db_user_transport', $dbUserTransportByDbId[(int) $dbId] ?? null);
                 }
                 return $product;
             });

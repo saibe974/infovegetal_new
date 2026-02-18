@@ -25,6 +25,8 @@ type DbProductAttributes = {
     mr: number;         // marge par roll
     tvap: number;       // tva produit
     tvat: number | null;// tva transport
+    t: number | null;   // id transporteur
+    z: number | null;   // id zone transporteur
     p: string;          // -1=auto, 0=prix départ, 1=prix rendu, ou nom de champ prix spécial
 };
 
@@ -40,16 +42,31 @@ const DEFAULT_ATTRIBUTES: DbProductAttributes = {
     mr: 0,
     tvap: 0,
     tvat: null,
+    t: null,
+    z: null,
     p: '-1',
 };
 
+type CarrierOption = {
+    id: number;
+    name: string;
+    country?: string | null;
+    zones?: Array<{
+        id: number;
+        carrier_id: number;
+        name: string;
+    }>;
+};
+
 export default function UserDbPage() {
-    const { auth, user: propsUser, dbProducts, selectedDbId, dbUserAttributes } = usePage<SharedData & {
+    const { auth, user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes } = usePage<SharedData & {
         user: User;
         dbProducts: Array<{ id: number; name: string; description?: string }>;
+        carriers: CarrierOption[];
         selectedDbId?: number[];
         dbUserAttributes?: Record<number, any>
     }>().props as any;
+    const carrierOptions: CarrierOption[] = Array.isArray(carriers) ? carriers : [];
 
     const { t } = useI18n();
     const targetUser: User = propsUser;
@@ -312,6 +329,58 @@ export default function UserDbPage() {
                                                             value={attrs.tvat ?? ''}
                                                             onChange={(e) => updateAttribute(dbId, 'tvat', e.target.value ? parseFloat(e.target.value) : null)}
                                                         />
+                                                    </FormField>
+
+                                                    <FormField label="Transporteur" htmlFor={`t-${dbId}`}>
+                                                        <Select
+                                                            value={attrs.t !== null ? String(attrs.t) : 'none'}
+                                                            onValueChange={(value) => {
+                                                                const carrierId = value === 'none' ? null : Number(value);
+                                                                const selectedCarrier = carrierOptions.find((c) => c.id === carrierId);
+                                                                const selectedZones = selectedCarrier?.zones ?? [];
+
+                                                                updateAttribute(dbId, 't', carrierId);
+                                                                updateAttribute(
+                                                                    dbId,
+                                                                    'z',
+                                                                    carrierId && selectedZones.some((zone) => zone.id === attrs.z)
+                                                                        ? attrs.z
+                                                                        : null,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <SelectTrigger id={`t-${dbId}`}>
+                                                                <SelectValue placeholder="Sélectionner un transporteur" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="none">Aucun</SelectItem>
+                                                                {carrierOptions.map((carrier) => (
+                                                                    <SelectItem key={carrier.id} value={String(carrier.id)}>
+                                                                        {carrier.name}{carrier.country ? ` (${carrier.country})` : ''}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </FormField>
+
+                                                    <FormField label="Zone" htmlFor={`z-${dbId}`}>
+                                                        <Select
+                                                            value={attrs.z !== null ? String(attrs.z) : 'none'}
+                                                            onValueChange={(value) => updateAttribute(dbId, 'z', value === 'none' ? null : Number(value))}
+                                                            disabled={!attrs.t}
+                                                        >
+                                                            <SelectTrigger id={`z-${dbId}`}>
+                                                                <SelectValue placeholder="Sélectionner une zone" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="none">Aucune</SelectItem>
+                                                                {(carrierOptions.find((c) => c.id === attrs.t)?.zones ?? []).map((zone) => (
+                                                                    <SelectItem key={zone.id} value={String(zone.id)}>
+                                                                        {zone.name}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
                                                     </FormField>
                                                 </div>
                                             </div>

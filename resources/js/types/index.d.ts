@@ -95,6 +95,13 @@ export interface Product {
     category?: ProductCategory | null;
     dbProduct?: dbProduct | null;
     db_user_attributes?: Record<string, unknown> | null;
+    db_user_transport?: {
+        carrier_id: number;
+        zone_id: number;
+        zone_name: string;
+        taxgo: number;
+        tariffs: Record<string, number | string | null>;
+    } | null;
     attributes: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;

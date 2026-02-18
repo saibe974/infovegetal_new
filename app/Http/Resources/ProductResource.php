@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Product;
+use App\Models\Carrier;
 use App\Http\Resources\DbProductsResource;
 
 use Illuminate\Http\Request;
@@ -46,6 +47,48 @@ class ProductResource extends JsonResource
         return is_array($decoded) ? $decoded : null;
     }
 
+    protected function resolveDbUserTransport(Request $request, ?array $dbUserAttributes = null): ?array
+    {
+        $preloaded = $this->resource->getAttribute('db_user_transport');
+        if (is_array($preloaded)) {
+            return $preloaded;
+        }
+
+        $attrs = $dbUserAttributes ?? $this->resolveDbUserAttributes($request);
+        if (!$attrs) {
+            return null;
+        }
+
+        $carrierId = (int) ($attrs['t'] ?? 0);
+        $zoneId = (int) ($attrs['z'] ?? 0);
+
+        if ($carrierId <= 0 || $zoneId <= 0) {
+            return null;
+        }
+
+        $carrier = Carrier::query()
+            ->where('id', $carrierId)
+            ->with([
+                'zones' => fn ($q) => $q
+                    ->where('id', $zoneId)
+                    ->select(['id', 'carrier_id', 'name', 'tariffs']),
+            ])
+            ->first(['id', 'taxgo']);
+
+        $zone = $carrier?->zones?->first();
+        if (!$carrier || !$zone) {
+            return null;
+        }
+
+        return [
+            'carrier_id' => (int) $carrier->id,
+            'zone_id' => (int) $zone->id,
+            'zone_name' => (string) ($zone->name ?? ''),
+            'taxgo' => (float) ($carrier->taxgo ?? 0),
+            'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
+        ];
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -53,6 +96,8 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $dbUserAttributes = $this->resolveDbUserAttributes($request);
+
         return [
             'id' => $this->resource->id,
             'sku' => $this->resource->sku,
@@ -64,7 +109,8 @@ class ProductResource extends JsonResource
             'attributes' => $this->attributes,
             'category_products_id' => $this->category_products_id,
             'db_products_id' => $this->db_products_id,
-            'db_user_attributes' => $this->resolveDbUserAttributes($request),
+            'db_user_attributes' => $dbUserAttributes,
+            'db_user_transport' => $this->resolveDbUserTransport($request, $dbUserAttributes),
             'ref' => $this->ref,
             'ean13' => $this->ean13,
             'pot' => $this->pot,

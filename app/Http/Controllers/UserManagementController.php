@@ -476,6 +476,10 @@ class UserManagementController extends Controller
         }
 
         $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
+        $carriers = \App\Models\Carrier::query()
+            ->with(['zones:id,carrier_id,name'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'country']);
 
         // On charge les pivots pour récupérer les attributs
         $userWithPivots = $user->load(['dbProducts' => function ($q) {
@@ -499,6 +503,7 @@ class UserManagementController extends Controller
             'user' => $user->load(['roles', 'permissions']),
             'editingUser' => $user,
             'dbProducts' => $dbProducts,
+            'carriers' => $carriers,
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,
         ]);
