@@ -19,6 +19,7 @@ import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import { ProductsFilters } from '@/components/products/products-filters';
+import ProductDetails from '@/components/products/product-details';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { useCart } from '@/components/cart/use-cart';
 
@@ -303,6 +304,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     //     filtersActive 
     // })
 
+    const uniqueProducts = Array.from(new Map(collection.data.map((p) => [p.id, p])).values());
+    const singleProduct = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
+
     return (
         <>
             <Head title="Products" />
@@ -384,20 +388,22 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         <p className='text-lg'>{t('Aucun produit disponible.')}</p>
                     )}
                 </div>
+            ) : singleProduct ? (
+                <ProductDetails product={singleProduct} showBackLink={false} />
             ) :
                 <InfiniteScroll data="collection" className=''>
                     {viewMode === 'table' ? (
                         <ProductsTable
                             collection={{
                                 ...collection,
-                                data: Array.from(new Map(collection.data.map((p) => [p.id, p])).values()),
+                                data: uniqueProducts,
                             }}
                             canEdit={canEdit}
                             canDelete={canDelete}
                         />
                     ) : (
                         <ProductsCardsList
-                            products={Array.from(new Map(collection.data.map((p) => [p.id, p])).values())}
+                            products={uniqueProducts}
                             canEdit={canEdit}
                             canDelete={canDelete}
                             showStatusBadge={filtersState.active !== 'active'}
@@ -406,7 +412,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 </InfiniteScroll>
             }
 
-            {uniqueCount < collection.meta.total &&
+            {singleProduct === null && uniqueCount < collection.meta.total &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
                     <Loader2Icon size={50} className='animate-spin text-brand-main' />
                 </div>

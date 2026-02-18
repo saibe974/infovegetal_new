@@ -11,6 +11,14 @@ import { useSidebar } from "../ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 
+const formatCurrency = (value: number): string =>
+    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+
+const toNumber = (value: unknown): number | null => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
 type Props = {
     product: Product;
     canEdit?: boolean;
@@ -63,6 +71,11 @@ export function ProductCard({
     };
 
     const isInCart = items.some((item) => item.product.id === product.id);
+
+    const price = toNumber(product.price);
+    const priceFloor = toNumber(product.price_floor);
+    const priceRoll = toNumber(product.price_roll);
+    const pricePromo = toNumber(product.price_promo);
 
     // console.log(product)
 
@@ -199,7 +212,7 @@ export function ProductCard({
 
                 {isAuthenticated && (
                     <CardFooter className="flex flex-col lg:flex-row p-0 gap-2 w-full">
-                        {product?.price && (
+                        {price !== null && (
                             <button
                                 className={cn(
                                     "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
@@ -218,12 +231,12 @@ export function ProductCard({
                                     <span className="w-5 h-5">
                                         <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
                                     </span>
-                                    <span className="font-semibold">{product.price} €</span>
+                                    <span className="font-semibold">{formatCurrency(price)}</span>
                                 </div>
                                 <span className="text-xs font-light">X {String(product.cond)}</span>
                             </button>
                         )}
-                        {product?.price_floor ? (
+                        {priceFloor !== null ? (
                             <button
                                 className={cn(
                                     "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
@@ -242,12 +255,12 @@ export function ProductCard({
                                     <span className="w-5 h-5">
                                         <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
                                     </span>
-                                    <span className="font-semibold">{String(product.price_floor)} €</span>
+                                    <span className="font-semibold">{formatCurrency(priceFloor)}</span>
                                 </div>
                                 <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
                             </button>
                         ) : null}
-                        {product?.price_roll ? (
+                        {priceRoll !== null ? (
                             <button
                                 className={cn(
                                     "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
@@ -271,7 +284,7 @@ export function ProductCard({
                                             product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
                                         )}
                                     >
-                                        {product.price_promo && Number(product.price_promo) > 0 ? String(product.price_promo) : String(product.price_roll)} €
+                                        {pricePromo !== null ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
                                     </span>
                                 </div>
 

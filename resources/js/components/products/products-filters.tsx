@@ -133,76 +133,112 @@ export function ProductsFilters({
         }),
     ];
 
+    const categoryChoices = categoryOptions.length > 0
+        ? categories.filter((category) => categoryOptions.includes(category.id))
+        : categories;
+    const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
+    const singleCountry = countries.length === 1 ? countries[0] : null;
+    const singlePot = potOptions.length === 1 ? potOptions[0] : null;
+    const singleHeight = heightOptions.length === 1 ? heightOptions[0] : null;
+
+    const singleFilters = [
+        singleCategory ? { key: 'category', label: t('Category'), value: renderCategoryLabel(singleCategory) } : null,
+        singleCountry ? { key: 'country', label: t('Country'), value: getCountryLabel(singleCountry) } : null,
+        singlePot ? { key: 'pot', label: t('Pot diameter'), value: String(singlePot) } : null,
+        singleHeight ? { key: 'height', label: t('Height'), value: String(singleHeight) } : null,
+    ].filter((item): item is { key: string; label: string; value: string } => Boolean(item));
+
     return (
         <div className="w-full space-y-4 text-left ">
+            {singleFilters.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    {singleFilters.map((filter) => (
+                        <div key={filter.key} className="flex items-center gap-2">
+                            {filter.key === 'country' && singleCountry ? (
+                                (() => {
+                                    const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[singleCountry];
+                                    return Flag ? <Flag title={filter.value} className="w-4" /> : null;
+                                })()
+                            ) : null}
+                            <span className="font-semibold uppercase tracking-wide">{filter.label}</span>
+                            <span>{filter.value}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
 
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
-                <Select value={localCategory} onValueChange={setLocalCategory}>
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('All categories')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_CATEGORIES}>{t('All categories')}</SelectItem>
-                        {(categoryOptions.length > 0
-                            ? categories.filter((category) => categoryOptions.includes(category.id))
-                            : categories
-                        ).map((category) => (
-                            <SelectItem key={category.id} value={String(category.id)}>
-                                {renderCategoryLabel(category)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            {!singleCategory && (
+                <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
+                    <Select value={localCategory} onValueChange={setLocalCategory}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={t('All categories')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_CATEGORIES}>{t('All categories')}</SelectItem>
+                            {categoryChoices.map((category) => (
+                                <SelectItem key={category.id} value={String(category.id)}>
+                                    {renderCategoryLabel(category)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
 
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
-                <SelectWithItems
-                    name="country"
-                    items={countrySelectOptions}
-                    defaultValue={localCountry}
-                    placeholder={t('All countries')}
-                    onValueChange={setLocalCountry}
-                />
-            </div>
+            {!singleCountry && (
+                <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
+                    <SelectWithItems
+                        name="country"
+                        items={countrySelectOptions}
+                        defaultValue={localCountry}
+                        placeholder={t('All countries')}
+                        onValueChange={setLocalCountry}
+                    />
+                </div>
+            )}
 
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
-                <Select value={localPot} onValueChange={setLocalPot}>
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('All pot diameters')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
-                        {(potOptions || []).map((value) => (
-                            <SelectItem key={value} value={String(value)}>
-                                {value}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            {!singlePot && (
+                <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
+                    <Select value={localPot} onValueChange={setLocalPot}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={t('All pot diameters')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
+                            {(potOptions || []).map((value) => (
+                                <SelectItem key={value} value={String(value)}>
+                                    {value}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
 
-            <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
-                <Select value={localHeight} onValueChange={setLocalHeight}>
-                    <SelectTrigger>
-                        <SelectValue placeholder={t('All heights')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
-                        {(heightOptions || []).map((value) => (
-                            <SelectItem key={value} value={String(value)}>
-                                {value}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            {!singleHeight && (
+                <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
+                    <Select value={localHeight} onValueChange={setLocalHeight}>
+                        <SelectTrigger>
+                            <SelectValue placeholder={t('All heights')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
+                            {(heightOptions || []).map((value) => (
+                                <SelectItem key={value} value={String(value)}>
+                                    {value}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Status')}</p>
                 <ToggleGroup
                     type="single"
@@ -223,7 +259,7 @@ export function ProductsFilters({
                         <XIcon className="w-4 h-4 text-destructive" /> {t('Inactive')}
                     </ToggleGroupItem>
                 </ToggleGroup>
-            </div>
+            </div> */}
 
             <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>

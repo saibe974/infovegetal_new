@@ -11,6 +11,14 @@ import { CartContext } from "../cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
 
+const formatCurrency = (value: number): string =>
+    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+
+const toNumber = (value: unknown): number | null => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
 type Props = {
     collection: PaginatedCollection<Product>;
     canEdit?: boolean;
@@ -70,6 +78,10 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
             <TableBody className="">
                 {collection.data.map((item) => {
                     const isInCart = items.some((cartItem) => cartItem.product.id === item.id);
+                    const price = toNumber(item.price);
+                    const priceFloor = toNumber(item.price_floor);
+                    const priceRoll = toNumber(item.price_roll);
+                    const pricePromo = toNumber(item.price_promo);
                     return (
                         <TableRow
                             key={item.id}
@@ -123,7 +135,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                 <>
                                     <TableCell className="text-end">
                                         <div className="flex gap-1">
-                                            {item?.price && (
+                                            {price !== null && (
                                                 <button
                                                     className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-tertiary hover:bg-brand-tertiary/90 text-white dark:text-black"
                                                     onClick={(e: React.MouseEvent) => {
@@ -139,12 +151,12 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                         </span>
                                                     </div>
                                                     <div className="w-1/2 flex flex-col items-center">
-                                                        <span className="font-semibold">{item.price} €</span>
+                                                        <span className="font-semibold">{formatCurrency(price)}</span>
                                                         <span className="text-xs font-light mr-1">X {Number(item.cond)}</span>
                                                     </div>
                                                 </button>
                                             )}
-                                            {item?.price_floor ? (
+                                            {priceFloor !== null ? (
                                                 <button
                                                     className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-secondary hover:bg-brand-secondary/90 text-white dark:text-black"
                                                     onClick={(e: React.MouseEvent) => {
@@ -160,12 +172,12 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                         </span>
                                                     </div>
                                                     <div className="w-1/2 flex flex-col items-center">
-                                                        <span className="font-semibold">{String(item.price_floor)} €</span>
+                                                        <span className="font-semibold">{formatCurrency(priceFloor)}</span>
                                                         <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor)}</span>
                                                     </div>
                                                 </button>
                                             ) : null}
-                                            {item?.price_roll ? (
+                                            {priceRoll !== null ? (
                                                 <button
                                                     className="w-full text-sm flex items-center border dark:border-accent rounded-md py-1 bg-brand-main hover:bg-brand-main-hover text-white dark:text-black"
                                                     onClick={(e: React.MouseEvent) => {
@@ -181,16 +193,16 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                         </span>
                                                     </div>
                                                     <div className="w-1/2 flex flex-col items-center">
-                                                        {item?.price_promo && Number(item.price_promo) > 0 ? (
+                                                        {pricePromo !== null ? (
                                                             <>
                                                                 {/* <span className="font-thin line-through opacity-75 text-[10px]">{String(item.price_roll)} €</span> */}
-                                                                <span className="font-bold text-red-300 dark:text-red-600">{String(item.price_promo)} €</span>
+                                                                <span className="font-bold text-red-300 dark:text-red-600">{formatCurrency(pricePromo)}</span>
                                                                 <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
                                                             </>
 
                                                         ) : (
                                                             <>
-                                                                <span className="font-semibold">{String(item.price_roll)} €</span>
+                                                                <span className="font-semibold">{formatCurrency(priceRoll)}</span>
                                                                 <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
                                                             </>
                                                         )}
