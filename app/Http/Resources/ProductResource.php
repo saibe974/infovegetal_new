@@ -15,6 +15,37 @@ class ProductResource extends JsonResource
 {
     public static $wrap = null;
 
+    protected function resolveDbUserAttributes(Request $request): ?array
+    {
+        $preloaded = $this->resource->getAttribute('db_user_attributes');
+        if (is_array($preloaded)) {
+            return $preloaded;
+        }
+
+        $user = $request->user();
+        if (!$user) {
+            return null;
+        }
+
+        $dbProductId = (int) ($this->resource->db_products_id ?? 0);
+        if ($dbProductId <= 0) {
+            return null;
+        }
+
+        $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
+        $pivotAttributes = $dbProduct?->pivot?->attributes;
+
+        if (!$pivotAttributes) {
+            return null;
+        }
+
+        $decoded = is_string($pivotAttributes)
+            ? json_decode($pivotAttributes, true)
+            : $pivotAttributes;
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -33,6 +64,7 @@ class ProductResource extends JsonResource
             'attributes' => $this->attributes,
             'category_products_id' => $this->category_products_id,
             'db_products_id' => $this->db_products_id,
+            'db_user_attributes' => $this->resolveDbUserAttributes($request),
             'ref' => $this->ref,
             'ean13' => $this->ean13,
             'pot' => $this->pot,

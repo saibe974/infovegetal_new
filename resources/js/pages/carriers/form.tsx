@@ -9,7 +9,7 @@ import carriers from '@/routes/carriers';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useMemo, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
 
@@ -109,6 +109,8 @@ const getNextRoll = (zones: ZoneDraft[]) => {
     return candidate;
 };
 
+const normalizeDecimal = (value: string) => value.trim().replace(',', '.');
+
 export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
     const { t } = useI18n();
     const isNew = !carrier || !carrier.id;
@@ -122,35 +124,44 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
     });
     const [newRoll, setNewRoll] = useState('');
 
-    const updateZone = (index: number, updates: Partial<ZoneDraft>) => {
-        const next = [...data.zones];
-        next[index] = { ...next[index], ...updates };
-        setData('zones', next);
-    };
+    const updateZone = useCallback((index: number, updates: Partial<ZoneDraft>) => {
+        setData((current) => {
+            const next = [...current.zones];
+            next[index] = { ...next[index], ...updates };
+            return { ...current, zones: next };
+        });
+    }, [setData]);
 
-    const updateTierPrice = (zoneIndex: number, roll: string, price: string) => {
-        const next = [...data.zones];
-        const zone = next[zoneIndex];
-        const tiers = [...zone.tiers];
-        const index = tiers.findIndex((tier) => tier.roll === roll);
-        if (index >= 0) {
-            tiers[index] = { ...tiers[index], price };
-        } else {
-            tiers.push({ roll, price });
-        }
-        next[zoneIndex] = { ...zone, tiers };
-        setData('zones', next);
-    };
+    const updateTierPrice = useCallback((zoneIndex: number, roll: string, price: string) => {
+        setData((current) => {
+            const next = [...current.zones];
+            const zone = next[zoneIndex];
+            const tiers = [...zone.tiers];
+            const index = tiers.findIndex((tier) => tier.roll === roll);
+            if (index >= 0) {
+                tiers[index] = { ...tiers[index], price };
+            } else {
+                tiers.push({ roll, price });
+            }
+            next[zoneIndex] = { ...zone, tiers };
+            return { ...current, zones: next };
+        });
+    }, [setData]);
 
     const addZone = () => {
         setData('zones', [...data.zones, { name: '', mini: '', tiers: [] }]);
     };
 
-    const removeZone = (index: number) => {
-        const next = [...data.zones];
-        next.splice(index, 1);
-        setData('zones', next.length > 0 ? next : [{ name: '', mini: '', tiers: [] }]);
-    };
+    const removeZone = useCallback((index: number) => {
+        setData((current) => {
+            const next = [...current.zones];
+            next.splice(index, 1);
+            return {
+                ...current,
+                zones: next.length > 0 ? next : [{ name: '', mini: '', tiers: [] }],
+            };
+        });
+    }, [setData]);
 
     const addRoll = () => {
         let roll = newRoll.trim();
@@ -173,23 +184,27 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         setNewRoll('');
     };
 
-    const removeRoll = (roll: string) => {
-        const next = data.zones.map((zone) => ({
-            ...zone,
-            tiers: zone.tiers.filter((tier) => tier.roll !== roll),
-        }));
-        setData('zones', next);
-    };
+    const removeRoll = useCallback((roll: string) => {
+        setData((current) => {
+            const next = current.zones.map((zone) => ({
+                ...zone,
+                tiers: zone.tiers.filter((tier) => tier.roll !== roll),
+            }));
+
+            return { ...current, zones: next };
+        });
+    }, [setData]);
 
     const buildPayload = () => {
         const rolls = getUniqueRolls(data.zones);
 
         return {
             ...data,
+            taxgo: normalizeDecimal(data.taxgo),
             zones: data.zones.map((zone) => {
                 const tariffs: Record<string, string | null> = {};
                 if (zone.mini.trim() !== '') {
-                    tariffs.mini = zone.mini.trim();
+                    tariffs.mini = normalizeDecimal(zone.mini);
                 }
 
                 rolls.forEach((roll) => {
@@ -199,7 +214,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                         return;
                     }
 
-                    const price = tier.price.trim();
+                    const price = normalizeDecimal(tier.price);
                     tariffs[`roll:${roll}`] = price === '' ? null : price;
                 });
 
@@ -212,33 +227,67 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         };
     };
 
-    const rolls = useMemo(() => getUniqueRolls(data.zones), [data.zones]);
+    const rollsSignature = useMemo(
+        () =>
+            data.zones
+                .map((zone) =>
+                    zone.tiers
+                        .map((tier) => tier.roll.trim())
+                        .sort()
+                        .join(','),
+                )
+                .join('|'),
+        [data.zones],
+    );
+    const rolls = useMemo(() => getUniqueRolls(data.zones), [rollsSignature]);
     const zoneRows = useMemo<ZoneRow[]>(
         () => data.zones.map((zone, index) => ({ ...zone, __index: index })),
         [data.zones],
     );
 
-    const renameRoll = (columnId: string, nextValue: string) => {
+    const renameRoll = useCallback((columnId: string, nextValue: string) => {
         const oldRoll = columnId.replace(/^roll-/, '');
         const nextRoll = nextValue.trim();
         if (!nextRoll || nextRoll === oldRoll) {
             return;
         }
 
-        const existing = getUniqueRolls(data.zones);
-        if (existing.includes(nextRoll)) {
-            return;
+        setData((current) => {
+            const existing = getUniqueRolls(current.zones);
+            if (existing.includes(nextRoll)) {
+                return current;
+            }
+
+            const next = current.zones.map((zone) => ({
+                ...zone,
+                tiers: zone.tiers.map((tier) =>
+                    tier.roll === oldRoll ? { ...tier, roll: nextRoll } : tier,
+                ),
+            }));
+
+            return { ...current, zones: next };
+        });
+    }, [setData]);
+
+    const getZoneRowId = useCallback((row: ZoneRow) => (row.id ? `id-${row.id}` : `new-${row.__index}`), []);
+
+    const headerControls = useCallback((columnId: string) => {
+        if (!columnId.startsWith('roll-')) {
+            return null;
         }
+        const roll = columnId.replace(/^roll-/, '');
 
-        const next = data.zones.map((zone) => ({
-            ...zone,
-            tiers: zone.tiers.map((tier) =>
-                tier.roll === oldRoll ? { ...tier, roll: nextRoll } : tier,
-            ),
-        }));
+        return {
+            editable: true,
+            deletable: true,
+            value: roll,
+            onChange: (value: string) => renameRoll(columnId, value),
+            onDelete: () => removeRoll(roll),
+        };
+    }, [removeRoll, renameRoll]);
 
-        setData('zones', next);
-    };
+    const zonesHeader = t('Zones');
+    const minimumPriceHeader = t('Minimum price');
 
     const columns = useMemo<ColumnDef<ZoneRow>[]>(() => {
         const rollColumns = rolls.map((roll) => ({
@@ -249,11 +298,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                 const price = zone.tiers.find((tier) => tier.roll === roll)?.price ?? '';
                 return (
                     <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={price}
-                        onChange={(e) => updateTierPrice(zone.__index, roll, e.target.value)}
+                        onChange={(e) =>
+                            updateTierPrice(zone.__index, roll, e.target.value.replace(',', '.'))
+                        }
                     />
                 );
             },
@@ -262,7 +312,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         return [
             {
                 id: 'name',
-                header: t('Zones'),
+                header: zonesHeader,
                 cell: ({ row }: CellContext<ZoneRow, unknown>) => (
                     <Input
                         value={row.original.name}
@@ -272,14 +322,15 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
             },
             {
                 id: 'mini',
-                header: t('Minimum price'),
+                header: minimumPriceHeader,
                 cell: ({ row }: CellContext<ZoneRow, unknown>) => (
                     <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={row.original.mini}
-                        onChange={(e) => updateZone(row.original.__index, { mini: e.target.value })}
+                        onChange={(e) =>
+                            updateZone(row.original.__index, { mini: e.target.value.replace(',', '.') })
+                        }
                     />
                 ),
             },
@@ -299,7 +350,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                 ),
             },
         ];
-    }, [rolls, removeZone, t, updateTierPrice, updateZone]);
+    }, [minimumPriceHeader, rolls, removeZone, updateTierPrice, updateZone, zonesHeader]);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -389,11 +440,10 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                                 <Input
                                     id="taxgo"
                                     name="taxgo"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={data.taxgo}
-                                    onChange={(e) => setData('taxgo', e.target.value)}
+                                    onChange={(e) => setData('taxgo', e.target.value.replace(',', '.'))}
                                     aria-invalid={!!errors.taxgo}
                                 />
                             </FormField>
@@ -425,21 +475,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                             columns={columns}
                             data={zoneRows}
                             emptyMessage={t('No zones yet')}
-                            getRowId={(row) => (row.id ? `id-${row.id}` : `new-${row.__index}`)}
-                            headerControls={(columnId) => {
-                                if (!columnId.startsWith('roll-')) {
-                                    return null;
-                                }
-                                const roll = columnId.replace(/^roll-/, '');
-
-                                return {
-                                    editable: true,
-                                    deletable: true,
-                                    value: roll,
-                                    onChange: (value) => renameRoll(columnId, value),
-                                    onDelete: () => removeRoll(roll),
-                                };
-                            }}
+                            getRowId={getZoneRowId}
+                            headerControls={headerControls}
                         />
                     </Card>
                 </main>

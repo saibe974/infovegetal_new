@@ -121,11 +121,30 @@ class ProductController extends Controller
 
         $products = $query->paginate(24);
         $user = $request->user();
+        $dbUserAttributesByDbId = [];
+        
+        if ($user) {
+            $userDbProducts = $user->dbProducts()->get();
+            foreach ($userDbProducts as $dbProduct) {
+                $pivotAttributes = $dbProduct->pivot?->attributes;
+                if (!$pivotAttributes) {
+                    continue;
+                }
+
+                $decoded = is_string($pivotAttributes)
+                    ? json_decode($pivotAttributes, true)
+                    : $pivotAttributes;
+
+                if (is_array($decoded)) {
+                    $dbUserAttributesByDbId[(int) $dbProduct->id] = $decoded;
+                }
+            }
+        }
         
         // Calculer les prix avec marges pour les utilisateurs non-admin
         if ($user && !$user->hasRole('admin')) {
             $priceCalculator = app(PriceCalculatorService::class);
-            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user) {
+            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user, $dbUserAttributesByDbId) {
                 $dbId = $product->db_products_id;
                 if ($dbId) {
                     $prices = $priceCalculator->calculatePrice($product, $user, $dbId);
@@ -133,6 +152,15 @@ class ProductController extends Controller
                     $product->price_floor = $prices[1];
                     $product->price_roll = $prices[2];
                     $product->price_promo = $prices[3];
+                    $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
+                }
+                return $product;
+            });
+        } elseif ($user) {
+            $products->getCollection()->transform(function ($product) use ($dbUserAttributesByDbId) {
+                $dbId = $product->db_products_id;
+                if ($dbId) {
+                    $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
                 }
                 return $product;
             });

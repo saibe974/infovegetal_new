@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import {
     SidebarContent,
@@ -18,6 +18,7 @@ import { SharedData } from "@/types";
 import { Button } from "../ui/button";
 import HeadingSmall from "../heading-small";
 import { ProductRollMini } from "@/components/products/product-roll-mini";
+import { calculateCartShipping } from "./cart-shipping";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
@@ -36,6 +37,8 @@ export function CartSidebarHeader() {
         const pricing = getCartPricing(item.product, item.quantity);
         return sum + pricing.lineTotal;
     }, 0);
+    const shipping = useMemo(() => calculateCartShipping(items), [items]);
+    const orderTotal = total + shipping.total;
 
     const getFiltersUrl = () => {
         const location =
@@ -262,7 +265,8 @@ export function CartSidebarHeader() {
 
 
                         <div className="flex-shrink-0">
-                            <div className="my-2">Total : {total?.toFixed(2) ?? 0} €</div>
+                            <div className="my-1 text-sm">Transport : {shipping.total.toFixed(2)} €</div>
+                            <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
 
                             {saveMessage && (
                                 <div
@@ -278,7 +282,10 @@ export function CartSidebarHeader() {
 
                         {items.length > 0 && (
                             <div className="mt-4">
-                                <ProductRollMini items={items} />
+                                <ProductRollMini
+                                    items={items}
+                                    getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                                />
                             </div>
                         )}
                     </SidebarHeader>

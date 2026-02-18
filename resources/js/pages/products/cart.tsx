@@ -1,27 +1,21 @@
 import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { type BreadcrumbItem, type Product, SharedData } from '@/types';
+import { type BreadcrumbItem, type Product } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Minus, Plus, SaveIcon, Trash2 } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
+import { calculateCartShipping } from '@/components/cart/cart-shipping';
 
 type Props = Record<string, never>;
 
@@ -31,26 +25,6 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: products.index().url,
     },
 ];
-
-const transportTaxOptions = [
-    { value: 0, label: '0 (0%)', rate: 0 },
-    { value: 1, label: '1 (5%)', rate: 0.05 },
-    { value: 2, label: '2 (10%)', rate: 0.1 },
-    { value: 3, label: '3 (20%)', rate: 0.2 },
-];
-
-const countries = [
-    { value: 'fr', label: 'France' },
-    { value: 'be', label: 'Belgique' },
-    { value: 'nl', label: 'Hollande' },
-];
-
-// Basic shipping multipliers per country; replace with real rates when available.
-const countryShippingMultiplier: Record<string, number> = {
-    fr: 0.02,
-    be: 0.03,
-    nl: 0.035,
-};
 
 const formatCurrency = (value: number) =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -69,12 +43,9 @@ const toText = (value: unknown): string => (value === undefined || value === nul
 export default withAppLayout<Props>(breadcrumbs, false, () => {
     const { t } = useI18n();
     const { items, updateQuantity, removeFromCart, clearCart } = useContext(CartContext);
-    const { auth } = usePage<SharedData>().props;
-    const user = auth?.user;
-    const isAuthenticated = !!user;
 
-    const [country, setCountry] = useState(countries[0].value);
-    const [transportTax, setTransportTax] = useState<number>(transportTaxOptions[0].value);
+    // console.log(user)
+
     const [deliveryDate, setDeliveryDate] = useState('');
 
     const [isSaving, setIsSaving] = useState(false);
@@ -94,10 +65,8 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     };
 
     const itemsTotal = items.reduce((sum, { product, quantity }) => sum + getUnitPrice(product) * quantity, 0);
-
-    const selectedRate = transportTaxOptions.find((option) => option.value === transportTax)?.rate ?? 0;
-    const deliveryBase = itemsTotal * (countryShippingMultiplier[country] ?? 0);
-    const deliveryTotal = deliveryBase * (1 + selectedRate);
+    const shipping = useMemo(() => calculateCartShipping(items), [items]);
+    const deliveryTotal = shipping.total;
     const orderTotal = itemsTotal + deliveryTotal;
 
     const handleQuantityChange = (productId: number, next: number) => {
@@ -406,7 +375,10 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                             <CardTitle>{t('Rolls')}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ProductRoll items={items} />
+                            <ProductRoll
+                                items={items}
+                                getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                            />
                         </CardContent>
                     </Card>
                 </div>
@@ -438,41 +410,6 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">{t('Pays de livraison')}</label>
-                                <Select value={country} onValueChange={(value) => setCountry(value)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t('Sélectionner un pays')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {countries.map((countryOption) => (
-                                            <SelectItem key={countryOption.value} value={countryOption.value}>
-                                                {countryOption.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">{t('Taxe transport')}</label>
-                                <Select
-                                    value={String(transportTax)}
-                                    onValueChange={(value) => setTransportTax(Number(value))}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={t('Sélectionner une taxe')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {transportTaxOptions.map((option) => (
-                                            <SelectItem key={option.value} value={String(option.value)}>
-                                                {option.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
                                 <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
                                 <Input
                                     type="date"
@@ -483,7 +420,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
                             <div className="rounded-lg border p-3 space-y-2">
                                 <div className="flex items-center justify-between text-sm">
-                                    <span>{t('Total livraison TTC')}</span>
+                                    <span>{t('Frais de transport')}</span>
                                     <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-base font-semibold">

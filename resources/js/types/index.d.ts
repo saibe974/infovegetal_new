@@ -94,6 +94,7 @@ export interface Product {
     roll?: number | null;
     category?: ProductCategory | null;
     dbProduct?: dbProduct | null;
+    db_user_attributes?: Record<string, unknown> | null;
     attributes: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
