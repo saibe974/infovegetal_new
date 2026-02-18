@@ -10,6 +10,8 @@ import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Badge } from "../ui/badge";
+import * as Flags from "country-flag-icons/react/3x2";
+import { type ComponentType } from "react";
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -72,17 +74,30 @@ export function ProductCard({
 
     const isInCart = items.some((item) => item.product.id === product.id);
 
+    const buildShowUrl = (id: number) => {
+        if (typeof window === 'undefined') return `/products/${id}`;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('q')) {
+            return `/products/${id}?from=search`;
+        }
+        return `/products/${id}`;
+    };
+
     const price = toNumber(product.price);
     const priceFloor = toNumber(product.price_floor);
     const priceRoll = toNumber(product.price_roll);
     const pricePromo = toNumber(product.price_promo);
+    const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
+    const CountryFlag = countryCode.length === 2
+        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
+        : undefined;
 
     // console.log(product)
 
     return (
         <Link
             key={product.id}
-            href={'/products/' + product.id}
+            href={buildShowUrl(product.id)}
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${name}`}
         >
@@ -93,6 +108,11 @@ export function ProductCard({
                     className,
                 )}
             >
+                {CountryFlag ? (
+                    <span className="absolute top-2 right-2 rounded-md border bg-white/90 px-1.5 py-1 shadow-sm">
+                        <CountryFlag title={countryCode} className="w-4" />
+                    </span>
+                ) : null}
                 {product?.price_promo && Number(product.price_promo) > 0 ? (
                     <div className="absolute top-6 -left-10 w-40">
                         <div className="gap-1 bg-red-600 text-white inline-flex items-center justify-center px-4 py-2 text-sm font-semibold shadow-lg -rotate-45 w-full">

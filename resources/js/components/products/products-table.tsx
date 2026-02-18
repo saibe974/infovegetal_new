@@ -10,6 +10,8 @@ import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
+import * as Flags from "country-flag-icons/react/3x2";
+import { type ComponentType } from "react";
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -31,8 +33,17 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
     const user = auth?.user;
     const isAuthenticated = !!user;
 
+    const buildShowUrl = (id: number) => {
+        if (typeof window === 'undefined') return `/products/${id}`;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('q')) {
+            return `/products/${id}?from=search`;
+        }
+        return `/products/${id}`;
+    };
+
     const goToProductPage = (id: number) => {
-        window.location.href = `/products/${id}`;
+        window.location.href = buildShowUrl(id);
     }
 
     const handleEditClick = (e: React.MouseEvent, id: number) => {
@@ -82,6 +93,10 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     const priceFloor = toNumber(item.price_floor);
                     const priceRoll = toNumber(item.price_roll);
                     const pricePromo = toNumber(item.price_promo);
+                    const countryCode = (item.dbProduct?.country ?? '').trim().toUpperCase();
+                    const CountryFlag = countryCode.length === 2
+                        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
+                        : undefined;
                     return (
                         <TableRow
                             key={item.id}
@@ -96,6 +111,11 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                     <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />
                                 )
                                 }
+                                {CountryFlag ? (
+                                    <span className="absolute right-1 top-1 rounded-md border bg-white/90 px-1.5 py-1 shadow-sm">
+                                        <CountryFlag title={countryCode} className="w-4" />
+                                    </span>
+                                ) : null}
                                 {item?.price_promo && Number(item.price_promo) > 0 ? (
                                     <span className="absolute left-2 top-0 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold">
                                         <BadgeEuro className="w-5 h-5" />

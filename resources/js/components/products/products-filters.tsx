@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -54,6 +54,10 @@ export function ProductsFilters({
     const [localPot, setLocalPot] = useState<string>(pot ? String(pot) : ALL_POTS);
     const ALL_HEIGHTS = "all";
     const [localHeight, setLocalHeight] = useState<string>(height ? String(height) : ALL_HEIGHTS);
+    const didInitRef = useRef(false);
+    const lastAppliedRef = useRef<string>(
+        `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}`
+    );
 
     useEffect(() => {
         setLocalActive(active);
@@ -62,6 +66,27 @@ export function ProductsFilters({
         setLocalPot(pot ? String(pot) : ALL_POTS);
         setLocalHeight(height ? String(height) : ALL_HEIGHTS);
     }, [active, categoryId, country, pot, height]);
+
+    useEffect(() => {
+        if (!didInitRef.current) {
+            didInitRef.current = true;
+            return;
+        }
+
+        const nextKey = `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}`;
+        if (nextKey === lastAppliedRef.current) {
+            return;
+        }
+        lastAppliedRef.current = nextKey;
+
+        onApply({
+            active: localActive,
+            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
+            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
+            pot: localPot !== ALL_POTS ? localPot : null,
+            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+        });
+    }, [localActive, localCategory, localCountry, localPot, localHeight, onApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
