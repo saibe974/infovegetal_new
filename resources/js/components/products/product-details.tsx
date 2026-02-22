@@ -10,6 +10,8 @@ import { Lens } from '@/components/ui/lens';
 import { useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { type Product, SharedData } from '@/types';
+import { resolveImageUrl } from '@/lib/resolve-image-url';
+import { resolveProductPrices } from '@/lib/resolve-product-prices';
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -34,10 +36,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const user = auth?.user;
     const isAuthenticated = !!user;
 
-    const price = toNumber(product.price);
-    const priceFloor = toNumber(product.price_floor);
-    const priceRoll = toNumber(product.price_roll);
-    const pricePromo = toNumber(product.price_promo);
+    const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
 
     const handleAddToCart = () => {
         addToCart(product, quantity);
@@ -85,7 +84,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                     ariaLabel="Zoom Area"
                                 >
                                     <img
-                                        src={product.img_link || '/images/placeholder.png'}
+                                        src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
                                         alt={product.name}
                                         className="h-full w-auto object-contain select-none"
                                         draggable={false}
@@ -93,7 +92,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                 </Lens>
                             ) : (
                                 <img
-                                    src="/placeholder.png"
+                                    src={resolveImageUrl('/placeholder.png')}
                                     alt={product.name}
                                     className="h-full w-auto object-contain select-none"
                                     draggable={false}
@@ -190,7 +189,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                                 <span className="w-5 h-5">
                                                     <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
                                                 </span>
-                                                {pricePromo !== null ? (
+                                                {pricePromo > 0 ? (
                                                     <div className="flex flex-col md:flex-row md:gap-1 items-center">
                                                         <span className="font-semibold line-through opacity-75 text-xs leading-tight">
                                                             {formatCurrency(priceRoll)}

@@ -20,4 +20,13 @@ export default defineConfig({
     esbuild: {
         jsx: 'automatic',
     },
+    server: {
+        host: 'localhost',
+        cors: {
+            origin: 'http://localhost:8000',
+        },
+        hmr: {
+            host: 'localhost',
+        },
+    },
 });

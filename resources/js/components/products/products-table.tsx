@@ -12,14 +12,11 @@ import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ComponentType } from "react";
+import { resolveImageUrl } from "../../lib/resolve-image-url";
+import { resolveProductPrices } from "@/lib/resolve-product-prices";
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
-const toNumber = (value: unknown): number | null => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-};
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -89,10 +86,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
             <TableBody className="">
                 {collection.data.map((item) => {
                     const isInCart = items.some((cartItem) => cartItem.product.id === item.id);
-                    const price = toNumber(item.price);
-                    const priceFloor = toNumber(item.price_floor);
-                    const priceRoll = toNumber(item.price_roll);
-                    const pricePromo = toNumber(item.price_promo);
+                    const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(item);
                     const countryCode = (item.dbProduct?.country ?? '').trim().toUpperCase();
                     const CountryFlag = countryCode.length === 2
                         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
@@ -106,9 +100,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             <TableCell>{String(item.ref)}</TableCell>
                             <TableCell className="relative">
                                 {item.img_link ? (
-                                    <img src={item.img_link} className="w-20 object-cover" alt={item.name} />
+                                    <img src={resolveImageUrl(item.img_link)} className="w-20 object-cover" alt={item.name} />
                                 ) : (
-                                    <img src="/placeholder.png" className="w-20 object-cover" alt="Placeholder" />
+                                    <img src={resolveImageUrl('/placeholder.png')} className="w-20 object-cover" alt="Placeholder" />
                                 )
                                 }
                                 {CountryFlag ? (
@@ -213,10 +207,11 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                         </span>
                                                     </div>
                                                     <div className="w-1/2 flex flex-col items-center">
-                                                        {pricePromo !== null ? (
+                                                        {pricePromo > 0 ? (
                                                             <>
                                                                 {/* <span className="font-thin line-through opacity-75 text-[10px]">{String(item.price_roll)} €</span> */}
-                                                                <span className="font-bold text-red-300 dark:text-red-600">{formatCurrency(pricePromo)}</span>
+                                                                <span className="font-semibold line-through opacity-75 text-[10px]">{formatCurrency(priceRoll)}</span>
+                                                                <span className="font-semibold text-red-300 dark:text-red-600">{formatCurrency(pricePromo)}</span>
                                                                 <span className="text-xs font-light mr-1">X {Number(item.cond) * Number(item.floor) * Number(item.roll)}</span>
                                                             </>
 

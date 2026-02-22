@@ -200,11 +200,27 @@ class PriceCalculatorService
             $result[$k] = $adjustedPrice;
         }
 
-        // Vérifications finales : si un prix est 0, utiliser le suivant
-        if ($result[1] == 0) $result[1] = $result[2];
-        if ($result[0] == 0) $result[0] = $result[1];
-        if ($result[1] == 0) $result[1] = $result[0];
-        if ($result[2] == 0) $result[2] = $result[1];
+        // Garantir 3 prix non nuls (carton, etage, roll)
+        $fallback = 0.0;
+        foreach ([$result[0] ?? 0, $result[1] ?? 0, $result[2] ?? 0, $prices[0] ?? 0, $prices[1] ?? 0, $prices[2] ?? 0] as $candidate) {
+            if ($candidate > 0) {
+                $fallback = (float) $candidate;
+                break;
+            }
+        }
+        if ($fallback <= 0) {
+            $fallback = 0.01;
+        }
+
+        if (($result[0] ?? 0) <= 0) {
+            $result[0] = $fallback;
+        }
+        if (($result[1] ?? 0) <= 0) {
+            $result[1] = $fallback;
+        }
+        if (($result[2] ?? 0) <= 0) {
+            $result[2] = $fallback;
+        }
 
         return $this->roundPrices($result);
     }

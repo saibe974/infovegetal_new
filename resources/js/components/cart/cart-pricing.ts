@@ -1,4 +1,5 @@
 import type { Product } from '@/types';
+import { resolveProductPrices } from '@/lib/resolve-product-prices';
 
 type PricingTier = 'roll' | 'floor' | 'tray' | 'unit';
 
@@ -26,10 +27,11 @@ export const getCartPricing = (product: Product, quantity: number): CartPricing 
     const floorSize = cond > 0 && floor > 0 ? cond * floor : 0;
     const rollSize = cond > 0 && floor > 0 && roll > 0 ? cond * floor * roll : 0;
 
-    const price = toNumber(product.price);
-    const priceFloor = toNumber(product.price_floor);
-    const priceRoll = toNumber(product.price_roll);
-    const pricePromo = toNumber(product.price_promo);
+    const resolved = resolveProductPrices(product);
+    const price = resolved.price;
+    const priceFloor = resolved.price_floor;
+    const priceRoll = resolved.price_roll;
+    const pricePromo = resolved.price_promo;
     const rollPrice = pricePromo > 0 ? pricePromo : priceRoll;
 
     let tier: PricingTier = 'unit';

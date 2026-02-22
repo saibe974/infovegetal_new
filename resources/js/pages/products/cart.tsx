@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { resolveImageUrl } from '@/lib/resolve-image-url';
 import { CartContext } from '@/components/cart/cart.context';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -298,7 +299,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                         <div className="flex items-center gap-4 md:w-1/2">
                                             <div className="h-20 w-20 rounded relative shrink-0">
                                                 <img
-                                                    src={product.img_link || '/images/placeholder.png'}
+                                                    src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
                                                     alt={product.name}
                                                     className="h-full w-full object-cover"
                                                 />

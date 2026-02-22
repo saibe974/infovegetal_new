@@ -22,6 +22,7 @@ import SearchSelect from '@/components/app/search-select';
 import { useState, FormEvent } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
+import { resolveImageUrl } from '@/lib/resolve-image-url';
 // import { StepsField } from '@/components/forms/steps-field';
 // import { useState } from 'react';
 
@@ -329,7 +330,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             <aside className="space-y-4">
                                 <Card className="overflow-hidden">
                                     <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                                        <img src={product.img_link} alt={product.name} className="h-full w-full object-contain" />
+                                        <img src={resolveImageUrl(product.img_link)} alt={product.name} className="h-full w-full object-contain" />
                                     </div>
                                     <div className="p-4 space-y-2">
                                         <div className="flex items-center justify-between">

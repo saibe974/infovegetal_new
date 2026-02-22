@@ -12,14 +12,13 @@ import { cn } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ComponentType } from "react";
+import { resolveImageUrl } from "@/lib/resolve-image-url";
+import { resolveProductPrices } from "@/lib/resolve-product-prices";
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
-const toNumber = (value: unknown): number | null => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-};
+
 
 type Props = {
     product: Product;
@@ -50,7 +49,7 @@ export function ProductCard({
 
     const name = String(product?.name ?? "");
     const description = String(product?.description ?? "");
-    const img = product?.img_link ?? "/placeholder.png";
+    const img = resolveImageUrl(product?.img_link ?? "/placeholder.png");
 
     const handleEdit = (id: number) => {
         if (editProduct) return editProduct(id);
@@ -83,16 +82,13 @@ export function ProductCard({
         return `/products/${id}`;
     };
 
-    const price = toNumber(product.price);
-    const priceFloor = toNumber(product.price_floor);
-    const priceRoll = toNumber(product.price_roll);
-    const pricePromo = toNumber(product.price_promo);
+    const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
     const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
     const CountryFlag = countryCode.length === 2
         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
         : undefined;
 
-    // console.log(product)
+    console.log(product)
 
     return (
         <Link
@@ -304,7 +300,7 @@ export function ProductCard({
                                             product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
                                         )}
                                     >
-                                        {pricePromo !== null ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
+                                        {pricePromo > 0 ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
                                     </span>
                                 </div>
 

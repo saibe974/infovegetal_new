@@ -123,4 +123,24 @@ class Product extends Model implements HasMedia
     {
         return isset($this->attributes['price']) ? $this->attributes['price'] : null;
     }
+
+    public function getPriceRollAttribute($value): ?string
+    {
+        $roll = is_numeric($value) ? (float) $value : 0.0;
+        if ($roll > 0) {
+            return number_format($roll, 2, '.', '');
+        }
+
+        $floor = $this->attributes['price_floor'] ?? null;
+        if (is_numeric($floor) && (float) $floor > 0) {
+            return number_format((float) $floor, 2, '.', '');
+        }
+
+        $price = $this->attributes['price'] ?? null;
+        if (is_numeric($price) && (float) $price > 0) {
+            return number_format((float) $price, 2, '.', '');
+        }
+
+        return $value;
+    }
 }

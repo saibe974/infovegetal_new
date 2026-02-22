@@ -59,7 +59,7 @@ return [
      *
      * This model is only used in Media Library Pro (https://medialibrary.pro)
      */
-    'temporary_upload_model' => Spatie\MediaLibraryPro\Models\TemporaryUpload::class,
+    // 'temporary_upload_model' => Spatie\MediaLibraryPro\Models\TemporaryUpload::class,
 
     /*
      * When enabled, Media Library Pro will only process temporary uploads that were uploaded
@@ -218,7 +218,12 @@ return [
      * This is particularly useful when the url of the image is behind a firewall and
      * need to add additional flags, possibly using curl.
      */
-    'media_downloader' => Spatie\MediaLibrary\Downloaders\DefaultDownloader::class,
+    'media_downloader' => App\Services\MediaTimeoutDownloader::class,
+
+    /*
+     * Timeout (in seconds) for remote downloads via addMediaFromUrl.
+     */
+    'media_downloader_timeout' => env('MEDIA_DOWNLOADER_TIMEOUT', 12),
 
     /*
      * When using the addMediaFromUrl method the SSL is verified by default.

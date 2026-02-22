@@ -10,6 +10,7 @@ use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\CarrierController;
+use App\Http\Controllers\MediaController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -94,9 +95,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Gestion des utilisateurs (admin uniquement)
 Route::middleware(['role:admin'])->group(function () {
-    Route::get('admin/media-manager', function () {
-        return Inertia::render('media/index');
-    })->name('media.index');
+    Route::get('admin/media-manager', [MediaController::class, 'index'])->name('media.index');
+
+    Route::post('admin/media-manager/sync-missing', [MediaController::class, 'syncMissingImages'])
+        ->name('media.sync-missing');
 
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 

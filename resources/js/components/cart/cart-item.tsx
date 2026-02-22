@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { getCartPricing } from './cart-pricing';
+import { resolveImageUrl } from '@/lib/resolve-image-url';
 
 export type CartItemProps = {
     product: Product;
@@ -45,7 +46,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                 {/* Image produit */}
                 <div className="relative shrink-0">
                     <img
-                        src={product.img_link ?? '/placeholder.png'}
+                        src={resolveImageUrl(product.img_link ?? '/placeholder.png')}
                         alt={product.name}
                         className="size-15 object-cover rounded"
                     />
