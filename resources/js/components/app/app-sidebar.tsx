@@ -17,7 +17,7 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon } from 'lucide-react';
+import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
@@ -49,6 +49,7 @@ export function AppSidebar() {
     const canPreview = isDev(user) || hasPermission(user, 'preview');
     const canManageCategories = isAdmin(user) || hasPermission(user, 'manage categories');
     const canManageCarriers = isAdmin(user) || hasPermission(user, 'manage carriers');
+    const canManageMedia = isAdmin(user);
 
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
@@ -122,6 +123,16 @@ export function AppSidebar() {
                 title: t('Database'),
                 href: dbProducts.index().url,
                 icon: ServerIcon,
+            });
+        }
+
+        if (canManageMedia) {
+            //@ts-ignore
+            mainNavItems[1].subItems.push({
+                title: t('Media library'),
+                href: '/admin/media-manager',
+                icon: ImageIcon,
+                target: '_self',
             });
         }
 

@@ -29,6 +29,7 @@ class FormProductRequest extends FormRequest
             'ref' => ['nullable', 'string', 'max:255'],
             'ean13' => ['nullable', 'string', 'max:13'],
             'description' => ['nullable', 'string'],
+            'img_link' => ['nullable', 'string', 'max:2048'],
             'tags' => ['nullable'],
             'pot' => ['nullable', 'numeric', 'min:0'],
             'height' => ['nullable', 'regex:/^\d+(-\d+)?$/', 'max:20'],

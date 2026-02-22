@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Models\CategoryProducts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Product extends Model
+class Product extends Model implements HasMedia
 {
     use HasFactory;
     use Traits\HasSortable;
+    use InteractsWithMedia;
 
     protected $fillable = [
         'sku',
@@ -73,6 +76,23 @@ class Product extends Model
         'updated_at' => 'immutable_datetime',
         'deleted_at' => 'immutable_datetime',
     ];
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images')
+            ->useDisk(config('media-library.disk_name', 'public'))
+            ->singleFile();
+    }
+
+    public function getImgLinkAttribute(): ?string
+    {
+        $mediaUrl = $this->getFirstMediaUrl('images');
+        if ($mediaUrl !== '') {
+            return $mediaUrl;
+        }
+
+        return $this->attributes['img_link'] ?? null;
+    }
 
 
     public function category()

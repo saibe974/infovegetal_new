@@ -94,6 +94,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Gestion des utilisateurs (admin uniquement)
 Route::middleware(['role:admin'])->group(function () {
+    Route::get('admin/media-manager', function () {
+        return Inertia::render('media/index');
+    })->name('media.index');
+
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 
     // Routes statiques d'abord (avant les routes avec {user})

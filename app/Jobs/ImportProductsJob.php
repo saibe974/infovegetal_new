@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Product;
+use App\Services\ProductMediaService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -167,7 +168,7 @@ class ImportProductsJob implements ShouldQueue
                     $price = isset($map['price']) && is_numeric($map['price']) ? (float)$map['price'] : 0;
                     $active = isset($map['active']) ? (int)$map['active'] : 1;
 
-                    Product::updateOrCreate(
+                    $product = Product::updateOrCreate(
                         ['sku' => $sku],
                         [
                             'name' => $name,
@@ -177,6 +178,10 @@ class ImportProductsJob implements ShouldQueue
                             'active' => $active,
                         ]
                     );
+
+                    if ($imgLink) {
+                        app(ProductMediaService::class)->syncFromImgLink($product, $imgLink);
+                    }
 
                     $processed++;
                 } catch (\Throwable $e) {

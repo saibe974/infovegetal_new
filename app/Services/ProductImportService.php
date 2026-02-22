@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Services\ProductMediaService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -346,6 +347,27 @@ class ProductImportService
                             $columnsToUpdate
                         );
                     });
+
+                    $skus = array_values(array_filter(array_map(function ($row) {
+                        return $row['sku'] ?? null;
+                    }, $chunk)));
+
+                    if (!empty($skus)) {
+                        $mediaService = app(ProductMediaService::class);
+                        $products = Product::query()
+                            ->whereIn('sku', $skus)
+                            ->with('media')
+                            ->get();
+
+                        foreach ($products as $product) {
+                            $rawImg = $product->getRawOriginal('img_link');
+                            if (!$rawImg) {
+                                continue;
+                            }
+
+                            $mediaService->syncFromImgLink($product, $rawImg);
+                        }
+                    }
                 }
             }
 

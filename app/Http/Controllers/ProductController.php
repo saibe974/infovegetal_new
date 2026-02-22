@@ -9,6 +9,7 @@ use App\Models\CategoryProducts;
 use App\Models\Carrier;
 use App\Models\Product;
 use App\Services\ProductImportService;
+use App\Services\ProductMediaService;
 use App\Services\PriceCalculatorService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -572,6 +573,10 @@ class ProductController extends Controller
 
         $product = Product::create($data);
         $this->handleFormRequest($product, $request);
+        app(ProductMediaService::class)->syncFromImgLink(
+            $product,
+            $data['img_link'] ?? $product->getRawOriginal('img_link')
+        );
 
         // Log::info("[STORE] Product created with ID: {$product->id}");
 
@@ -616,6 +621,10 @@ class ProductController extends Controller
         
         $product->update($data);
         $this->handleFormRequest($product, $request);
+        app(ProductMediaService::class)->syncFromImgLink(
+            $product,
+            $data['img_link'] ?? $product->getRawOriginal('img_link')
+        );
         
         // Log::info("[UPDATE] Product {$product->id} updated successfully");
         
