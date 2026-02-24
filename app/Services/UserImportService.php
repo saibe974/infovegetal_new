@@ -141,6 +141,7 @@ class UserImportService
                         $name = trim((string) ($mapped['nom'] ?? ''));
                         $mailField = trim((string) ($mapped['mail'] ?? ''));
                         $passwordRaw = trim((string) ($mapped['pass'] ?? ''));
+                        $expediteursRaw = $mapped['expediteurs'] ?? null;
                         
                         // Extraire le premier email de la liste séparée par ;
                         $emails = array_filter(array_map('trim', explode(';', $mailField)));
@@ -155,10 +156,12 @@ class UserImportService
                             default: $roles = 'guest'; break;
                         }
 
+                        $dbProductsSync = $this->buildDbProductsSyncFromExpediteurs($expediteursRaw);
+
                         // Conserver la hiérarchie nested set
                         // Stockage de l'old_id pour mapper les parent_id plus tard
-                        $lft = !empty($mapped['lft']) ? (int)$mapped['lft'] : 0;
-                        $rgt = !empty($mapped['rgt']) ? (int)$mapped['rgt'] : 0;
+                        // $lft = !empty($mapped['lft']) ? (int)$mapped['lft'] : 0;
+                        // $rgt = !empty($mapped['rgt']) ? (int)$mapped['rgt'] : 0;
                         
                     } else {
                         // Import basique standard
@@ -166,8 +169,9 @@ class UserImportService
                         $name = trim((string) ($mapped['name'] ?? ''));
                         $password = trim((string) ($mapped['password'] ?? null));
                         $roles = trim((string) ($mapped['roles'] ?? ''));
-                        $lft = 0;
-                        $rgt = 0;
+                        $dbProductsSync = [];
+                        // $lft = 0;
+                        // $rgt = 0;
                     }
 
                     $currentSnapshot = [
@@ -198,10 +202,11 @@ class UserImportService
                         'name' => $name,
                         'password' => $password,
                         'roles' => $roles,
+                        'db_products_sync' => $dbProductsSync,
                         'email_verified_at' => now(),
-                        '_lft' => $lft,
-                        '_rgt' => $rgt,
-                        'parent_id' => null,  // À corriger après le mapping
+                        // '_lft' => $lft,
+                        // '_rgt' => $rgt,
+                        // 'parent_id' => null,  // À corriger après le mapping
                     ];
 
                     $processed++;
@@ -340,11 +345,12 @@ class UserImportService
                 $name = $row['name'];
                 $password = $row['password'];
                 $rolesStr = $row['roles'];
-                $lft = $row['_lft'] ?? 0;
-                $rgt = $row['_rgt'] ?? 0;
-                $parentId = $row['parent_id'] ?? null;
-                $oldId = $row['old_id'] ?? null;
-                $oldParentId = $row['old_parent_id'] ?? null;
+                $dbProductsSync = $row['db_products_sync'] ?? [];
+                // $lft = $row['_lft'] ?? 0;
+                // $rgt = $row['_rgt'] ?? 0;
+                // $parentId = $row['parent_id'] ?? null;
+                // $oldId = $row['old_id'] ?? null;
+                // $oldParentId = $row['old_parent_id'] ?? null;
 
                 // Préparer le password haché (générer un aléatoire si vide)
                 $hashedPassword = !empty($password) 
@@ -359,11 +365,11 @@ class UserImportService
                         'name' => $name,
                         'password' => $hashedPassword,
                         'email_verified_at' => now(),
-                        '_lft' => $lft,
-                        '_rgt' => $rgt,
-                        'parent_id' => $parentId,
-                        'old_id' => $oldId,
-                        'old_parent_id' => $oldParentId,
+                        // '_lft' => $lft,
+                        // '_rgt' => $rgt,
+                        // 'parent_id' => $parentId,
+                        // 'old_id' => $oldId,
+                        // 'old_parent_id' => $oldParentId,
                     ]
                 );
 
@@ -379,6 +385,10 @@ class UserImportService
                     if (!empty($validRoleNames)) {
                         $user->syncRoles($validRoleNames);
                     }
+                }
+
+                if (!empty($dbProductsSync)) {
+                    $user->dbProducts()->sync($dbProductsSync, false);
                 }
 
             } catch (\Throwable $e) {
@@ -424,6 +434,105 @@ class UserImportService
             $rawJson = json_encode($row);
             fputcsv($handle, [$line, $error, $email, $name, $rawJson], ';');
         }
+    }
+
+    /**
+     * Préparer le sync des db_products depuis la colonne expediteurs (JSON).
+     */
+    private function buildDbProductsSyncFromExpediteurs($raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $sync = [];
+
+        foreach ($decoded as $key => $value) {
+            $sourceId = null;
+            $attributes = [];
+
+            if (is_array($value)) {
+                $attributes = $value;
+                if (is_numeric($key)) {
+                    $sourceId = (int) $key;
+                }
+                if ($sourceId === null && isset($value['id'])) {
+                    $sourceId = (int) $value['id'];
+                }
+                if ($sourceId === null && isset($value['db_product_id'])) {
+                    $sourceId = (int) $value['db_product_id'];
+                }
+                if ($sourceId === null && isset($value['db_id'])) {
+                    $sourceId = (int) $value['db_id'];
+                }
+            } else {
+                if (is_numeric($key)) {
+                    $sourceId = (int) $key;
+                    $attributes = ['value' => $value];
+                }
+            }
+
+            $mappedId = $this->mapLegacyDbProductId($sourceId);
+            if ($mappedId === null) {
+                continue;
+            }
+
+            unset($attributes['id'], $attributes['db_product_id'], $attributes['db_id']);
+
+            if (isset($attributes['c']) && $attributes['c'] === 'x') {
+                $attributes['c'] = 'admin';
+            }
+
+            if (array_key_exists('p', $attributes)) {
+                $pValue = is_numeric($attributes['p']) ? (int) $attributes['p'] : $attributes['p'];
+                if ($pValue === 0) {
+                    $attributes['p'] = 1;
+                } elseif ($pValue === -1) {
+                    $attributes['p'] = 0;
+                }
+            }
+
+            if (isset($sync[$mappedId]['attributes'])) {
+                $existing = json_decode($sync[$mappedId]['attributes'], true);
+                $merged = is_array($existing) ? array_merge($existing, $attributes) : $attributes;
+                $sync[$mappedId]['attributes'] = json_encode($merged);
+            } else {
+                $sync[$mappedId] = ['attributes' => json_encode($attributes)];
+            }
+        }
+
+        return $sync;
+    }
+
+    /**
+     * Mapper les ids legacy d'expediteurs vers db_products.
+     */
+    private function mapLegacyDbProductId($sourceId): ?int
+    {
+        if ($sourceId === null) {
+            return null;
+        }
+
+        $sourceId = (int) $sourceId;
+
+        if ($sourceId === 2) {
+            return 4; // peplant
+        }
+
+        if ($sourceId === 3) {
+            return 5; // ddk
+        }
+
+        if ($sourceId === 12 || $sourceId === 13) {
+            return 3; // eurofleurs
+        }
+
+        return null;
     }
 
     /**

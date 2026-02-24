@@ -17,6 +17,9 @@ class ProductImportService
 {
     public function run(string $id, string $fullPath, string $relativePath, int $limit = 4000): void
     {
+        // Import long: avoid default 30s timeout when downloading media
+        set_time_limit(300);
+
         // Charger l'état pour récupérer le db_products_id
         $state = Cache::get("import:$id", []);
         $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
@@ -36,6 +39,9 @@ class ProductImportService
 
     public function runChunk(string $id, string $relativePath, int $chunkIndex): void
     {
+        // Import long: avoid default 30s timeout when downloading media
+        set_time_limit(300);
+
         try {
             $normalizeKey = function ($value): string {
                 $string = (string) $value;
@@ -348,26 +354,6 @@ class ProductImportService
                         );
                     });
 
-                    $skus = array_values(array_filter(array_map(function ($row) {
-                        return $row['sku'] ?? null;
-                    }, $chunk)));
-
-                    if (!empty($skus)) {
-                        $mediaService = app(ProductMediaService::class);
-                        $products = Product::query()
-                            ->whereIn('sku', $skus)
-                            ->with('media')
-                            ->get();
-
-                        foreach ($products as $product) {
-                            $rawImg = $product->getRawOriginal('img_link');
-                            if (!$rawImg) {
-                                continue;
-                            }
-
-                            $mediaService->syncFromImgLink($product, $rawImg);
-                        }
-                    }
                 }
             }
 

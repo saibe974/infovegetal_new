@@ -88,7 +88,7 @@ export function ProductCard({
         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
         : undefined;
 
-    console.log(product)
+    // console.log(product)
 
     return (
         <Link
