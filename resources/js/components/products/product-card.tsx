@@ -106,7 +106,7 @@ export function ProductCard({
             >
                 {CountryFlag ? (
                     <span className="absolute top-2 right-2 rounded-md border bg-white/90 px-1.5 py-1 shadow-sm">
-                        <CountryFlag title={countryCode} className="w-4" />
+                        <CountryFlag title={countryCode} className="w-5" />
                     </span>
                 ) : null}
                 {product?.price_promo && Number(product.price_promo) > 0 ? (

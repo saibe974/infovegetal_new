@@ -4,7 +4,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BadgeEuro, Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon } from 'lucide-react';
+import { BadgeEuro, Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon, Zap } from 'lucide-react';
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
@@ -67,7 +67,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     <SortableTableHead field='ref'>Ref</SortableTableHead>
                     <TableHead></TableHead>
                     <SortableTableHead field='name'>{t('Name')}</SortableTableHead>
-                    <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead>
+                    {/* <SortableTableHead field='category_products_id'>{t('Category')}</SortableTableHead> */}
                     <TableHead className="flex items-center">
                         <CircleSlash2 className="size-3 mr-1" />{t('Pot')} / <MoveVertical className="size-3" />{t('Height')}
                     </TableHead>
@@ -98,23 +98,24 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             onClick={() => goToProductPage(item.id)}
                         >
                             <TableCell>{String(item.ref)}</TableCell>
-                            <TableCell className="relative">
-                                {item.img_link ? (
-                                    <img src={resolveImageUrl(item.img_link)} className="w-20 object-cover" alt={item.name} />
-                                ) : (
-                                    <img src={resolveImageUrl('/placeholder.png')} className="w-20 object-cover" alt="Placeholder" />
-                                )
-                                }
-                                {CountryFlag ? (
-                                    <span className="absolute right-1 top-1 rounded-md border bg-white/90 px-1.5 py-1 shadow-sm">
-                                        <CountryFlag title={countryCode} className="w-4" />
-                                    </span>
-                                ) : null}
-                                {item?.price_promo && Number(item.price_promo) > 0 ? (
-                                    <span className="absolute left-2 top-0 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold">
-                                        <BadgeEuro className="w-5 h-5" />
-                                    </span>
-                                ) : null}
+                            <TableCell>
+                                <div className="relative w-20">
+                                    {item.img_link ? (
+                                        <img src={resolveImageUrl(item.img_link)} className="w-20 object-cover" alt={item.name} />
+                                    ) : (
+                                        <img src={resolveImageUrl('/placeholder.png')} className="w-20 object-cover" alt="Placeholder" />
+                                    )}
+                                    {CountryFlag ? (
+                                        <span className="absolute right-1 top-1">
+                                            <CountryFlag title={countryCode} className="w-4" />
+                                        </span>
+                                    ) : null}
+                                    {item?.price_promo && Number(item.price_promo) > 0 ? (
+                                        <span className="absolute -left-2 -top-1 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold" title="promo">
+                                            <Zap className="w-5 h-5" />
+                                        </span>
+                                    ) : null}
+                                </div>
                             </TableCell>
                             <TableCell className=''>
                                 <div className="flex flex-col justify-center gap-1">
@@ -126,7 +127,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                     </span>
                                 </div>
                             </TableCell>
-                            <TableCell>{item.category ? item.category.name.charAt(0).toUpperCase() + item.category.name.slice(1) : ''}</TableCell>
+                            {/* <TableCell>{item.category ? item.category.name.charAt(0).toUpperCase() + item.category.name.slice(1) : ''}</TableCell> */}
                             <TableCell>
                                 <div className="space-y-2">
                                     {item?.pot ? (
