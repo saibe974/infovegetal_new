@@ -476,6 +476,10 @@ class UserManagementController extends Controller
         }
 
         $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
+        $eligibleUsers = User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
         $carriers = \App\Models\Carrier::query()
             ->with(['zones:id,carrier_id,name'])
             ->orderBy('name')
@@ -503,6 +507,7 @@ class UserManagementController extends Controller
             'user' => $user->load(['roles', 'permissions']),
             'editingUser' => $user,
             'dbProducts' => $dbProducts,
+            'eligibleUsers' => $eligibleUsers,
             'carriers' => $carriers,
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,

@@ -20,7 +20,7 @@ export default function AppSidebarLayout({
                 <AppSidebar />
 
                 <AppContent variant="sidebar" className="overflow-x-hidden pt-14">
-                    <ImpersonationBanner />
+                    {/* <ImpersonationBanner /> */}
                     <AppSidebarHeader breadcrumbs={breadcrumbs} />
                     {children}
                 </AppContent>

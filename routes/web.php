@@ -46,9 +46,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
             Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');
             Route::post('/generate-pdf', [\App\Http\Controllers\CartController::class, 'generatePdf'])->name('generate-pdf');
+            Route::put('/{cart}/status', [\App\Http\Controllers\CartController::class, 'updateStatus'])->name('update-status');
+            Route::delete('/{cart}', [\App\Http\Controllers\CartController::class, 'destroy'])->name('destroy');
         });
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
+    Route::get('dashboard', function (Request $request) {
+        $user = $request->user();
+        $query = \App\Models\Cart::query()->with(['user', 'products']);
+
+        if (!$user->hasRole('admin')) {
+            $query->where('user_id', $user->id);
+        }
+
+        $carts = $query->latest('updated_at')->get();
+
+        return Inertia::render('dashboard', [
+            'carts' => $carts,
+        ]);
     })->name('dashboard');
 
     // Route d'upload générique (gère POST pour l'envoi, PATCH pour les chunks, DELETE pour revert)

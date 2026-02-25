@@ -28,6 +28,8 @@ type DbProductAttributes = {
     t: number | null;   // id transporteur
     z: number | null;   // id zone transporteur
     p: string;          // -1=auto, 0=prix départ, 1=prix rendu, ou nom de champ prix spécial
+    com: number | null; // id commercial
+    fact: number | null; // id facturant
 };
 
 const DEFAULT_ATTRIBUTES: DbProductAttributes = {
@@ -45,6 +47,8 @@ const DEFAULT_ATTRIBUTES: DbProductAttributes = {
     t: null,
     z: null,
     p: '-1',
+    com: null,
+    fact: null,
 };
 
 type CarrierOption = {
@@ -59,14 +63,25 @@ type CarrierOption = {
 };
 
 export default function UserDbPage() {
-    const { auth, user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes } = usePage<SharedData & {
+    const { auth, user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers } = usePage<SharedData & {
         user: User;
         dbProducts: Array<{ id: number; name: string; description?: string }>;
+        eligibleUsers: Array<{ id: number; name: string; email: string }>;
         carriers: CarrierOption[];
         selectedDbId?: number[];
         dbUserAttributes?: Record<number, any>
     }>().props as any;
     const carrierOptions: CarrierOption[] = Array.isArray(carriers) ? carriers : [];
+    const eligibleUserOptions = useMemo(() => {
+        const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
+        return list.map((user) => ({
+            value: String(user.id),
+            label: `${user.name} (${user.email})`,
+        }));
+    }, [eligibleUsers]);
+    const eligibleUserOptionById = useMemo(() => {
+        return new Map(eligibleUserOptions.map((option) => [Number(option.value), option]));
+    }, [eligibleUserOptions]);
 
     const { t } = useI18n();
     const targetUser: User = propsUser;
@@ -89,6 +104,7 @@ export default function UserDbPage() {
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<number[]>(Array.isArray(selectedDbId) ? selectedDbId : []);
     const [processing, setProcessing] = useState(false);
+    const [contactSearchByDbId, setContactSearchByDbId] = useState<Record<number, { com: string; fact: string }>>({});
 
     // Préparer la sélection initiale pour SearchSelect
     const initialSelection = useMemo(() => {
@@ -125,6 +141,17 @@ export default function UserDbPage() {
                 ...prev[dbId],
                 [key]: value
             }
+        }));
+    };
+
+    const updateContactSearch = (dbId: number, key: 'com' | 'fact', value: string) => {
+        setContactSearchByDbId((prev) => ({
+            ...prev,
+            [dbId]: {
+                com: prev[dbId]?.com ?? '',
+                fact: prev[dbId]?.fact ?? '',
+                [key]: value,
+            },
         }));
     };
 
@@ -172,6 +199,10 @@ export default function UserDbPage() {
                             {selectedIds.map((dbId) => {
                                 const db = (dbProducts as any[]).find((d) => d.id === dbId);
                                 const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
+                                const commercialOption = attrs.com ? eligibleUserOptionById.get(attrs.com) : undefined;
+                                const facturantOption = attrs.fact ? eligibleUserOptionById.get(attrs.fact) : undefined;
+                                const commercialSelection = commercialOption ? [commercialOption] : [];
+                                const facturantSelection = facturantOption ? [facturantOption] : [];
 
                                 return (
                                     <Card key={dbId}>
@@ -182,6 +213,49 @@ export default function UserDbPage() {
                                             )}
                                         </CardHeader>
                                         <CardContent className="space-y-6">
+                                            {/* Section Contacts */}
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <FormField label="Facturant" htmlFor={`fact-${dbId}`}>
+                                                        <SearchSelect
+                                                            value={contactSearchByDbId[dbId]?.fact ?? ''}
+                                                            onChange={(value) => updateContactSearch(dbId, 'fact', value)}
+                                                            onSubmit={(value) => {
+                                                                const tokens = value.trim().split(/\s+/).filter(Boolean);
+                                                                const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
+                                                                const nextId = nextValue ? Number(nextValue) : null;
+                                                                updateAttribute(dbId, 'fact', Number.isFinite(nextId) ? nextId : null);
+                                                                updateContactSearch(dbId, 'fact', '');
+                                                            }}
+                                                            propositions={eligibleUserOptions}
+                                                            selection={facturantSelection}
+                                                            loading={false}
+                                                            minQueryLength={0}
+                                                        />
+                                                    </FormField>
+
+                                                    <FormField label="Commercial" htmlFor={`com-${dbId}`}>
+                                                        <SearchSelect
+                                                            value={contactSearchByDbId[dbId]?.com ?? ''}
+                                                            onChange={(value) => updateContactSearch(dbId, 'com', value)}
+                                                            onSubmit={(value) => {
+                                                                const tokens = value.trim().split(/\s+/).filter(Boolean);
+                                                                const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
+                                                                const nextId = nextValue ? Number(nextValue) : null;
+                                                                updateAttribute(dbId, 'com', Number.isFinite(nextId) ? nextId : null);
+                                                                updateContactSearch(dbId, 'com', '');
+                                                            }}
+                                                            propositions={eligibleUserOptions}
+                                                            selection={commercialSelection}
+                                                            loading={false}
+                                                            minQueryLength={0}
+                                                        />
+                                                    </FormField>
+                                                </div>
+                                            </div>
+
+                                            <Separator />
+
                                             {/* Section Marges */}
                                             <div className="space-y-4">
                                                 <h3 className="text-sm font-semibold">Marges</h3>
@@ -382,8 +456,14 @@ export default function UserDbPage() {
                                                             </SelectContent>
                                                         </Select>
                                                     </FormField>
+
+
                                                 </div>
                                             </div>
+
+                                            <Separator />
+
+
 
                                             {/* Champ caché pour envoyer le JSON au backend */}
                                             <input

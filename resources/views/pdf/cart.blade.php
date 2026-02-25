@@ -98,11 +98,19 @@
             <tr>
                 <td>{{ $item['product']->sku ?? 'N/A' }}</td>
                 <td>{{ $item['product']->name }}</td>
-                <td class="text-right">{{ number_format($item['product']->price, 2, ',', ' ') }} €</td>
+                <td class="text-right">{{ number_format($item['unit_price'], 2, ',', ' ') }} €</td>
                 <td class="text-right">{{ $item['quantity'] }}</td>
-                <td class="text-right">{{ number_format($item['product']->price * $item['quantity'], 2, ',', ' ') }} €</td>
+                <td class="text-right">{{ number_format($item['line_total'], 2, ',', ' ') }} €</td>
             </tr>
             @endforeach
+            <tr>
+                <td colspan="4" class="text-right">Total produits :</td>
+                <td class="text-right">{{ number_format($items_total ?? 0, 2, ',', ' ') }} €</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="text-right">Frais de transport :</td>
+                <td class="text-right">{{ number_format($shipping_total ?? 0, 2, ',', ' ') }} €</td>
+            </tr>
             <tr class="total-row">
                 <td colspan="4" class="text-right">Total général :</td>
                 <td class="text-right">{{ number_format($total, 2, ',', ' ') }} €</td>

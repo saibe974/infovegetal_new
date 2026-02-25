@@ -1,6 +1,6 @@
 import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { type BreadcrumbItem, type Product } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
+import { getCartPricing } from '@/components/cart/cart-pricing';
 
 type Props = Record<string, never>;
 
@@ -29,15 +30,6 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const formatCurrency = (value: number) =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
-const toNumber = (value: unknown): number => {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-        const parsed = parseFloat(value);
-        return Number.isNaN(parsed) ? 0 : parsed;
-    }
-    return 0;
-};
 
 const toText = (value: unknown): string => (value === undefined || value === null ? '' : String(value));
 
@@ -53,22 +45,62 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
 
-    const getUnitPrice = (product: Product) => {
-        const promo = toNumber((product as any).price_promo);
-        const roll = toNumber((product as any).price_roll);
-        const floor = toNumber((product as any).price_floor);
-        const base = toNumber(product.price);
+    const itemsPricing = useMemo(
+        () => items.map(({ product, quantity }) => ({ product, quantity, pricing: getCartPricing(product, quantity) })),
+        [items],
+    );
 
-        if (promo > 0) return promo;
-        if (roll > 0) return roll;
-        if (floor > 0) return floor;
-        return base;
+    const getGroupKey = (product: { db_products_id?: number | null; dbProduct?: { id?: number | null } | null }) =>
+        Number(product.db_products_id ?? product.dbProduct?.id ?? 0);
+
+    const getGroupLabel = (product: { dbProduct?: { name?: string | null } | null; db_products_id?: number | null }) => {
+        if (product.dbProduct?.name) return String(product.dbProduct.name);
+        if (product.db_products_id) return `DB #${product.db_products_id}`;
+        return t('Sans DB');
     };
 
-    const itemsTotal = items.reduce((sum, { product, quantity }) => sum + getUnitPrice(product) * quantity, 0);
-    const shipping = useMemo(() => calculateCartShipping(items), [items]);
-    const transportContext = useMemo(() => buildCartTransportContext(items), [items]);
-    const deliveryTotal = shipping.total;
+    const toFileSlug = (value: string) =>
+        value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '') || 'panier';
+
+    const groupedItems = useMemo(() => {
+        const groups = new Map<number, { id: number; label: string; items: typeof itemsPricing }>();
+
+        itemsPricing.forEach((item) => {
+            const groupId = getGroupKey(item.product);
+            const label = getGroupLabel(item.product);
+            const existing = groups.get(groupId);
+            if (existing) {
+                existing.items.push(item);
+                return;
+            }
+            groups.set(groupId, { id: groupId, label, items: [item] });
+        });
+
+        return Array.from(groups.values()).map((group) => {
+            const cartItems = group.items.map(({ product, quantity }) => ({ product, quantity }));
+            const shippingSummary = calculateCartShipping(cartItems);
+            const transport = buildCartTransportContext(cartItems);
+            const itemsTotal = group.items.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
+            const deliveryTotal = shippingSummary.total;
+            const orderTotal = itemsTotal + deliveryTotal;
+
+            return {
+                ...group,
+                cartItems,
+                itemsTotal,
+                shipping: shippingSummary,
+                transportContext: transport,
+                deliveryTotal,
+                orderTotal,
+            };
+        });
+    }, [itemsPricing]);
+
+    const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
+    const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
     const orderTotal = itemsTotal + deliveryTotal;
 
     const handleQuantityChange = (productId: number, next: number) => {
@@ -141,40 +173,46 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                 ) as HTMLMetaElement
             )?.content;
 
-            const response = await fetch("/cart/generate-pdf", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-Token": csrfToken || "",
-                },
-                body: JSON.stringify({
-                    items: items.map((item) => ({
-                        id: item.product.id,
-                        quantity: item.quantity,
-                    })),
-                }),
-            });
+            for (const group of groupedItems) {
+                const response = await fetch("/cart/generate-pdf", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-Token": csrfToken || "",
+                    },
+                    body: JSON.stringify({
+                        items: group.items.map((item) => ({
+                            id: item.product.id,
+                            quantity: item.quantity,
+                        })),
+                        shipping_total: group.deliveryTotal,
+                        group_label: group.label,
+                        group_key: group.id,
+                    }),
+                });
 
-            if (response.ok) {
-                // Créer un blob à partir de la réponse
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `panier-${new Date().toISOString().split('T')[0]}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-
-                setSaveMessage("PDF généré avec succès");
-                setTimeout(() => setSaveMessage(null), 3000);
-            } else {
-                const data = await response.json();
-                setSaveMessage(
-                    data.message || "Erreur lors de la génération du PDF"
-                );
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    const labelSlug = toFileSlug(group.label);
+                    link.download = `panier-${labelSlug}-${new Date().toISOString().split('T')[0]}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const data = await response.json();
+                    setSaveMessage(
+                        data.message || "Erreur lors de la génération du PDF"
+                    );
+                    return;
+                }
             }
+
+            setSaveMessage("PDFs générés avec succès");
+            setTimeout(() => setSaveMessage(null), 3000);
         } catch (error) {
             console.error("Error generating PDF:", error);
             setSaveMessage("Erreur lors de la génération du PDF");
@@ -271,127 +309,134 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>
-                                {t('Produits')} ({items.length})
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {items.length === 0 && (
+                    {items.length === 0 && (
+                        <Card>
+                            <CardContent className="space-y-4">
                                 <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
                                     <p>{t('Votre panier est vide')}</p>
                                     <Button asChild>
                                         <Link href={products.index().url}>{t('Voir les produits')}</Link>
                                     </Button>
                                 </div>
-                            )}
+                            </CardContent>
+                        </Card>
+                    )}
 
-                            {items.map(({ product, quantity }) => {
-                                const unitPrice = getUnitPrice(product);
-                                const lineTotal = unitPrice * quantity;
+                    {groupedItems.map((group) => (
+                        <div key={group.id} className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>
+                                        {t('Produits')} - {group.label} ({group.items.length})
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {group.items.map(({ product, quantity, pricing }) => {
+                                        const unitPrice = pricing.unitPrice;
+                                        const lineTotal = pricing.lineTotal;
 
-                                return (
-                                    <div
-                                        key={product.id}
-                                        className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
-                                    >
-                                        <div className="flex items-center gap-4 md:w-1/2">
-                                            <div className="h-20 w-20 rounded relative shrink-0">
-                                                <img
-                                                    src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
-                                                    alt={product.name}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                                <Badge
-                                                    // variant={''}
-                                                    className={cn(
-                                                        "absolute -top-1 -right-1 text-xs rounded-full",
-                                                        quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
-                                                    )}
-                                                >
-                                                    {quantity}
-                                                </Badge>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
-                                                {toText((product as any).ref) ? (
-                                                    <p className="text-xs text-muted-foreground">Ref: {toText((product as any).ref)}</p>
-                                                ) : null}
-                                                <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
-                                                <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
-                                            <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    aria-label={t('Diminuer la quantité')}
-                                                    onClick={() => handleQuantityChange(product.id, quantity - 1)}
-                                                    disabled={quantity <= 1}
-                                                >
-                                                    <Minus className="h-4 w-4" />
-                                                </Button>
-                                                <Input
-                                                    type="text"
-                                                    min={1}
-                                                    value={quantity}
-                                                    onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
-                                                    className="w-16 h-8 text-center border-0"
-                                                />
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    aria-label={t('Augmenter la quantité')}
-                                                    onClick={() => handleQuantityChange(product.id, quantity + 1)}
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-
-                                            <div className="text-right">
-                                                <p className="text-xs text-muted-foreground">{t('Total ligne')}</p>
-                                                <p className="text-lg font-semibold">{formatCurrency(lineTotal)}</p>
-                                            </div>
-
-                                            <Button
-                                                variant="ghost"
-                                                className="text-destructive"
-                                                onClick={() => removeFromCart(product.id)}
+                                        return (
+                                            <div
+                                                key={product.id}
+                                                className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
                                             >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </CardContent>
-                    </Card>
+                                                <div className="flex items-center gap-4 md:w-1/2">
+                                                    <div className="h-20 w-20 rounded relative shrink-0">
+                                                        <img
+                                                            src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
+                                                            alt={product.name}
+                                                            className="h-full w-full object-cover"
+                                                        />
+                                                        <Badge
+                                                            className={cn(
+                                                                "absolute -top-1 -right-1 text-xs rounded-full",
+                                                                quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                            )}
+                                                        >
+                                                            {quantity}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
+                                                        {toText((product as any).ref) ? (
+                                                            <p className="text-xs text-muted-foreground">Ref: {toText((product as any).ref)}</p>
+                                                        ) : null}
+                                                        <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
+                                                        <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>
+                                                    </div>
+                                                </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('Rolls')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ProductRoll
-                                items={items}
-                                getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
-                                getRollPrice={(supplier, roll, rollIndex) => {
-                                    const prices = getSupplierRollPrices(
-                                        supplier,
-                                        transportContext.attrsBySupplier[supplier.supplierId],
-                                        transportContext.transportBySupplier[supplier.supplierId],
-                                    );
+                                                <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
+                                                    <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            aria-label={t('Diminuer la quantité')}
+                                                            onClick={() => handleQuantityChange(product.id, quantity - 1)}
+                                                            disabled={quantity <= 1}
+                                                        >
+                                                            <Minus className="h-4 w-4" />
+                                                        </Button>
+                                                        <Input
+                                                            type="text"
+                                                            min={1}
+                                                            value={quantity}
+                                                            onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
+                                                            className="w-16 h-8 text-center border-0"
+                                                        />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                            aria-label={t('Augmenter la quantité')}
+                                                            onClick={() => handleQuantityChange(product.id, quantity + 1)}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
 
-                                    return prices ? prices[rollIndex] ?? null : null;
-                                }}
-                            />
-                        </CardContent>
-                    </Card>
+                                                    <div className="text-right">
+                                                        <p className="text-xs text-muted-foreground">{t('Total ligne')}</p>
+                                                        <p className="text-lg font-semibold">{formatCurrency(lineTotal)}</p>
+                                                    </div>
+
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="text-destructive"
+                                                        onClick={() => removeFromCart(product.id)}
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{t('Rolls')}</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ProductRoll
+                                        items={group.cartItems}
+                                        getSupplierPrice={(supplier) => group.shipping.bySupplier[supplier.supplierId] ?? 0}
+                                        getRollPrice={(supplier, roll, rollIndex) => {
+                                            const prices = getSupplierRollPrices(
+                                                supplier,
+                                                group.transportContext.attrsBySupplier[supplier.supplierId],
+                                                group.transportContext.transportBySupplier[supplier.supplierId],
+                                            );
+
+                                            return prices ? prices[rollIndex] ?? null : null;
+                                        }}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    ))}
                 </div>
 
                 <BasicSticky
@@ -415,9 +460,24 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                             )}
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between text-sm">
-                                <span>{t('Total produits')}</span>
-                                <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
+                            <div className="space-y-3">
+                                {groupedItems.map((group) => (
+                                    <div key={group.id} className="rounded-md border px-3 py-2">
+                                        <div className="text-xs text-muted-foreground">{group.label}</div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span>{t('Total produits')}</span>
+                                            <span className="font-semibold">{formatCurrency(group.itemsTotal)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span>{t('Frais de transport')}</span>
+                                            <span className="font-semibold">{formatCurrency(group.deliveryTotal)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm font-semibold">
+                                            <span>{t('Total')}</span>
+                                            <span>{formatCurrency(group.orderTotal)}</span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
 
                             <div className="space-y-2">
@@ -430,6 +490,10 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                             </div>
 
                             <div className="rounded-lg border p-3 space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span>{t('Total produits')}</span>
+                                    <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
+                                </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <span>{t('Frais de transport')}</span>
                                     <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
