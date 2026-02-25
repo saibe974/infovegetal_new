@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useState } from "react";
-import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -269,7 +269,7 @@ export function CartSidebarHeader() {
 
 
                         <div className="flex-shrink-0">
-                            <div className="my-1 text-sm">Transport : {shipping.total.toFixed(2)} €</div>
+                            <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
                             <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
 
                             {saveMessage && (
