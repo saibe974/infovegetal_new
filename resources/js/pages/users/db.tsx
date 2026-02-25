@@ -176,17 +176,26 @@ export default function UserDbPage() {
                                 return (
                                     <Card key={dbId}>
                                         <CardHeader>
-                                            <CardTitle>{db ? db.name : `DB #${dbId}`}</CardTitle>
+                                            <CardTitle className='text-lg'>{db ? db.name : `DB #${dbId}`}</CardTitle>
                                             {db?.description && (
                                                 <CardDescription>{db.description}</CardDescription>
                                             )}
                                         </CardHeader>
                                         <CardContent className="space-y-6">
                                             {/* Section Marges */}
-                                            <div className="space-y-4">
-                                                <h3 className="text-sm font-semibold">Marges</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <FormField label="Marge générale (%)" htmlFor={`m-${dbId}`}>
+                                            <div className="space-y-6 ">
+                                                <h3 className="text-md font-semibold">{t('Margin')}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <FormField label={t('Margin category')} htmlFor={`c-${dbId}`}>
+                                                        <Input
+                                                            id={`c-${dbId}`}
+                                                            type="text"
+                                                            value={attrs.c}
+                                                            onChange={(e) => updateAttribute(dbId, 'c', e.target.value)}
+                                                        />
+                                                    </FormField>
+
+                                                    <FormField label={t('General margin (%)')} htmlFor={`m-${dbId}`}>
                                                         <Input
                                                             id={`m-${dbId}`}
                                                             type="number"
@@ -196,7 +205,7 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label="Marge min par roll (€)" htmlFor={`mm-${dbId}`}>
+                                                    <FormField label={t('Minimum margin per roll (€)')} htmlFor={`mm-${dbId}`}>
                                                         <Input
                                                             id={`mm-${dbId}`}
                                                             type="number"
@@ -206,7 +215,9 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label="Marge par carton (%)" htmlFor={`mc-${dbId}`}>
+                                                    {/* </div> */}
+                                                    {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
+                                                    <FormField label={t('Margin per carton (%)')} htmlFor={`mc-${dbId}`}>
                                                         <Input
                                                             id={`mc-${dbId}`}
                                                             type="number"
@@ -216,7 +227,7 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label="Marge par étage (%)" htmlFor={`me-${dbId}`}>
+                                                    <FormField label={t('Margin per level (%)')} htmlFor={`me-${dbId}`}>
                                                         <Input
                                                             id={`me-${dbId}`}
                                                             type="number"
@@ -226,7 +237,7 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label="Marge par roll (%)" htmlFor={`mr-${dbId}`}>
+                                                    <FormField label={t('Margin per roll (%)')} htmlFor={`mr-${dbId}`}>
                                                         <Input
                                                             id={`mr-${dbId}`}
                                                             type="number"
@@ -236,15 +247,16 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
                                                 </div>
+
                                             </div>
 
                                             <Separator />
 
                                             {/* Section Prix et Pondération */}
-                                            <div className="space-y-4">
-                                                <h3 className="text-sm font-semibold">Prix et Pondération</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <FormField label="Mode de prix" htmlFor={`p-${dbId}`}>
+                                            <div className="space-y-6">
+                                                <h3 className="text-md font-semibold">{t('Price and Weighting')}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <FormField label={t('Price mode')} htmlFor={`p-${dbId}`}>
                                                         <Select
                                                             value={attrs.p}
                                                             onValueChange={(value) => updateAttribute(dbId, 'p', value)}
@@ -253,18 +265,18 @@ export default function UserDbPage() {
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="-1">Auto (hérite du parent)</SelectItem>
-                                                                <SelectItem value="0">Prix départ</SelectItem>
-                                                                <SelectItem value="1">Prix rendu</SelectItem>
-                                                                <SelectItem value="price">Prix de base</SelectItem>
-                                                                <SelectItem value="price_floor">Prix étage</SelectItem>
-                                                                <SelectItem value="price_roll">Prix roll</SelectItem>
-                                                                <SelectItem value="price_promo">Prix promo</SelectItem>
+                                                                <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
+                                                                <SelectItem value="0">{t('Departure price')}</SelectItem>
+                                                                <SelectItem value="1">{t('Rendered price')}</SelectItem>
+                                                                <SelectItem value="price">{t('Base price')}</SelectItem>
+                                                                <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
+                                                                <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
+                                                                <SelectItem value="price_promo">{t('Promo price')}</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </FormField>
 
-                                                    <FormField label="Coefficient de pondération (%)" htmlFor={`pd-${dbId}`}>
+                                                    <FormField label={t('Weighting coefficient (%)')} htmlFor={`pd-${dbId}`}>
                                                         <Input
                                                             id={`pd-${dbId}`}
                                                             type="number"
@@ -274,16 +286,7 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label="Catégorie de marges" htmlFor={`c-${dbId}`}>
-                                                        <Input
-                                                            id={`c-${dbId}`}
-                                                            type="text"
-                                                            value={attrs.c}
-                                                            onChange={(e) => updateAttribute(dbId, 'c', e.target.value)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label="Hausse sur roll" htmlFor={`h-${dbId}`}>
+                                                    <FormField label={t('Increase on roll')} htmlFor={`h-${dbId}`}>
                                                         <Input
                                                             id={`h-${dbId}`}
                                                             type="number"
@@ -298,40 +301,11 @@ export default function UserDbPage() {
                                             <Separator />
 
                                             {/* Section Livraison et TVA */}
-                                            <div className="space-y-4">
-                                                <h3 className="text-sm font-semibold">Livraison et TVA</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <FormField label="Livraison (€)" htmlFor={`l-${dbId}`}>
-                                                        <Input
-                                                            id={`l-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.l}
-                                                            onChange={(e) => updateAttribute(dbId, 'l', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
+                                            <div className="space-y-6">
+                                                <h3 className="text-md font-semibold">{t('Delivery and VAT')}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                                                    <FormField label="TVA produit (%)" htmlFor={`tvap-${dbId}`}>
-                                                        <Input
-                                                            id={`tvap-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.tvap}
-                                                            onChange={(e) => updateAttribute(dbId, 'tvap', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label="TVA transport (%)" htmlFor={`tvat-${dbId}`}>
-                                                        <Input
-                                                            id={`tvat-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.tvat ?? ''}
-                                                            onChange={(e) => updateAttribute(dbId, 'tvat', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label="Transporteur" htmlFor={`t-${dbId}`}>
+                                                    <FormField label={t('Carrier')} htmlFor={`t-${dbId}`}>
                                                         <Select
                                                             value={attrs.t !== null ? String(attrs.t) : 'none'}
                                                             onValueChange={(value) => {
@@ -353,7 +327,7 @@ export default function UserDbPage() {
                                                                 <SelectValue placeholder="Sélectionner un transporteur" />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="none">Aucun</SelectItem>
+                                                                <SelectItem value="none">{t('None')}</SelectItem>
                                                                 {carrierOptions.map((carrier) => (
                                                                     <SelectItem key={carrier.id} value={String(carrier.id)}>
                                                                         {carrier.name}{carrier.country ? ` (${carrier.country})` : ''}
@@ -363,17 +337,17 @@ export default function UserDbPage() {
                                                         </Select>
                                                     </FormField>
 
-                                                    <FormField label="Zone" htmlFor={`z-${dbId}`}>
+                                                    <FormField label={t('Zone')} htmlFor={`z-${dbId}`}>
                                                         <Select
                                                             value={attrs.z !== null ? String(attrs.z) : 'none'}
                                                             onValueChange={(value) => updateAttribute(dbId, 'z', value === 'none' ? null : Number(value))}
                                                             disabled={!attrs.t}
                                                         >
                                                             <SelectTrigger id={`z-${dbId}`}>
-                                                                <SelectValue placeholder="Sélectionner une zone" />
+                                                                <SelectValue placeholder={t('Select a zone')} />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="none">Aucune</SelectItem>
+                                                                <SelectItem value="none">{t('None')}</SelectItem>
                                                                 {(carrierOptions.find((c) => c.id === attrs.t)?.zones ?? []).map((zone) => (
                                                                     <SelectItem key={zone.id} value={String(zone.id)}>
                                                                         {zone.name}
@@ -381,6 +355,36 @@ export default function UserDbPage() {
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
+                                                    </FormField>
+
+                                                    <FormField label={t('Delivery (€)')} htmlFor={`l-${dbId}`}>
+                                                        <Input
+                                                            id={`l-${dbId}`}
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={attrs.l}
+                                                            onChange={(e) => updateAttribute(dbId, 'l', parseFloat(e.target.value) || 0)}
+                                                        />
+                                                    </FormField>
+
+                                                    <FormField label={t('Product VAT (%)')} htmlFor={`tvap-${dbId}`}>
+                                                        <Input
+                                                            id={`tvap-${dbId}`}
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={attrs.tvap}
+                                                            onChange={(e) => updateAttribute(dbId, 'tvap', parseFloat(e.target.value) || 0)}
+                                                        />
+                                                    </FormField>
+
+                                                    <FormField label={t('Transport VAT (%)')} htmlFor={`tvat-${dbId}`}>
+                                                        <Input
+                                                            id={`tvat-${dbId}`}
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={attrs.tvat ?? ''}
+                                                            onChange={(e) => updateAttribute(dbId, 'tvat', e.target.value ? parseFloat(e.target.value) : null)}
+                                                        />
                                                     </FormField>
                                                 </div>
                                             </div>
