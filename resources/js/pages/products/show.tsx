@@ -20,5 +20,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const params = new URLSearchParams(url.split('?')[1] ?? '');
     const showBackLink = params.get('from') === 'search';
 
-    return <ProductDetails product={product} showBackLink={showBackLink} />;
+    return (
+        <>
+            <ProductDetails product={product} showBackLink={true} />
+        </>
+    );
 });

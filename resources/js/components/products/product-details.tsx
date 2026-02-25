@@ -105,6 +105,11 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                         <CardHeader>
                             <CardTitle>
                                 <h2 className="capitalize text-xl">{product.name}</h2>
+                                {product.ref && (
+                                    <p className="text-sm text-muted-foreground mt-1 font-mono">
+                                        Ref: {String(product.ref)}
+                                    </p>
+                                )}
                                 {product.category && (
                                     <p className="text-sm text-muted-foreground mt-1 capitalize">
                                         {product.category.name}
@@ -112,14 +117,62 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                 )}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6 w-full">
+                        <CardContent className="space-y-4 w-full flex flex-col h-full">
                             <p className="capitalize">
                                 {product.description || t('Aucune description disponible')}
                             </p>
+
+                            <div className="space-y-4">
+                                {product.tags && product.tags.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold mb-2">{t('Tags')}</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {product.tags.map((tag) => (
+                                                <Badge key={tag.id} variant="secondary" className="text-xs px-2 py-0.5">
+                                                    {tag.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* <div> */}
+                                {/* <h3 className="text-sm font-semibold mb-2">{t('Product Characteristics')}</h3> */}
+                                <div className="space-y-2">
+                                    {product.pot ? (
+                                        <div className="flex items-center gap-2">
+                                            <CircleSlash2 className="size-4 text-main-purple dark:text-main-green" />
+                                            <div className="text-sm">
+                                                <span className="text-muted-foreground">{t('Diameter of the pot')}:</span>{' '}
+                                                <span className="font-semibold">{String(product.pot)} cm</span>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                    {product.height ? (
+                                        <div className="flex items-center gap-2">
+                                            <MoveVertical className="size-4 text-main-purple dark:text-main-green" />
+                                            <div className="text-sm">
+                                                <span className="text-muted-foreground">{t('Height')}:</span>{' '}
+                                                <span className="font-semibold">{String(product.height)} cm</span>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </div>
+                                {/* </div> */}
+
+                                {product.ean13 && (
+                                    <div className='flex items-baseline gap-2'>
+                                        <h3 className="text-sm font-semibold mb-2">{t('EAN13 Code')} :</h3>
+                                        <div className="text-sm text-muted-foreground font-mono">
+                                            {String(product.ean13)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
 
                         {isAuthenticated && (
-                            <CardFooter className="w-full flex flex-col gap-3 pt-6 mt-auto">
+                            <CardFooter className="w-full flex flex-col gap-3 pt-4 mt-auto">
                                 <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
 
                                 <div className="flex flex-row gap-2 w-full">
@@ -208,93 +261,6 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                 </div>
                             </CardFooter>
                         )}
-                    </Card>
-                </div>
-
-                <div className="space-y-6 w-full max-w-[1200px] md:mx-auto">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('Product Information')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid md:grid-cols-2 gap-6">
-                                <div className="space-y-6">
-                                    {product.tags && product.tags.length > 0 && (
-                                        <div>
-                                            <h3 className="text-sm font-semibold mb-3">{t('Tags')}</h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {product.tags.map((tag) => (
-                                                    <Badge key={tag.id} variant="secondary" className="text-sm px-3 py-1">
-                                                        {tag.name}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div>
-                                        <h3 className="text-sm font-semibold mb-3">{t('Product Characteristics')}</h3>
-                                        <div className="space-y-3">
-                                            {product.pot ? (
-                                                <div className="flex items-center gap-2">
-                                                    <CircleSlash2 className="size-5 text-main-purple dark:text-main-green mt-0.5" />
-                                                    <div>
-                                                        <div className="text-xs font-medium text-muted-foreground">{t('Diameter of the pot')}</div>
-                                                        <div className="text-base font-semibold">{String(product.pot)} cm</div>
-                                                    </div>
-                                                </div>
-                                            ) : null}
-                                            {product.height ? (
-                                                <div className="flex items-center gap-2">
-                                                    <MoveVertical className="size-5 text-main-purple dark:text-main-green mt-0.5" />
-                                                    <div>
-                                                        <div className="text-xs font-medium text-muted-foreground">{t('Height')}</div>
-                                                        <div className="text-base font-semibold">{String(product.height)} cm</div>
-                                                    </div>
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h3 className="text-sm font-semibold mb-3">{t('References')}</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <div className="text-xs font-medium text-muted-foreground mb-1">SKU</div>
-                                            <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
-                                                {String(product.sku) || 'N/A'}
-                                            </div>
-                                        </div>
-
-                                        {product.ref ? (
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('RReference')}</div>
-                                                <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
-                                                    {String(product.ref)}
-                                                </div>
-                                            </div>
-                                        ) : null}
-
-                                        {product.ean13 ? (
-                                            <div>
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">{t('EAN13 Code')}</div>
-                                                <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
-                                                    {String(product.ean13)}
-                                                </div>
-                                            </div>
-                                        ) : null}
-
-                                        <div>
-                                            <div className="text-xs font-medium text-muted-foreground mb-1">{t('Product ID')}</div>
-                                            <div className="text-sm font-mono bg-muted px-3 py-2 rounded">
-                                                #{product.id}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
                     </Card>
                 </div>
             </div>
