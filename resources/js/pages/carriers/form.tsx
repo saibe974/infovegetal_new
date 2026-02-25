@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { StickyBar } from '@/components/ui/sticky-bar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { withAppLayout } from '@/layouts/app-layout';
 import carriers from '@/routes/carriers';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
@@ -111,18 +113,47 @@ const getNextRoll = (zones: ZoneDraft[]) => {
 
 const normalizeDecimal = (value: string) => value.trim().replace(',', '.');
 
+const WEEKDAYS = [
+    { value: '1', label: 'Lundi' },
+    { value: '2', label: 'Mardi' },
+    { value: '3', label: 'Mercredi' },
+    { value: '4', label: 'Jeudi' },
+    { value: '5', label: 'Vendredi' },
+    { value: '6', label: 'Samedi' },
+    { value: '7', label: 'Dimanche' },
+];
+
+const parseDays = (days: string | number | null | undefined): string[] => {
+    if (!days) return [];
+    const str = String(days);
+    if (str.includes(',')) {
+        return str.split(',').map(d => d.trim()).filter(Boolean);
+    }
+    return str.split('').filter(d => d >= '1' && d <= '7');
+};
+
 export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
     const { t } = useI18n();
     const isNew = !carrier || !carrier.id;
     const { data, setData, post, put, processing, errors, transform } = useForm({
         name: carrier?.name ?? '',
         country: carrier?.country ?? '',
-        days: carrier?.days !== null && carrier?.days !== undefined ? String(carrier.days) : '',
+        days: parseDays(carrier?.days),
         minimum: carrier?.minimum !== null && carrier?.minimum !== undefined ? String(carrier.minimum) : '',
         taxgo: carrier?.taxgo !== null && carrier?.taxgo !== undefined ? String(carrier.taxgo) : '',
         zones: mapZones(carrier?.zones),
     });
     const [newRoll, setNewRoll] = useState('');
+
+    const toggleDay = (day: string) => {
+        setData((current) => {
+            const days = current.days.includes(day)
+                ? current.days.filter((d) => d !== day)
+                : [...current.days, day].sort();
+
+            return { ...current, days };
+        });
+    };
 
     const updateZone = useCallback((index: number, updates: Partial<ZoneDraft>) => {
         setData((current) => {
@@ -200,6 +231,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
 
         return {
             ...data,
+            days: data.days.join(','),
             taxgo: normalizeDecimal(data.taxgo),
             zones: data.zones.map((zone) => {
                 const tariffs: Record<string, string | null> = {};
@@ -392,10 +424,10 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                 </div>
             </StickyBar>
 
-            <div className="grid items-start gap-8 xl:grid-cols-[2fr_1fr]">
+            <div className="w-full max-w-[1200px] md:mx-auto flex flex-col gap-5">
                 <main className="space-y-6">
                     <Card className="p-4">
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-3">
                             <FormField label={t('Name')} htmlFor="name" error={errors.name}>
                                 <Input
                                     id="name"
@@ -414,17 +446,6 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                                     aria-invalid={!!errors.country}
                                 />
                             </FormField>
-                            <FormField label={t('Delivery days')} htmlFor="days" error={errors.days}>
-                                <Input
-                                    id="days"
-                                    name="days"
-                                    type="number"
-                                    min="0"
-                                    value={data.days}
-                                    onChange={(e) => setData('days', e.target.value)}
-                                    aria-invalid={!!errors.days}
-                                />
-                            </FormField>
                             <FormField label={t('Minimum rolls')} htmlFor="minimum" error={errors.minimum}>
                                 <Input
                                     id="minimum"
@@ -435,6 +456,28 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                                     onChange={(e) => setData('minimum', e.target.value)}
                                     aria-invalid={!!errors.minimum}
                                 />
+                            </FormField>
+
+                        </div>
+                        <div className='grid gap-4 md:grid-cols-2'>
+                            <FormField label={t('Delivery days')} htmlFor="days" error={errors.days}>
+                                <div className="flex flex-wrap gap-3">
+                                    {WEEKDAYS.map((day) => (
+                                        <div key={day.value} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`day-${day.value}`}
+                                                checked={data.days.includes(day.value)}
+                                                onCheckedChange={() => toggleDay(day.value)}
+                                            />
+                                            <Label
+                                                htmlFor={`day-${day.value}`}
+                                                className="text-sm font-normal cursor-pointer"
+                                            >
+                                                {day.label}
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </div>
                             </FormField>
                             <FormField label={t('Taxgo')} htmlFor="taxgo" error={errors.taxgo}>
                                 <Input
@@ -447,7 +490,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                                     aria-invalid={!!errors.taxgo}
                                 />
                             </FormField>
+
                         </div>
+
                     </Card>
 
                     <Card className="p-4 space-y-4">
