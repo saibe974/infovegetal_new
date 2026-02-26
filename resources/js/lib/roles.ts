@@ -1,5 +1,15 @@
 import { User } from '@/types';
 
+type AuthLike = { user?: User | null; impersonator?: User | null } | null | undefined;
+
+export function getEffectiveUser(auth: AuthLike): User | null | undefined {
+    if (!auth) return undefined;
+    if (typeof auth === 'object' && 'user' in auth) {
+        return auth.impersonator ?? auth.user ?? null;
+    }
+    return auth as User;
+}
+
 /**
  * Vérifie si l'utilisateur a un rôle spécifique
  */

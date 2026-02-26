@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { router, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import SearchSelect from '@/components/app/search-select';
 import { type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
-import { isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { take as impersonateTake } from '@/actions/Lab404/Impersonate/Controllers/ImpersonateController';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui/button';
 
@@ -22,8 +23,10 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     const [currentPage, setCurrentPage] = useState<number>(1);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const isCurrentUserAdmin = isAdmin(auth.user);
+    const effectiveUser = getEffectiveUser(auth);
+    const isCurrentUserAdmin = isAdmin(effectiveUser);
     if (!isCurrentUserAdmin) return null;
+    const isImpersonating = !!auth.impersonate_from;
 
     // Use passed `users` prop if present, otherwise fall back to Inertia shared `users` prop
     const sharedUsers: User[] = (users && users.length > 0) ? users : ((pageProps as any).users || []);
@@ -38,10 +41,14 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     };
 
     const handleSelect = (targetUser: User) => {
+        if (!targetUser?.id) {
+            return;
+        }
         setSearch('');
         setCurrentPage(1);
         if (onClose) onClose();
-        router.visit(`/impersonate/take/${targetUser.id}`, { preserveState: false });
+        const url = impersonateTake({ id: targetUser.id }).url;
+        window.location.href = url;
     };
 
     let filteredUsers: User[] = availableUsers;
@@ -84,6 +91,10 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
         </div>
     );
 
+    if (isImpersonating) {
+        return null;
+    }
+
     return (
         <DropdownMenu.Sub>
             <div className="px-2 py-2 w-full" onKeyDown={(e) => e.stopPropagation()}>
@@ -91,11 +102,13 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
                     value={search}
                     onChange={handleSearch}
                     onSubmit={(val: string) => {
-                        if (!val) return;
-                        const tokens = val.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-                        if (tokens.length === 0) return;
-                        const first = tokens[0];
-                        const match = filteredUsers.find((u: User) => u.name === first || `${u.name} <${u.email}>` === first);
+                        const query = val.trim();
+                        if (!query) return;
+                        const normalized = query.toLowerCase();
+                        const match = filteredUsers.find((u: User) => {
+                            const name = u.name.toLowerCase();
+                            return name === normalized;
+                        });
                         if (match) {
                             handleSelect(match);
                         }

@@ -16,7 +16,11 @@ use Lab404\Impersonate\Models\Impersonate;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles, NodeTrait, Impersonate;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles {
+        hasRole as protected hasRoleTrait;
+        hasAnyRole as protected hasAnyRoleTrait;
+    }
+    use NodeTrait, Impersonate;
 
     public function cart(): HasOne
     {
@@ -91,7 +95,13 @@ class User extends Authenticatable
      */
     public function canImpersonate(): bool
     {
-        return $this->hasRole('admin');
+        if ($this->hasRoleTrait('admin')) {
+            return true;
+        }
+
+        $impersonator = $this->resolveImpersonator();
+
+        return $impersonator ? $impersonator->hasRoleTrait('admin') : false;
     }
 
     /**
@@ -101,5 +111,42 @@ class User extends Authenticatable
     public function canBeImpersonated(): bool
     {
         return !$this->hasRole('admin');
+    }
+
+    public function hasRole($roles, ?string $guard = null): bool
+    {
+        if ($this->hasRoleTrait($roles, $guard)) {
+            return true;
+        }
+
+        $impersonator = $this->resolveImpersonator();
+
+        return $impersonator ? $impersonator->hasRole($roles, $guard) : false;
+    }
+
+    public function hasAnyRole($roles, ?string $guard = null): bool
+    {
+        if ($this->hasAnyRoleTrait($roles, $guard)) {
+            return true;
+        }
+
+        $impersonator = $this->resolveImpersonator();
+
+        return $impersonator ? $impersonator->hasAnyRole($roles, $guard) : false;
+    }
+
+    private function resolveImpersonator(): ?self
+    {
+        if (!method_exists($this, 'isImpersonated') || !$this->isImpersonated()) {
+            return null;
+        }
+
+        $impersonatorId = app('impersonate')->getImpersonatorId();
+
+        if (!$impersonatorId) {
+            return null;
+        }
+
+        return self::find($impersonatorId);
     }
 }

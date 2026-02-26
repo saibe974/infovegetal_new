@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { UploadIcon, EditIcon, TrashIcon, LoaderIcon, Loader2Icon } from 'lucide-react';
 import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
-import { isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { getEffectiveUser, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -80,10 +80,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
+    const effectiveUser = getEffectiveUser(auth);
     const isAuthenticated = !!user;
-    const canEdit = isAdmin(user) || hasPermission(user, 'edit products');
-    const canDelete = isAdmin(user) || hasPermission(user, 'delete products');
-    const canImportExport = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
+    const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
+    const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
+    const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
 
     const page = usePage<{ searchPropositions?: Array<string | SearchOption> }>();
     const searchPropositions = page.props.searchPropositions ?? [];

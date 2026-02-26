@@ -70,14 +70,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // API routes accessibles depuis l'admin (JSON)
     Route::prefix('api')
         ->name('api.')
-        ->middleware(['role:admin'])
+        ->middleware(['role_or_impersonator:admin'])
         ->group(function () {
             Route::get('/db-products', [\App\Http\Controllers\Api\DbProductsController::class, 'index'])
                 ->name('db-products.index');
         });
 
     // Routes admin des produits - nécessite le rôle admin
-    Route::middleware(['role:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
+    Route::middleware(['role_or_impersonator:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
         Route::get('/', [\App\Http\Controllers\ProductController::class, 'index'])->name('index');
         Route::get('/create', [\App\Http\Controllers\ProductController::class, 'create'])->name('create');
         Route::post('/', [\App\Http\Controllers\ProductController::class, 'store'])->name('store');
@@ -94,20 +94,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
     });
 
-    Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role:admin']);
-    Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role:admin']);
+    Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role_or_impersonator:admin']);
+    Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role_or_impersonator:admin']);
     // Move endpoint pour dnd-kit (déplacement granulaire)
     Route::post('products/categories/move', [\App\Http\Controllers\CategoryProductsController::class, 'move'])
         ->name('products.categories.move')
-        ->middleware(['role:admin']);
-    Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role:admin']);
-    Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role:admin']);
-    Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role:admin']);
-    Route::resource('carriers', CarrierController::class)->middleware(['role:admin']);
+        ->middleware(['role_or_impersonator:admin']);
+    Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role_or_impersonator:admin']);
+    Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role_or_impersonator:admin']);
+    Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role_or_impersonator:admin']);
+    Route::resource('carriers', CarrierController::class)->middleware(['role_or_impersonator:admin']);
 });
 
 // Gestion des utilisateurs (admin uniquement)
-Route::middleware(['role:admin'])->group(function () {
+Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/media-manager', [MediaController::class, 'index'])->name('media.index');
 
     Route::post('admin/media-manager/sync-missing', [MediaController::class, 'syncMissingImages'])

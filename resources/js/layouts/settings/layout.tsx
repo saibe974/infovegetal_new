@@ -9,7 +9,7 @@ import { show } from '@/routes/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
 import { ArrowLeftCircle, Menu } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -20,6 +20,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
+    const effectiveUser = getEffectiveUser(auth);
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
@@ -58,7 +59,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const currentPath = window.location.pathname;
 
     // Ajout de lien si l'utilisateur est admin
-    if (isAdmin(auth.user)) {
+    if (isAdmin(effectiveUser)) {
         sidebarNavItems.push({
             title: 'Database access',
             href: editingUser ? `/admin/users/${editingUser.id}/db` : '#',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -57,11 +58,11 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $userArray = null;
         $impersonatorId = null;
+        $impersonatorArray = null;
 
-        if ($user) {
+        $formatUser = function (User $user) {
             $user->loadMissing(['roles', 'permissions']);
 
-            // Fusionner les permissions directes et celles héritées des rôles
             $allPermissions = $user->getAllPermissions()
                 ->map(fn ($permission) => $permission->only(['id', 'name']))
                 ->unique('id')
@@ -72,10 +73,22 @@ class HandleInertiaRequests extends Middleware
                 ->map(fn ($role) => $role->only(['id', 'name']))
                 ->values();
             $userArray['permissions'] = $allPermissions;
-            
+
+            return $userArray;
+        };
+
+        if ($user) {
+            $userArray = $formatUser($user);
+
             // Utiliser le service du package laravel-impersonate
             if ($user->isImpersonated()) {
                 $impersonatorId = app('impersonate')->getImpersonatorId();
+                if ($impersonatorId) {
+                    $impersonator = User::find($impersonatorId);
+                    if ($impersonator) {
+                        $impersonatorArray = $formatUser($impersonator);
+                    }
+                }
             }
         }
 
@@ -91,6 +104,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user ? $userArray : null,
                 'impersonate_from' => $impersonatorId,
+                'impersonator' => $impersonatorArray,
             ],
             'users' => $users,
             'flash' => [

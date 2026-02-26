@@ -27,7 +27,7 @@ import carriers from '@/routes/carriers';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 
 import users from '@/routes/users';
 import legal from '@/routes/legal';
@@ -41,15 +41,20 @@ export function AppSidebar() {
 
     const { auth, locale } = usePage<SharedData>().props;
     const user = auth?.user;
+    const effectiveUser = getEffectiveUser(auth);
+    const isImpersonating = !!auth?.impersonate_from;
+    const impersonationLinkClass = isImpersonating
+        ? 'text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200'
+        : undefined;
     const isAuthenticated = !!user;
-    const canEditProducts = isAdmin(user) || hasPermission(user, 'edit products');
-    const canDeleteProducts = isAdmin(user) || hasPermission(user, 'delete products');
-    const canImportExportProducts = isAdmin(user) || hasPermission(user, 'import products') || hasPermission(user, 'export products');
-    const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
-    const canPreview = isDev(user) || hasPermission(user, 'preview');
-    const canManageCategories = isAdmin(user) || hasPermission(user, 'manage categories');
-    const canManageCarriers = isAdmin(user) || hasPermission(user, 'manage carriers');
-    const canManageMedia = isAdmin(user);
+    const canEditProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
+    const canDeleteProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
+    const canImportExportProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
+    const canManageUsers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage users');
+    const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
+    const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage categories');
+    const canManageCarriers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage carriers');
+    const canManageMedia = isAdmin(effectiveUser);
 
     // derive active state from current url/path
     const currentPath = page.props?.url ?? page.props?.current ?? '';
@@ -218,11 +223,11 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMainExtended title={title} items={mainNavItems} />
+                <NavMainExtended title={title} items={mainNavItems} menuButtonClassName={impersonationLinkClass} />
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooterExtended items={footerNavItems} className="mt-auto" />
+                <NavFooterExtended items={footerNavItems} className="mt-auto" menuButtonClassName={impersonationLinkClass} />
             </SidebarFooter>
         </Sidebar>
     );

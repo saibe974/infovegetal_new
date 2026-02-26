@@ -19,7 +19,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { edit, update } from '@/routes/users';
 import { useI18n } from '@/lib/i18n';
-import { isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
 
 export default function Profile({
     mustVerifyEmail,
@@ -130,7 +130,7 @@ export default function Profile({
                         )}
 
                     <Form
-                    className='space-y-6'
+                        className='space-y-6'
                         onSubmit={(e) => {
                             e.preventDefault();
 
@@ -260,7 +260,7 @@ export default function Profile({
                         </Card>
 
                         {/* Section Permissions (affiché si l'éditeur est admin) */}
-                        {isAdmin(auth.user) && (
+                        {isAdmin(getEffectiveUser(auth)) && (
                             <Card className="p-6">
                                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                     <Lock size={20} />

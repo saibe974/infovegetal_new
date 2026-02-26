@@ -380,7 +380,7 @@ export default function SearchSelect({
                                 "px-4",
                                 openFilters && renderedFilters ? "md:w-1/2 md:border-r md:border-r-accent" : "w-full"
                             )}>
-                                <Heading title={t('Propositions')} />
+                                {/* <Heading title={t('Propositions')} /> */}
                                 {loading ? (
                                     <div className="flex justify-center items-center py-2 text-muted-foreground">
                                         <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}

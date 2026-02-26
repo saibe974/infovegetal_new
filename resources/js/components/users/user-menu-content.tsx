@@ -12,7 +12,7 @@ import { edit } from '@/routes/users';
 import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings, UserCheck } from 'lucide-react';
-import { isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
 import { useState } from 'react';
 
 interface UserMenuContentProps {
@@ -24,7 +24,8 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
     const { auth } = usePage<SharedData>().props;
     // const [showImpersonate, setShowImpersonate] = useState(false);
-    const isCurrentUserAdmin = isAdmin(auth.user);
+    const effectiveUser = getEffectiveUser(auth);
+    const isCurrentUserAdmin = isAdmin(effectiveUser);
 
     const handleLogout = () => {
         cleanup();
@@ -71,7 +72,7 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
                 // </>
                 <ImpersonateSelect
                     users={users}
-                    // onClose={() => setShowImpersonate(false)}
+                // onClose={() => setShowImpersonate(false)}
                 />
             )}
             {isImpersonating && (

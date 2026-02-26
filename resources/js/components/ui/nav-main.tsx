@@ -41,7 +41,15 @@ function NavMain({ items = [] }: { items: NavItem[] }) {
     );
 }
 
-export function NavMainExtended({ items = [], title = 'Navigation' }: { items: NavItemExtended[]; title?: string }) {
+export function NavMainExtended({
+    items = [],
+    title = 'Navigation',
+    menuButtonClassName,
+}: {
+    items: NavItemExtended[];
+    title?: string;
+    menuButtonClassName?: string;
+}) {
     const page = usePage();
     const { state, isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
@@ -144,6 +152,7 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                     <SidebarMenuButton
                                         asChild
                                         isActive={isActive}
+                                        className={menuButtonClassName}
                                         tooltip={!isOpenId('main') ? {
                                             children: item.title,
                                             side: 'right',
@@ -185,10 +194,11 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                                         isActive={page.url.startsWith(
                                                             typeof subItem.href === 'string' ? subItem.href : subItem.href.url,
                                                         )}
+                                                        className={menuButtonClassName}
                                                         tooltip={!isOpenId('main') ? { children: subItem.title } : undefined}
                                                     >
                                                         <Link href={subItem.href} prefetch>
-                                                            {subItem.icon && <subItem.icon className='group-data-[collapsible=icon]:size-3.5'/>}
+                                                            {subItem.icon && <subItem.icon className='group-data-[collapsible=icon]:size-3.5' />}
                                                             <span>{subItem.title}</span>
                                                         </Link>
                                                     </SidebarMenuButton>
@@ -198,7 +208,12 @@ export function NavMainExtended({ items = [], title = 'Navigation' }: { items: N
                                     </div>
                                 </>
                             ) : (
-                                <SidebarMenuButton asChild isActive={isActive} tooltip={!isOpenId('main') ? { children: item.title } : undefined}>
+                                <SidebarMenuButton
+                                    asChild
+                                    isActive={isActive}
+                                    className={menuButtonClassName}
+                                    tooltip={!isOpenId('main') ? { children: item.title } : undefined}
+                                >
                                     <Link href={item.href} prefetch>
                                         {item.icon && <item.icon />}
                                         <span>{item.title}</span>

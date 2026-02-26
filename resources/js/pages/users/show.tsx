@@ -13,7 +13,7 @@ import { useState } from 'react';
 import users from '@/routes/users';
 import { Badge } from '@/components/ui/badge';
 import { useI18n } from '@/lib/i18n';
-import { hasPermission, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, hasPermission, isAdmin } from '@/lib/roles';
 
 type Props = {
     user: User;
@@ -41,9 +41,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
     const { t } = useI18n();
 
     const { auth, locale } = usePage<SharedData>().props;
-    const userAuth = auth?.user;
-    const canEdit = isAdmin(userAuth) || hasPermission(userAuth, 'edit users') || hasPermission(userAuth, 'manage users');
-    const canDelete = isAdmin(userAuth) || hasPermission(userAuth, 'delete users') || hasPermission(userAuth, 'manage users');
+    const effectiveUser = getEffectiveUser(auth);
+    const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
+    const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
 
     const handleDelete = (userId: number) => {
         if (confirm(t('Are you sure?'))) {

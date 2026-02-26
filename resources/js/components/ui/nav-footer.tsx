@@ -63,10 +63,12 @@ export function NavFooterExtended({
     items = [],
     title,
     className,
+    menuButtonClassName,
 }: {
     items: NavItemExtended[] | NavItem[];
     title?: string;
     className?: string;
+    menuButtonClassName?: string;
 }) {
     const page = usePage();
     const { state, isOpenId } = useSidebar();
@@ -197,6 +199,7 @@ export function NavFooterExtended({
                                         <SidebarMenuButton
                                             asChild
                                             onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
+                                            className={menuButtonClassName}
                                             tooltip={!isOpenId('main') ? item.title : undefined}
                                         >
                                             <button type="button" className="w-full text-left flex items-center gap-2">
@@ -213,7 +216,11 @@ export function NavFooterExtended({
                                             <SidebarMenuSub>
                                                 {(item as NavItemExtended).subItems!.map((sub) => (
                                                     <SidebarMenuItem key={sub.title} >
-                                                        <SidebarMenuButton tooltip={!isOpenId('main') ? sub.title : undefined} asChild>
+                                                        <SidebarMenuButton
+                                                            tooltip={!isOpenId('main') ? sub.title : undefined}
+                                                            asChild
+                                                            className={menuButtonClassName}
+                                                        >
                                                             {renderLink(sub.href, (
                                                                 <>
                                                                     {sub.icon && <Icon iconNode={sub.icon} className="h-4 w-4 group-data-[collapsible=icon]:size-3.5" />}
@@ -227,7 +234,7 @@ export function NavFooterExtended({
                                         </div>
                                     </>
                                 ) : (
-                                    <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild>
+                                    <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild className={menuButtonClassName}>
                                         {renderLink(item.href ?? (item as NavItem).href, label, (item as any).target)}
                                     </SidebarMenuButton>
                                 )}
@@ -239,5 +246,4 @@ export function NavFooterExtended({
         </SidebarGroup>
     );
 }
-
 export default NavFooterExtended;

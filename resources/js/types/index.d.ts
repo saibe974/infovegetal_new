@@ -138,6 +138,7 @@ export interface NavItemExtended extends NavItem {
 export interface Auth {
     user?: User | null;
     impersonate_from?: number | null;
+    impersonator?: User | null;
 }
 
 export interface SharedData {

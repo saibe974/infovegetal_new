@@ -29,7 +29,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
-import { isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
 import usersRoutes from '@/routes/users';
@@ -89,9 +89,10 @@ export default withAppLayout(
 
         const { auth, locale } = usePage<SharedData>().props;
         const user = auth?.user;
+        const effectiveUser = getEffectiveUser(auth);
         const isAuthenticated = !!user;
-        const canManageUsers = isAdmin(user) || hasPermission(user, 'manage users');
-        const canPreview = isDev(user) || hasPermission(user, 'preview');
+        const canManageUsers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage users');
+        const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
 
 
         const breadcrumbs: BreadcrumbItem[] = [
@@ -102,7 +103,7 @@ export default withAppLayout(
         ];
 
         // Vérifier que l'utilisateur est admin
-        if (!isAdmin(auth.user)) {
+        if (!isAdmin(effectiveUser)) {
             return (
                 <AppLayout breadcrumbs={breadcrumbs}>
                     <Head title={t('Users management')} />
@@ -120,9 +121,9 @@ export default withAppLayout(
             );
         }
 
-        const canEdit = isAdmin(user) || hasPermission(user, 'edit users') || hasPermission(user, 'manage users');
-        const canDelete = isAdmin(user) || hasPermission(user, 'delete users') || hasPermission(user, 'manage users');
-        const canImportExport = isAdmin(user) || hasPermission(user, 'import users') || hasPermission(user, 'export users') || hasPermission(user, 'manage users');
+        const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
+        const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
+        const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import users') || hasPermission(effectiveUser, 'export users') || hasPermission(effectiveUser, 'manage users');
 
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
