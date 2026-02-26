@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { ComponentType, useContext } from 'react';
 import { type Product } from '@/types';
 import { CartContext } from './cart.context';
 import { Trash2, Minus, Plus } from 'lucide-react';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { getCartPricing } from './cart-pricing';
 import { resolveImageUrl } from '@/lib/resolve-image-url';
+import * as Flags from "country-flag-icons/react/3x2";
 
 export type CartItemProps = {
     product: Product;
@@ -27,6 +28,11 @@ export function CartItem({ product, quantity }: CartItemProps) {
         tray: t('Tray'),
         unit: t('Unit'),
     };
+
+    const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
+    const CountryFlag = countryCode.length === 2
+        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
+        : undefined;
 
     return (
         <div className="group relative border-b pb-3 last:border-b-0">
@@ -50,6 +56,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                         alt={product.name}
                         className="size-15 object-cover rounded"
                     />
+                    {CountryFlag && <CountryFlag title={String(product.dbProduct?.country)} className="absolute top-0 left-0 w-5" />}
                     <Badge
                         // variant={''}
                         className={cn(

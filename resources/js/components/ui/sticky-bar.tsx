@@ -69,7 +69,7 @@ export function StickyBar({
             wrapperClassName={`relative z-${zIndex} ${className}`}
             stickyStyle={{ top: topOffset, ...(width && { width }) }}
         >
-            <div className={`z-${zIndex} flex items-center relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>
+            <div className={`z-${zIndex} flex items-center justify-between relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>
                 {children}
             </div>
         </BasicSticky>

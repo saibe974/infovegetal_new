@@ -414,7 +414,7 @@ export default function SearchSelect({
                                 "px-4",
                                 open && value.length >= minQueryLength ? "md:w-1/2" : "w-full"
                             )}>
-                                <Heading title={t('Filters')} />
+                                {/* <Heading title={t('Filters')} /> */}
                                 {renderedFilters}
                             </div>
                         )}

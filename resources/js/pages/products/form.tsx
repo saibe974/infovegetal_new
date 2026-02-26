@@ -172,7 +172,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                             />
                                         </FormField>
 
-                                        <FormField label={t('SKU')} htmlFor="sku" error={currentErrors['sku']}>
+                                        {/* <FormField label={t('SKU')} htmlFor="sku" error={currentErrors['sku']}>
                                             <Input
                                                 id="sku"
                                                 name="sku"
@@ -180,7 +180,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 onChange={(e) => setData('sku', e.target.value)}
                                                 aria-invalid={!!currentErrors['sku']}
                                             />
-                                        </FormField>
+                                        </FormField> */}
 
                                         <FormField label={t('Reference')} htmlFor="ref" error={currentErrors['ref']}>
                                             <Input
@@ -231,7 +231,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                 <Card className="p-4 space-y-4">
                                     <h3 className="text-sm font-semibold text-muted-foreground">{t('Dimensions & packaging')}</h3>
-                                    <div className="grid gap-4 md:grid-cols-3">
+                                    <div className="grid gap-4 md:grid-cols-2">
                                         <FormField label={t('Pot (cm)')} htmlFor="pot" error={currentErrors['pot']}>
                                             <Input
                                                 id="pot"
@@ -254,6 +254,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 Format: nombre (30) ou plage (30-40). Sans unité.
                                             </p>
                                         </FormField>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-3">
                                         <FormField label={t('Packaging')} htmlFor="cond" error={currentErrors['cond']}>
                                             <Input
                                                 id="cond"
@@ -305,15 +307,6 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 aria-invalid={!!currentErrors['price_floor']}
                                             />
                                         </FormField>
-                                        <FormField label={t('Promo price')} htmlFor="price_promo" error={currentErrors['price_promo']}>
-                                            <Input
-                                                id="price_promo"
-                                                name="price_promo"
-                                                value={data.price_promo}
-                                                onChange={(e) => setData('price_promo', e.target.value)}
-                                                aria-invalid={!!currentErrors['price_promo']}
-                                            />
-                                        </FormField>
                                         <FormField label={t('Roll price')} htmlFor="price_roll" error={currentErrors['price_roll']}>
                                             <Input
                                                 id="price_roll"
@@ -321,6 +314,15 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 value={data.price_roll}
                                                 onChange={(e) => setData('price_roll', e.target.value)}
                                                 aria-invalid={!!currentErrors['price_roll']}
+                                            />
+                                        </FormField>
+                                        <FormField label={t('Promo price')} htmlFor="price_promo" error={currentErrors['price_promo']}>
+                                            <Input
+                                                id="price_promo"
+                                                name="price_promo"
+                                                value={data.price_promo}
+                                                onChange={(e) => setData('price_promo', e.target.value)}
+                                                aria-invalid={!!currentErrors['price_promo']}
                                             />
                                         </FormField>
                                     </div>

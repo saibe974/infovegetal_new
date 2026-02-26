@@ -215,53 +215,70 @@ export function ProductsFilters({
             {!singleCountry && (
                 <div className="space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
-                    <SelectWithItems
-                        name="country"
-                        items={countrySelectOptions}
-                        defaultValue={localCountry}
-                        placeholder={t('All countries')}
-                        onValueChange={setLocalCountry}
-                    />
+                    <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex flex-wrap"
+                        spacing={2}
+                        value={localCountry}
+                        onValueChange={(val) => setLocalCountry(val || ALL_COUNTRIES)}
+                    >
+                        <ToggleGroupItem value={ALL_COUNTRIES} className="">
+                            {t('All countries')}
+                        </ToggleGroupItem>
+                        {countries.map((code) => {
+                            const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
+                            return (
+                                <ToggleGroupItem key={code} value={code} className="">
+                                    {Flag && <Flag title={getCountryLabel(code)} className="w-4 mr-1" />}
+                                    {getCountryLabel(code)}
+                                </ToggleGroupItem>
+                            );
+                        })}
+                    </ToggleGroup>
                 </div>
             )}
 
-            {!singlePot && (
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
-                    <Select value={localPot} onValueChange={setLocalPot}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={t('All pot diameters')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
-                            {(potOptions || []).map((value) => (
-                                <SelectItem key={value} value={String(value)}>
-                                    {value}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
+            <div className="w-full flex flex-col gap-2 lg:flex-row">
+                {!singlePot && (
+                    <div className="space-y-2 w-full lg:w-1/2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
+                        <Select value={localPot} onValueChange={setLocalPot}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={t('All pot diameters')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
+                                {(potOptions || []).map((value) => (
+                                    <SelectItem key={value} value={String(value)}>
+                                        {value}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
 
-            {!singleHeight && (
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
-                    <Select value={localHeight} onValueChange={setLocalHeight}>
-                        <SelectTrigger>
-                            <SelectValue placeholder={t('All heights')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
-                            {(heightOptions || []).map((value) => (
-                                <SelectItem key={value} value={String(value)}>
-                                    {value}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
+                {!singleHeight && (
+                    <div className="space-y-2 w-full lg:w-1/2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
+                        <Select value={localHeight} onValueChange={setLocalHeight}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={t('All heights')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
+                                {(heightOptions || []).map((value) => (
+                                    <SelectItem key={value} value={String(value)}>
+                                        {value}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
 
             {/* <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Status')}</p>

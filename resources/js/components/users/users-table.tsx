@@ -54,7 +54,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                     <TableHead>{t('Name')}</TableHead>
                     <TableHead>{t('Email')}</TableHead>
                     <TableHead>{t('Current roles')}</TableHead>
-                    {canPreview && <TableHead>{t('Change role')}</TableHead>}
+                    {/* {canPreview && <TableHead>{t('Change role')}</TableHead>} */}
                     <TableHead>{t('Joined')}</TableHead>
                     {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
                 </TableRow>
@@ -92,7 +92,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                 )}
                             </div>
                         </TableCell>
-                        {canPreview && <TableCell>
+                        {/* {canPreview && <TableCell>
                             <Select
                                 onValueChange={(value) =>
                                     handleRoleChange(user.id, value)
@@ -121,7 +121,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                 </p>
                             )}
                         </TableCell>
-                        }
+                        } */}
                         <TableCell className="text-sm text-muted-foreground">
                             {new Date(
                                 user.created_at
