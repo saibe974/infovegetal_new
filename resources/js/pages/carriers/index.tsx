@@ -19,6 +19,28 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const WEEKDAY_LABELS: Record<string, string> = {
+    '1': 'Lundi',
+    '2': 'Mardi',
+    '3': 'Mercredi',
+    '4': 'Jeudi',
+    '5': 'Vendredi',
+    '6': 'Samedi',
+    '7': 'Dimanche',
+};
+
+const formatDays = (days?: string[] | null) => {
+    if (!days || days.length === 0) {
+        return '-';
+    }
+
+    const labels = days
+        .map((day) => WEEKDAY_LABELS[day])
+        .filter(Boolean);
+
+    return labels.length > 0 ? labels.join(', ') : '-';
+};
+
 type Props = {
     collection: PaginatedCollection<Carrier>;
     q?: string | null;
@@ -107,7 +129,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                     </Link>
                                 </TableCell>
                                 <TableCell>{item.country ?? '-'}</TableCell>
-                                <TableCell>{item.days ?? '-'}</TableCell>
+                                <TableCell>{formatDays(item.days)}</TableCell>
                                 <TableCell>{item.minimum ?? '-'}</TableCell>
                                 <TableCell>{item.taxgo ?? '-'}</TableCell>
                                 <TableCell>{item.zones_count ?? 0}</TableCell>

@@ -63,7 +63,7 @@ export interface Carrier {
     id?: number;
     name: string;
     country?: string | null;
-    days?: number | null;
+    days?: string[] | null;
     minimum?: number | null;
     taxgo?: number | null;
     zones?: CarrierZone[];

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import InputError from '@/components/ui/input-error';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -123,13 +124,38 @@ const WEEKDAYS = [
     { value: '7', label: 'Dimanche' },
 ];
 
-const parseDays = (days: string | number | null | undefined): string[] => {
+const DAY_MASKS: Record<string, number> = {
+    '1': 1,
+    '2': 2,
+    '3': 4,
+    '4': 8,
+    '5': 16,
+    '6': 32,
+    '7': 64,
+};
+
+const maskToDays = (mask: number): string[] =>
+    Object.entries(DAY_MASKS)
+        .filter(([, bit]) => (mask & bit) === bit)
+        .map(([day]) => day);
+
+const parseDays = (days: string[] | number | string | null | undefined): string[] => {
     if (!days) return [];
-    const str = String(days);
-    if (str.includes(',')) {
-        return str.split(',').map(d => d.trim()).filter(Boolean);
+    if (Array.isArray(days)) {
+        return days.map((day) => String(day)).filter((day) => day >= '1' && day <= '7');
     }
-    return str.split('').filter(d => d >= '1' && d <= '7');
+    if (typeof days === 'number') {
+        return maskToDays(days);
+    }
+    const str = String(days).trim();
+    if (!str) return [];
+    if (str.includes(',')) {
+        return str.split(',').map((d) => d.trim()).filter(Boolean);
+    }
+    if (/^\d+$/.test(str)) {
+        return maskToDays(Number(str));
+    }
+    return [];
 };
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
@@ -144,6 +170,19 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         zones: mapZones(carrier?.zones),
     });
     const [newRoll, setNewRoll] = useState('');
+    const errorBag = errors as Record<string, string>;
+
+    const daysError = useMemo(() => {
+        if (errors.days) {
+            return errors.days as string;
+        }
+        const entry = Object.entries(errorBag).find(([key]) => key.startsWith('days.'));
+        return entry ? entry[1] : undefined;
+    }, [errorBag, errors.days]);
+
+    const getZoneNameError = useCallback((index: number) => {
+        return errorBag[`zones.${index}.name`];
+    }, [errorBag]);
 
     const toggleDay = (day: string) => {
         setData((current) => {
@@ -231,7 +270,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
 
         return {
             ...data,
-            days: data.days.join(','),
+            days: data.days,
             taxgo: normalizeDecimal(data.taxgo),
             zones: data.zones.map((zone) => {
                 const tariffs: Record<string, string | null> = {};
@@ -346,10 +385,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                 id: 'name',
                 header: zonesHeader,
                 cell: ({ row }: CellContext<ZoneRow, unknown>) => (
-                    <Input
-                        value={row.original.name}
-                        onChange={(e) => updateZone(row.original.__index, { name: e.target.value })}
-                    />
+                    <div className="space-y-1">
+                        <Input
+                            value={row.original.name}
+                            onChange={(e) => updateZone(row.original.__index, { name: e.target.value })}
+                            aria-invalid={!!getZoneNameError(row.original.__index)}
+                        />
+                        <InputError message={getZoneNameError(row.original.__index)} />
+                    </div>
                 ),
             },
             {
@@ -460,7 +503,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
 
                         </div>
                         <div className='grid gap-4 md:grid-cols-2'>
-                            <FormField label={t('Delivery days')} htmlFor="days" error={errors.days}>
+                            <FormField label={t('Delivery days')} htmlFor="days" error={daysError}>
                                 <div className="flex flex-wrap gap-3">
                                     {WEEKDAYS.map((day) => (
                                         <div key={day.value} className="flex items-center space-x-2">

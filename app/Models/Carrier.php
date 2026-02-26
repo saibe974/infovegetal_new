@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DaysMask;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -19,7 +20,7 @@ class Carrier extends Model
     ];
 
     protected $casts = [
-        'days' => 'integer',
+        'days' => DaysMask::class,
         'minimum' => 'integer',
         'taxgo' => 'decimal:2',
     ];

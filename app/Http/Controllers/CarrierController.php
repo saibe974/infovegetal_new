@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CarrierResource;
 use App\Models\Carrier;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CarrierController extends Controller
@@ -47,15 +48,22 @@ class CarrierController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $this->validateCarrier($request);
-        $zones = $this->normalizeZones($data['zones'] ?? []);
-        unset($data['zones']);
+        try {
+            $data = $this->validateCarrier($request);
+            $zones = $this->normalizeZones($data['zones'] ?? []);
+            unset($data['zones']);
 
-        $carrier = Carrier::create($data);
-        $this->syncZones($carrier, $zones);
+            $carrier = Carrier::create($data);
+            $this->syncZones($carrier, $zones);
 
-        return redirect()->route('carriers.index')
-            ->with('success', 'Transporteur cree');
+            return back()
+                ->with('success', 'Transporteur cree');
+        } catch (ValidationException $exception) {
+            return back()
+                ->withErrors($exception->errors())
+                ->withInput()
+                ->with('error', 'Merci de corriger les erreurs du formulaire.');
+        }
     }
 
     /**
@@ -83,15 +91,22 @@ class CarrierController extends Controller
      */
     public function update(Request $request, Carrier $carrier)
     {
-        $data = $this->validateCarrier($request);
-        $zones = $this->normalizeZones($data['zones'] ?? []);
-        unset($data['zones']);
+        try {
+            $data = $this->validateCarrier($request);
+            $zones = $this->normalizeZones($data['zones'] ?? []);
+            unset($data['zones']);
 
-        $carrier->update($data);
-        $this->syncZones($carrier, $zones);
+            $carrier->update($data);
+            $this->syncZones($carrier, $zones);
 
-        return redirect()->route('carriers.index')
-            ->with('success', 'Transporteur mis a jour');
+            return back()
+                ->with('success', 'Transporteur mis a jour');
+        } catch (ValidationException $exception) {
+            return back()
+                ->withErrors($exception->errors())
+                ->withInput()
+                ->with('error', 'Merci de corriger les erreurs du formulaire.');
+        }
     }
 
     /**
@@ -109,12 +124,13 @@ class CarrierController extends Controller
     private function validateCarrier(Request $request): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'min:2', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
-            'days' => ['nullable', 'integer', 'min:0'],
+            'days' => ['nullable', 'array'],
+            'days.*' => ['string', 'in:1,2,3,4,5,6,7'],
             'minimum' => ['nullable', 'integer', 'min:0'],
             'taxgo' => ['nullable', 'numeric', 'min:0'],
-            'zones' => ['array'],
+            'zones' => ['nullable', 'array'],
             'zones.*.id' => ['nullable', 'integer', 'exists:carrier_zones,id'],
             'zones.*.name' => ['required', 'string', 'max:100'],
             'zones.*.tariffs' => ['nullable', 'array'],
