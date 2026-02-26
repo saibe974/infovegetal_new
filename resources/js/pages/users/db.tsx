@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type DbProductAttributes = {
     m: number;          // marge en %
@@ -255,7 +256,7 @@ export default function UserDbPage() {
                                             {/* Section Prix et Pondération */}
                                             <div className="space-y-6">
                                                 <h3 className="text-md font-semibold">{t('Price and Weighting')}</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <FormField label={t('Price mode')} htmlFor={`p-${dbId}`}>
                                                         <Select
                                                             value={attrs.p}
@@ -276,7 +277,7 @@ export default function UserDbPage() {
                                                         </Select>
                                                     </FormField>
 
-                                                    <FormField label={t('Weighting coefficient (%)')} htmlFor={`pd-${dbId}`}>
+                                                    <FormField label={t('Ponderation coefficient (%)')} htmlFor={`pd-${dbId}`}>
                                                         <Input
                                                             id={`pd-${dbId}`}
                                                             type="number"
@@ -286,15 +287,7 @@ export default function UserDbPage() {
                                                         />
                                                     </FormField>
 
-                                                    <FormField label={t('Increase on roll')} htmlFor={`h-${dbId}`}>
-                                                        <Input
-                                                            id={`h-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.h}
-                                                            onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
+
                                                 </div>
                                             </div>
 
@@ -304,6 +297,20 @@ export default function UserDbPage() {
                                             <div className="space-y-6">
                                                 <h3 className="text-md font-semibold">{t('Delivery and VAT')}</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                                    <FormField label={t('Higher roll')} htmlFor={`h-${dbId}`} >
+                                                        <Input
+                                                            id={`h-${dbId}`}
+                                                            type="checkbox"
+                                                            // step="0.01"
+                                                            checked={attrs.h === 1}
+                                                            defaultChecked={attrs.h === 1}
+                                                            value={attrs.h}
+                                                            onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
+                                                        />
+                                                        {/* <Checkbox id={`h-${dbId}`} checked={attrs.h === 1} onCheckedChange={(checked) => updateAttribute(dbId, 'h', checked ? 1 : 0)} /> */}
+                                                        
+                                                    </FormField>
 
                                                     <FormField label={t('Carrier')} htmlFor={`t-${dbId}`}>
                                                         <Select
