@@ -107,7 +107,7 @@ class ProductResource extends JsonResource
         $priceRoll = $this->price_roll;
         $pricePromo = $this->price_promo;
 
-        if ($user && !$isAdminView && $this->resource->db_products_id) {
+        if ($user && $this->resource->db_products_id && (!$isAdminView || $dbUserAttributes)) {
             $calculator = app(PriceCalculatorService::class);
             $prices = $calculator->calculatePrice($this->resource, $user, (int) $this->resource->db_products_id);
             $price = $prices[0] ?? $price;

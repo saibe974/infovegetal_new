@@ -30,6 +30,37 @@ Route::get('/api/products/{product}', function (Product $product) {
     return new ProductResource($product->load(['category', 'tags', 'dbProduct']));
 });
 
+// API authentifiee pour le panier (prix calcules selon le user courant)
+Route::middleware(['auth'])->get('/api/auth/products/{product}', function (Request $request, Product $product) {
+    $user = $request->user();
+    $dbProductId = (int) ($product->db_products_id ?? 0);
+
+    if ($user && $dbProductId > 0) {
+        $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
+        $pivotAttributes = $dbProduct?->pivot?->attributes;
+
+        if ($pivotAttributes) {
+            $decoded = is_string($pivotAttributes)
+                ? json_decode($pivotAttributes, true)
+                : $pivotAttributes;
+            if (is_array($decoded)) {
+                $product->setAttribute('db_user_attributes', $decoded);
+            }
+        }
+
+        if ($product->getAttribute('db_user_attributes')) {
+            $prices = app(\App\Services\PriceCalculatorService::class)
+                ->calculatePrice($product, $user, $dbProductId);
+            $product->price = $prices[0] ?? $product->price;
+            $product->price_floor = $prices[1] ?? $product->price_floor;
+            $product->price_roll = $prices[2] ?? $product->price_roll;
+            $product->price_promo = $prices[3] ?? $product->price_promo;
+        }
+    }
+
+    return new ProductResource($product->load(['category', 'tags', 'dbProduct']));
+});
+
 // Route pour sauvegarder le panier en session (authentifiée)
 Route::post('/products/save-cart-filter', [\App\Http\Controllers\ProductController::class, 'saveCartToSession'])
     ->middleware(['auth'])

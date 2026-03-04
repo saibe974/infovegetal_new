@@ -68,6 +68,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return [];
     });
 
+    const itemsRef = useRef<CartItem[]>(items);
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
     const [pendingProductId, setPendingProductId] = useState<number | null>(null);
 
     // Vérifier s'il y a une intention d'ajout au panier après connexion
@@ -84,22 +89,97 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     // Récupérer le produit et l'ajouter au panier
     useEffect(() => {
-        if (pendingProductId && userId) {
-            // Récupérer les infos du produit depuis le serveur
-            fetch(`/api/products/${pendingProductId}`)
-                .then(res => res.json())
-                .then(product => {
-                    addToCart(product, 1);
-                    setPendingProductId(null);
-                })
-                .catch(err => {
-                    console.error('Erreur lors de la récupération du produit:', err);
-                    setPendingProductId(null);
-                });
+        if (!pendingProductId) {
+            return;
         }
+
+        const url = userId
+            ? `/api/auth/products/${pendingProductId}`
+            : `/api/products/${pendingProductId}`;
+
+        fetch(url, { credentials: 'include' })
+            .then(res => res.json())
+            .then(product => {
+                addToCart(product, 1);
+                setPendingProductId(null);
+            })
+            .catch(err => {
+                console.error('Erreur lors de la récupération du produit:', err);
+                setPendingProductId(null);
+            });
     }, [pendingProductId, userId]);
 
     const lastRefreshTokenRef = useRef<number | string | null>(null);
+    const lastUserRefreshRef = useRef<number | null>(null);
+
+    const refreshCartProducts = async (itemsToRefresh: CartItem[]) => {
+        const uniqueIds = Array.from(new Set(itemsToRefresh.map((item) => item.product.id)));
+        if (uniqueIds.length === 0) {
+            return;
+        }
+
+        try {
+            const responses = await Promise.all(
+                uniqueIds.map((id) =>
+                    fetch(`/api/auth/products/${id}`, { credentials: 'include' }).then((res) => (res.ok ? res.json() : null))
+                )
+            );
+
+            const productsById = new Map<number, Product>();
+            responses.forEach((product) => {
+                if (product && typeof product.id === 'number') {
+                    productsById.set(product.id, product as Product);
+                }
+            });
+
+
+            setItems((prev) =>
+                prev.map((item) => {
+                    const refreshed = productsById.get(item.product.id);
+                    if (!refreshed) {
+                        return item;
+                    }
+
+                    const hadUserMeta = !!item.product.db_user_attributes || !!item.product.db_user_transport;
+                    const hasUserMeta = !!refreshed.db_user_attributes || !!refreshed.db_user_transport;
+
+                    if (hadUserMeta && !hasUserMeta) {
+                        return item;
+                    }
+
+                    return { ...item, product: refreshed };
+                })
+            );
+        } catch (error) {
+            console.error('Erreur lors du rafraichissement du panier:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (!userId || typeof window === 'undefined') {
+            lastUserRefreshRef.current = null;
+            return;
+        }
+
+        if (lastUserRefreshRef.current === userId) {
+            return;
+        }
+
+        const currentItems = itemsRef.current;
+        if (currentItems.length === 0) {
+            const stored = localStorage.getItem(getCartKey());
+            const nextItems: CartItem[] = stored ? JSON.parse(stored) : [];
+            setItems(nextItems);
+
+            if (nextItems.length > 0) {
+                void refreshCartProducts(nextItems);
+            }
+        } else {
+            void refreshCartProducts(currentItems);
+        }
+
+        lastUserRefreshRef.current = userId;
+    }, [userId]);
 
     useEffect(() => {
         if (!userId || !cart_refresh_token || items.length === 0) {
@@ -111,48 +191,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        let isCancelled = false;
-        const refreshProducts = async () => {
-            try {
-                const uniqueIds = Array.from(new Set(items.map((item) => item.product.id)));
-                const responses = await Promise.all(
-                    uniqueIds.map((id) =>
-                        fetch(`/api/products/${id}`).then((res) => (res.ok ? res.json() : null))
-                    )
-                );
+        const currentItems = itemsRef.current;
+        if (currentItems.length === 0) {
+            lastRefreshTokenRef.current = cart_refresh_token ?? null;
+            return;
+        }
 
-                const productsById = new Map<number, any>();
-                responses.forEach((product) => {
-                    if (product && typeof product.id === 'number') {
-                        productsById.set(product.id, product);
-                    }
-                });
-
-                if (isCancelled) {
-                    return;
-                }
-
-                setItems((prev) =>
-                    prev.map((item) => {
-                        const refreshed = productsById.get(item.product.id);
-                        return refreshed ? { ...item, product: refreshed } : item;
-                    })
-                );
-            } catch (error) {
-                console.error('Erreur lors du rafraichissement du panier:', error);
-            } finally {
-                if (!isCancelled) {
-                    lastRefreshTokenRef.current = cart_refresh_token ?? null;
-                }
-            }
-        };
-
-        refreshProducts();
-
-        return () => {
-            isCancelled = true;
-        };
-    }, [cart_refresh_token, items, userId]);
+        void refreshCartProducts(currentItems).finally(() => {
+            lastRefreshTokenRef.current = cart_refresh_token ?? null;
+        });
+    }, [cart_refresh_token, userId]);
 
     useEffect(() => {
         localStorage.setItem(getCartKey(), JSON.stringify(items));
