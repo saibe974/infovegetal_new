@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\Product;
 use App\Models\Carrier;
 use App\Http\Resources\DbProductsResource;
+use App\Services\PriceCalculatorService;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -97,6 +98,23 @@ class ProductResource extends JsonResource
     public function toArray(Request $request): array
     {
         $dbUserAttributes = $this->resolveDbUserAttributes($request);
+        $user = $request->user();
+        $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
+        $isAdminView = $user && $user->hasRole('admin') && !$isImpersonated;
+
+        $price = $this->price;
+        $priceFloor = $this->price_floor;
+        $priceRoll = $this->price_roll;
+        $pricePromo = $this->price_promo;
+
+        if ($user && !$isAdminView && $this->resource->db_products_id) {
+            $calculator = app(PriceCalculatorService::class);
+            $prices = $calculator->calculatePrice($this->resource, $user, (int) $this->resource->db_products_id);
+            $price = $prices[0] ?? $price;
+            $priceFloor = $prices[1] ?? $priceFloor;
+            $priceRoll = $prices[2] ?? $priceRoll;
+            $pricePromo = $prices[3] ?? $pricePromo;
+        }
 
         return [
             'id' => $this->resource->id,
@@ -104,7 +122,7 @@ class ProductResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'img_link' => $this->img_link,
-            'price' => $this->price,
+            'price' => $price,
             'active' => $this->active,
             'attributes' => $this->attributes,
             'category_products_id' => $this->category_products_id,
@@ -115,9 +133,9 @@ class ProductResource extends JsonResource
             'ean13' => $this->ean13,
             'pot' => $this->pot,
             'height' => $this->height,
-            'price_floor' => $this->price_floor,
-            'price_roll' => $this->price_roll,
-            'price_promo' => $this->price_promo,
+            'price_floor' => $priceFloor,
+            'price_roll' => $priceRoll,
+            'price_promo' => $pricePromo,
             'producer_id' => $this->producer_id,
             'tva_id' => $this->tva_id,
             'cond' => $this->cond,

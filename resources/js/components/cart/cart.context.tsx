@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
 import { type SharedData } from '@/types';
@@ -53,7 +53,7 @@ export const CartContext = createContext<CartContextType>({
 
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const { auth } = usePage<SharedData>().props;
+    const { auth, cart_refresh_token } = usePage<SharedData & { cart_refresh_token?: number | string | null }>().props;
     const userId = auth?.user?.id;
 
     const getCartKey = () => {
@@ -98,6 +98,61 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 });
         }
     }, [pendingProductId, userId]);
+
+    const lastRefreshTokenRef = useRef<number | string | null>(null);
+
+    useEffect(() => {
+        if (!userId || !cart_refresh_token || items.length === 0) {
+            lastRefreshTokenRef.current = cart_refresh_token ?? null;
+            return;
+        }
+
+        if (lastRefreshTokenRef.current === cart_refresh_token) {
+            return;
+        }
+
+        let isCancelled = false;
+        const refreshProducts = async () => {
+            try {
+                const uniqueIds = Array.from(new Set(items.map((item) => item.product.id)));
+                const responses = await Promise.all(
+                    uniqueIds.map((id) =>
+                        fetch(`/api/products/${id}`).then((res) => (res.ok ? res.json() : null))
+                    )
+                );
+
+                const productsById = new Map<number, any>();
+                responses.forEach((product) => {
+                    if (product && typeof product.id === 'number') {
+                        productsById.set(product.id, product);
+                    }
+                });
+
+                if (isCancelled) {
+                    return;
+                }
+
+                setItems((prev) =>
+                    prev.map((item) => {
+                        const refreshed = productsById.get(item.product.id);
+                        return refreshed ? { ...item, product: refreshed } : item;
+                    })
+                );
+            } catch (error) {
+                console.error('Erreur lors du rafraichissement du panier:', error);
+            } finally {
+                if (!isCancelled) {
+                    lastRefreshTokenRef.current = cart_refresh_token ?? null;
+                }
+            }
+        };
+
+        refreshProducts();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [cart_refresh_token, items, userId]);
 
     useEffect(() => {
         localStorage.setItem(getCartKey(), JSON.stringify(items));

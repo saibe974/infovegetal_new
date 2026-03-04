@@ -145,6 +145,7 @@ export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
+    cart_refresh_token?: number | string | null;
     users?: User[];
     sidebarOpen: boolean;
     flash: {

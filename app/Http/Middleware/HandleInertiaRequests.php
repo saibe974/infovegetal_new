@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\User;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Inertia\Middleware;
 
@@ -106,6 +107,7 @@ class HandleInertiaRequests extends Middleware
                 'impersonate_from' => $impersonatorId,
                 'impersonator' => $impersonatorArray,
             ],
+            'cart_refresh_token' => $user ? Cache::get('cart:refresh:' . $user->id) : null,
             'users' => $users,
             'flash' => [
                 'success' => $request->session()->get('success'),

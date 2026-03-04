@@ -32,6 +32,11 @@ const toNumber = (value: unknown): number => {
 
 const roundCurrency = (value: number): number => Math.round(value * 100) / 100;
 
+const toFillRatio = (coef: number): number => {
+    const normalized = coef > 1 ? coef / 100 : coef;
+    return Math.max(0, Math.min(1, normalized));
+};
+
 const extractSupplierAttributes = (items: CartItem[]): Record<number, DbUserAttributes> => {
     const result: Record<number, DbUserAttributes> = {};
 
@@ -77,30 +82,68 @@ const extractSupplierTransport = (items: CartItem[]): Record<number, DbUserTrans
     return result;
 };
 
+const parseTariffKey = (rawKey: string): { min: number; max: number | null } | null => {
+    const normalized = rawKey.replace(/^roll:/, '').trim();
+    if (!normalized) {
+        return null;
+    }
+
+    const matches = normalized.match(/\d+(?:[.,]\d+)?/g) ?? [];
+    if (matches.length === 0) {
+        return null;
+    }
+
+    const toValue = (value: string) => Number(value.replace(',', '.'));
+    const first = matches[0];
+    if (!first) {
+        return null;
+    }
+    const min = toValue(first);
+    if (!Number.isFinite(min)) {
+        return null;
+    }
+
+    if (matches.length >= 2) {
+        const second = matches[1];
+        const max = second ? toValue(second) : NaN;
+        return {
+            min,
+            max: Number.isFinite(max) ? max : null,
+        };
+    }
+
+    return { min, max: null };
+};
+
 const pickZoneTariff = (rollCount: number, tariffs: Record<string, number | string | null>): number => {
     if (rollCount <= 0) {
         return 0;
     }
 
     const entries = Object.entries(tariffs)
-        .map(([key, value]) => ({ key: key.replace(/^roll:/, ''), value: toNumber(value) }))
-        .filter((entry) => entry.key !== 'mini')
-        .map((entry) => ({ threshold: Number(entry.key), value: entry.value }))
-        .filter((entry) => Number.isFinite(entry.threshold) && entry.threshold > 0)
-        .sort((a, b) => a.threshold - b.threshold);
+        .filter(([key]) => key !== 'mini')
+        .map(([key, value]) => ({ range: parseTariffKey(key), value: toNumber(value) }))
+        .filter((entry) => entry.range && Number.isFinite(entry.value) && entry.value > 0)
+        .map((entry) => ({
+            min: entry.range!.min,
+            max: entry.range!.max,
+            value: entry.value,
+        }))
+        .filter((entry) => entry.min > 0)
+        .sort((a, b) => (a.min === b.min ? (a.max ?? Infinity) - (b.max ?? Infinity) : a.min - b.min));
 
     let base = 0;
 
     if (entries.length > 0) {
-        const lowerOrEqual = entries.filter((entry) => entry.threshold <= rollCount);
-        if (lowerOrEqual.length > 0) {
-            base = lowerOrEqual[lowerOrEqual.length - 1].value;
+        const eligible = entries.filter((entry) => rollCount >= entry.min && (entry.max === null || rollCount <= entry.max));
+        if (eligible.length > 0) {
+            base = eligible.reduce((best, entry) => (entry.min >= best.min ? entry : best)).value;
+        } else {
+            const lowerOrEqual = entries.filter((entry) => rollCount >= entry.min);
+            if (lowerOrEqual.length > 0) {
+                base = lowerOrEqual[lowerOrEqual.length - 1].value;
+            }
         }
-    }
-
-    const mini = toNumber(tariffs.mini);
-    if (mini > 0 && base < mini) {
-        base = mini;
     }
 
     return base;
@@ -122,20 +165,26 @@ export const getSupplierTransportCost = (
 
     if (carrierId > 0 && zoneId > 0 && supplierTransport) {
         const rollCount = supplier.rolls.length;
-        const baseTariff = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
-        let adjustedTariff = baseTariff;
+        const baseTariffPerRoll = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
+        const baseTotal = baseTariffPerRoll * rollCount;
+        let adjustedTotal = 0;
 
         if (priceMode === 1 && rollCount > 0) {
-            const perRollTariff = baseTariff / rollCount;
-            adjustedTariff = supplier.rolls.reduce((sum, roll) => {
-                const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
-                const ratioToPay = 1 - coef / 100;
-                return sum + perRollTariff * ratioToPay;
+            adjustedTotal = supplier.rolls.reduce((sum, roll) => {
+                const ratioToPay = 1 - toFillRatio(toNumber(roll.coef));
+                return sum + baseTariffPerRoll * ratioToPay;
             }, 0);
+        } else {
+            adjustedTotal = baseTariffPerRoll * rollCount;
+        }
+
+        const mini = toNumber(supplierTransport.tariffs?.mini);
+        if (mini > 0 && baseTotal < mini) {
+            adjustedTotal = Math.max(adjustedTotal, mini);
         }
 
         const taxgoRate = Math.max(0, toNumber(supplierTransport.taxgo));
-        const totalWithTaxgo = adjustedTariff * (1 + taxgoRate / 100);
+        const totalWithTaxgo = adjustedTotal * (1 + taxgoRate / 100);
         return roundCurrency(totalWithTaxgo);
     }
 
@@ -202,21 +251,27 @@ export const getSupplierRollPrices = (
     const zoneId = toNumber(supplierAttributes.z);
 
     if (carrierId > 0 && zoneId > 0 && supplierTransport) {
-        const baseTariff = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
+        const baseTariffPerRoll = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
         const taxgoRate = Math.max(0, toNumber(supplierTransport.taxgo));
-        const perRollTariff = rollCount > 0 ? baseTariff / rollCount : 0;
+        const baseTotal = baseTariffPerRoll * rollCount;
 
-        const rollPrices = supplier.rolls.map((roll) => {
+        const rawRollPrices = supplier.rolls.map((roll) => {
             if (priceMode === 1) {
-                const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
-                const ratioToPay = 1 - coef / 100;
-                return roundCurrency(perRollTariff * ratioToPay * (1 + taxgoRate / 100));
+                const ratioToPay = 1 - toFillRatio(toNumber(roll.coef));
+                return baseTariffPerRoll * ratioToPay;
             }
 
-            return roundCurrency(perRollTariff * (1 + taxgoRate / 100));
+            return baseTariffPerRoll;
         });
 
-        return rollPrices;
+        const mini = toNumber(supplierTransport.tariffs?.mini);
+        const rawTotal = rawRollPrices.reduce((sum, price) => sum + price, 0);
+        let scale = 1;
+        if (mini > 0 && baseTotal < mini && rawTotal > 0) {
+            scale = mini / rawTotal;
+        }
+
+        return rawRollPrices.map((price) => roundCurrency(price * scale * (1 + taxgoRate / 100)));
     }
 
     const rollPrice = toNumber(supplierAttributes.l);
@@ -230,8 +285,7 @@ export const getSupplierRollPrices = (
 
     if (priceMode === 1) {
         return supplier.rolls.map((roll) => {
-            const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
-            const ratioToPay = 1 - coef / 100;
+            const ratioToPay = 1 - toFillRatio(toNumber(roll.coef));
             return roundCurrency(rollPrice * ratioToPay);
         });
     }

@@ -785,7 +785,7 @@ export function ProductRoll({
                                                                 key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}`}
                                                                 className={cn(
                                                                     'flex items-end border-b border-slate-900',
-                                                                    isFull ? 'justify-between' : 'flex-wrap-reverse'
+                                                                    isFull ? 'justify-between' : 'flex-wrap'
                                                                 )}
                                                                 style={{ marginTop: '2px' }}
                                                             >

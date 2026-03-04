@@ -105,6 +105,7 @@ export default function UserDbPage() {
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<number[]>(Array.isArray(selectedDbId) ? selectedDbId : []);
     const [processing, setProcessing] = useState(false);
+    const [savingDbId, setSavingDbId] = useState<number | null>(null);
     const [contactSearchByDbId, setContactSearchByDbId] = useState<Record<number, { com: string; fact: string }>>({});
 
     // Préparer la sélection initiale pour SearchSelect
@@ -154,6 +155,26 @@ export default function UserDbPage() {
                 [key]: value,
             },
         }));
+    };
+
+    const handleSaveDb = (dbId: number) => {
+        const attrs = attributesByDbId[dbId] ?? DEFAULT_ATTRIBUTES;
+
+        router.post(
+            `/admin/users/${targetUser.id}/db`,
+            {
+                db_ids: [dbId],
+                merge: true,
+                attributes: {
+                    [dbId]: attrs,
+                },
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSavingDbId(dbId),
+                onFinish: () => setSavingDbId(null),
+            }
+        );
     };
 
     return (
@@ -208,10 +229,22 @@ export default function UserDbPage() {
                                 return (
                                     <Card key={dbId}>
                                         <CardHeader>
-                                            <CardTitle className='text-lg'>{db ? db.name : `DB #${dbId}`}</CardTitle>
-                                            {db?.description && (
-                                                <CardDescription>{db.description}</CardDescription>
-                                            )}
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div>
+                                                    <CardTitle className='text-lg'>{db ? db.name : `DB #${dbId}`}</CardTitle>
+                                                    {db?.description && (
+                                                        <CardDescription>{db.description}</CardDescription>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={() => handleSaveDb(dbId)}
+                                                    disabled={savingDbId === dbId}
+                                                >
+                                                    {savingDbId === dbId ? t('Saving...') : t('Save')}
+                                                </Button>
+                                            </div>
                                         </CardHeader>
                                         <CardContent className="space-y-6">
                                             {/* Section Contacts */}
@@ -383,7 +416,7 @@ export default function UserDbPage() {
                                                             onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
                                                         />
                                                         {/* <Checkbox id={`h-${dbId}`} checked={attrs.h === 1} onCheckedChange={(checked) => updateAttribute(dbId, 'h', checked ? 1 : 0)} /> */}
-                                                        
+
                                                     </FormField>
 
                                                     <FormField label={t('Carrier')} htmlFor={`t-${dbId}`}>

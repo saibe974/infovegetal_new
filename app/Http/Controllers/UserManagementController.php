@@ -407,13 +407,51 @@ class UserManagementController extends Controller
             'db_ids' => ['nullable', 'array'],
             'db_ids.*' => ['integer', 'exists:db_products,id'],
             'attributes' => ['nullable', 'array'],
+            'merge' => ['nullable', 'boolean'],
         ]);
 
         $dbIds = $request->input('db_ids', []);
         $attributes = $request->input('attributes', []);
+        $merge = $request->boolean('merge');
+
+        $normalize = function (array $value) use (&$normalize): array {
+            foreach ($value as $key => $item) {
+                if (is_array($item)) {
+                    $value[$key] = $normalize($item);
+                }
+            }
+            ksort($value);
+            return $value;
+        };
+
+        $current = $user->dbProducts()
+            ->get()
+            ->mapWithKeys(function ($dbProduct) use ($normalize) {
+                $attrs = [];
+                $pivot = $dbProduct->pivot;
+                if ($pivot && $pivot->attributes) {
+                    $decoded = json_decode($pivot->attributes, true);
+                    if (is_array($decoded)) {
+                        $attrs = $normalize($decoded);
+                    }
+                }
+                return [(int) $dbProduct->id => $attrs];
+            })
+            ->toArray();
 
         // On prépare le tableau pour sync : [db_product_id => ['attributes' => ...], ...]
         $syncData = [];
+        $next = [];
+
+        if ($merge) {
+            $next = $current;
+            foreach ($current as $dbId => $attrs) {
+                $syncData[$dbId] = [
+                    'attributes' => json_encode($attrs),
+                ];
+            }
+        }
+
         foreach ($dbIds as $dbId) {
             $attr = $attributes[$dbId] ?? [];
             // Si c'est une string JSON (cas rare), on la décode
@@ -421,12 +459,38 @@ class UserManagementController extends Controller
                 $decoded = json_decode($attr, true);
                 $attr = is_array($decoded) ? $decoded : [];
             }
+            if (!is_array($attr)) {
+                $attr = [];
+            }
+            $normalizedAttr = $normalize($attr);
+            $next[(int) $dbId] = $normalizedAttr;
             $syncData[$dbId] = [
-                'attributes' => json_encode($attr),
+                'attributes' => json_encode($normalizedAttr),
             ];
         }
 
         $user->dbProducts()->sync($syncData);
+
+        $currentIds = array_keys($current);
+        $nextIds = array_keys($next);
+        sort($currentIds);
+        sort($nextIds);
+        $hasChanges = $currentIds !== $nextIds;
+
+        if (!$hasChanges) {
+            foreach ($nextIds as $dbId) {
+                $currentJson = json_encode($current[$dbId] ?? []);
+                $nextJson = json_encode($next[$dbId] ?? []);
+                if ($currentJson !== $nextJson) {
+                    $hasChanges = true;
+                    break;
+                }
+            }
+        }
+
+        if ($hasChanges) {
+            Cache::put('cart:refresh:' . $user->id, now()->getTimestamp(), now()->addHour());
+        }
 
         return back()->with('success', 'User DB association and attributes updated successfully');
     }   
