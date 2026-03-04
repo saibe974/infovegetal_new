@@ -2,10 +2,14 @@ import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
-import { edit as editPassword } from '@/routes/password';
-import { edit } from '@/routes/users';
-import { show } from '@/routes/two-factor';
+import { edit as editAdminAppearance } from '@/routes/appearance';
+import { edit as editAdminPassword } from '@/routes/password';
+import { edit as editAdminUser } from '@/routes/users';
+import { show as showAdminTwoFactor } from '@/routes/two-factor';
+import { edit as editProfile } from '@/routes/profile';
+import { edit as editSettingsAppearance } from '@/routes/settings/appearance';
+import { edit as editSettingsPassword } from '@/routes/settings/password';
+import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
@@ -28,29 +32,48 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }
 
     const userId = editingUser ? editingUser.id : auth.user!.id;
+    const isSelf = !editingUser || editingUser.id === auth.user!.id;
 
     const sidebarNavItems: NavItem[] = [
         {
             title: 'Profile',
-            href: edit(userId),
+            href: isSelf ? editProfile() : editAdminUser(userId),
             icon: null,
         },
     ];
 
-    if (userId == auth.user!.id) {
+    if (isSelf) {
         sidebarNavItems.push({
             title: 'Password',
-            href: editPassword(userId),
+            href: editSettingsPassword(),
             icon: null,
         },
             {
                 title: 'Two-Factor Auth',
-                href: show(userId),
+                href: showSettingsTwoFactor(),
                 icon: null,
             },
             {
                 title: 'Appearance',
-                href: editAppearance(userId),
+                href: editSettingsAppearance(),
+                icon: null,
+            }
+        );
+
+    } else {
+        sidebarNavItems.push({
+            title: 'Password',
+            href: editAdminPassword(userId),
+            icon: null,
+        },
+            {
+                title: 'Two-Factor Auth',
+                href: showAdminTwoFactor(userId),
+                icon: null,
+            },
+            {
+                title: 'Appearance',
+                href: editAdminAppearance(userId),
                 icon: null,
             }
         );

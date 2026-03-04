@@ -61,7 +61,10 @@ class ProductController extends Controller
         $activeFilter = null;
 
         $user = $request->user();
-        if ($user && !$user->hasRole('admin')) {
+        $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
+        $isAdminView = $user && $user->hasRole('admin') && !$isImpersonated;
+
+        if ($user && !$isAdminView) {
             $allowedDbIds = $user->dbProducts()->pluck('db_products.id')->toArray();
             $baseQuery->whereIn('db_products_id', $allowedDbIds);
         }
@@ -292,7 +295,7 @@ class ProductController extends Controller
         }
         
         // Calculer les prix avec marges pour les utilisateurs non-admin
-        if ($user && !$user->hasRole('admin')) {
+        if ($user && !$isAdminView) {
             $priceCalculator = app(PriceCalculatorService::class);
             $products->getCollection()->transform(function ($product) use ($priceCalculator, $user, $dbUserAttributesByDbId, $dbUserTransportByDbId) {
                 $dbId = $product->db_products_id;

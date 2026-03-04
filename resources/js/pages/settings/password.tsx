@@ -11,7 +11,8 @@ import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { edit, update } from '@/routes/password';
+import { edit as editAdminPassword, update as updateAdminPassword } from '@/routes/password';
+import { edit as editSettingsPassword, update as updateSettingsPassword } from '@/routes/settings/password';
 import { usePage } from '@inertiajs/react';
 import { Card } from '@/components/ui/card';
 
@@ -22,11 +23,12 @@ export default function Password() {
     const pageProps = usePage<{ auth: { user: { id: number } }, editingUser?: { id: number } }>().props;
     const { auth, editingUser } = pageProps;
     const userId = editingUser ? editingUser.id : auth.user.id;
+    const isSelf = !editingUser || editingUser.id === auth.user.id;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Password settings'),
-            href: edit(userId).url,
+            href: (isSelf ? editSettingsPassword() : editAdminPassword(userId)).url,
         },
     ];
 
@@ -42,7 +44,7 @@ export default function Password() {
                     /> */}
 
                     <Form
-                        {...update.form(userId)}
+                        {...(isSelf ? updateSettingsPassword.form() : updateAdminPassword.form(userId))}
                         options={{
                             preserveScroll: true,
                         }}

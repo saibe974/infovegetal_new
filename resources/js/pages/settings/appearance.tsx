@@ -7,7 +7,8 @@ import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit as editAppearance } from '@/routes/appearance';
+import { edit as editAdminAppearance } from '@/routes/appearance';
+import { edit as editSettingsAppearance } from '@/routes/settings/appearance';
 import { usePage } from '@inertiajs/react';
 import { Card } from '@/components/ui/card';
 
@@ -16,12 +17,13 @@ export default function Appearance() {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
     const userId = editingUser ? editingUser.id : auth.user?.id;
+    const isSelf = !editingUser || editingUser.id === auth.user?.id;
     if (!userId) return null;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Appearance settings'),
-            href: editAppearance(userId).url,
+            href: (isSelf ? editSettingsAppearance() : editAdminAppearance(userId)).url,
         },
     ];
 
@@ -35,7 +37,7 @@ export default function Appearance() {
                         title={t('Appearance settings')}
                         description={t("Update your account's appearance settings")}
                     />
-                    <AppearanceTabs className='w-fit'/>
+                    <AppearanceTabs className='w-fit' />
                 </Card>
             </SettingsLayout>
         </AppLayout>

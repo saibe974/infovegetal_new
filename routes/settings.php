@@ -10,10 +10,36 @@ use Inertia\Inertia;
 Route::middleware('auth')->group(function () {
     // Redirect legacy settings root to the authenticated user's profile path
     Route::get('settings', function (Request $request) {
-        return redirect()->route('profile.edit', ['user' => $request->user()->id]);
+        return redirect()->route('profile.edit');
     });
 
-    // ...existing code...
+    Route::get('settings/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('settings/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    Route::delete('settings/profile', [ProfileController::class, 'destroy'])
+        ->name('profile.destroy');
+
+    Route::get('settings/password', function (Request $request, PasswordController $controller) {
+        return $controller->edit($request);
+    })->name('settings.password.edit');
+
+    Route::put('settings/password', function (Request $request, PasswordController $controller) {
+        return $controller->update($request);
+    })->middleware('throttle:6,1')
+      ->name('settings.password.update');
+
+    Route::get('settings/appearance', function (Request $request) {
+        $user = $request->user();
+        return Inertia::render('settings/appearance', [
+            'editingUser' => $user?->load(['roles', 'permissions']),
+        ]);
+    })->name('settings.appearance.edit');
+
+    Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
+        ->name('settings.two-factor.show');
 
 
     Route::get('admin/users/{user}/password', function (Request $request, PasswordController $controller) {

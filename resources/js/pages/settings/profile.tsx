@@ -17,7 +17,8 @@ import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit, update } from '@/routes/users';
+import { edit as editAdminUser } from '@/routes/users';
+import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
 
@@ -36,11 +37,12 @@ export default function Profile({
     const errors = pageProps.errors ?? {};
     const { t } = useI18n();
     const targetUser = editingUser ?? auth.user;
+    const isSelf = !editingUser || editingUser.id === auth.user?.id;
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Profile settings'),
-            href: edit(targetUser!.id).url,
+            href: (isSelf ? editProfile() : editAdminUser(targetUser!.id)).url,
         },
     ];
 
@@ -147,13 +149,13 @@ export default function Profile({
                             payload.permissions = selectedPermissionIds;
 
                             // Use PUT for admin edit; use PATCH for own profile (settings route expects PATCH)
-                            if (editingUser) {
+                            if (!isSelf) {
                                 router.put(`/admin/users/${targetUser?.id}`, payload, {
                                     preserveScroll: true,
                                 });
                             } else {
                                 // settings/profile route uses PATCH — include target user id
-                                router.patch(update((editingUser ?? auth.user)!.id).url, payload, {
+                                router.patch(updateProfile().url, payload, {
                                     preserveScroll: true,
                                 });
                             }

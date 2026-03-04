@@ -8,7 +8,8 @@ import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
-import { disable, enable, show } from '@/routes/two-factor';
+import { disable, enable, show as showAdminTwoFactor } from '@/routes/two-factor';
+import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
 import { type BreadcrumbItem } from '@/types';
 import { usePage, Form, Head } from '@inertiajs/react';
 import { ShieldBan, ShieldCheck } from 'lucide-react';
@@ -36,11 +37,12 @@ export default function TwoFactor({
     } = useTwoFactorAuth();
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
 
-    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const { auth, editingUser } = usePage<{ auth: { user: { id: number } }, editingUser?: { id: number } }>().props;
+    const isSelf = !editingUser || editingUser.id === auth.user.id;
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: t('Two-Factor Authentication'),
-            href: show(auth.user.id).url,
+            href: (isSelf ? showSettingsTwoFactor() : showAdminTwoFactor(editingUser!.id)).url,
         },
     ];
 
