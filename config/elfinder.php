@@ -14,11 +14,11 @@ return [
 
     'roots' => [
         [
-            'driver' => 'LocalFileSystem',
-            'path' => storage_path('app/public/media'),
-            'URL' => env('APP_URL') . '/storage/media',
-            'alias' => 'Media',
-            'accessControl' => 'Barryvdh\Elfinder\Elfinder::checkAccess',
+                'driver' => 'LocalFileSystem',
+                'path' => storage_path('app/public'),
+                'URL' => env('APP_URL') . '/storage',
+                'alias' => 'Fichiers',
+                'accessControl' => 'Barryvdh\Elfinder\Elfinder::checkAccess',
         ],
     ],
 
