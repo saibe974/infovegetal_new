@@ -21,7 +21,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
     return (
         <AuthLayout
             title={t('Log in to your account')}
-            description={t('Enter your email and password below to log in')}
+            description={t('Enter your email or alias and password below to log in')}
         >
             <Head title={t('Log in')} />
 
@@ -35,16 +35,16 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="email">{t('Email address')}</Label>
+                                <Label htmlFor="email">{t('Email or alias')}</Label>
                                 <Input
                                     id="email"
-                                    type="email"
+                                    type="text"
                                     name="email"
                                     required
                                     // autoFocus
                                     tabIndex={1}
                                     autoComplete="email"
-                                    placeholder={t('email@example.com')}
+                                    placeholder={t('email@example.com or your-alias')}
                                 />
                                 <InputError message={errors.email} />
                             </div>

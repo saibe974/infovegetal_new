@@ -143,6 +143,14 @@ class UserManagementController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
+            'ref' => ['nullable', 'string', 'max:50'],
+            'tel' => ['nullable', 'string', 'max:25'],
+            'address_road' => ['nullable', 'string', 'max:255'],
+            'address_zip' => ['nullable', 'string', 'max:32'],
+            'address_town' => ['nullable', 'string', 'max:120'],
+            'active' => ['sometimes', 'boolean'],
+            'mailing' => ['sometimes', 'boolean'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8'],
             'roles' => ['sometimes', 'array'],
@@ -154,6 +162,14 @@ class UserManagementController extends Controller
         // Crée le noeud racine immédiatement pour initialiser _lft/_rgt (nested set)
         $user = new User([
             'name' => $validated['name'],
+            'alias' => $validated['alias'] ?? null,
+            'ref' => $validated['ref'] ?? null,
+            'tel' => $validated['tel'] ?? null,
+            'address_road' => $validated['address_road'] ?? null,
+            'address_zip' => $validated['address_zip'] ?? null,
+            'address_town' => $validated['address_town'] ?? null,
+            'active' => array_key_exists('active', $validated) ? (bool) $validated['active'] : true,
+            'mailing' => array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : false,
             'email' => $validated['email'],
             'password' => bcrypt($validated['password']),
         ]);
@@ -217,6 +233,14 @@ class UserManagementController extends Controller
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
+            'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias,' . $user->id],
+            'ref' => ['nullable', 'string', 'max:50'],
+            'tel' => ['nullable', 'string', 'max:25'],
+            'address_road' => ['nullable', 'string', 'max:255'],
+            'address_zip' => ['nullable', 'string', 'max:32'],
+            'address_town' => ['nullable', 'string', 'max:120'],
+            'active' => ['nullable', 'boolean'],
+            'mailing' => ['nullable', 'boolean'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
@@ -228,6 +252,14 @@ class UserManagementController extends Controller
 
         // Update basic fields
         $user->name = $validated['name'];
+        $user->alias = $validated['alias'] ?? null;
+        $user->ref = $validated['ref'] ?? null;
+        $user->tel = $validated['tel'] ?? null;
+        $user->address_road = $validated['address_road'] ?? null;
+        $user->address_zip = $validated['address_zip'] ?? null;
+        $user->address_town = $validated['address_town'] ?? null;
+        $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
+        $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
         $user->email = $validated['email'];
         $user->save();
 

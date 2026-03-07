@@ -34,6 +34,14 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'alias',
+        'ref',
+        'tel',
+        'address_road',
+        'address_zip',
+        'address_town',
+        'active',
+        'mailing',
         'email',
         'password',
         '_lft',
@@ -65,6 +73,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'active' => 'boolean',
+            'mailing' => 'boolean',
         ];
     }
 
@@ -87,6 +97,14 @@ class User extends Authenticatable
             'user_id',
             'db_product_id',
         )->withTimestamps()->withPivot('attributes');
+    }
+
+    /**
+     * User custom key/value metadata.
+     */
+    public function usersMeta(): HasMany
+    {
+        return $this->hasMany(UserMeta::class);
     }
 
     /**

@@ -57,6 +57,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 title: 'Appearance',
                 href: editSettingsAppearance(),
                 icon: null,
+            },
+            {
+                title: 'Additional info',
+                href: '/settings/additional-info',
+                icon: null,
             }
         );
 
@@ -74,6 +79,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             {
                 title: 'Appearance',
                 href: editAdminAppearance(userId),
+                icon: null,
+            },
+            {
+                title: 'Additional info',
+                href: `/admin/users/${userId}/additional-info`,
                 icon: null,
             }
         );
