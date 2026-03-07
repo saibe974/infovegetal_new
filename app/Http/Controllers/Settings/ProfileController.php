@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\User;
@@ -41,6 +42,11 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request, ?User $user = null): RedirectResponse
     {
         $target = $user ?? $request->user();
+        Log::info('ProfileController update called', [
+            'auth_id' => $request->user()?->id,
+            'target_id' => $target->id,
+            'route' => $request->path(),
+        ]);
 
         // Authorization: only self or admin
         if ($request->user()->id !== $target->id && !$request->user()->hasRole('admin')) {
@@ -56,7 +62,8 @@ class ProfileController extends Controller
         $target->save();
 
         // Redirect back to the same edit page (preserve route name)
-        return to_route('profile.edit', ['user' => $target->id]);
+        return to_route('profile.edit', ['user' => $target->id])
+            ->with('success', 'Profil mis a jour avec succes');
     }
 
     /**

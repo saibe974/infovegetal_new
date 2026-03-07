@@ -1,7 +1,7 @@
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Transition } from '@headlessui/react';
-import { Form, Head, Link, usePage, router } from '@inertiajs/react';
+import { Form, Head, Link, usePage } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
 import { Mail, Shield, Lock, AlertCircle } from 'lucide-react';
 
@@ -17,7 +17,7 @@ import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit as editAdminUser } from '@/routes/users';
+import { edit as editAdminUser, update as updateAdminUser } from '@/routes/users';
 import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
@@ -32,8 +32,9 @@ export default function Profile({
     // Optional user being edited (when an admin edits another user)
     editingUser?: User;
 }) {
-    const { auth, locale } = usePage<SharedData>().props as SharedData & { locale?: string };
-    const pageProps = usePage().props as any;
+    const page = usePage<SharedData>();
+    const { auth, locale } = page.props as SharedData & { locale?: string };
+    const pageProps = page.props as any;
     const errors = pageProps.errors ?? {};
     const { t } = useI18n();
     const targetUser = editingUser ?? auth.user;
@@ -45,6 +46,12 @@ export default function Profile({
             href: (isSelf ? editProfile() : editAdminUser(targetUser!.id)).url,
         },
     ];
+
+    const isAdminUser = isAdmin(getEffectiveUser(auth));
+    const isAdminEditContext = page.url.startsWith('/admin/users/') || isAdminUser;
+    const formAction = isAdminEditContext
+        ? updateAdminUser.form({ user: targetUser!.id })
+        : updateProfile.form();
 
     // console.log(editingUser);
 
@@ -131,36 +138,7 @@ export default function Profile({
                             </div>
                         )}
 
-                    <Form
-                        className='space-y-6'
-                        onSubmit={(e) => {
-                            e.preventDefault();
-
-                            const form = e.currentTarget as HTMLFormElement;
-                            const formData = new FormData(form);
-
-                            const payload: any = {
-                                name: String(formData.get('name') || ''),
-                                email: String(formData.get('email') || ''),
-                            };
-
-                            // Attach roles/permissions arrays from state
-                            payload.roles = selectedRoleIds;
-                            payload.permissions = selectedPermissionIds;
-
-                            // Use PUT for admin edit; use PATCH for own profile (settings route expects PATCH)
-                            if (!isSelf) {
-                                router.put(`/admin/users/${targetUser?.id}`, payload, {
-                                    preserveScroll: true,
-                                });
-                            } else {
-                                // settings/profile route uses PATCH — include target user id
-                                router.patch(updateProfile().url, payload, {
-                                    preserveScroll: true,
-                                });
-                            }
-                        }}
-                    >
+                    <Form {...formAction} className='space-y-6'>
 
                         {/* Informations Personnelles */}
                         <Card className="p-6">
@@ -168,9 +146,6 @@ export default function Profile({
                                 <Mail size={20} />
                                 {t('Profile information')}
                             </h2>
-
-                            {/* When editing another user, spoof PUT for RESTful update (kept for compatibility) */}
-                            {editingUser && <input type="hidden" name="_method" value="PUT" />}
 
                             <div className="grid gap-2">
                                 <Label htmlFor="name">{t('Name')}</Label>
@@ -262,7 +237,7 @@ export default function Profile({
                         </Card>
 
                         {/* Section Permissions (affiché si l'éditeur est admin) */}
-                        {isAdmin(getEffectiveUser(auth)) && (
+                        {isAdminUser && (
                             <Card className="p-6">
                                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                     <Lock size={20} />

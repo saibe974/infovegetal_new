@@ -133,11 +133,13 @@ class UserManagementController extends Controller
     }   
 
     public function store(Request $request): HttpFoundationRedirectResponse
-    {
+    {Log::info("Creating new user by " . $request->user()->id);
         // Vérifier que l'utilisateur est admin
         if (!$request->user()->hasRole('admin')) {
             abort(403, 'Unauthorized');
         }
+
+        
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -207,9 +209,11 @@ class UserManagementController extends Controller
     {
         // Only admin or the user itself can update
         $me = $request->user();
+        Log::info("Updating user $user->id by $me->id");
         if ($me->id !== $user->id && !$me->hasRole('admin')) {
             abort(403, 'Unauthorized');
         }
+
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -233,8 +237,17 @@ class UserManagementController extends Controller
                 // non-admin cannot change roles
                 // ignore
             } else {
-                // If admin is editing themselves, disallow removing own admin role
-                if ($me->id === $user->id) {
+                // If the real admin account is editing itself, disallow removing own admin role.
+                // In impersonation mode, $me is the impersonated user, so we must resolve the impersonator id.
+                $actorId = $me->id;
+                if (method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
+                    $impersonatorId = app('impersonate')->getImpersonatorId();
+                    if ($impersonatorId) {
+                        $actorId = (int) $impersonatorId;
+                    }
+                }
+
+                if ((int) $actorId === (int) $user->id) {
                     // ensure admin role remains
                     $current = collect($validated['roles']);
                     $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')->value('id');
@@ -278,8 +291,9 @@ class UserManagementController extends Controller
             $user->syncPermissions($permNames);
         }
 
-        // Redirection vers la page d'édition du profil
-        return to_route('users.edit', ['user' => $user->id]);
+        // Redirection vers la page d'édition du profil avec confirmation visuelle
+        return to_route('users.edit', ['user' => $user->id])
+            ->with('success', 'Utilisateur mis a jour avec succes');
 
     }
 
