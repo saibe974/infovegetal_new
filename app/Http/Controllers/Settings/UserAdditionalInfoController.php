@@ -225,7 +225,9 @@ class UserAdditionalInfoController extends Controller
                 ? json_encode($validated['value_json'])
                 : null;
         } elseif (($inputKind === 'file/image' || $key === 'logo') && $request->hasFile('value_file')) {
-            $path = $request->file('value_file')->store('users-meta', 'uploads');
+            // Prefer public disk for images, fallback to default disk if public is not available.
+            $disk = config('filesystems.disks.public') ? 'public' : config('filesystems.default', 'local');
+            $path = $request->file('value_file')->store('users-meta', (string) $disk);
             $value = $path;
         }
 
