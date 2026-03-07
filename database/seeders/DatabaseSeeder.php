@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             DbProductsSeeder::class,
+            UsersMetaKeysSeeder::class,
+            UsersMetaFieldTypesSeeder::class,
         ]);
     }
 }

@@ -10,7 +10,7 @@ import { edit as editProfile } from '@/routes/profile';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react';
 
 type UserMetaItem = {
     id: number;
@@ -24,6 +24,8 @@ type UserMetaItem = {
 type PageProps = SharedData & {
     editingUser?: User;
     userMeta?: UserMetaItem[];
+    metaKeyOptions?: Array<{ value: string; label: string }>;
+    metaKeyConfig?: Record<string, { input: string; fields: string[] }>;
 };
 
 type AdditionalInfoPayload = {
@@ -37,6 +39,16 @@ type AdditionalInfoPayload = {
     mailing: boolean;
 };
 
+type MetaFormPayload = {
+    key: string;
+    custom_key: string;
+    value: string;
+    value_json: Record<string, string>;
+    value_file: File | null;
+    type: string;
+    sort_order: number;
+};
+
 export default function AdditionalInfo() {
     const page = usePage<PageProps>();
     const { auth, editingUser } = page.props;
@@ -44,6 +56,8 @@ export default function AdditionalInfo() {
     const isSelf = !editingUser || editingUser.id === auth.user?.id;
     const isAdminPath = page.url.startsWith('/admin/users/');
     const userMeta = page.props.userMeta ?? [];
+    const metaKeyOptions = page.props.metaKeyOptions ?? [];
+    const metaKeyConfig = page.props.metaKeyConfig ?? {};
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -71,12 +85,17 @@ export default function AdditionalInfo() {
         mailing: Boolean((targetUser as any)?.mailing ?? false),
     });
 
-    const newMetaForm = useForm({
-        key: '',
+    const newMetaForm = useForm<MetaFormPayload>({
+        key: metaKeyOptions[0]?.value ?? 'custom',
+        custom_key: '',
         value: '',
+        value_json: { number: '', road: '', zip: '', town: '' },
+        value_file: null,
         type: '',
         sort_order: 0,
     });
+
+    const selectedNewMetaInput = resolveInputKind(newMetaForm.data.key, metaKeyConfig);
 
     const saveMain = (e: FormEvent) => {
         e.preventDefault();
@@ -85,10 +104,22 @@ export default function AdditionalInfo() {
 
     const addMeta = (e: FormEvent) => {
         e.preventDefault();
+
+        const actualKey = resolveActualKey(newMetaForm.data.key, newMetaForm.data.custom_key);
+        const mappedType = metaKeyConfig[actualKey]?.input ?? selectedNewMetaInput;
+
+        newMetaForm.transform((payload) => ({
+            ...payload,
+            key: actualKey,
+            type: mappedType,
+        }));
+
         newMetaForm.post(metaBaseUrl, {
+            forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
-                newMetaForm.reset('key', 'value', 'type', 'sort_order');
+                newMetaForm.reset('custom_key', 'value', 'type', 'sort_order', 'value_file');
+                newMetaForm.setData('value_json', { number: '', road: '', zip: '', town: '' });
             },
         });
     };
@@ -168,32 +199,59 @@ export default function AdditionalInfo() {
                     <Card className="p-6">
                         <h2 className="mb-4 text-xl font-semibold">Champs dynamiques</h2>
 
-                        <form onSubmit={addMeta} className="mb-6 grid gap-3 md:grid-cols-[1fr_1fr_140px_120px_auto]">
-                            <Input
-                                placeholder="key (ex: phone.secondary)"
-                                value={newMetaForm.data.key}
-                                onChange={(e) => newMetaForm.setData('key', e.target.value)}
+                        <form onSubmit={addMeta} className="mb-6 space-y-3">
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div className="grid gap-2">
+                                    <Label>Cle</Label>
+                                    <select
+                                        className="h-10 rounded-md border bg-background px-3"
+                                        value={newMetaForm.data.key}
+                                        onChange={(e) => newMetaForm.setData('key', e.target.value)}
+                                    >
+                                        {metaKeyOptions.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Type detecte</Label>
+                                    <Input value={selectedNewMetaInput} readOnly />
+                                </div>
+
+                                {newMetaForm.data.key === 'custom' && (
+                                    <div className="grid gap-2 md:col-span-2">
+                                        <Label>Nom de la cle custom</Label>
+                                        <Input
+                                            placeholder="ex: contact.secondary_email"
+                                            value={newMetaForm.data.custom_key}
+                                            onChange={(e) => newMetaForm.setData('custom_key', e.target.value)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <DynamicValueInput
+                                inputKind={selectedNewMetaInput}
+                                fields={metaKeyConfig[newMetaForm.data.key]?.fields ?? []}
+                                data={newMetaForm.data}
+                                setData={newMetaForm.setData}
                             />
-                            <Input
-                                placeholder="value"
-                                value={newMetaForm.data.value}
-                                onChange={(e) => newMetaForm.setData('value', e.target.value)}
-                            />
-                            <Input
-                                placeholder="type (ex: string/json)"
-                                value={newMetaForm.data.type}
-                                onChange={(e) => newMetaForm.setData('type', e.target.value)}
-                            />
-                            <Input
-                                type="number"
-                                placeholder="ordre"
-                                value={String(newMetaForm.data.sort_order)}
-                                onChange={(e) => newMetaForm.setData('sort_order', Number(e.target.value || 0))}
-                            />
-                            <Button type="submit" disabled={newMetaForm.processing}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Ajouter
-                            </Button>
+
+                            <div className="grid gap-3 md:grid-cols-[140px_auto]">
+                                <Input
+                                    type="number"
+                                    placeholder="ordre"
+                                    value={String(newMetaForm.data.sort_order)}
+                                    onChange={(e) => newMetaForm.setData('sort_order', Number(e.target.value || 0))}
+                                />
+                                <Button type="submit" disabled={newMetaForm.processing}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Ajouter
+                                </Button>
+                            </div>
                         </form>
                         <InputError message={newMetaForm.errors.key || newMetaForm.errors.value || newMetaForm.errors.type} />
 
@@ -207,6 +265,8 @@ export default function AdditionalInfo() {
                                     key={item.id}
                                     item={item}
                                     metaBaseUrl={metaBaseUrl}
+                                    metaKeyOptions={metaKeyOptions}
+                                    metaKeyConfig={metaKeyConfig}
                                 />
                             ))}
                         </div>
@@ -217,17 +277,47 @@ export default function AdditionalInfo() {
     );
 }
 
-function MetaRow({ item, metaBaseUrl }: { item: UserMetaItem; metaBaseUrl: string }) {
-    const form = useForm({
-        key: item.key,
+function MetaRow({
+    item,
+    metaBaseUrl,
+    metaKeyOptions,
+    metaKeyConfig,
+}: {
+    item: UserMetaItem;
+    metaBaseUrl: string;
+    metaKeyOptions: Array<{ value: string; label: string }>;
+    metaKeyConfig: Record<string, { input: string; fields: string[] }>;
+}) {
+    const knownKeys = useMemo(() => new Set(metaKeyOptions.map((x) => x.value)), [metaKeyOptions]);
+    const startsAsCustom = !knownKeys.has(item.key);
+
+    const form = useForm<MetaFormPayload>({
+        key: startsAsCustom ? 'custom' : item.key,
+        custom_key: startsAsCustom ? item.key : '',
         value: item.value ?? '',
+        value_json: parseJsonValue(item.value),
+        value_file: null,
         type: item.type ?? '',
         sort_order: item.sort_order ?? 0,
     });
 
+    const actualKey = resolveActualKey(form.data.key, form.data.custom_key);
+    const inputKind = resolveInputKind(actualKey, metaKeyConfig);
+    const fields = metaKeyConfig[actualKey]?.fields ?? [];
+
     const save = (e: FormEvent) => {
         e.preventDefault();
-        form.put(`${metaBaseUrl}/${item.id}`, { preserveScroll: true });
+
+        form.transform((payload) => ({
+            ...payload,
+            key: actualKey,
+            type: inputKind,
+        }));
+
+        form.put(`${metaBaseUrl}/${item.id}`, {
+            forceFormData: true,
+            preserveScroll: true,
+        });
     };
 
     const remove = () => {
@@ -235,23 +325,177 @@ function MetaRow({ item, metaBaseUrl }: { item: UserMetaItem; metaBaseUrl: strin
     };
 
     return (
-        <form onSubmit={save} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_140px_120px_auto_auto]">
-            <Input value={form.data.key} onChange={(e) => form.setData('key', e.target.value)} />
-            <Input value={form.data.value} onChange={(e) => form.setData('value', e.target.value)} />
-            <Input value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} />
-            <Input
-                type="number"
-                value={String(form.data.sort_order)}
-                onChange={(e) => form.setData('sort_order', Number(e.target.value || 0))}
+        <form onSubmit={save} className="space-y-3 rounded-md border p-3">
+            <div className="grid gap-3 md:grid-cols-2">
+                <select
+                    className="h-10 rounded-md border bg-background px-3"
+                    value={form.data.key}
+                    onChange={(e) => form.setData('key', e.target.value)}
+                >
+                    {metaKeyOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                    <option value="custom">Custom</option>
+                </select>
+
+                <Input value={inputKind} readOnly />
+
+                {form.data.key === 'custom' && (
+                    <Input
+                        placeholder="Nom de la cle custom"
+                        value={form.data.custom_key}
+                        onChange={(e) => form.setData('custom_key', e.target.value)}
+                        className="md:col-span-2"
+                    />
+                )}
+            </div>
+
+            <DynamicValueInput
+                inputKind={inputKind}
+                fields={fields}
+                data={form.data}
+                setData={form.setData}
             />
-            <Button type="submit" variant="secondary" disabled={form.processing}>
-                <Save className="mr-2 h-4 w-4" />
-                Sauver
-            </Button>
-            <Button type="button" variant="destructive" onClick={remove} disabled={form.processing}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Supprimer
-            </Button>
+
+            <div className="grid gap-3 md:grid-cols-[120px_auto_auto]">
+                <Input
+                    type="number"
+                    value={String(form.data.sort_order)}
+                    onChange={(e) => form.setData('sort_order', Number(e.target.value || 0))}
+                />
+                <Button type="submit" variant="secondary" disabled={form.processing}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Sauver
+                </Button>
+                <Button type="button" variant="destructive" onClick={remove} disabled={form.processing}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                </Button>
+            </div>
         </form>
+    );
+}
+
+function resolveActualKey(key: string, customKey: string): string {
+    return key === 'custom' ? customKey.trim() : key;
+}
+
+function resolveInputKind(key: string, config: Record<string, { input: string; fields: string[] }>): string {
+    if (!key || key === 'custom') {
+        return 'input';
+    }
+
+    return config[key]?.input ?? 'input';
+}
+
+function parseJsonValue(raw: string | null): Record<string, string> {
+    if (!raw) {
+        return { number: '', road: '', zip: '', town: '' };
+    }
+
+    try {
+        const decoded = JSON.parse(raw);
+        return {
+            number: String(decoded?.number ?? ''),
+            road: String(decoded?.road ?? ''),
+            zip: String(decoded?.zip ?? ''),
+            town: String(decoded?.town ?? ''),
+        };
+    } catch {
+        return { number: '', road: '', zip: '', town: '' };
+    }
+}
+
+function DynamicValueInput({
+    inputKind,
+    fields,
+    data,
+    setData,
+}: {
+    inputKind: string;
+    fields: string[];
+    data: MetaFormPayload;
+    setData: (key: keyof MetaFormPayload, value: any) => void;
+}) {
+    if (inputKind === 'textarea') {
+        return (
+            <textarea
+                className="min-h-24 rounded-md border p-3"
+                placeholder="Valeur"
+                value={data.value}
+                onChange={(e) => setData('value', e.target.value)}
+            />
+        );
+    }
+
+    if (inputKind === 'json') {
+        const jsonFields = fields.length > 0 ? fields : ['number', 'road', 'zip', 'town'];
+        return (
+            <div className="grid gap-3 md:grid-cols-2">
+                {jsonFields.map((field) => (
+                    <Input
+                        key={field}
+                        placeholder={field}
+                        value={data.value_json[field] ?? ''}
+                        onChange={(e) =>
+                            setData('value_json', {
+                                ...data.value_json,
+                                [field]: e.target.value,
+                            })
+                        }
+                    />
+                ))}
+            </div>
+        );
+    }
+
+    if (inputKind === 'file/image') {
+        return (
+            <div className="grid gap-3 md:grid-cols-2">
+                <Input
+                    placeholder="Valeur actuelle (path/url)"
+                    value={data.value}
+                    onChange={(e) => setData('value', e.target.value)}
+                />
+                <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setData('value_file', e.target.files?.[0] ?? null)}
+                />
+            </div>
+        );
+    }
+
+    if (inputKind === 'tel') {
+        return (
+            <Input
+                type="tel"
+                placeholder="+33123456789"
+                value={data.value}
+                onChange={(e) => setData('value', e.target.value)}
+            />
+        );
+    }
+
+    if (inputKind === 'number tel') {
+        return (
+            <Input
+                type="tel"
+                placeholder="+33123456789"
+                value={data.value}
+                onChange={(e) => setData('value', e.target.value)}
+            />
+        );
+    }
+
+    return (
+        <Input
+            type={inputKind === 'mail' ? 'email' : 'text'}
+            placeholder="Valeur"
+            value={data.value}
+            onChange={(e) => setData('value', e.target.value)}
+        />
     );
 }

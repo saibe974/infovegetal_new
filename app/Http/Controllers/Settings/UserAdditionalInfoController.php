@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserMeta;
+use App\Models\UserOption;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,6 +27,8 @@ class UserAdditionalInfoController extends Controller
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(['id', 'user_id', 'key', 'value', 'type', 'sort_order', 'created_at', 'updated_at']),
+            'metaKeyOptions' => $this->metaKeyOptions(),
+            'metaKeyConfig' => $this->metaKeyConfig(),
         ]);
     }
 
@@ -66,15 +70,20 @@ class UserAdditionalInfoController extends Controller
 
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:255'],
+            'custom_key' => ['nullable', 'string', 'max:255', 'required_if:key,custom'],
             'value' => ['nullable', 'string'],
+            'value_json' => ['nullable', 'array'],
+            'value_file' => ['nullable', 'file', 'image', 'max:5120'],
             'type' => ['nullable', 'string', 'max:50'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $validated);
+
         $target->usersMeta()->create([
-            'key' => $validated['key'],
-            'value' => $validated['value'] ?? null,
-            'type' => $validated['type'] ?? null,
+            'key' => $metaKey,
+            'value' => $metaValue,
+            'type' => $metaType,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
@@ -93,15 +102,20 @@ class UserAdditionalInfoController extends Controller
 
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:255'],
+            'custom_key' => ['nullable', 'string', 'max:255', 'required_if:key,custom'],
             'value' => ['nullable', 'string'],
+            'value_json' => ['nullable', 'array'],
+            'value_file' => ['nullable', 'file', 'image', 'max:5120'],
             'type' => ['nullable', 'string', 'max:50'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $validated);
+
         $meta->update([
-            'key' => $validated['key'],
-            'value' => $validated['value'] ?? null,
-            'type' => $validated['type'] ?? null,
+            'key' => $metaKey,
+            'value' => $metaValue,
+            'type' => $metaType,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
 
@@ -145,5 +159,78 @@ class UserAdditionalInfoController extends Controller
         }
 
         abort(403, 'Unauthorized');
+    }
+
+    private function metaKeyOptions(): array
+    {
+        return UserOption::query()
+            ->where('key', 'users_meta.allowed_key')
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->get(['value', 'label'])
+            ->map(fn (UserOption $row) => [
+                'value' => (string) $row->value,
+                'label' => (string) ($row->label ?: $row->value),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function metaKeyConfig(): array
+    {
+        $kinds = UserOption::query()
+            ->where('key', 'users_meta.input_kind')
+            ->where('active', true)
+            ->get(['value', 'label', 'type'])
+            ->keyBy('value');
+
+        $fields = UserOption::query()
+            ->where('key', 'users_meta.input_fields')
+            ->where('active', true)
+            ->get(['value', 'label'])
+            ->keyBy('value');
+
+        $config = [];
+        foreach ($kinds as $value => $row) {
+            $fieldRow = $fields->get($value);
+            $config[$value] = [
+                'input' => (string) ($row->label ?: $row->type ?: 'input'),
+                'fields' => $fieldRow && $fieldRow->label
+                    ? array_values(array_filter(array_map('trim', explode(',', (string) $fieldRow->label))))
+                    : [],
+            ];
+        }
+
+        return $config;
+    }
+
+    private function resolveMetaPayload(Request $request, array $validated): array
+    {
+        $key = (string) ($validated['key'] ?? '');
+        if ($key === 'custom') {
+            $key = (string) ($validated['custom_key'] ?? '');
+        }
+
+        if ($key === '') {
+            abort(422, 'Invalid key');
+        }
+
+        $config = $this->metaKeyConfig();
+        $inputKind = $config[$key]['input'] ?? null;
+
+        $value = $validated['value'] ?? null;
+
+        if ($inputKind === 'json') {
+            $value = !empty($validated['value_json'])
+                ? json_encode($validated['value_json'])
+                : null;
+        } elseif (($inputKind === 'file/image' || $key === 'logo') && $request->hasFile('value_file')) {
+            $path = $request->file('value_file')->store('users-meta', 'uploads');
+            $value = $path;
+        }
+
+        $type = $validated['type'] ?? $inputKind;
+
+        return [$key, $type, $value];
     }
 }
