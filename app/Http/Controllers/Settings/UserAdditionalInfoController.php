@@ -8,10 +8,10 @@ use App\Models\UserMeta;
 use App\Models\UserOption;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserAdditionalInfoController extends Controller
 {
@@ -78,7 +78,7 @@ class UserAdditionalInfoController extends Controller
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $validated);
+        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $target, $validated);
 
         $target->usersMeta()->create([
             'key' => $metaKey,
@@ -110,7 +110,7 @@ class UserAdditionalInfoController extends Controller
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $validated);
+        [$metaKey, $metaType, $metaValue] = $this->resolveMetaPayload($request, $target, $validated, $meta);
 
         $meta->update([
             'key' => $metaKey,
@@ -130,6 +130,11 @@ class UserAdditionalInfoController extends Controller
 
         if ((int) $meta->user_id !== (int) $target->id) {
             abort(404);
+        }
+
+        $existingMediaId = $this->extractMediaId($meta->value);
+        if ($existingMediaId) {
+            Media::query()->whereKey($existingMediaId)->delete();
         }
 
         $meta->delete();
@@ -204,7 +209,7 @@ class UserAdditionalInfoController extends Controller
         return $config;
     }
 
-    private function resolveMetaPayload(Request $request, array $validated): array
+    private function resolveMetaPayload(Request $request, User $target, array $validated, ?UserMeta $existingMeta = null): array
     {
         $key = (string) ($validated['key'] ?? '');
         if ($key === 'custom') {
@@ -225,14 +230,43 @@ class UserAdditionalInfoController extends Controller
                 ? json_encode($validated['value_json'])
                 : null;
         } elseif (($inputKind === 'file/image' || $key === 'logo') && $request->hasFile('value_file')) {
-            // Prefer public disk for images, fallback to default disk if public is not available.
-            $disk = config('filesystems.disks.public') ? 'public' : config('filesystems.default', 'local');
-            $path = $request->file('value_file')->store('users-meta', (string) $disk);
-            $value = $path;
+            $collection = $key === 'logo' ? 'user_logos' : 'user_meta_files';
+
+            $previousMediaId = $existingMeta ? $this->extractMediaId($existingMeta->value) : null;
+            if ($previousMediaId) {
+                Media::query()->whereKey($previousMediaId)->delete();
+            }
+
+            $media = $target
+                ->addMediaFromRequest('value_file')
+                ->toMediaCollection($collection);
+
+            $value = json_encode([
+                'media_id' => $media->id,
+                'collection' => $collection,
+                'url' => $media->getUrl(),
+                'thumb_url' => $media->getUrl('thumb'),
+                'medium_url' => $media->getUrl('medium'),
+                'file_name' => $media->file_name,
+            ]);
         }
 
         $type = $validated['type'] ?? $inputKind;
 
         return [$key, $type, $value];
+    }
+
+    private function extractMediaId(?string $value): ?int
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded) && isset($decoded['media_id'])) {
+            return (int) $decoded['media_id'];
+        }
+
+        return null;
     }
 }

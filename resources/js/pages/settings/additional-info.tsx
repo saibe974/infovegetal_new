@@ -10,7 +10,7 @@ import { edit as editProfile } from '@/routes/profile';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { Plus, Save, Trash2 } from 'lucide-react';
-import { FormEvent, useMemo } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type UserMetaItem = {
     id: number;
@@ -294,7 +294,7 @@ function MetaRow({
     const form = useForm<MetaFormPayload>({
         key: startsAsCustom ? 'custom' : item.key,
         custom_key: startsAsCustom ? item.key : '',
-        value: item.value ?? '',
+        value: resolvePersistedFileValue(item.value),
         value_json: parseJsonValue(item.value),
         value_file: null,
         type: item.type ?? '',
@@ -419,6 +419,9 @@ function DynamicValueInput({
     data: MetaFormPayload;
     setData: (key: keyof MetaFormPayload, value: any) => void;
 }) {
+    const selectedPreview = useSelectedFilePreview(data.value_file);
+    const persistedPreview = resolveImagePreview(data.value);
+
     if (inputKind === 'textarea') {
         return (
             <textarea
@@ -453,17 +456,30 @@ function DynamicValueInput({
 
     if (inputKind === 'file/image') {
         return (
-            <div className="grid gap-3 md:grid-cols-2">
-                <Input
-                    placeholder="Valeur actuelle (path/url)"
-                    value={data.value}
-                    onChange={(e) => setData('value', e.target.value)}
-                />
-                <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setData('value_file', e.target.files?.[0] ?? null)}
-                />
+            <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                    <Input
+                        placeholder="Valeur actuelle (path/url)"
+                        value={data.value}
+                        onChange={(e) => setData('value', e.target.value)}
+                    />
+                    <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setData('value_file', e.target.files?.[0] ?? null)}
+                    />
+                </div>
+
+                {(selectedPreview || persistedPreview) && (
+                    <div className="rounded-md border p-3">
+                        <p className="mb-2 text-sm text-muted-foreground">Apercu</p>
+                        <img
+                            src={selectedPreview ?? persistedPreview ?? ''}
+                            alt="Apercu image"
+                            className="max-h-52 rounded-md border object-contain"
+                        />
+                    </div>
+                )}
             </div>
         );
     }
@@ -498,4 +514,76 @@ function DynamicValueInput({
             onChange={(e) => setData('value', e.target.value)}
         />
     );
+}
+
+function resolvePersistedFileValue(raw: string | null): string {
+    if (!raw) {
+        return '';
+    }
+
+    const decoded = safeJson(raw);
+    if (decoded && typeof decoded.url === 'string') {
+        return decoded.url;
+    }
+
+    return raw;
+}
+
+function resolveImagePreview(raw: string): string | null {
+    const decoded = safeJson(raw);
+    if (decoded) {
+        if (typeof decoded.medium_url === 'string' && decoded.medium_url) {
+            return decoded.medium_url;
+        }
+        if (typeof decoded.thumb_url === 'string' && decoded.thumb_url) {
+            return decoded.thumb_url;
+        }
+        if (typeof decoded.url === 'string' && decoded.url) {
+            return decoded.url;
+        }
+    }
+
+    const value = raw.trim();
+    if (!value) {
+        return null;
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
+        return value;
+    }
+
+    if (value.startsWith('/')) {
+        return value;
+    }
+
+    return `/storage/${value}`;
+}
+
+function safeJson(value: string): Record<string, any> | null {
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function useSelectedFilePreview(file: File | null): string | null {
+    const [preview, setPreview] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!file) {
+            setPreview(null);
+            return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        setPreview(objectUrl);
+
+        return () => {
+            URL.revokeObjectURL(objectUrl);
+        };
+    }, [file]);
+
+    return preview;
 }
