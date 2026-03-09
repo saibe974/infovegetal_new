@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use League\Csv\Reader;
@@ -65,6 +66,22 @@ class UserImportService
 
             if (!is_file($dataFile)) {
                 Log::info("No data file for chunk $chunkIndex, nothing to process for ID: $id");
+                $completed = min($total, max(0, $processed + $errors));
+                $progress = $total > 0
+                    ? (int) floor(($completed / max(1, $total)) * 100)
+                    : 100;
+
+                $this->updateImportState($id, [
+                    'status' => 'done',
+                    'processed' => $processed,
+                    'total' => $total,
+                    'errors' => $errors,
+                    'progress' => min(100, max(0, $progress)),
+                    'next_offset' => $chunkIndex,
+                    'has_more' => false,
+                    'path' => $relativePath,
+                ]);
+
                 return;
             }
 
@@ -394,6 +411,34 @@ class UserImportService
 
         // Hash par defaut calcule une seule fois pour limiter fortement le cout CPU.
         $defaultHashedPassword = $this->hashPasswordForImport(Str::random(40));
+        $availableColumns = $this->getImportableUserColumns();
+        $allowAlias = in_array('alias', $availableColumns, true);
+        $allowRef = in_array('ref', $availableColumns, true);
+        $allowPhone = in_array('phone', $availableColumns, true);
+        $allowAddressRoad = in_array('address_road', $availableColumns, true);
+        $allowAddressZip = in_array('address_zip', $availableColumns, true);
+        $allowAddressTown = in_array('address_town', $availableColumns, true);
+
+        $aliasOwners = [];
+        $batchAliasOwners = [];
+
+        if ($allowAlias) {
+            $aliasValues = array_values(array_unique(array_filter(array_map(static fn ($r) => strtolower(trim((string) ($r['alias'] ?? ''))), $rows))));
+            if (!empty($aliasValues)) {
+                $existingAliasRows = User::query()
+                    ->select(['email', 'alias'])
+                    ->whereNotNull('alias')
+                    ->whereIn(DB::raw('LOWER(alias)'), $aliasValues)
+                    ->get();
+
+                foreach ($existingAliasRows as $existingAliasRow) {
+                    $key = strtolower(trim((string) ($existingAliasRow->alias ?? '')));
+                    if ($key !== '' && !isset($aliasOwners[$key])) {
+                        $aliasOwners[$key] = (string) $existingAliasRow->email;
+                    }
+                }
+            }
+        }
 
         foreach ($rows as $row) {
             $email = (string) ($row['email'] ?? '');
@@ -416,20 +461,57 @@ class UserImportService
                 $hashedPassword = $existing?->password ?: $defaultHashedPassword;
             }
 
-            $userUpserts[] = [
+            $resolvedAlias = null;
+            if ($allowAlias) {
+                $requestedAlias = trim((string) ($row['alias'] ?? ''));
+                if ($requestedAlias !== '') {
+                    $aliasKey = strtolower($requestedAlias);
+                    $existingOwnerEmail = $aliasOwners[$aliasKey] ?? null;
+                    $batchOwnerEmail = $batchAliasOwners[$aliasKey] ?? null;
+                    $currentUserAlias = trim((string) ($existing?->alias ?? ''));
+                    $ownedByCurrentUser =
+                        $currentUserAlias !== '' && strtolower($currentUserAlias) === $aliasKey;
+                    $freeInDb = $existingOwnerEmail === null || strcasecmp($existingOwnerEmail, $email) === 0;
+                    $freeInBatch = $batchOwnerEmail === null || strcasecmp($batchOwnerEmail, $email) === 0;
+
+                    if ($ownedByCurrentUser || ($freeInDb && $freeInBatch)) {
+                        $resolvedAlias = $requestedAlias;
+                        $batchAliasOwners[$aliasKey] = $email;
+                    } elseif ($currentUserAlias !== '') {
+                        $resolvedAlias = $currentUserAlias;
+                    }
+                }
+            }
+
+            $payload = [
                 'email' => $email,
                 'name' => (string) ($row['name'] ?? ''),
                 'password' => $hashedPassword,
-                'alias' => $row['alias'] ?? null,
-                'ref' => $row['ref'] ?? null,
-                'phone' => $row['phone'] ?? null,
-                'address_road' => $row['address_road'] ?? null,
-                'address_zip' => $row['address_zip'] ?? null,
-                'address_town' => $row['address_town'] ?? null,
                 'email_verified_at' => $now,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
+
+            if ($allowAlias) {
+                $payload['alias'] = $resolvedAlias;
+            }
+            if ($allowRef) {
+                $payload['ref'] = $row['ref'] ?? null;
+            }
+            if ($allowPhone) {
+                $payload['phone'] = $row['phone'] ?? null;
+            }
+            if ($allowAddressRoad) {
+                $payload['address_road'] = $row['address_road'] ?? null;
+            }
+            if ($allowAddressZip) {
+                $payload['address_zip'] = $row['address_zip'] ?? null;
+            }
+            if ($allowAddressTown) {
+                $payload['address_town'] = $row['address_town'] ?? null;
+            }
+
+            $userUpserts[] = $payload;
 
             $rolesStr = trim((string) ($row['roles'] ?? ''));
             if ($rolesStr !== '') {
@@ -471,10 +553,27 @@ class UserImportService
 
         try {
             DB::transaction(function () use ($userUpserts, $emails, $rolesByEmail, $validRoleIds, $dbProductsByEmail, $now) {
+                $availableColumns = $this->getImportableUserColumns();
+                $updateColumns = array_values(array_intersect(
+                    [
+                        'name',
+                        'password',
+                        'alias',
+                        'ref',
+                        'phone',
+                        'address_road',
+                        'address_zip',
+                        'address_town',
+                        'email_verified_at',
+                        'updated_at',
+                    ],
+                    $availableColumns
+                ));
+
                 User::upsert(
                     $userUpserts,
                     ['email'],
-                    ['name', 'password', 'alias', 'ref', 'phone', 'address_road', 'address_zip', 'address_town', 'email_verified_at', 'updated_at']
+                    $updateColumns
                 );
 
                 $usersByEmail = User::query()
@@ -549,6 +648,14 @@ class UserImportService
             Log::warning('[User Import] Batch upsert failed: ' . $e->getMessage());
 
             // Fallback robuste en cas d'echec transactionnel.
+            $availableColumns = $this->getImportableUserColumns();
+            $allowAlias = in_array('alias', $availableColumns, true);
+            $allowRef = in_array('ref', $availableColumns, true);
+            $allowPhone = in_array('phone', $availableColumns, true);
+            $allowAddressRoad = in_array('address_road', $availableColumns, true);
+            $allowAddressZip = in_array('address_zip', $availableColumns, true);
+            $allowAddressTown = in_array('address_town', $availableColumns, true);
+
             foreach ($rows as $row) {
                 try {
                     $email = $row['email'];
@@ -563,20 +670,42 @@ class UserImportService
                             : $this->hashPasswordForImport((string) $password))
                         : $this->hashPasswordForImport(Str::random(32));
 
-                    $user = User::updateOrCreate(
-                        ['email' => $email],
-                        [
-                            'name' => $name,
-                            'password' => $hashedPassword,
-                            'alias' => $row['alias'] ?? null,
-                            'ref' => $row['ref'] ?? null,
-                            'phone' => $row['phone'] ?? null,
-                            'address_road' => $row['address_road'] ?? null,
-                            'address_zip' => $row['address_zip'] ?? null,
-                            'address_town' => $row['address_town'] ?? null,
-                            'email_verified_at' => now(),
-                        ]
-                    );
+                    $updatePayload = [
+                        'name' => $name,
+                        'password' => $hashedPassword,
+                        'email_verified_at' => now(),
+                    ];
+
+                    if ($allowAlias) {
+                        $requestedAlias = trim((string) ($row['alias'] ?? ''));
+                        if ($requestedAlias !== '') {
+                            $existingOwner = User::query()
+                                ->select(['email'])
+                                ->whereRaw('LOWER(alias) = ?', [strtolower($requestedAlias)])
+                                ->first();
+
+                            if (!$existingOwner || strcasecmp((string) $existingOwner->email, (string) $email) === 0) {
+                                $updatePayload['alias'] = $requestedAlias;
+                            }
+                        }
+                    }
+                    if ($allowRef) {
+                        $updatePayload['ref'] = $row['ref'] ?? null;
+                    }
+                    if ($allowPhone) {
+                        $updatePayload['phone'] = $row['phone'] ?? null;
+                    }
+                    if ($allowAddressRoad) {
+                        $updatePayload['address_road'] = $row['address_road'] ?? null;
+                    }
+                    if ($allowAddressZip) {
+                        $updatePayload['address_zip'] = $row['address_zip'] ?? null;
+                    }
+                    if ($allowAddressTown) {
+                        $updatePayload['address_town'] = $row['address_town'] ?? null;
+                    }
+
+                    $user = User::updateOrCreate(['email' => $email], $updatePayload);
 
                     if (!empty($rolesStr)) {
                         $roleNames = array_map('trim', explode('|', $rolesStr));
@@ -709,6 +838,8 @@ class UserImportService
                 $sync[$mappedId] = ['attributes' => json_encode($attributes)];
             }
         }
+        
+        // Log::info("Mapped expediteurs to db_products sync: " . json_encode($sync));
 
         return $sync;
     }
@@ -732,11 +863,38 @@ class UserImportService
             return 5; // ddk
         }
 
+        if ($sourceId === 5) {
+            return 2; // infovegetal_old
+        }
+
+        if ($sourceId === 17 || $sourceId === 21 || $sourceId === 22 || $sourceId === 23) {
+            return 1; // infovegetal
+        }
+
         if ($sourceId === 12 || $sourceId === 13) {
             return 3; // eurofleurs
         }
 
         return null;
+    }
+
+    /**
+     * Colonnes users presentes en base et utilisables pour l'import.
+     */
+    private function getImportableUserColumns(): array
+    {
+        static $columns = null;
+
+        if ($columns === null) {
+            try {
+                $columns = Schema::getColumnListing('users');
+            } catch (\Throwable $e) {
+                Log::warning('[User Import] Unable to read users columns: ' . $e->getMessage());
+                $columns = ['email', 'name', 'password', 'email_verified_at', 'created_at', 'updated_at'];
+            }
+        }
+
+        return $columns;
     }
 
     /**
