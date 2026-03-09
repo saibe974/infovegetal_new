@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 type ImportProgressPayload = {
@@ -30,40 +30,162 @@ export function UsersImportTreatment({
     onStartImport,
 }: Props) {
     const [strategy, setStrategy] = useState<'basique' | 'old_DB'>('basique');
+    const [visualProgress, setVisualProgress] = useState(0);
+    const [speedPctPerSec, setSpeedPctPerSec] = useState(2.5);
+    const hasSeenBackendProgressRef = useRef(false);
+    const lastBackendProgressRef = useRef(0);
+    const lastBackendTimestampRef = useRef(0);
+    const lastTickTimestampRef = useRef(0);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (onStartImport) {
             onStartImport({ strategy });
         }
     };
-    // Progression temporairement désactivée pour correction ultérieure.
-    // const effectiveProgress = (() => {
-    //     const fromProp = Number.isFinite(displayProgress) ? displayProgress : 0;
-    //     const fromInfo = Number.isFinite(progressInfo?.progress as number) ? (progressInfo?.progress as number) : 0;
-    //     // Si la prop est 0 mais l'API remonte une progression, on l'utilise en repli
-    //     const base = fromProp > 0 ? fromProp : fromInfo;
-    //     // Si status fini/annulé, forcer 100 ou 0 cohérent
-    //     if (importStatus === 'finished') return 100;
-    //     if (importStatus === 'cancelled') return Math.min(base, 100);
-    //     return Math.min(base, 100);
-    // })();
 
-    // useEffect(() => {
-    //     console.log('[UsersImportTreatment] status=', importStatus, 'uploadId=', uploadId);
-    // }, [importStatus, uploadId]);
+    const computeBackendProgress = () => {
+        const fromInfo = Number.isFinite(progressInfo?.progress as number)
+            ? (progressInfo?.progress as number)
+            : null;
 
-    // useEffect(() => {
-    //     console.log('[UsersImportTreatment] progress update:', {
-    //         displayProgress,
-    //         backendProgress: progressInfo?.progress ?? null,
-    //         effectiveProgress,
-    //         processed: progressInfo?.processed ?? null,
-    //         total: progressInfo?.total ?? null,
-    //         errors: progressInfo?.errors ?? null,
-    //         status: progressInfo?.status ?? null,
-    //     });
-    // }, [displayProgress, progressInfo?.progress, progressInfo?.processed, progressInfo?.total, progressInfo?.errors, effectiveProgress]);
+        if (typeof fromInfo === 'number') {
+            return Math.max(0, Math.min(100, fromInfo));
+        }
 
+        const processed = typeof progressInfo?.processed === 'number' ? progressInfo.processed : 0;
+        const errors = typeof progressInfo?.errors === 'number' ? progressInfo.errors : 0;
+        const total = typeof progressInfo?.total === 'number' ? progressInfo.total : 0;
+
+        if (total > 0) {
+            return Math.max(0, Math.min(100, ((processed + errors) / total) * 100));
+        }
+
+        return 0;
+    };
+
+    const computeInitialSpeedPerSec = () => {
+        const total = typeof progressInfo?.total === 'number' ? progressInfo.total : 0;
+
+        // Vitesse en % par seconde (phase arbitraire initiale).
+        if (total <= 0) return 2.8;
+        if (total <= 1000) return 4.2;
+        if (total <= 5000) return 3.1;
+        if (total <= 15000) return 2.2;
+        return 1.5;
+    };
+
+    const hasBackendProgressSignal = () => {
+        const p = progressInfo?.progress;
+        if (typeof p === 'number' && p > 0) {
+            return true;
+        }
+
+        const processed = typeof progressInfo?.processed === 'number' ? progressInfo.processed : 0;
+        const errors = typeof progressInfo?.errors === 'number' ? progressInfo.errors : 0;
+        const total = typeof progressInfo?.total === 'number' ? progressInfo.total : 0;
+
+        return total > 0 && (processed + errors) > 0;
+    };
+
+    const backendProgress = computeBackendProgress();
+    const hasBackendProgress = hasBackendProgressSignal();
+
+    useEffect(() => {
+        if (importStatus === 'idle') {
+            setVisualProgress(0);
+            setSpeedPctPerSec(computeInitialSpeedPerSec());
+            hasSeenBackendProgressRef.current = false;
+            lastBackendProgressRef.current = 0;
+            lastBackendTimestampRef.current = 0;
+            lastTickTimestampRef.current = 0;
+            return;
+        }
+
+        if (importStatus === 'finished') {
+            setVisualProgress(100);
+            return;
+        }
+
+        if (importStatus !== 'processing' && importStatus !== 'cancelling') {
+            return;
+        }
+
+        const interval = window.setInterval(() => {
+            const now = performance.now();
+            if (lastTickTimestampRef.current === 0) {
+                lastTickTimestampRef.current = now;
+            }
+
+            const deltaSec = Math.max(0.05, (now - lastTickTimestampRef.current) / 1000);
+            lastTickTimestampRef.current = now;
+
+            setVisualProgress((current) => {
+                // Phase 1: pas encore de vraie progression backend, avance arbitraire.
+                if (!hasSeenBackendProgressRef.current && (!hasBackendProgress || backendProgress <= 0)) {
+                    return current + speedPctPerSec * deltaSec;
+                }
+
+                // A partir du premier vrai signal backend, on bascule en suivi backend.
+                hasSeenBackendProgressRef.current = true;
+
+                // Cible = progression backend reelle (retour arriere leger autorise).
+                const target = backendProgress;
+                const next = current + speedPctPerSec * deltaSec;
+
+                if (next > target) {
+                    // Recalage doux vers la cible backend.
+                    return current - (current - target) * 0.2;
+                }
+
+                return next;
+            });
+        }, 120);
+
+        return () => window.clearInterval(interval);
+    }, [importStatus, progressInfo?.total, backendProgress, hasBackendProgress, speedPctPerSec]);
+
+    useEffect(() => {
+        if (importStatus !== 'processing' && importStatus !== 'cancelling') {
+            return;
+        }
+
+        // Recalibrage de la vitesse uniquement quand progressInfo fournit un nouveau palier.
+        if (!hasBackendProgress || backendProgress <= 0) {
+            return;
+        }
+
+        const now = performance.now();
+
+        if (!hasSeenBackendProgressRef.current) {
+            hasSeenBackendProgressRef.current = true;
+            lastBackendProgressRef.current = backendProgress;
+            lastBackendTimestampRef.current = now;
+            return;
+        }
+
+        const previousProgress = lastBackendProgressRef.current;
+        const previousTime = lastBackendTimestampRef.current;
+
+        if (backendProgress <= previousProgress || previousTime <= 0) {
+            return;
+        }
+
+        const deltaProgress = backendProgress - previousProgress;
+        const deltaSec = Math.max(0.1, (now - previousTime) / 1000);
+        const instantSpeed = deltaProgress / deltaSec; // %/sec
+
+        setSpeedPctPerSec((prev) => {
+            // Moyenne glissante: stabilise la vitesse sans yoyo.
+            const blended = prev * 0.65 + instantSpeed * 0.35;
+            return Math.min(8, Math.max(0.25, blended));
+        });
+
+        lastBackendProgressRef.current = backendProgress;
+        lastBackendTimestampRef.current = now;
+    }, [importStatus, backendProgress, hasBackendProgress]);
+
+    // console.log(progressInfo?.progress, visualProgress);
 
     return (
         <>
@@ -103,16 +225,12 @@ export function UsersImportTreatment({
                             ? 'Annulation en cours…'
                             : <>Import en cours <Loader2 className="inline-block ml-2 animate-spin" size={16} /></>}
                     </p>
-                    {/*
-                        Progress bar temporairement commentée.
-                        A réactiver après correction du flux de progression.
-                    */}
-                    {/* <div className="w-full h-2 rounded bg-muted">
+                    <div className="w-full h-2 rounded bg-muted">
                         <div
                             className="h-2 rounded bg-primary transition-all"
-                            style={{ width: `${effectiveProgress}%` }}
+                            style={{ width: `${Math.max(0, Math.min(100, visualProgress))}%` }}
                         />
-                    </div> */}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                         {progressInfo?.processed ?? 0} traités · {progressInfo?.errors ?? 0} erreurs
                     </p>
