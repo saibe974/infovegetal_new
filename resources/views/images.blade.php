@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>Infovegetal - Images</title>
 
          @php
@@ -47,6 +48,25 @@
                 color: inherit;
                 cursor: pointer;
             }
+            .toolbar {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+                margin: 8px 0 12px;
+            }
+            .btn-sm {
+                padding: 5px 8px;
+                font-size: 12px;
+            }
+            .status {
+                font-size: 12px;
+                opacity: .85;
+            }
+            .progress {
+                width: 100%;
+                height: 8px;
+            }
             table {
                 width: 100%;
                 border-collapse: collapse;
@@ -78,6 +98,16 @@
                 border: 1px solid {{ $theme === 'dark' ? '#334155' : '#e2e8f0' }};
                 background: {{ $theme === 'dark' ? '#1e293b' : '#f8fafc' }};
             }
+            tr.is-processing {
+                outline: 1px solid {{ $theme === 'dark' ? '#334155' : '#cbd5e1' }};
+                background: {{ $theme === 'dark' ? '#0b1220' : '#f8fafc' }};
+            }
+            tr.is-ok {
+                background: {{ $theme === 'dark' ? '#0f2a1f' : '#ecfdf5' }};
+            }
+            tr.is-error {
+                background: {{ $theme === 'dark' ? '#3a1616' : '#fef2f2' }};
+            }
             .pagination {
                 margin-top: 12px;
             }
@@ -105,6 +135,14 @@
                 {{ $products->total() }} produit(s) sans image locale
             </p>
 
+            <div class="toolbar">
+                <button type="button" id="btn-batch-download">Tout telecharger (page)</button>
+                <button type="button" id="btn-batch-thumbnail">Creer vignettes (page)</button>
+                <button type="button" id="btn-batch-compare">Comparer (page)</button>
+                <span class="status" id="batch-status">Pret</span>
+            </div>
+            <progress class="progress" id="batch-progress" max="100" value="0"></progress>
+
             <table>
                 <thead>
                     <tr>
@@ -113,11 +151,13 @@
                         <th>SKU</th>
                         <th>Nom</th>
                         <th>DB</th>
+                        <th>Actions</th>
+                        <th>Etat</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($products as $product)
-                        <tr>
+                        <tr data-product-id="{{ $product->id }}" data-product-img-link="{{ $product->img_link }}">
                             <td>{{ $product->id }}</td>
                             <td>
                                 <img
@@ -126,15 +166,22 @@
                                     class="thumb"
                                     loading="lazy"
                                     referrerpolicy="no-referrer"
+                                    onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2256%22 height=%2256%22><rect width=%2256%22 height=%2256%22 fill=%22%23cbd5e1%22/><text x=%2228%22 y=%2232%22 font-size=%2210%22 text-anchor=%22middle%22 fill=%22%2364748b%22>NO IMG</text></svg>'"
                                 >
                             </td>
                             <td>{{ $product->sku ?: '-' }}</td>
                             <td>{{ $product->name }}</td>
                             <td>{{ $product->dbProduct?->name ?: '-' }}</td>
+                            <td>
+                                <button type="button" class="btn-sm js-action" data-action="download">Upload</button>
+                                <button type="button" class="btn-sm js-action" data-action="thumbnail">Vignette</button>
+                                <button type="button" class="btn-sm js-action" data-action="compare">Comparer</button>
+                            </td>
+                            <td class="status js-row-status">-</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="muted">Aucun produit trouvé.</td>
+                            <td colspan="7" class="muted">Aucun produit trouvé.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -144,5 +191,128 @@
                 {{ $products->links() }}
             </div>
         </div>
+        <script>
+            (() => {
+                const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                const endpointByAction = {
+                    download: '/admin/media-manager/images/action/download',
+                    thumbnail: '/admin/media-manager/images/action/thumbnail',
+                    compare: '/admin/media-manager/images/action/compare',
+                };
+
+                const statusEl = document.getElementById('batch-status');
+                const progressEl = document.getElementById('batch-progress');
+
+                const setBatchStatus = (text) => {
+                    if (statusEl) statusEl.textContent = text;
+                };
+
+                const setRowState = (row, state, text) => {
+                    row.classList.remove('is-processing', 'is-ok', 'is-error');
+                    if (state) row.classList.add(state);
+                    const status = row.querySelector('.js-row-status');
+                    if (status) status.textContent = text || '-';
+                };
+
+                const callAction = async (row, action) => {
+                    const id = Number(row.dataset.productId || 0);
+                    if (!id || !endpointByAction[action]) return { ok: false, message: 'Action invalide' };
+
+                    setRowState(row, 'is-processing', 'Traitement...');
+
+                    const response = await fetch(endpointByAction[action], {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': token,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ id }),
+                    });
+
+                    const payload = await response.json().catch(() => ({ ok: false, message: 'Reponse invalide' }));
+                    if (!response.ok) {
+                        return { ok: false, message: payload?.message || 'Erreur serveur' };
+                    }
+
+                    return payload;
+                };
+
+                const runBatch = async (action) => {
+                    const rows = Array.from(document.querySelectorAll('tr[data-product-id]'));
+                    if (!rows.length) return;
+
+                    let ok = 0;
+                    let fail = 0;
+                    progressEl.value = 0;
+                    progressEl.max = rows.length;
+
+                    for (let i = 0; i < rows.length; i += 1) {
+                        const row = rows[i];
+                        setBatchStatus(`${action} ${i + 1}/${rows.length}...`);
+
+                        try {
+                            const result = await callAction(row, action);
+                            if (result.ok) {
+                                ok += 1;
+                                setRowState(row, 'is-ok', result.message || 'OK');
+                                if (result.thumb_url) {
+                                    const img = row.querySelector('.thumb');
+                                    if (img) img.src = result.thumb_url;
+                                }
+                                if (action === 'download') {
+                                    row.remove();
+                                }
+                            } else {
+                                fail += 1;
+                                setRowState(row, 'is-error', result.message || 'Erreur');
+                            }
+                        } catch (e) {
+                            fail += 1;
+                            setRowState(row, 'is-error', 'Erreur reseau');
+                        }
+
+                        progressEl.value = i + 1;
+                    }
+
+                    setBatchStatus(`Termine: ${ok} OK, ${fail} erreur(s)`);
+                };
+
+                document.querySelectorAll('.js-action').forEach((btn) => {
+                    btn.addEventListener('click', async () => {
+                        const row = btn.closest('tr[data-product-id]');
+                        if (!row) return;
+
+                        const action = btn.dataset.action;
+                        setBatchStatus(`Action ${action}...`);
+                        try {
+                            const result = await callAction(row, action);
+                            if (result.ok) {
+                                setRowState(row, 'is-ok', result.message || 'OK');
+                                if (result.thumb_url) {
+                                    const img = row.querySelector('.thumb');
+                                    if (img) img.src = result.thumb_url;
+                                }
+                                if (action === 'download') {
+                                    row.remove();
+                                }
+                                setBatchStatus(result.message || 'OK');
+                            } else {
+                                setRowState(row, 'is-error', result.message || 'Erreur');
+                                setBatchStatus(result.message || 'Erreur');
+                            }
+                        } catch (e) {
+                            setRowState(row, 'is-error', 'Erreur reseau');
+                            setBatchStatus('Erreur reseau');
+                        }
+                    });
+                });
+
+                document.getElementById('btn-batch-download')?.addEventListener('click', () => runBatch('download'));
+                document.getElementById('btn-batch-thumbnail')?.addEventListener('click', () => runBatch('thumbnail'));
+                document.getElementById('btn-batch-compare')?.addEventListener('click', () => runBatch('compare'));
+            })();
+        </script>
     </body>
 </html>

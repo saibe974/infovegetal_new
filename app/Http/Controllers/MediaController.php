@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Services\ProductMediaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class MediaController extends Controller
@@ -90,7 +91,7 @@ class MediaController extends Controller
             });
         }
 
-        $products = $query->paginate(30)->withQueryString();
+        $products = $query->paginate(60)->withQueryString();
 
         return view('images', [
             'products' => $products,
@@ -98,9 +99,89 @@ class MediaController extends Controller
         ]);
     }
 
+    public function actionDownload(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        return response()->json($mediaService->downloadMissing($product));
+    }
+
+    public function actionCompare(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        try {
+            return response()->json($mediaService->compareRemoteWithLocal($product));
+        } catch (\Throwable $e) {
+            Log::warning('Media compare failed', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Comparaison impossible'], 500);
+        }
+    }
+
+    public function actionThumbnail(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        return response()->json($mediaService->ensureThumbnail($product));
+    }
+
+    public function actionBatchDownload(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $data['ids'])));
+        $products = Product::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        $processed = 0;
+        $downloaded = 0;
+        $failed = 0;
+        $results = [];
+
+        foreach ($ids as $id) {
+            $product = $products->get($id);
+            if (!$product) {
+                $failed++;
+                $results[] = ['id' => $id, 'ok' => false, 'message' => 'Produit introuvable'];
+                continue;
+            }
+
+            $processed++;
+            $result = $mediaService->downloadMissing($product);
+            if (!empty($result['downloaded'])) {
+                $downloaded++;
+            }
+            if (empty($result['ok'])) {
+                $failed++;
+            }
+
+            $results[] = array_merge(['id' => $id], $result);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'processed' => $processed,
+            'downloaded' => $downloaded,
+            'failed' => $failed,
+            'results' => $results,
+        ]);
+    }
+
     private function missingImagesQuery(?int $dbProductsId, ?int $categoryProductsId)
     {
         $query = Product::query()
+            ->where('active', true)
             ->whereNotNull('img_link')
             ->where('img_link', '!=', '')
             ->whereDoesntHave('media', function ($q) {
@@ -144,5 +225,14 @@ class MediaController extends Controller
 
         $int = (int) $value;
         return $int > 0 ? $int : null;
+    }
+
+    private function findProductForAction(Request $request): ?Product
+    {
+        $data = $request->validate([
+            'id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return Product::query()->find((int) $data['id']);
     }
 }

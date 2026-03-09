@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Models\CategoryProducts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
@@ -82,6 +84,30 @@ class Product extends Model implements HasMedia
         $this->addMediaCollection('images')
             ->useDisk(config('media-library.disk_name', 'public'))
             ->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        // Thumb: utilisee par les listes et elFinder.
+        $this->addMediaConversion('thumb')
+            ->fit(Fit::Contain, 200, 200)
+            ->quality(78)
+            ->performOnCollections('images')
+            ->nonQueued();
+
+        // Small: usage cards/front/pdf leger.
+        $this->addMediaConversion('small')
+            ->fit(Fit::Contain, 600, 600)
+            ->quality(82)
+            ->performOnCollections('images')
+            ->nonQueued();
+
+        // Medium: usage detail/site et PDF meilleure qualite.
+        $this->addMediaConversion('medium')
+            ->fit(Fit::Contain, 1200, 1200)
+            ->quality(85)
+            ->performOnCollections('images')
+            ->nonQueued();
     }
 
     public function getImgLinkAttribute(): ?string

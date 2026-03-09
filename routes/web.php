@@ -142,6 +142,10 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/media-manager', [MediaController::class, 'index'])->name('media.index');
     Route::get('admin/media-manager/images', [MediaController::class, 'images'])->name('media.images');
     Route::get('admin/media-manager/images/frame', [MediaController::class, 'imagesFrame'])->name('media.images.frame');
+    Route::post('admin/media-manager/images/action/download', [MediaController::class, 'actionDownload'])->name('media.images.action.download');
+    Route::post('admin/media-manager/images/action/compare', [MediaController::class, 'actionCompare'])->name('media.images.action.compare');
+    Route::post('admin/media-manager/images/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('media.images.action.thumbnail');
+    Route::post('admin/media-manager/images/action/batch-download', [MediaController::class, 'actionBatchDownload'])->name('media.images.action.batch-download');
 
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 
