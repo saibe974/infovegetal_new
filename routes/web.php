@@ -140,9 +140,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // Gestion des utilisateurs (admin uniquement)
 Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/media-manager', [MediaController::class, 'index'])->name('media.index');
-
-    Route::post('admin/media-manager/sync-missing', [MediaController::class, 'syncMissingImages'])
-        ->name('media.sync-missing');
+    Route::get('admin/media-manager/images', [MediaController::class, 'images'])->name('media.images');
+    Route::get('admin/media-manager/images/frame', [MediaController::class, 'imagesFrame'])->name('media.images.frame');
 
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
 

@@ -11,11 +11,15 @@ const breadcrumbs: BreadcrumbItem[] = [
         title: 'Media library',
         href: '/admin/media-manager',
     },
+    {
+        title: 'Missing images',
+        href: '/admin/media-manager/images',
+    },
 ];
 
-type MediaPageProps = Record<string, never>;
+type MissingImagesPageProps = Record<string, never>;
 
-export default withAppLayout<MediaPageProps>(breadcrumbs, true, ({ }) => {
+export default withAppLayout<MissingImagesPageProps>(breadcrumbs, true, ({ }) => {
     const { t } = useI18n();
     const [libraryTheme, setLibraryTheme] = useState<'light' | 'dark'>('light');
 
@@ -34,18 +38,20 @@ export default withAppLayout<MediaPageProps>(breadcrumbs, true, ({ }) => {
         return () => observer.disconnect();
     }, []);
 
-    const mediaUrl = useMemo(() => `/admin/media?theme=${libraryTheme}`, [libraryTheme]);
-    const missingImagesUrl = '/admin/media-manager/images';
+    const frameUrl = useMemo(
+        () => `/admin/media-manager/images/frame?theme=${libraryTheme}`,
+        [libraryTheme],
+    );
 
     return (
         <div>
-            <Head title={t('Media library')} />
+            <Head title={t('Missing images')} />
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">{t('Media library')}</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">{t('Missing images')}</h1>
                     <p className="text-sm text-muted-foreground">
-                        {t('Manage product images and shared media in one place.')}
+                        {t('Browse products that still do not have local images.')}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -53,10 +59,10 @@ export default withAppLayout<MediaPageProps>(breadcrumbs, true, ({ }) => {
                         <a href="/admin/media-manager">{t('Library')}</a>
                     </Button>
                     <Button asChild variant="outline" className="gap-2">
-                        <a href={missingImagesUrl}>{t('Missing images')}</a>
+                        <a href="/admin/media-manager/images">{t('Missing images')}</a>
                     </Button>
                     <Button asChild variant="outline" className="gap-2">
-                        <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={frameUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-4 w-4" />
                             {t('Open in new tab')}
                         </a>
@@ -66,12 +72,12 @@ export default withAppLayout<MediaPageProps>(breadcrumbs, true, ({ }) => {
 
             <div className="flex h-[calc(100svh-10rem)] min-h-0 flex-col gap-3 overflow-hidden">
                 <iframe
-                    title="Media library"
-                    src={mediaUrl}
+                    title="Missing images"
+                    src={frameUrl}
                     className="block h-full min-h-0 w-full border-0 bg-background"
                     loading="lazy"
                 />
             </div>
         </div>
     );
-})
+});
