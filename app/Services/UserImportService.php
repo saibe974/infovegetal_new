@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use League\Csv\Reader;
 use League\Csv\Writer;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -16,10 +17,10 @@ use function Illuminate\Log\log;
 
 class UserImportService
 {
-    public function run(string $id, string $fullPath, string $relativePath, int $limit = 4000): void
+    public function run(string $id, string $fullPath, string $relativePath, int $limit = 100): void
     {
         // Augmenter la limite de temps pour les imports volumineux
-        set_time_limit(300); // 5 minutes
+        // set_time_limit(300); // 5 minutes
         
         // Première étape : découper le fichier CSV source en fichiers temporaires de données
         $this->splitIntoTempFiles($id, $fullPath, $limit);
@@ -30,7 +31,7 @@ class UserImportService
     public function runChunk(string $id, string $relativePath, int $chunkIndex): void
     {
         // Réinitialiser la limite de temps pour chaque chunk
-        set_time_limit(300);
+        // set_time_limit(300);
         
         try {
             $normalizeKey = function ($value): string {
@@ -46,6 +47,18 @@ class UserImportService
 
             $processed = isset($state['processed']) ? (int) $state['processed'] : 0;
             $errors = isset($state['errors']) ? (int) $state['errors'] : 0;
+
+            // Si un chunk 0 a plante avant finalisation (next_offset reste a 0),
+            // repartir d'un compteur propre pour eviter processed > total au retry.
+            if ($chunkIndex === 0 && ((int) ($state['next_offset'] ?? 0)) === 0 && ($processed > 0 || $errors > 0)) {
+                $processed = 0;
+                $errors = 0;
+                $this->updateImportState($id, [
+                    'processed' => 0,
+                    'errors' => 0,
+                    'progress' => 0,
+                ]);
+            }
 
             $tempDir = Storage::path('imports/tmp/' . $id);
             $dataFile = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $chunkIndex . '.csv';
@@ -87,7 +100,10 @@ class UserImportService
                     return;
                 }
 
-                // Mettre à jour à chaque ligne pour remonter la progression en continu
+                // Limiter les writes cache/log pour accelerer l'import.
+                if ($completed % 200 !== 0 && $completed !== $total) {
+                    return;
+                }
 
                 Log::info("User import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
 
@@ -158,6 +174,14 @@ class UserImportService
 
                         $dbProductsSync = $this->buildDbProductsSyncFromExpediteurs($expediteursRaw);
 
+                        // Mapping old_db.csv -> users
+                        $phone = trim((string) ($mapped['tel'] ?? ''));
+                        $addressRoad = trim((string) ($mapped['rue'] ?? ''));
+                        $addressZip = trim((string) ($mapped['zip'] ?? ''));
+                        $addressTown = trim((string) ($mapped['ville'] ?? ''));
+                        $ref = trim((string) ($mapped['alias'] ?? ''));   // alias CSV -> ref users
+                        $alias = trim((string) ($mapped['login'] ?? '')); // login CSV -> alias users
+
                         // Conserver la hiérarchie nested set
                         // Stockage de l'old_id pour mapper les parent_id plus tard
                         // $lft = !empty($mapped['lft']) ? (int)$mapped['lft'] : 0;
@@ -170,6 +194,12 @@ class UserImportService
                         $password = trim((string) ($mapped['password'] ?? null));
                         $roles = trim((string) ($mapped['roles'] ?? ''));
                         $dbProductsSync = [];
+                        $phone = null;
+                        $addressRoad = null;
+                        $addressZip = null;
+                        $addressTown = null;
+                        $ref = null;
+                        $alias = null;
                         // $lft = 0;
                         // $rgt = 0;
                     }
@@ -203,6 +233,12 @@ class UserImportService
                         'password' => $password,
                         'roles' => $roles,
                         'db_products_sync' => $dbProductsSync,
+                        'phone' => $phone !== '' ? $phone : null,
+                        'address_road' => $addressRoad !== '' ? $addressRoad : null,
+                        'address_zip' => $addressZip !== '' ? $addressZip : null,
+                        'address_town' => $addressTown !== '' ? $addressTown : null,
+                        'ref' => $ref !== '' ? $ref : null,
+                        'alias' => $alias !== '' ? $alias : null,
                         'email_verified_at' => now(),
                         // '_lft' => $lft,
                         // '_rgt' => $rgt,
@@ -211,7 +247,7 @@ class UserImportService
 
                     $processed++;
 
-                    if (count($upsertRows) >= 100) {
+                    if (count($upsertRows) >= 300) {
                         $this->batchUpsertUsers($upsertRows, $validRoleIds);
                         $upsertRows = [];
                         $updateProgress($currentSnapshot);
@@ -248,14 +284,15 @@ class UserImportService
             $nextDataFile = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $nextChunk . '.csv';
             $hasMore = is_file($nextDataFile);
 
-            $finalProgress = $total > 0 ? (int) ceil((($processed + $errors) / $total) * 100) : 100;
+            $completed = min($total, max(0, $processed + $errors));
+            $finalProgress = $total > 0 ? (int) ceil(($completed / $total) * 100) : 100;
             $finalProgress = min(100, max(0, $finalProgress));
 
             $finalState = [
                 'status' => $cancelled ? 'cancelled' : ($hasMore ? 'processing' : 'done'),
-                'processed' => $processed,
+                'processed' => min($processed, $total > 0 ? $total : $processed),
                 'total' => $total,
-                'errors' => $errors,
+                'errors' => min($errors, $total > 0 ? $total : $errors),
                 'progress' => $hasMore ? $finalProgress : 100,
                 'next_offset' => $nextChunk,
                 'has_more' => $hasMore,
@@ -339,60 +376,227 @@ class UserImportService
      */
     private function batchUpsertUsers(array $rows, array $validRoleIds): void
     {
+        if (empty($rows)) {
+            return;
+        }
+
+        $now = now();
+        $userUpserts = [];
+        $emails = [];
+        $rolesByEmail = [];
+        $dbProductsByEmail = [];
+
+        $existingUsersByEmail = User::query()
+            ->select(['id', 'email', 'password'])
+            ->whereIn('email', array_values(array_unique(array_map(static fn ($r) => (string) ($r['email'] ?? ''), $rows))))
+            ->get()
+            ->keyBy('email');
+
+        // Hash par defaut calcule une seule fois pour limiter fortement le cout CPU.
+        $defaultHashedPassword = $this->hashPasswordForImport(Str::random(40));
+
         foreach ($rows as $row) {
-            try {
-                $email = $row['email'];
-                $name = $row['name'];
-                $password = $row['password'];
-                $rolesStr = $row['roles'];
-                $dbProductsSync = $row['db_products_sync'] ?? [];
-                // $lft = $row['_lft'] ?? 0;
-                // $rgt = $row['_rgt'] ?? 0;
-                // $parentId = $row['parent_id'] ?? null;
-                // $oldId = $row['old_id'] ?? null;
-                // $oldParentId = $row['old_parent_id'] ?? null;
+            $email = (string) ($row['email'] ?? '');
+            if ($email === '') {
+                continue;
+            }
 
-                // Préparer le password haché (générer un aléatoire si vide)
-                $hashedPassword = !empty($password) 
-                    ? bcrypt($password) 
-                    : bcrypt(\Illuminate\Support\Str::random(32));
+            $emails[$email] = true;
 
-                // Upsert utilisateur avec password et nested set columns
-                // Inclure les colonnes temporaires pour le mapping des parent_id
-                $user = User::updateOrCreate(
-                    ['email' => $email],
-                    [
-                        'name' => $name,
-                        'password' => $hashedPassword,
-                        'email_verified_at' => now(),
-                        // '_lft' => $lft,
-                        // '_rgt' => $rgt,
-                        // 'parent_id' => $parentId,
-                        // 'old_id' => $oldId,
-                        // 'old_parent_id' => $oldParentId,
-                    ]
+            $plainPassword = trim((string) ($row['password'] ?? ''));
+            $existing = $existingUsersByEmail->get($email);
+
+            if ($plainPassword !== '') {
+                // Eviter de re-hasher si la valeur importee semble deja bcrypt.
+                $hashedPassword = str_starts_with($plainPassword, '$2y$')
+                    ? $plainPassword
+                    : $this->hashPasswordForImport($plainPassword);
+            } else {
+                // Conserver le hash existant si present, sinon hash par defaut pre-calcule.
+                $hashedPassword = $existing?->password ?: $defaultHashedPassword;
+            }
+
+            $userUpserts[] = [
+                'email' => $email,
+                'name' => (string) ($row['name'] ?? ''),
+                'password' => $hashedPassword,
+                'alias' => $row['alias'] ?? null,
+                'ref' => $row['ref'] ?? null,
+                'phone' => $row['phone'] ?? null,
+                'address_road' => $row['address_road'] ?? null,
+                'address_zip' => $row['address_zip'] ?? null,
+                'address_town' => $row['address_town'] ?? null,
+                'email_verified_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+
+            $rolesStr = trim((string) ($row['roles'] ?? ''));
+            if ($rolesStr !== '') {
+                $validRoleNames = [];
+                foreach (array_map('trim', explode('|', $rolesStr)) as $roleName) {
+                    if ($roleName !== '' && isset($validRoleIds[$roleName])) {
+                        $validRoleNames[$roleName] = true;
+                    }
+                }
+                if (!empty($validRoleNames)) {
+                    $rolesByEmail[$email] = array_keys($validRoleNames);
+                }
+            }
+
+            $dbProductsSync = $row['db_products_sync'] ?? [];
+            if (is_array($dbProductsSync) && !empty($dbProductsSync)) {
+                foreach ($dbProductsSync as $dbProductId => $pivotAttributes) {
+                    $dbProductId = (int) $dbProductId;
+                    if ($dbProductId <= 0) {
+                        continue;
+                    }
+
+                    $attributes = null;
+                    if (is_array($pivotAttributes)) {
+                        $attributes = $pivotAttributes['attributes'] ?? null;
+                    }
+
+                    $dbProductsByEmail[$email][$dbProductId] = [
+                        'db_product_id' => $dbProductId,
+                        'attributes' => $attributes,
+                    ];
+                }
+            }
+        }
+
+        if (empty($userUpserts)) {
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($userUpserts, $emails, $rolesByEmail, $validRoleIds, $dbProductsByEmail, $now) {
+                User::upsert(
+                    $userUpserts,
+                    ['email'],
+                    ['name', 'password', 'alias', 'ref', 'phone', 'address_road', 'address_zip', 'address_town', 'email_verified_at', 'updated_at']
                 );
 
-                // Assigner les rôles
-                if (!empty($rolesStr)) {
-                    $roleNames = array_map('trim', explode('|', $rolesStr));
-                    $validRoleNames = [];
-                    foreach ($roleNames as $roleName) {
-                        if (isset($validRoleIds[$roleName])) {
-                            $validRoleNames[] = $roleName;
+                $usersByEmail = User::query()
+                    ->select(['id', 'email'])
+                    ->whereIn('email', array_keys($emails))
+                    ->get()
+                    ->keyBy('email');
+
+                if (!empty($rolesByEmail)) {
+                    $roleSyncUserIds = [];
+                    $rolePivotRows = [];
+
+                    foreach ($rolesByEmail as $email => $roleNames) {
+                        $user = $usersByEmail->get($email);
+                        if (!$user) {
+                            continue;
+                        }
+
+                        $roleSyncUserIds[] = $user->id;
+
+                        foreach ($roleNames as $roleName) {
+                            $rolePivotRows[] = [
+                                'role_id' => (int) $validRoleIds[$roleName],
+                                'model_type' => User::class,
+                                'model_id' => (int) $user->id,
+                            ];
                         }
                     }
-                    if (!empty($validRoleNames)) {
-                        $user->syncRoles($validRoleNames);
+
+                    if (!empty($roleSyncUserIds)) {
+                        DB::table('model_has_roles')
+                            ->where('model_type', User::class)
+                            ->whereIn('model_id', array_values(array_unique($roleSyncUserIds)))
+                            ->delete();
+
+                        if (!empty($rolePivotRows)) {
+                            DB::table('model_has_roles')->insert($rolePivotRows);
+                        }
                     }
                 }
 
-                if (!empty($dbProductsSync)) {
-                    $user->dbProducts()->sync($dbProductsSync, false);
-                }
+                if (!empty($dbProductsByEmail)) {
+                    $pivotRows = [];
 
-            } catch (\Throwable $e) {
-                Log::warning("[User Import] Error upserting user {$row['email']}: " . $e->getMessage());
+                    foreach ($dbProductsByEmail as $email => $links) {
+                        $user = $usersByEmail->get($email);
+                        if (!$user) {
+                            continue;
+                        }
+
+                        foreach ($links as $link) {
+                            $pivotRows[] = [
+                                'user_id' => (int) $user->id,
+                                'db_product_id' => (int) $link['db_product_id'],
+                                'attributes' => $link['attributes'],
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
+                        }
+                    }
+
+                    if (!empty($pivotRows)) {
+                        DB::table('db_products_users')->upsert(
+                            $pivotRows,
+                            ['user_id', 'db_product_id'],
+                            ['attributes', 'updated_at']
+                        );
+                    }
+                }
+            }, 3);
+        } catch (\Throwable $e) {
+            Log::warning('[User Import] Batch upsert failed: ' . $e->getMessage());
+
+            // Fallback robuste en cas d'echec transactionnel.
+            foreach ($rows as $row) {
+                try {
+                    $email = $row['email'];
+                    $name = $row['name'];
+                    $password = $row['password'];
+                    $rolesStr = $row['roles'];
+                    $dbProductsSync = $row['db_products_sync'] ?? [];
+
+                    $hashedPassword = !empty($password)
+                        ? (str_starts_with((string) $password, '$2y$')
+                            ? (string) $password
+                            : $this->hashPasswordForImport((string) $password))
+                        : $this->hashPasswordForImport(Str::random(32));
+
+                    $user = User::updateOrCreate(
+                        ['email' => $email],
+                        [
+                            'name' => $name,
+                            'password' => $hashedPassword,
+                            'alias' => $row['alias'] ?? null,
+                            'ref' => $row['ref'] ?? null,
+                            'phone' => $row['phone'] ?? null,
+                            'address_road' => $row['address_road'] ?? null,
+                            'address_zip' => $row['address_zip'] ?? null,
+                            'address_town' => $row['address_town'] ?? null,
+                            'email_verified_at' => now(),
+                        ]
+                    );
+
+                    if (!empty($rolesStr)) {
+                        $roleNames = array_map('trim', explode('|', $rolesStr));
+                        $validRoleNames = [];
+                        foreach ($roleNames as $roleName) {
+                            if (isset($validRoleIds[$roleName])) {
+                                $validRoleNames[] = $roleName;
+                            }
+                        }
+                        if (!empty($validRoleNames)) {
+                            $user->syncRoles($validRoleNames);
+                        }
+                    }
+
+                    if (!empty($dbProductsSync)) {
+                        $user->dbProducts()->sync($dbProductsSync, false);
+                    }
+                } catch (\Throwable $inner) {
+                    Log::warning("[User Import] Error upserting user {$row['email']}: " . $inner->getMessage());
+                }
             }
         }
     }
@@ -533,6 +737,17 @@ class UserImportService
         }
 
         return null;
+    }
+
+    /**
+     * Hash de mot de passe optimise pour les imports massifs.
+     */
+    private function hashPasswordForImport(string $plain): string
+    {
+        $rounds = (int) env('IMPORT_BCRYPT_ROUNDS', 8);
+        $rounds = max(4, min(12, $rounds));
+
+        return password_hash($plain, PASSWORD_BCRYPT, ['cost' => $rounds]);
     }
 
     /**

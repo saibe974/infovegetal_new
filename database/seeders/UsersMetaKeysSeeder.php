@@ -16,9 +16,10 @@ class UsersMetaKeysSeeder extends Seeder
             ['value' => 'custom', 'label' => 'Custom', 'sort_order' => 10],
             ['value' => 'mail', 'label' => 'Mail', 'sort_order' => 20],
             ['value' => 'logo', 'label' => 'Logo', 'sort_order' => 30],
-            ['value' => 'tel', 'label' => 'Telephone', 'sort_order' => 40],
-            ['value' => 'adress', 'label' => 'Adress', 'sort_order' => 50],
-            ['value' => 'sales_conditions', 'label' => 'Conditions de vente', 'sort_order' => 60],
+            ['value' => 'phone', 'label' => 'Telephone', 'sort_order' => 40],
+            ['value' => 'mobile', 'label' => 'Mobile', 'sort_order' => 50],
+            ['value' => 'adress', 'label' => 'Adress', 'sort_order' => 60],
+            ['value' => 'sales_conditions', 'label' => 'Conditions de vente', 'sort_order' => 70],
         ];
 
         foreach ($items as $item) {

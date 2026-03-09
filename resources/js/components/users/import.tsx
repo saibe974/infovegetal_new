@@ -36,16 +36,17 @@ export function UsersImportTreatment({
             onStartImport({ strategy });
         }
     };
-    const effectiveProgress = (() => {
-        const fromProp = Number.isFinite(displayProgress) ? displayProgress : 0;
-        const fromInfo = Number.isFinite(progressInfo?.progress as number) ? (progressInfo?.progress as number) : 0;
-        // Si la prop est 0 mais l'API remonte une progression, on l'utilise en repli
-        const base = fromProp > 0 ? fromProp : fromInfo;
-        // Si status fini/annulé, forcer 100 ou 0 cohérent
-        if (importStatus === 'finished') return 100;
-        if (importStatus === 'cancelled') return Math.min(base, 100);
-        return Math.min(base, 100);
-    })();
+    // Progression temporairement désactivée pour correction ultérieure.
+    // const effectiveProgress = (() => {
+    //     const fromProp = Number.isFinite(displayProgress) ? displayProgress : 0;
+    //     const fromInfo = Number.isFinite(progressInfo?.progress as number) ? (progressInfo?.progress as number) : 0;
+    //     // Si la prop est 0 mais l'API remonte une progression, on l'utilise en repli
+    //     const base = fromProp > 0 ? fromProp : fromInfo;
+    //     // Si status fini/annulé, forcer 100 ou 0 cohérent
+    //     if (importStatus === 'finished') return 100;
+    //     if (importStatus === 'cancelled') return Math.min(base, 100);
+    //     return Math.min(base, 100);
+    // })();
 
     // useEffect(() => {
     //     console.log('[UsersImportTreatment] status=', importStatus, 'uploadId=', uploadId);
@@ -102,12 +103,16 @@ export function UsersImportTreatment({
                             ? 'Annulation en cours…'
                             : <>Import en cours <Loader2 className="inline-block ml-2 animate-spin" size={16} /></>}
                     </p>
-                    <div className="w-full h-2 rounded bg-muted">
+                    {/*
+                        Progress bar temporairement commentée.
+                        A réactiver après correction du flux de progression.
+                    */}
+                    {/* <div className="w-full h-2 rounded bg-muted">
                         <div
                             className="h-2 rounded bg-primary transition-all"
                             style={{ width: `${effectiveProgress}%` }}
                         />
-                    </div>
+                    </div> */}
                     <p className="text-xs text-muted-foreground">
                         {progressInfo?.processed ?? 0} traités · {progressInfo?.errors ?? 0} erreurs
                     </p>

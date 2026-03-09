@@ -60,6 +60,7 @@ type CsvUploadFilePondProps = {
     buttonClassName?: string;
     postTreatmentComponent?: React.ComponentType<any>;
     postTreatmentProps?: Record<string, any>;
+    disableProgressTracking?: boolean;
 
 };
 
@@ -104,6 +105,7 @@ export function CsvUploadFilePond({
     buttonClassName,
     postTreatmentComponent,
     postTreatmentProps,
+    disableProgressTracking = false,
 }: CsvUploadFilePondProps) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<any[]>([]);
@@ -413,8 +415,233 @@ export function CsvUploadFilePond({
         postTreatmentComponent,
     ]);
 
+    /*
+     * SUIVI DE PROGRESSION TEMPORAIREMENT DESACTIVE
+     * ------------------------------------------------
+     * - Polling importProgressUrl
+     * - Ecoute des statuts backend (processing/done/error/cancelled)
+     * - Declenchement automatique de process_chunk
+     * - Lissage visuel displayProgress/displayProcessed
+     *
+     * Ce bloc est conserve en commentaire pour reactivation/correction ulterieure.
+     */
+    // useEffect(() => {
+    //     // console.log('[UsersImport][Polling] useEffect, status=', importStatus);
+    //     if (!importProgressUrl || !uploadId) {
+    //         stopProgressPolling();
+    //         return;
+    //     }
+
+    //     const shouldPoll =
+    //         importStatus === 'processing' || importStatus === 'cancelling';
+    //     if (!shouldPoll) {
+    //         // console.log('[UsersImport][Polling] stopped, status=', importStatus);
+    //         stopProgressPolling();
+    //         return;
+    //     }
+
+    //     // if (!shouldPollRef.current) {
+    //     // console.log('[UsersImport][Polling] waiting import response, shouldPollRef=', shouldPollRef.current);
+    //     // no early return to keep polling readiness
+    //     // }
+
+    //     // console.log('[UsersImport][Polling] start for uploadId=', uploadId);
+    //     let cancelled = false;
+    //     const progressUrl = importProgressUrl!;
+
+    //     const fetchProgress = async () => {
+    //         const url = progressUrl(uploadId);
+    //         // console.log('[UsersImport][Polling] fetch progress for', uploadId, 'url=', url);
+    //         try {
+    //             const response = await fetch(url, {
+    //                 headers: { Accept: 'application/json' },
+    //                 credentials: 'same-origin',
+    //             });
+    //             // console.log('[UsersImport][Polling] raw response:', response.status, response.statusText);
+    //             if (!response.ok) return;
+
+    //             const data: ImportProgressPayload = await response.json();
+    //             // console.log('[UsersImport][Polling] payload:', {
+    //             //     status: data?.status,
+    //             //     processed: data?.processed,
+    //             //     total: data?.total,
+    //             //     errors: data?.errors,
+    //             //     progress: data?.progress,
+    //             //     has_more: (data as any)?.has_more,
+    //             //     next_offset: (data as any)?.next_offset,
+    //             // });
+    //             if (cancelled) return;
+
+    //             setProgressInfo(data);
+
+    //             const realProgress =
+    //                 typeof data.progress === 'number'
+    //                     ? Math.max(0, Math.min(100, data.progress))
+    //                     : 0;
+
+    //             const realProcessed =
+    //                 typeof data.processed === 'number'
+    //                     ? Math.max(0, data.processed)
+    //                     : 0;
+
+    //             const realErrors =
+    //                 typeof data.errors === 'number' ? Math.max(0, data.errors) : 0;
+
+    //             lastRealProgressRef.current = realProgress;
+    //             lastRealProcessedRef.current = realProcessed + realErrors;
+
+    //             const status = String(data.status ?? '').toLowerCase();
+
+    //             // Si le backend indique qu'il reste des chunks, on en declenche un nouveau
+    //             if (
+    //                 status === 'processing' &&
+    //                 data.has_more &&
+    //                 importProcessChunkUrl &&
+    //                 !isRequestingChunkRef.current
+    //             ) {
+    //                 try {
+    //                     // console.log('[UsersImport][Chunk] requesting next chunk...');
+    //                     isRequestingChunkRef.current = true;
+    //                     // Ne pas bloquer le polling: fire-and-forget avec gestion d'erreur
+    //                     fetch(importProcessChunkUrl, {
+    //                         method: 'POST',
+    //                         headers: {
+    //                             'Content-Type': 'application/json',
+    //                             Accept: 'application/json',
+    //                             'X-CSRF-TOKEN': csrfToken,
+    //                             'X-Requested-With': 'XMLHttpRequest',
+    //                         },
+    //                         body: JSON.stringify({ id: uploadId }),
+    //                     })
+    //                         .then(async (resp) => {
+    //                             const txt = await resp.text().catch(() => '');
+    //                             // console.log('[UsersImport][Chunk] response status=', resp.status, 'body=', txt);
+    //                             if (!resp.ok) {
+    //                                 console.error('[UsersImport][Chunk] non-OK response, will retry on next poll');
+    //                             }
+    //                         })
+    //                         .catch((e) => {
+    //                             console.error('[Import][Chunk] Failed to request next import chunk:', e);
+    //                         })
+    //                         .finally(() => {
+    //                             isRequestingChunkRef.current = false;
+    //                         });
+    //                     // Sortir immediatement pour laisser le polling continuer pendant le traitement du chunk
+    //                     return;
+    //                 } catch (e) {
+    //                     console.error(
+    //                         '[Import][Chunk] Failed to request next import chunk:',
+    //                         e,
+    //                     );
+    //                 } finally {
+    //                     // handled in finally of fetch above
+    //                 }
+    //             }
+
+    //             if (status === 'done') {
+    //                 // console.log('[UsersImport][Polling] status: done');
+    //                 setImportStatus('finished');
+    //                 stopProgressPolling();
+    //             } else if (status === 'error') {
+    //                 // console.log('[UsersImport][Polling] status: error');
+    //                 setImportStatus('error');
+    //                 setImportError(
+    //                     typeof data.message === 'string'
+    //                         ? data.message
+    //                         : 'Import process failed',
+    //                 );
+    //                 stopProgressPolling();
+    //             } else if (status === 'cancelled') {
+    //                 // console.log('[UsersImport][Polling] status: cancelled');
+    //                 setImportStatus('cancelled');
+    //                 stopProgressPolling();
+    //             } else if (status === 'cancelling') {
+    //                 // console.log('[UsersImport][Polling] status: cancelling');
+    //                 setImportStatus('cancelling');
+    //                 // Garder l'intervalle actuel, pas de recreation ici
+    //             } else {
+    //                 // console.log('[UsersImport][Polling] status: processing');
+    //                 // Garder l'intervalle actuel, pas de recreation ici
+    //             }
+    //         } catch (error) {
+    //             if (cancelled) return;
+    //             console.error('[UsersImport][Polling] Failed to fetch import progress:', error);
+    //         }
+    //     };
+
+    //     fetchProgress();
+    //     // Creer un seul intervalle durable si aucun n'existe deja
+    //     if (progressPollRef.current === null) {
+    //         progressPollRef.current = window.setInterval(fetchProgress, 1000);
+    //     }
+
+    //     return () => {
+    //         cancelled = true;
+    //         stopProgressPolling();
+    //     };
+    // }, [
+    //     importProgressUrl,
+    //     importStatus,
+    //     stopProgressPolling,
+    //     uploadId,
+    // ]);
+
+    // useEffect(() => {
+    //     if (importStatus !== 'processing') {
+    //         setDisplayProgress(lastRealProgressRef.current);
+    //         setDisplayProcessed(lastRealProcessedRef.current);
+    //         return;
+    //     }
+
+    //     const interval = 150; // ms
+
+    //     const id = window.setInterval(() => {
+    //         setDisplayProcessed((current) => {
+    //             const processedTarget = lastRealProcessedRef.current;
+    //             const totalLines = progressInfo?.total ?? 0;
+
+    //             if (totalLines === 0 || current >= processedTarget) {
+    //                 return current;
+    //             }
+
+    //             const increment = Math.max(
+    //                 1,
+    //                 Math.ceil((processedTarget - current) / 10),
+    //             );
+    //             const next = current + increment;
+    //             return next > processedTarget ? processedTarget : next;
+    //         });
+
+    //         setDisplayProgress((current) => {
+    //             const totalLines = progressInfo?.total ?? 0;
+    //             const processedTarget = lastRealProcessedRef.current;
+
+    //             if (totalLines === 0) {
+    //                 return current;
+    //             }
+
+    //             const calculatedProgress =
+    //                 (processedTarget / totalLines) * 100;
+    //             const effectiveTarget = Math.min(calculatedProgress, 100);
+
+    //             if (current >= effectiveTarget) {
+    //                 return current;
+    //             }
+    //             const increment = 0.3;
+    //             const next = current + increment;
+    //             return next > effectiveTarget ? effectiveTarget : next;
+    //         });
+    //     }, interval);
+
+    //     return () => window.clearInterval(id);
+    // }, [importStatus, progressInfo?.total]);
+
     useEffect(() => {
-        // console.log('[UsersImport][Polling] useEffect, status=', importStatus);
+        if (disableProgressTracking) {
+            stopProgressPolling();
+            return;
+        }
+
         if (!importProgressUrl || !uploadId) {
             stopProgressPolling();
             return;
@@ -423,41 +650,22 @@ export function CsvUploadFilePond({
         const shouldPoll =
             importStatus === 'processing' || importStatus === 'cancelling';
         if (!shouldPoll) {
-            // console.log('[UsersImport][Polling] stopped, status=', importStatus);
             stopProgressPolling();
             return;
         }
 
-        // if (!shouldPollRef.current) {
-        // console.log('[UsersImport][Polling] waiting import response, shouldPollRef=', shouldPollRef.current);
-        // no early return to keep polling readiness
-        // }
-
-        // console.log('[UsersImport][Polling] start for uploadId=', uploadId);
         let cancelled = false;
-        const progressUrl = importProgressUrl!;
 
         const fetchProgress = async () => {
-            const url = progressUrl(uploadId);
-            // console.log('[UsersImport][Polling] fetch progress for', uploadId, 'url=', url);
             try {
-                const response = await fetch(url, {
+                const response = await fetch(importProgressUrl(uploadId), {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
-                // console.log('[UsersImport][Polling] raw response:', response.status, response.statusText);
+
                 if (!response.ok) return;
 
                 const data: ImportProgressPayload = await response.json();
-                // console.log('[UsersImport][Polling] payload:', {
-                //     status: data?.status,
-                //     processed: data?.processed,
-                //     total: data?.total,
-                //     errors: data?.errors,
-                //     progress: data?.progress,
-                //     has_more: (data as any)?.has_more,
-                //     next_offset: (data as any)?.next_offset,
-                // });
                 if (cancelled) return;
 
                 setProgressInfo(data);
@@ -466,12 +674,10 @@ export function CsvUploadFilePond({
                     typeof data.progress === 'number'
                         ? Math.max(0, Math.min(100, data.progress))
                         : 0;
-
                 const realProcessed =
                     typeof data.processed === 'number'
                         ? Math.max(0, data.processed)
                         : 0;
-
                 const realErrors =
                     typeof data.errors === 'number' ? Math.max(0, data.errors) : 0;
 
@@ -480,58 +686,36 @@ export function CsvUploadFilePond({
 
                 const status = String(data.status ?? '').toLowerCase();
 
-                // Si le backend indique qu'il reste des chunks, on en déclenche un nouveau
                 if (
                     status === 'processing' &&
                     data.has_more &&
                     importProcessChunkUrl &&
                     !isRequestingChunkRef.current
                 ) {
-                    try {
-                        // console.log('[UsersImport][Chunk] requesting next chunk...');
-                        isRequestingChunkRef.current = true;
-                        // Ne pas bloquer le polling: fire-and-forget avec gestion d'erreur
-                        fetch(importProcessChunkUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                Accept: 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            body: JSON.stringify({ id: uploadId }),
+                    isRequestingChunkRef.current = true;
+                    fetch(importProcessChunkUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ id: uploadId }),
+                    })
+                        .catch((e) => {
+                            console.error('[Import][Chunk] Failed to request next import chunk:', e);
                         })
-                            .then(async (resp) => {
-                                const txt = await resp.text().catch(() => '');
-                                // console.log('[UsersImport][Chunk] response status=', resp.status, 'body=', txt);
-                                if (!resp.ok) {
-                                    console.error('[UsersImport][Chunk] non-OK response, will retry on next poll');
-                                }
-                            })
-                            .catch((e) => {
-                                console.error('[Import][Chunk] Failed to request next import chunk:', e);
-                            })
-                            .finally(() => {
-                                isRequestingChunkRef.current = false;
-                            });
-                        // Sortir immédiatement pour laisser le polling continuer pendant le traitement du chunk
-                        return;
-                    } catch (e) {
-                        console.error(
-                            '[Import][Chunk] Failed to request next import chunk:',
-                            e,
-                        );
-                    } finally {
-                        // handled in finally of fetch above
-                    }
+                        .finally(() => {
+                            isRequestingChunkRef.current = false;
+                        });
+                    return;
                 }
 
                 if (status === 'done') {
-                    // console.log('[UsersImport][Polling] status: done');
                     setImportStatus('finished');
                     stopProgressPolling();
                 } else if (status === 'error') {
-                    // console.log('[UsersImport][Polling] status: error');
                     setImportStatus('error');
                     setImportError(
                         typeof data.message === 'string'
@@ -540,16 +724,10 @@ export function CsvUploadFilePond({
                     );
                     stopProgressPolling();
                 } else if (status === 'cancelled') {
-                    // console.log('[UsersImport][Polling] status: cancelled');
                     setImportStatus('cancelled');
                     stopProgressPolling();
                 } else if (status === 'cancelling') {
-                    // console.log('[UsersImport][Polling] status: cancelling');
                     setImportStatus('cancelling');
-                    // Garder l’intervalle actuel, pas de recréation ici
-                } else {
-                    // console.log('[UsersImport][Polling] status: processing');
-                    // Garder l’intervalle actuel, pas de recréation ici
                 }
             } catch (error) {
                 if (cancelled) return;
@@ -557,8 +735,7 @@ export function CsvUploadFilePond({
             }
         };
 
-        fetchProgress();
-        // Créer un seul intervalle durable si aucun n’existe déjà
+        void fetchProgress();
         if (progressPollRef.current === null) {
             progressPollRef.current = window.setInterval(fetchProgress, 1000);
         }
@@ -568,20 +745,25 @@ export function CsvUploadFilePond({
             stopProgressPolling();
         };
     }, [
+        disableProgressTracking,
         importProgressUrl,
         importStatus,
         stopProgressPolling,
         uploadId,
+        importProcessChunkUrl,
+        csrfToken,
     ]);
 
     useEffect(() => {
+        if (disableProgressTracking) {
+            return;
+        }
+
         if (importStatus !== 'processing') {
             setDisplayProgress(lastRealProgressRef.current);
             setDisplayProcessed(lastRealProcessedRef.current);
             return;
         }
-
-        const interval = 150; // ms
 
         const id = window.setInterval(() => {
             setDisplayProcessed((current) => {
@@ -592,10 +774,7 @@ export function CsvUploadFilePond({
                     return current;
                 }
 
-                const increment = Math.max(
-                    1,
-                    Math.ceil((processedTarget - current) / 10),
-                );
+                const increment = Math.max(1, Math.ceil((processedTarget - current) / 10));
                 const next = current + increment;
                 return next > processedTarget ? processedTarget : next;
             });
@@ -608,21 +787,18 @@ export function CsvUploadFilePond({
                     return current;
                 }
 
-                const calculatedProgress =
-                    (processedTarget / totalLines) * 100;
-                const effectiveTarget = Math.min(calculatedProgress, 100);
-
+                const effectiveTarget = Math.min((processedTarget / totalLines) * 100, 100);
                 if (current >= effectiveTarget) {
                     return current;
                 }
-                const increment = 0.3;
-                const next = current + increment;
+
+                const next = current + 0.3;
                 return next > effectiveTarget ? effectiveTarget : next;
             });
-        }, interval);
+        }, 150);
 
         return () => window.clearInterval(id);
-    }, [importStatus, progressInfo?.total]);
+    }, [disableProgressTracking, importStatus, progressInfo?.total]);
 
     const handleServerResponse = (response: any) => {
         const rawResponse =
