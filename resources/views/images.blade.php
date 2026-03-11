@@ -123,7 +123,7 @@
     <body>
         <div class="wrap">
             <div class="header">
-                <h1 style="margin:0; font-size: 20px;">Images manquantes</h1>
+                <!-- <h1 style="margin:0; font-size: 20px;">Images manquantes</h1> -->
                 <form method="GET" class="search">
                     <input type="hidden" name="theme" value="{{ $theme }}">
                     <input type="text" name="q" placeholder="Rechercher par nom ou SKU" value="{{ $q ?? '' }}">
