@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ProductMediaService
 {
@@ -24,8 +25,40 @@ class ProductMediaService
             }
         }
 
+        $temporaryFile = tempnam(sys_get_temp_dir(), 'product-media-');
+
+        if ($temporaryFile === false) {
+            Log::warning('Product image temp file creation failed', [
+                'product_id' => $product->id,
+                'url' => $imgLink,
+            ]);
+
+            return false;
+        }
+
         try {
-            $product->addMediaFromUrl($imgLink)
+            $response = Http::timeout(30)
+                ->connectTimeout(10)
+                ->withHeaders([
+                    'User-Agent' => 'Infovegetal Media Sync',
+                    'Accept' => 'image/*,*/*;q=0.8',
+                ])
+                ->get($imgLink);
+
+            if (!$response->successful()) {
+                throw new RuntimeException('HTTP ' . $response->status());
+            }
+
+            $body = $response->body();
+            if ($body === '') {
+                throw new RuntimeException('Empty response body');
+            }
+
+            if (file_put_contents($temporaryFile, $body) === false) {
+                throw new RuntimeException('Failed to write temporary file');
+            }
+
+            $product->addMedia($temporaryFile)
                 ->usingFileName($this->buildProductFileName($product, $imgLink))
                 ->withCustomProperties(['source_url' => $imgLink])
                 ->toMediaCollection('images');
@@ -35,7 +68,12 @@ class ProductMediaService
                 'url' => $imgLink,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
+        } finally {
+            if (is_file($temporaryFile)) {
+                @unlink($temporaryFile);
+            }
         }
 
         return true;
