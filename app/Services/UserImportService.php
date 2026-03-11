@@ -191,6 +191,17 @@ class UserImportService
 
                         $dbProductsSync = $this->buildDbProductsSyncFromExpediteurs($expediteursRaw);
 
+                        if (
+                            strtolower(trim($email)) === 'emma.guyon39@orange.fr'
+                            && !empty((string) $expediteursRaw)
+                            && empty($dbProductsSync)
+                        ) {
+                            Log::info('[User Import][CSV][target-user] Expediteurs present mais mapping db_products_sync vide', [
+                                'email' => $email,
+                                'expediteurs_raw' => $expediteursRaw,
+                            ]);
+                        }
+
                         // Mapping old_db.csv -> users
                         $phone = trim((string) ($mapped['tel'] ?? ''));
                         $addressRoad = trim((string) ($mapped['rue'] ?? ''));
@@ -219,6 +230,23 @@ class UserImportService
                         $alias = null;
                         // $lft = 0;
                         // $rgt = 0;
+                    }
+
+                    if (strtolower(trim($email)) === 'emma.guyon39@orange.fr') {
+                        Log::info('[User Import][CSV][target-user] Donnees CSV recuperees', [
+                            'email' => $email,
+                            'name' => $name,
+                            'roles' => $roles,
+                            'phone' => $phone,
+                            'address_road' => $addressRoad,
+                            'address_zip' => $addressZip,
+                            'address_town' => $addressTown,
+                            'ref' => $ref,
+                            'alias' => $alias,
+                            'db_products_sync' => $dbProductsSync,
+                            'mapped' => $mapped,
+                            'raw_row' => $row,
+                        ]);
                     }
 
                     $currentSnapshot = [
@@ -404,10 +432,10 @@ class UserImportService
         $dbProductsByEmail = [];
 
         $existingUsersByEmail = User::query()
-            ->select(['id', 'email', 'password'])
+            ->select(['id', 'email', 'password', 'alias'])
             ->whereIn('email', array_values(array_unique(array_map(static fn ($r) => (string) ($r['email'] ?? ''), $rows))))
             ->get()
-            ->keyBy('email');
+            ->mapWithKeys(static fn ($user) => [strtolower((string) $user->email) => $user]);
 
         // Hash par defaut calcule une seule fois pour limiter fortement le cout CPU.
         $defaultHashedPassword = $this->hashPasswordForImport(Str::random(40));
@@ -441,7 +469,7 @@ class UserImportService
         }
 
         foreach ($rows as $row) {
-            $email = (string) ($row['email'] ?? '');
+            $email = strtolower(trim((string) ($row['email'] ?? '')));
             if ($email === '') {
                 continue;
             }
@@ -580,14 +608,15 @@ class UserImportService
                     ->select(['id', 'email'])
                     ->whereIn('email', array_keys($emails))
                     ->get()
-                    ->keyBy('email');
+                    ->mapWithKeys(static fn ($user) => [strtolower((string) $user->email) => $user]);
 
                 if (!empty($rolesByEmail)) {
                     $roleSyncUserIds = [];
                     $rolePivotRows = [];
 
                     foreach ($rolesByEmail as $email => $roleNames) {
-                        $user = $usersByEmail->get($email);
+                        $emailKey = strtolower(trim((string) $email));
+                        $user = $usersByEmail->get($emailKey);
                         if (!$user) {
                             continue;
                         }
@@ -617,11 +646,42 @@ class UserImportService
 
                 if (!empty($dbProductsByEmail)) {
                     $pivotRows = [];
+                    $targetEmail = 'emma.guyon39@orange.fr';
 
                     foreach ($dbProductsByEmail as $email => $links) {
-                        $user = $usersByEmail->get($email);
+                        $emailKey = strtolower(trim((string) $email));
+
+                        // Sync user resolution must use email (stable unique key).
+                        $user = $usersByEmail->get($emailKey);
+
+                        // Ancienne piste alias conservee en commentaire pour reference/debug.
+                        // $user = null;
+                        // $aliasKey = strtolower(trim((string) ($links['alias'] ?? '')));
+                        // if ($aliasKey !== '') {
+                        //     $user = User::query()
+                        //         ->select(['id'])
+                        //         ->whereRaw('LOWER(alias) = ?', [$aliasKey])
+                        //         ->first();
+                        // }
+
                         if (!$user) {
+                            if ($emailKey === $targetEmail) {
+                                Log::info('[User Import][SYNC][target-user] User introuvable pour sync db_products_users', [
+                                    'email' => $email,
+                                    'email_key' => $emailKey,
+                                    'db_products_sync' => $links,
+                                ]);
+                            }
                             continue;
+                        }
+
+                        if ($emailKey === $targetEmail) {
+                            Log::info('[User Import][SYNC][target-user] Preparation sync db_products_users', [
+                                'email' => $email,
+                                'email_key' => $emailKey,
+                                'user_id' => (int) $user->id,
+                                'db_products_sync' => $links,
+                            ]);
                         }
 
                         foreach ($links as $link) {
@@ -641,6 +701,13 @@ class UserImportService
                             ['user_id', 'db_product_id'],
                             ['attributes', 'updated_at']
                         );
+
+                        if (isset($dbProductsByEmail[$targetEmail])) {
+                            Log::info('[User Import][SYNC][target-user] Upsert db_products_users execute', [
+                                'email' => $targetEmail,
+                                'rows_count' => count($dbProductsByEmail[$targetEmail]),
+                            ]);
+                        }
                     }
                 }
             }, 3);
@@ -778,7 +845,7 @@ class UserImportService
             return [];
         }
 
-        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        $decoded = is_array($raw) ? $raw : $this->decodeLegacyJsonish((string) $raw);
         if (!is_array($decoded)) {
             return [];
         }
@@ -821,13 +888,16 @@ class UserImportService
                 $attributes['c'] = 'admin';
             }
 
-            if (array_key_exists('p', $attributes)) {
-                $pValue = is_numeric($attributes['p']) ? (int) $attributes['p'] : $attributes['p'];
+            if (array_key_exists('pu', $attributes)) {
+                $pValue = is_numeric($attributes['pu']) ? (int) $attributes['pu'] : $attributes['pu'];
                 if ($pValue === 0) {
-                    $attributes['p'] = 1;
+                    $attributes['p'] = "price_render";
                 } elseif ($pValue === -1) {
-                    $attributes['p'] = 0;
+                    $attributes['p'] = "price_depart";
+                } else {
+                    $attributes['p'] = (string) $pValue;
                 }
+                unset($attributes['pu']);
             }
 
             if (isset($sync[$mappedId]['attributes'])) {
@@ -845,6 +915,27 @@ class UserImportService
     }
 
     /**
+     * Decoder tolerant pour payload legacy pseudo-JSON (valeurs vides: "key":,).
+     */
+    private function decodeLegacyJsonish(string $raw): ?array
+    {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Remplace les valeurs vides invalides par null: "z":, -> "z":null,
+        $sanitized = preg_replace('/:\s*(?=[,}])/m', ':null', $raw);
+        if (!is_string($sanitized) || $sanitized === '') {
+            return null;
+        }
+
+        $decoded = json_decode($sanitized, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * Mapper les ids legacy d'expediteurs vers db_products.
      */
     private function mapLegacyDbProductId($sourceId): ?int
@@ -859,19 +950,15 @@ class UserImportService
             return 4; // peplant
         }
 
-        if ($sourceId === 3) {
+        if ($sourceId === 5) {
             return 5; // ddk
         }
 
-        if ($sourceId === 5) {
-            return 2; // infovegetal_old
+        if ($sourceId === 13 || $sourceId === 17 || $sourceId === 21) {
+            return 2; // old_infovegetal
         }
 
-        if ($sourceId === 17 || $sourceId === 21 || $sourceId === 22 || $sourceId === 23) {
-            return 1; // infovegetal
-        }
-
-        if ($sourceId === 12 || $sourceId === 13) {
+        if ($sourceId === 22 || $sourceId === 23) {
             return 3; // eurofleurs
         }
 

@@ -42,7 +42,7 @@ class PriceCalculatorService
         }
 
         // Prix spéciaux fixes (si p n'est pas -1, 0 ou 1)
-        $priceMode = $userAttributes['p'] ?? -1;
+            $priceMode = $this->normalizePriceMode($userAttributes['p'] ?? -1);
         if ($priceMode != -1 && $priceMode != 0 && $priceMode != 1) {
             $specialPrice = $this->getSpecialPrice($product, $priceMode);
             return $this->roundPrices([
@@ -150,7 +150,7 @@ class PriceCalculatorService
         $margeMin = $attributes['mm'] ?? 0;       // marge min par roll
         $ponderation = $attributes['pd'] ?? 0;    // coefficient de pondération
         $livraison = $attributes['l'] ?? 0;       // livraison
-        $priceMode = $attributes['p'] ?? -1;      // 0=départ, 1=rendu
+            $priceMode = $this->normalizePriceMode($attributes['p'] ?? -1); // 0=depart, 1=rendu
         
         // Marges par quantité
         $margeCarton = $attributes['mc'] ?? 0;    // marge par carton
@@ -225,6 +225,36 @@ class PriceCalculatorService
         return $this->roundPrices($result);
     }
 
+        /**
+         * Normalise les modes de prix (legacy numerique et alias explicites).
+         */
+        protected function normalizePriceMode($value)
+        {
+            if ($value === null || $value === '') {
+                return -1;
+            }
+
+            if (is_int($value) || is_float($value)) {
+                $intValue = (int) $value;
+                return in_array($intValue, [-1, 0, 1], true) ? $intValue : (string) $value;
+            }
+
+            $raw = strtolower(trim((string) $value));
+
+            if ($raw === 'price_depart') {
+                return 0;
+            }
+
+            if ($raw === 'price_render') {
+                return 1;
+            }
+
+            if ($raw === '-1' || $raw === '0' || $raw === '1') {
+                return (int) $raw;
+            }
+
+            return (string) $value;
+        }
     /**
      * Arrondit les prix à 2 décimales.
      */
