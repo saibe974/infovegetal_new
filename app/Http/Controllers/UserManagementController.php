@@ -145,7 +145,7 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],
@@ -164,7 +164,7 @@ class UserManagementController extends Controller
             'name' => $validated['name'],
             'alias' => $validated['alias'] ?? null,
             'ref' => $validated['ref'] ?? null,
-            'tel' => $validated['tel'] ?? null,
+            'phone' => $validated['phone'] ?? null,
             'address_road' => $validated['address_road'] ?? null,
             'address_zip' => $validated['address_zip'] ?? null,
             'address_town' => $validated['address_town'] ?? null,
@@ -235,7 +235,7 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias,' . $user->id],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],
@@ -254,7 +254,7 @@ class UserManagementController extends Controller
         $user->name = $validated['name'];
         $user->alias = $validated['alias'] ?? null;
         $user->ref = $validated['ref'] ?? null;
-        $user->tel = $validated['tel'] ?? null;
+        $user->phone = $validated['phone'] ?? null;
         $user->address_road = $validated['address_road'] ?? null;
         $user->address_zip = $validated['address_zip'] ?? null;
         $user->address_town = $validated['address_town'] ?? null;

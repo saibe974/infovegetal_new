@@ -36,7 +36,6 @@ class User extends Authenticatable
         'name',
         'alias',
         'ref',
-        'tel',
         'phone',
         'address_road',
         'address_zip',

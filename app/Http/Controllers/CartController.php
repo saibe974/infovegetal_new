@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\Product;
+use App\Services\PdfRollDistributionService;
 use App\Services\PriceCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -170,7 +172,7 @@ class CartController extends Controller
 
         // Récupérer les produits avec leurs détails
         $productIds = collect($data['items'])->pluck('id')->toArray();
-        $products = Product::with(['category', 'tags'])->whereIn('id', $productIds)->get()->keyBy('id');
+        $products = Product::with(['category', 'tags', 'media', 'dbProduct'])->whereIn('id', $productIds)->get()->keyBy('id');
 
         // Construire les items avec les produits complets
         /** @var \App\Models\User $user */
@@ -195,18 +197,44 @@ class CartController extends Controller
         });
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
         $total = $itemsTotal + $shippingTotal;
+        $rollDistribution = app(PdfRollDistributionService::class)->build($items);
+
+        // Récupérer le facturant et le commercial via le pivot db_products_users
+        $facturant = null;
+        $commercial = null;
+        $dbProductId = isset($data['group_key']) ? (int) $data['group_key'] : 0;
+        if ($dbProductId > 0) {
+            $pivot = DB::table('db_products_users')
+                ->where('user_id', $user->id)
+                ->where('db_product_id', $dbProductId)
+                ->value('attributes');
+            if ($pivot) {
+                $attrs = is_array($pivot) ? $pivot : json_decode($pivot, true);
+                $factId = isset($attrs['fact']) ? (int) $attrs['fact'] : null;
+                $comId  = isset($attrs['com'])  ? (int) $attrs['com']  : null;
+                if ($factId) {
+                    $facturant  = \App\Models\User::with('usersMeta')->find($factId);
+                }
+                if ($comId) {
+                    $commercial = \App\Models\User::with('usersMeta')->find($comId);
+                }
+            }
+        }
 
         // Générer le PDF avec Spatie
         $label = isset($data['group_label']) ? trim((string) $data['group_label']) : '';
         $safeLabel = $label !== '' ? Str::slug($label) : 'panier';
-        $suffix = isset($data['group_key']) ? '-' . (int) $data['group_key'] : '';
+        $suffix = $dbProductId > 0 ? '-' . $dbProductId : '';
 
         return Pdf::view('pdf.cart', [
             'items' => $items,
             'items_total' => $itemsTotal,
             'shipping_total' => $shippingTotal,
             'total' => $total,
+            'roll_distribution' => $rollDistribution,
             'user' => $user,
+            'facturant' => $facturant,
+            'commercial' => $commercial,
         ])
             ->format('a4')
             ->name($safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '.pdf')
