@@ -49,7 +49,11 @@ export function ProductCard({
 
     const name = String(product?.name ?? "");
     const description = String(product?.description ?? "");
-    const img = resolveImageUrl(product?.img_link ?? "/placeholder.png");
+    const img = resolveImageUrl(
+        product?.image_medium
+        ?? product?.img_link
+        ?? "/placeholder.png"
+    );
 
     const handleEdit = (id: number) => {
         if (editProduct) return editProduct(id);

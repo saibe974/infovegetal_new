@@ -101,7 +101,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             <TableCell>
                                 <div className="relative w-20">
                                     {item.img_link ? (
-                                        <img src={resolveImageUrl(item.img_link)} className="w-20 object-cover" alt={item.name} />
+                                        <img src={resolveImageUrl(item.image_thumb ?? item.img_link)} className="w-20 object-cover" alt={item.name} />
                                     ) : (
                                         <img src={resolveImageUrl('/placeholder.png')} className="w-20 object-cover" alt="Placeholder" />
                                     )}

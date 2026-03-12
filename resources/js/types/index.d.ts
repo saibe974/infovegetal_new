@@ -76,6 +76,9 @@ export interface Product {
     id: number;
     name: string;
     img_link: string;
+    image_original?: string | null;
+    image_medium?: string | null;
+    image_thumb?: string | null;
     description: string;
     price: number;
     active: boolean;

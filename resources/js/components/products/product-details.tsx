@@ -84,7 +84,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                     ariaLabel="Zoom Area"
                                 >
                                     <img
-                                        src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
+                                        src={resolveImageUrl(product.image_original ?? product.img_link ?? '/images/placeholder.png')}
                                         alt={product.name}
                                         className="h-full w-auto object-contain select-none"
                                         draggable={false}
