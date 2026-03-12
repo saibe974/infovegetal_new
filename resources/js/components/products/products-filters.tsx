@@ -7,7 +7,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
@@ -417,38 +416,83 @@ export function ProductsFilters({
                 {!singlePot && (
                     <div className="space-y-2 w-full lg:w-1/2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
-                        <Select value={localPot} onValueChange={setLocalPot}>
-                            <SelectTrigger>
-                                <SelectValue placeholder={t('All pot diameters')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ALL_POTS}>{t('All pot diameters')}</SelectItem>
-                                {(potOptions || []).map((value) => (
-                                    <SelectItem key={value} value={String(value)}>
-                                        {value}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+
+                        <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                                <Button type="button" variant="ghost" size="sm" className="w-full justify-between border border-input rounded-md">
+                                    <span className="truncate">
+                                        {localPot === ALL_POTS ? t('All pot diameters') : localPot}
+                                    </span>
+                                    <ChevronDown className="size-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="start"
+                                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-75 md:max-h-80 overflow-auto"
+                            >
+                                <DropdownMenuItem
+                                    onSelect={() => setLocalPot(ALL_POTS)}
+                                    className={localPot === ALL_POTS ? "bg-accent" : undefined}
+                                >
+                                    {t('All pot diameters')}
+                                </DropdownMenuItem>
+                                {(potOptions || []).map((value) => {
+                                    const option = String(value);
+                                    const isSelected = localPot === option;
+
+                                    return (
+                                        <DropdownMenuItem
+                                            key={option}
+                                            onSelect={() => setLocalPot(option)}
+                                            className={isSelected ? "bg-accent" : undefined}
+                                        >
+                                            {option}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 )}
 
                 {!singleHeight && (
                     <div className="space-y-2 w-full lg:w-1/2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
-                        <Select value={localHeight} onValueChange={setLocalHeight}>
-                            <SelectTrigger>
-                                <SelectValue placeholder={t('All heights')} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ALL_HEIGHTS}>{t('All heights')}</SelectItem>
-                                {(heightOptions || []).map((value) => (
-                                    <SelectItem key={value} value={String(value)}>
-                                        {value}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                                <Button type="button" variant="ghost" size="sm" className="w-full justify-between border border-input rounded-md">
+                                    <span className="truncate">
+                                        {localHeight === ALL_HEIGHTS ? t('All heights') : localHeight}
+                                    </span>
+                                    <ChevronDown className="size-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="start"
+                                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-75 md:max-h-80 overflow-auto"
+                            >
+                                <DropdownMenuItem
+                                    onSelect={() => setLocalHeight(ALL_HEIGHTS)}
+                                    className={localHeight === ALL_HEIGHTS ? "bg-accent" : undefined}
+                                >
+                                    {t('All heights')}
+                                </DropdownMenuItem>
+                                {(heightOptions || []).map((value) => {
+                                    const option = String(value);
+                                    const isSelected = localHeight === option;
+
+                                    return (
+                                        <DropdownMenuItem
+                                            key={option}
+                                            onSelect={() => setLocalHeight(option)}
+                                            className={isSelected ? "bg-accent" : undefined}
+                                        >
+                                            {option}
+                                        </DropdownMenuItem>
+                                    );
+                                })}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 )}
             </div>
