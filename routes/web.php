@@ -82,13 +82,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
     Route::get('dashboard', function (Request $request) {
         $user = $request->user();
-        $query = \App\Models\Cart::query()->with(['user', 'products']);
+        $query = \App\Models\Cart::query()
+            ->select(['id', 'user_id', 'status', 'updated_at'])
+            ->with([
+                'user:id,name,email',
+                'products' => function ($q) {
+                    $q->select([
+                        'products.id',
+                        'products.price',
+                        'products.price_floor',
+                        'products.price_roll',
+                        'products.price_promo',
+                        'products.cond',
+                        'products.floor',
+                        'products.roll',
+                    ]);
+                },
+            ]);
 
         if (!$user->hasRole('admin')) {
             $query->where('user_id', $user->id);
         }
 
-        $carts = $query->latest('updated_at')->get();
+        $carts = $query->latest('updated_at')->limit(200)->get();
 
         return Inertia::render('dashboard', [
             'carts' => $carts,

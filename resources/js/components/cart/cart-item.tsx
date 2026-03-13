@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { getCartPricing } from './cart-pricing';
-import { resolveImageUrl } from '@/lib/resolve-image-url';
+import { getProductCartImage } from '@/components/products/product-cart-image';
 import * as Flags from "country-flag-icons/react/3x2";
 
 export type CartItemProps = {
@@ -33,6 +33,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
     const CountryFlag = countryCode.length === 2
         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
         : undefined;
+    const productImage = getProductCartImage(product);
 
     return (
         <div className="group relative border-b pb-3 last:border-b-0">
@@ -52,7 +53,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                 {/* Image produit */}
                 <div className="relative shrink-0">
                     <img
-                        src={resolveImageUrl(product.img_link ?? '/placeholder.png')}
+                        src={productImage}
                         alt={product.name}
                         className="size-15 object-cover rounded"
                     />

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { resolveImageUrl } from '@/lib/resolve-image-url';
 import { CartContext } from '@/components/cart/cart.context';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -18,6 +17,7 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
+import { getProductCartImage } from '@/components/products/product-cart-image';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Props = Record<string, never>;
@@ -444,7 +444,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                                 <div className="flex items-center gap-4 md:w-1/2">
                                                     <div className="h-20 w-20 rounded relative shrink-0">
                                                         <img
-                                                            src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
+                                                            src={getProductCartImage(product)}
                                                             alt={product.name}
                                                             className="h-full w-full object-cover"
                                                         />
