@@ -75,8 +75,11 @@ export default withAppLayout(
 
         console.log(collection)
         const { t } = useI18n();
-        type TreeUser = User & { depth: number; parent_id: number | null };
+        type TreeUser = User & { depth: number; parent_id: number | null; has_children?: boolean };
         const [pending, setPending] = useState<TreeUser[] | null>(null);
+        const [treeSearchItems, setTreeSearchItems] = useState<TreeUser[] | null>(null);
+        const [treeSearchExpandedIds, setTreeSearchExpandedIds] = useState<number[]>([]);
+        const [treeSearchLoading, setTreeSearchLoading] = useState(false);
         const [saving, setSaving] = useState(false);
         const [allUsers, setAllUsers] = useState<User[]>(collection?.data || []);
         const [search, setSearch] = useState(q || '');
@@ -133,6 +136,9 @@ export default withAppLayout(
             const views = JSON.parse(localStorage.getItem('views') || '{}');
             return (views.users || 'table') as ViewMode;
         });
+
+        const treeSearchQuery = (q ?? '').trim();
+        const isTreeSearchMode = viewMode === 'tree' && treeSearchQuery.length > 0;
 
         const handleSearch = (s: string) => {
             setSearch(s);
@@ -209,68 +215,118 @@ export default withAppLayout(
             }
         };
 
-        // Construire une liste plate pour le SortableTree avec calcul de depth basé sur parent_id
-        const allItems = useMemo<TreeUser[]>(() => {
-            const safeUsers = Array.isArray(allUsers) ? allUsers : [];
+        const hasChanges = useMemo(() => !isTreeSearchMode && pending !== null, [pending, isTreeSearchMode]);
 
-            // Créer un map id -> user pour accès rapide
-            const userMap = new Map<number, any>();
-            const usersWithParent = safeUsers
-                .filter((u: any) => u && typeof u.id === 'number')
-                .map((u: any) => ({
-                    ...u,
-                    parent_id: (u as any).parent_id ?? null,
-                }));
+        useEffect(() => {
+            if (!isTreeSearchMode) {
+                setTreeSearchItems(null);
+                setTreeSearchExpandedIds([]);
+                setTreeSearchLoading(false);
+                return;
+            }
 
-            usersWithParent.forEach(u => userMap.set(u.id, u));
+            const controller = new AbortController();
+            setTreeSearchLoading(true);
 
-            // Calculer le depth pour chaque user en parcourant la chaîne parent
-            return usersWithParent.map((u: any) => {
-                let depth = 0;
-                let parentId = u.parent_id;
-                const visited = new Set<number>();
+            fetch(`/admin/users/tree-search?q=${encodeURIComponent(treeSearchQuery)}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                signal: controller.signal,
+            })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load users tree search fragment');
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    const nextItems = ((payload.items || []) as any[]).map((item) => ({
+                        ...item,
+                        parent_id: item.parent_id ?? null,
+                        depth: Number(item.depth ?? 0),
+                        has_children: Boolean(item.has_children),
+                    })) as TreeUser[];
 
-                while (parentId !== null && !visited.has(parentId)) {
-                    visited.add(parentId);
-                    const parent = userMap.get(parentId);
-                    if (!parent) break;
-                    depth++;
-                    parentId = parent.parent_id ?? null;
-                }
+                    setTreeSearchItems(nextItems);
+                    setTreeSearchExpandedIds(
+                        (payload.expanded_ids || [])
+                            .map((id: unknown) => Number(id))
+                            .filter((id: number) => Number.isFinite(id)),
+                    );
+                })
+                .catch((error) => {
+                    if (error?.name === 'AbortError') {
+                        return;
+                    }
+                    console.error(error);
+                    toast.error(t('Error while loading tree search'));
+                })
+                .finally(() => {
+                    if (!controller.signal.aborted) {
+                        setTreeSearchLoading(false);
+                    }
+                });
 
-                return {
-                    ...u,
-                    depth,
-                };
+            return () => {
+                controller.abort();
+            };
+        }, [isTreeSearchMode, treeSearchQuery]);
+
+        const loadTreePage = async (
+            parent: TreeUser | null,
+            args: { offset: number; limit: number },
+        ): Promise<{ items: TreeUser[]; hasMore: boolean; nextOffset: number }> => {
+            const params = new URLSearchParams();
+            params.set('offset', String(args.offset));
+            params.set('limit', String(args.limit));
+
+            if (parent && parent.id) {
+                params.set('parent_id', String(parent.id));
+            }
+
+            const currentSearch = (search || '').trim();
+            if (currentSearch.length >= 2) {
+                params.set('q', currentSearch);
+            }
+
+            const response = await fetch(`/admin/users/tree-children?${params.toString()}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
             });
-        }, [allUsers]);
 
-        const hasChanges = useMemo(() => {
-            if (!pending) return false;
-            const a = pending.map(i => i.id);
-            const b = allItems.map(i => i.id);
-            return JSON.stringify(a) !== JSON.stringify(b) ||
-                JSON.stringify(pending.map(i => i.parent_id ?? null)) !== JSON.stringify(allItems.map(i => i.parent_id ?? null));
-        }, [pending, allItems]);
+            if (!response.ok) {
+                throw new Error('Failed to load users tree page');
+            }
 
-        // Map des parents qui possèdent au moins un enfant (utilisé pour afficher/masquer le chevron)
-        const parentsWithChildren = useMemo(() => {
-            const source = pending ?? allItems;
-            const set = new Set<number>();
-            source.forEach((it) => {
-                const pid = (it as any)?.parent_id;
-                if (pid != null) set.add(pid as number);
-            });
-            return set;
-        }, [pending, allItems]);
+            const payload = await response.json();
+            const parentDepth = parent?.depth ?? -1;
+            const items = (payload.items || []).map((item: any) => ({
+                ...item,
+                parent_id: item.parent_id ?? (parent ? parent.id : null),
+                depth:
+                    item.depth !== null &&
+                        item.depth !== undefined &&
+                        Number.isFinite(Number(item.depth))
+                        ? Number(item.depth)
+                        : parentDepth + 1,
+                has_children: Boolean(item.has_children),
+            }));
 
-        const loadChildren = async (): Promise<TreeUser[]> => {
-            // Pas de hiérarchie utilisateur à charger côté client pour l'instant
-            return [];
+            return {
+                items,
+                hasMore: Boolean(payload.has_more),
+                nextOffset: Number(payload.next_offset ?? (args.offset + items.length)),
+            };
         };
 
-        const handleTreeChange = (items: TreeUser[], reason?: 'drag' | 'expand' | 'collapse') => {
+        const handleTreeChange = (items: TreeUser[], reason?: 'drag' | 'expand' | 'collapse' | 'lazy-load') => {
+            if (isTreeSearchMode) return;
             if (reason === 'expand' || reason === 'collapse') return;
+            if (reason === 'lazy-load') return;
             if (reason === 'drag') {
                 // Réordonner en parcours DFS pour garantir parent avant enfants
                 const reorderedItems = (() => {
@@ -390,7 +446,34 @@ export default withAppLayout(
                         marginLeft: depth * 24,
                     }}
                 >
-                    {!isDragging && parentsWithChildren.has((item as any).id) ? (
+                    {depth > 0 && (
+                        <div className="pointer-events-none absolute inset-y-0 left-0" aria-hidden>
+                            {Array.from({ length: depth }).map((_, level) => (
+                                <span
+                                    key={`guide-${(item as any).id}-${level}`}
+                                    className="absolute top-[-1px] bottom-[-1px] w-px bg-emerald-600/30 dark:bg-emerald-400/35"
+                                    style={{ left: level * 24 + 10.5 }}
+                                />
+                            ))}
+                            <span
+                                className="absolute h-px bg-emerald-600/30 dark:bg-emerald-400/35"
+                                style={{
+                                    left: (depth - 1) * 24 + 10.5,
+                                    top: '50%',
+                                    width: 13,
+                                }}
+                            />
+                            <span
+                                className="absolute size-1 rounded-full bg-emerald-600/40 dark:bg-emerald-400/45"
+                                style={{
+                                    left: depth * 24 + 8,
+                                    top: 'calc(50% - 3px)',
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {!isDragging && Boolean((item as any)?.has_children) ? (
                         <button
                             type="button"
                             onClick={toggleExpand}
@@ -532,16 +615,23 @@ export default withAppLayout(
                     </InfiniteScroll>
                 ) : (
                     <div className="space-y-2">
+                        {isTreeSearchMode && treeSearchLoading && (
+                            <div className="text-sm text-muted-foreground px-1">Chargement du fragment...</div>
+                        )}
                         <div className="border rounded-md overflow-hidden">
                             <SortableTree
-                                items={allItems}
+                                items={isTreeSearchMode ? (treeSearchItems ?? []) : (pending ?? [])}
                                 idKey="id"
                                 parentKey="parent_id"
                                 depthKey="depth"
-                                loadChildren={loadChildren}
+                                expandOnInside={false}
+                                forcedExpandedIds={isTreeSearchMode ? treeSearchExpandedIds : undefined}
+                                lazy={isTreeSearchMode ? undefined : {
+                                    pageSize: 30,
+                                    loadPage: loadTreePage,
+                                }}
                                 onChange={handleTreeChange}
                                 renderItem={renderItem}
-                                storageKey="users"
                             />
                         </div>
                     </div>

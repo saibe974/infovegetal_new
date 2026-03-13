@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserImportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -67,6 +68,233 @@ class UserManagementController extends Controller
             'collection' => Inertia::scroll(fn() => UserResource::collection($users)),
             'roles' => $roles,
             'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
+        ]);
+    }
+
+    /**
+     * Lazy-load direct children for a branch of the users tree.
+     */
+    public function treeChildren(Request $request): JsonResponse
+    {
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $parentId = array_key_exists('parent_id', $validated)
+            ? ($validated['parent_id'] !== null ? (int) $validated['parent_id'] : null)
+            : null;
+
+        $offset = (int) ($validated['offset'] ?? 0);
+        $limit = (int) ($validated['limit'] ?? 30);
+        $search = trim((string) ($validated['q'] ?? ''));
+
+        $query = User::query()
+            ->select([
+                'id',
+                'name',
+                'email',
+                'active',
+                'parent_id',
+                '_lft',
+                '_rgt',
+            ])
+            ->where('parent_id', $parentId)
+            ->orderBy('_lft', 'asc');
+
+        if ($search !== '') {
+            $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $qq->where('name', 'like', '%' . $token . '%');
+                    }
+                });
+            });
+        }
+
+        $total = (clone $query)->count();
+        $users = $query->offset($offset)->limit($limit)->get();
+
+        $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $parentsWithChildren = [];
+
+        if (!empty($userIds)) {
+            $parentsWithChildren = User::query()
+                ->whereIn('parent_id', $userIds)
+                ->whereNotNull('parent_id')
+                ->distinct()
+                ->pluck('parent_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        $hasChildrenLookup = array_fill_keys($parentsWithChildren, true);
+
+        $items = $users->map(function (User $user) use ($parentId) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'active' => (bool) $user->active,
+                'parent_id' => $user->parent_id,
+                '_lft' => $user->_lft,
+                '_rgt' => $user->_rgt,
+                'depth' => $parentId === null ? 0 : null,
+                'has_children' => false,
+            ];
+        })->map(function (array $item) use ($hasChildrenLookup) {
+            $item['has_children'] = isset($hasChildrenLookup[(int) $item['id']]);
+            return $item;
+        })->values();
+
+        $nextOffset = $offset + $items->count();
+
+        return response()->json([
+            'items' => $items,
+            'offset' => $offset,
+            'next_offset' => $nextOffset,
+            'limit' => $limit,
+            'total' => $total,
+            'has_more' => $nextOffset < $total,
+        ]);
+    }
+
+    /**
+     * Return only matching users and their ancestor chain as a tree fragment.
+     */
+    public function treeSearch(Request $request): JsonResponse
+    {
+        if (!$request->user()->hasRole('admin')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'max:255'],
+        ]);
+
+        $search = trim((string) $validated['q']);
+        if ($search === '') {
+            return response()->json([
+                'items' => [],
+                'expanded_ids' => [],
+                'matched_ids' => [],
+            ]);
+        }
+
+        $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+        $matchedIds = User::query()
+            ->select('id')
+            ->where(function ($q) use ($tokens, $isSingleNumeric) {
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $qq->where('name', 'like', '%' . $token . '%');
+                    }
+                });
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($matchedIds)) {
+            return response()->json([
+                'items' => [],
+                'expanded_ids' => [],
+                'matched_ids' => [],
+            ]);
+        }
+
+        $allUsers = User::query()
+            ->select(['id', 'name', 'email', 'active', 'parent_id', '_lft', '_rgt'])
+            ->orderBy('_lft', 'asc')
+            ->get();
+
+        $byId = $allUsers->keyBy('id');
+        $keepIds = [];
+
+        foreach ($matchedIds as $matchedId) {
+            $cursor = $matchedId;
+
+            while ($cursor !== null && !isset($keepIds[$cursor])) {
+                $keepIds[$cursor] = true;
+                $node = $byId->get($cursor);
+
+                if (!$node) {
+                    break;
+                }
+
+                $cursor = $node->parent_id !== null ? (int) $node->parent_id : null;
+            }
+        }
+
+        $subset = $allUsers
+            ->filter(fn (User $user) => isset($keepIds[(int) $user->id]))
+            ->values();
+
+        $subsetChildrenByParent = [];
+        foreach ($subset as $node) {
+            $pid = $node->parent_id !== null ? (int) $node->parent_id : null;
+            if ($pid === null) {
+                continue;
+            }
+
+            $subsetChildrenByParent[$pid] = true;
+        }
+
+        $items = $subset->map(function (User $user) use ($keepIds, $subsetChildrenByParent, $byId) {
+            $depth = 0;
+            $cursor = $user->parent_id !== null ? (int) $user->parent_id : null;
+
+            while ($cursor !== null && isset($keepIds[$cursor])) {
+                $depth++;
+                $parent = $byId->get($cursor);
+                if (!$parent) {
+                    break;
+                }
+                $cursor = $parent->parent_id !== null ? (int) $parent->parent_id : null;
+            }
+
+            return [
+                'id' => (int) $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'active' => (bool) $user->active,
+                'parent_id' => $user->parent_id,
+                '_lft' => $user->_lft,
+                '_rgt' => $user->_rgt,
+                'depth' => $depth,
+                'has_children' => isset($subsetChildrenByParent[(int) $user->id]),
+            ];
+        })->values();
+
+        $expandedIds = collect($items)
+            ->filter(fn (array $item) => (bool) ($item['has_children'] ?? false))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        return response()->json([
+            'items' => $items,
+            'expanded_ids' => $expandedIds,
+            'matched_ids' => array_values(array_unique($matchedIds)),
         ]);
     }
 

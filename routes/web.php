@@ -169,6 +169,8 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
+    Route::get('admin/users/tree-children', [UserManagementController::class, 'treeChildren'])->name('users.tree-children');
+    Route::get('admin/users/tree-search', [UserManagementController::class, 'treeSearch'])->name('users.tree-search');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     
     // Routes avec {user} après
