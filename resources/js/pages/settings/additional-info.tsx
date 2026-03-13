@@ -279,25 +279,27 @@ export default function AdditionalInfo() {
                         </form>
                         <InputError message={newMetaForm.errors.key || newMetaForm.errors.value || newMetaForm.errors.type} />
 
-                        <div className="">
+                        {/* <div className="">
                             {userMeta.length === 0 && (
                                 <p className="text-sm text-muted-foreground">Aucun champ dynamique.</p>
                             )}
-                        </div>
+                        </div> */}
                     </Card>
 
-                    <Card className="p-6">
-                        <h2 className="mb-4 text-xl font-semibold">Champs dynamiques</h2>
-                        {userMeta.map((item) => (
-                            <MetaRow
-                                key={item.id}
-                                item={item}
-                                metaBaseUrl={metaBaseUrl}
-                                metaKeyOptions={metaKeyOptions}
-                                metaKeyConfig={metaKeyConfig}
-                            />
-                        ))}
-                    </Card>
+                    {userMeta.length > 0 && (
+                        <Card className="p-6">
+                            <h2 className="mb-4 text-xl font-semibold">Champs dynamiques</h2>
+                            {userMeta.map((item) => (
+                                <MetaRow
+                                    key={item.id}
+                                    item={item}
+                                    metaBaseUrl={metaBaseUrl}
+                                    metaKeyOptions={metaKeyOptions}
+                                    metaKeyConfig={metaKeyConfig}
+                                />
+                            ))}
+                        </Card>
+                    )}
                 </div>
             </SettingsLayout>
         </AppLayout>
