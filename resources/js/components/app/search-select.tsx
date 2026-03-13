@@ -64,9 +64,8 @@ export default function SearchSelect({
 
     const [selected, setSelected] = useState<Option[]>(toOptions(selection) || []);
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const filtersRef = useRef<HTMLDivElement | null>(null);
-    const lastMouseDownInsideRef = useRef(false);
     const listOptions = toOptions(propositions);
     // Track last submitted query to avoid duplicate submit loops
     const lastSubmittedRef = useRef<string | null>(null);
@@ -193,9 +192,34 @@ export default function SearchSelect({
         onSubmit(next);
     }, [selected]);
 
+    useEffect(() => {
+        const handleOutsidePointerDown = (event: PointerEvent) => {
+            const target = event.target as Node | null;
+            if (!target) return;
+
+            if (containerRef.current?.contains(target)) {
+                return;
+            }
+
+            // Allow interactions with Radix portals opened by controls inside SearchSelect.
+            if (target instanceof Element && target.closest('[data-radix-popper-content-wrapper]')) {
+                return;
+            }
+
+            setOpenFilters(false);
+            setOpen(false);
+            setHighlightedIndex(-1);
+        };
+
+        document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+        return () => {
+            document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+        };
+    }, []);
+
 
     return (
-        <div className="relative w-full">
+        <div ref={containerRef} className="relative w-full">
 
             <div
                 className={cn(
@@ -295,34 +319,7 @@ export default function SearchSelect({
                         }
                     }}
                     onBlur={() => {
-                        // Délai pour permettre aux interactions avec le panneau (Select, boutons) de se terminer
-                        setTimeout(() => {
-                            // Si mouseDown a commencé dans le panneau, ne pas fermer
-                            if (lastMouseDownInsideRef.current) {
-                                lastMouseDownInsideRef.current = false;
-                                return;
-                            }
-
-                            const active = document.activeElement as Element | null;
-
-                            // Vérifier si le focus est toujours dans le panneau de filtres
-                            if (filtersRef.current && active && filtersRef.current.contains(active)) {
-                                return;
-                            }
-
-                            // Vérifier si le focus est dans un Select portal (radix-ui portals)
-                            if (active && active.closest('[role="listbox"]')) {
-                                return;
-                            }
-
-                            // Vérifier si le focus est dans un autre portal radix
-                            if (active && active.closest('[data-radix-popper-content-wrapper]')) {
-                                return;
-                            }
-
-                            setOpenFilters(false);
-                            setOpen(false);
-                        }, 150);
+                        setHighlightedIndex(-1);
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder ?? t('Search...')}
@@ -362,11 +359,6 @@ export default function SearchSelect({
             {/* Panneau combiné filtres + propositions */}
             {(openFilters || (open && value.length >= minQueryLength)) && (
                 <div
-                    ref={filtersRef}
-                    onMouseDown={(e) => {
-                        e.stopPropagation();
-                        lastMouseDownInsideRef.current = true;
-                    }}
                     className="absolute top-full left-0 w-full mt-1 py-4 px-2 border bg-popover rounded-md shadow-lg z-50 max-h-120 overflow-y-auto"
                 >
                     <div className={cn(

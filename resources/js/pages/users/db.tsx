@@ -448,7 +448,7 @@ export default function UserDbPage() {
                                                             type="checkbox"
                                                             // step="0.01"
                                                             checked={attrs.h === 1}
-                                                            defaultChecked={attrs.h === 1}
+                                                            // defaultChecked={attrs.h === 1}
                                                             value={attrs.h}
                                                             onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
                                                         />

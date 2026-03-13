@@ -66,6 +66,21 @@ interface UsersPageProps {
     searchPropositions?: string[];
 }
 
+const dedupeUsersById = (users: User[]): User[] => {
+    const seen = new Set<number>();
+    const unique: User[] = [];
+
+    for (const user of users) {
+        if (!user || typeof user.id !== 'number' || seen.has(user.id)) {
+            continue;
+        }
+        seen.add(user.id);
+        unique.push(user);
+    }
+
+    return unique;
+};
+
 
 
 export default withAppLayout(
@@ -73,7 +88,7 @@ export default withAppLayout(
     true,
     ({ collection, roles, q, searchPropositions = [] }: UsersPageProps) => {
 
-        console.log(collection)
+        // console.log(collection)
         const { t } = useI18n();
         type TreeUser = User & { depth: number; parent_id: number | null; has_children?: boolean };
         const [pending, setPending] = useState<TreeUser[] | null>(null);
@@ -81,13 +96,13 @@ export default withAppLayout(
         const [treeSearchExpandedIds, setTreeSearchExpandedIds] = useState<number[]>([]);
         const [treeSearchLoading, setTreeSearchLoading] = useState(false);
         const [saving, setSaving] = useState(false);
-        const [allUsers, setAllUsers] = useState<User[]>(collection?.data || []);
+        const [allUsers, setAllUsers] = useState<User[]>(() => dedupeUsersById(collection?.data || []));
         const [search, setSearch] = useState(q || '');
         const [fetching, setFetching] = useState(false);
         const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
 
         useEffect(() => {
-            setAllUsers(collection?.data || []);
+            setAllUsers(dedupeUsersById(collection?.data || []));
         }, [collection]);
 
         const { auth, locale } = usePage<SharedData>().props;
@@ -533,7 +548,7 @@ export default withAppLayout(
             );
         };
 
-        const uniqueCount = Array.from(new Set(collection.data.map((u: User) => u.id))).length;
+        const uniqueCount = allUsers.length;
 
         // console.log(usersRoutes.import.process.url())
         return (

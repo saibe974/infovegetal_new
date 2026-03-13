@@ -133,7 +133,7 @@ export default function AdditionalInfo() {
                     <Card className="p-6">
                         <h2 className="mb-4 text-xl font-semibold">Informations complementaires</h2>
                         <form onSubmit={saveMain} className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <div className="grid gap-2">
                                     <Label htmlFor="alias">Alias</Label>
                                     <Input id="alias" value={data.alias} onChange={(e) => setData('alias', e.target.value)} />
@@ -149,20 +149,21 @@ export default function AdditionalInfo() {
                                     <Input id="tel" value={data.tel} onChange={(e) => setData('tel', e.target.value)} />
                                     <InputError message={errors.tel} />
                                 </div>
+
                                 <div className="grid gap-2">
-                                    <Label htmlFor="address_zip">Code postal</Label>
-                                    <Input id="address_zip" value={data.address_zip} onChange={(e) => setData('address_zip', e.target.value)} />
-                                    <InputError message={errors.address_zip} />
-                                </div>
-                                <div className="grid gap-2 md:col-span-2">
                                     <Label htmlFor="address_road">Adresse</Label>
                                     <Input id="address_road" value={data.address_road} onChange={(e) => setData('address_road', e.target.value)} />
                                     <InputError message={errors.address_road} />
                                 </div>
-                                <div className="grid gap-2 md:col-span-2">
+                                <div className="grid gap-2">
                                     <Label htmlFor="address_town">Ville</Label>
                                     <Input id="address_town" value={data.address_town} onChange={(e) => setData('address_town', e.target.value)} />
                                     <InputError message={errors.address_town} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="address_zip">Code postal</Label>
+                                    <Input id="address_zip" value={data.address_zip} onChange={(e) => setData('address_zip', e.target.value)} />
+                                    <InputError message={errors.address_zip} />
                                 </div>
                             </div>
 
@@ -197,14 +198,14 @@ export default function AdditionalInfo() {
                     </Card>
 
                     <Card className="p-6">
-                        <h2 className="mb-4 text-xl font-semibold">Champs dynamiques</h2>
+                        <h2 className="mb-4 text-xl font-semibold">Création de champs dynamiques</h2>
 
                         <form onSubmit={addMeta} className="mb-6 space-y-3">
                             <div className="grid gap-3 md:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label>Cle</Label>
                                     <select
-                                        className="h-10 rounded-md border bg-background px-3"
+                                        className="h-10 rounded-md border bg-card px-3"
                                         value={newMetaForm.data.key}
                                         onChange={(e) => newMetaForm.setData('key', e.target.value)}
                                     >
@@ -217,36 +218,59 @@ export default function AdditionalInfo() {
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label>Type detecte</Label>
-                                    <Input value={selectedNewMetaInput} readOnly />
+                                    <Label>Ordre</Label>
+                                    {/* <Label>Type detecte</Label> */}
+                                    {/* <Input value={selectedNewMetaInput} readOnly /> */}
+                                    <Input
+                                        type="number"
+                                        placeholder="ordre"
+                                        value={String(newMetaForm.data.sort_order)}
+                                        onChange={(e) => newMetaForm.setData('sort_order', Number(e.target.value || 0))}
+                                    />
                                 </div>
 
                                 {newMetaForm.data.key === 'custom' && (
-                                    <div className="grid gap-2 md:col-span-2">
-                                        <Label>Nom de la cle custom</Label>
-                                        <Input
-                                            placeholder="ex: contact.secondary_email"
-                                            value={newMetaForm.data.custom_key}
-                                            onChange={(e) => newMetaForm.setData('custom_key', e.target.value)}
-                                        />
-                                    </div>
+                                    <>
+                                        <div className="grid gap-2 ">
+                                            <Label>Nom de la cle custom</Label>
+                                            <Input
+                                                placeholder="ex: contact.secondary_email"
+                                                value={newMetaForm.data.custom_key}
+                                                onChange={(e) => newMetaForm.setData('custom_key', e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className='grid gap-2'>
+                                            <Label>Valeur</Label>
+                                            <DynamicValueInput
+                                                inputKind={selectedNewMetaInput}
+                                                fields={metaKeyConfig[newMetaForm.data.key]?.fields ?? []}
+                                                data={newMetaForm.data}
+                                                setData={newMetaForm.setData}
+                                            />
+                                        </div>
+
+                                    </>
                                 )}
                             </div>
 
-                            <DynamicValueInput
-                                inputKind={selectedNewMetaInput}
-                                fields={metaKeyConfig[newMetaForm.data.key]?.fields ?? []}
-                                data={newMetaForm.data}
-                                setData={newMetaForm.setData}
-                            />
+                            {newMetaForm.data.key !== 'custom' && (
+                                <DynamicValueInput
+                                    inputKind={selectedNewMetaInput}
+                                    fields={metaKeyConfig[newMetaForm.data.key]?.fields ?? []}
+                                    data={newMetaForm.data}
+                                    setData={newMetaForm.setData}
+                                />
+                            )}
 
-                            <div className="grid gap-3 md:grid-cols-[140px_auto]">
-                                <Input
+
+                            <div className="pt-2">
+                                {/* <Input
                                     type="number"
                                     placeholder="ordre"
                                     value={String(newMetaForm.data.sort_order)}
                                     onChange={(e) => newMetaForm.setData('sort_order', Number(e.target.value || 0))}
-                                />
+                                /> */}
                                 <Button type="submit" disabled={newMetaForm.processing}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Ajouter
@@ -255,11 +279,16 @@ export default function AdditionalInfo() {
                         </form>
                         <InputError message={newMetaForm.errors.key || newMetaForm.errors.value || newMetaForm.errors.type} />
 
-                        <div className="space-y-3">
+                        {/* <div className="">
                             {userMeta.length === 0 && (
                                 <p className="text-sm text-muted-foreground">Aucun champ dynamique.</p>
                             )}
+                        </div> */}
+                    </Card>
 
+                    {userMeta.length > 0 && (
+                        <Card className="p-6">
+                            <h2 className="mb-4 text-xl font-semibold">Champs dynamiques</h2>
                             {userMeta.map((item) => (
                                 <MetaRow
                                     key={item.id}
@@ -269,8 +298,8 @@ export default function AdditionalInfo() {
                                     metaKeyConfig={metaKeyConfig}
                                 />
                             ))}
-                        </div>
-                    </Card>
+                        </Card>
+                    )}
                 </div>
             </SettingsLayout>
         </AppLayout>
@@ -325,54 +354,76 @@ function MetaRow({
     };
 
     return (
-        <form onSubmit={save} className="space-y-3 rounded-md border p-3">
+        <form onSubmit={save} className="space-y-4 rounded-md border p-4">
             <div className="grid gap-3 md:grid-cols-2">
-                <select
-                    className="h-10 rounded-md border bg-background px-3"
-                    value={form.data.key}
-                    onChange={(e) => form.setData('key', e.target.value)}
-                >
-                    {metaKeyOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                        </option>
-                    ))}
-                    <option value="custom">Custom</option>
-                </select>
+                <div className="grid gap-2">
+                    <Label>Cle</Label>
+                    <select
+                        className="h-10 rounded-md border bg-card px-3"
+                        value={form.data.key}
+                        onChange={(e) => form.setData('key', e.target.value)}
+                    >
+                        {metaKeyOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
 
-                <Input value={inputKind} readOnly />
+                <div className="grid gap-2">
+                    <Label>Ordre</Label>
+                    <Input
+                        type="number"
+                        value={String(form.data.sort_order)}
+                        onChange={(e) => form.setData('sort_order', Number(e.target.value || 0))}
+                    />
+                </div>
 
                 {form.data.key === 'custom' && (
-                    <Input
-                        placeholder="Nom de la cle custom"
-                        value={form.data.custom_key}
-                        onChange={(e) => form.setData('custom_key', e.target.value)}
-                        className="md:col-span-2"
-                    />
+                    <>
+                        <div className="grid gap-2">
+                            <Label>Nom de la cle custom</Label>
+                            <Input
+                                placeholder="Nom de la cle custom"
+                                value={form.data.custom_key}
+                                onChange={(e) => form.setData('custom_key', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Valeur</Label>
+                            <DynamicValueInput
+                                inputKind={inputKind}
+                                fields={fields}
+                                data={form.data}
+                                setData={form.setData}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
 
-            <DynamicValueInput
-                inputKind={inputKind}
-                fields={fields}
-                data={form.data}
-                setData={form.setData}
-            />
-
-            <div className="grid gap-3 md:grid-cols-[120px_auto_auto]">
-                <Input
-                    type="number"
-                    value={String(form.data.sort_order)}
-                    onChange={(e) => form.setData('sort_order', Number(e.target.value || 0))}
+            {form.data.key !== 'custom' && (
+                <DynamicValueInput
+                    inputKind={inputKind}
+                    fields={fields}
+                    data={form.data}
+                    setData={form.setData}
                 />
-                <Button type="submit" variant="secondary" disabled={form.processing}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Sauver
-                </Button>
-                <Button type="button" variant="destructive" onClick={remove} disabled={form.processing}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Supprimer
-                </Button>
+            )}
+
+            <div className="pt-2">
+                <div className="flex items-center justify-between gap-2">
+                    <Button type="submit" disabled={form.processing}>
+                        <Save className="mr-2 h-4 w-4" />
+                        Sauver
+                    </Button>
+                    <Button type="button" variant="destructive-outline" size="icon" onClick={remove} disabled={form.processing}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
         </form>
     );
@@ -422,7 +473,7 @@ function DynamicValueInput({
     if (inputKind === 'textarea') {
         return (
             <textarea
-                className="min-h-24 rounded-md border p-3"
+                className="min-h-24 w-full rounded-md border p-3"
                 placeholder="Valeur"
                 value={data.value}
                 onChange={(e) => setData('value', e.target.value)}
@@ -433,7 +484,7 @@ function DynamicValueInput({
     if (inputKind === 'json') {
         const jsonFields = fields.length > 0 ? fields : ['number', 'road', 'zip', 'town'];
         return (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className='grid gap-3 md:grid-cols-2'>
                 {jsonFields.map((field) => (
                     <Input
                         key={field}
@@ -496,6 +547,7 @@ function DynamicValueInput({
             placeholder="Valeur"
             value={data.value}
             onChange={(e) => setData('value', e.target.value)}
+            className=''
         />
     );
 }
