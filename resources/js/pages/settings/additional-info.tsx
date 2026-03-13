@@ -31,7 +31,7 @@ type PageProps = SharedData & {
 type AdditionalInfoPayload = {
     alias: string;
     ref: string;
-    tel: string;
+    phone: string;
     address_road: string;
     address_zip: string;
     address_town: string;
@@ -77,7 +77,7 @@ export default function AdditionalInfo() {
     const { data, setData, patch, processing, errors } = useForm<AdditionalInfoPayload>({
         alias: (targetUser as any)?.alias ?? '',
         ref: (targetUser as any)?.ref ?? '',
-        tel: (targetUser as any)?.tel ?? '',
+        phone: (targetUser as any)?.phone ?? '',
         address_road: (targetUser as any)?.address_road ?? '',
         address_zip: (targetUser as any)?.address_zip ?? '',
         address_town: (targetUser as any)?.address_town ?? '',
@@ -145,9 +145,9 @@ export default function AdditionalInfo() {
                                     <InputError message={errors.ref} />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="tel">Telephone</Label>
-                                    <Input id="tel" value={data.tel} onChange={(e) => setData('tel', e.target.value)} />
-                                    <InputError message={errors.tel} />
+                                    <Label htmlFor="phone">Telephone</Label>
+                                    <Input id="phone" value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
+                                    <InputError message={errors.phone} />
                                 </div>
 
                                 <div className="grid gap-2">

@@ -27,7 +27,7 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class, 'alias')->ignore($ignoreId),
             ],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],

@@ -164,7 +164,7 @@ export interface User {
     name: string;
     alias?: string | null;
     ref?: string | null;
-    tel?: string | null;
+    phone?: string | null;
     address_road?: string | null;
     address_zip?: string | null;
     address_town?: string | null;

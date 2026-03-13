@@ -41,7 +41,7 @@ class UserAdditionalInfoController extends Controller
         $validated = $request->validate([
             'alias' => ['nullable', 'string', 'max:255', Rule::unique('users', 'alias')->ignore($target->id)],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],
@@ -51,7 +51,7 @@ class UserAdditionalInfoController extends Controller
 
         $target->alias = $validated['alias'] ?? null;
         $target->ref = $validated['ref'] ?? null;
-        $target->tel = $validated['tel'] ?? null;
+        $target->phone = $validated['phone'] ?? null;
         $target->address_road = $validated['address_road'] ?? null;
         $target->address_zip = $validated['address_zip'] ?? null;
         $target->address_town = $validated['address_town'] ?? null;
