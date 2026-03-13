@@ -10,7 +10,6 @@ import { Lens } from '@/components/ui/lens';
 import { useSidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { type Product, SharedData } from '@/types';
-import { resolveImageUrl } from '@/lib/resolve-image-url';
 import { resolveProductPrices } from '@/lib/resolve-product-prices';
 
 const formatCurrency = (value: number): string =>
@@ -84,7 +83,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                     ariaLabel="Zoom Area"
                                 >
                                     <img
-                                        src={resolveImageUrl(product.image_original ?? product.img_link ?? '/images/placeholder.png')}
+                                        src={product.image_original ?? product.img_link ?? '/images/placeholder.png'}
                                         alt={product.name}
                                         className="h-full w-auto object-contain select-none"
                                         draggable={false}
@@ -92,7 +91,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                 </Lens>
                             ) : (
                                 <img
-                                    src={resolveImageUrl('/placeholder.png')}
+                                    src={'/placeholder.png'}
                                     alt={product.name}
                                     className="h-full w-auto object-contain select-none"
                                     draggable={false}

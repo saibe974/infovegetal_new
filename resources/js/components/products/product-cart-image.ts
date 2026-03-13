@@ -1,8 +1,7 @@
 import { type Product } from '@/types';
-import { resolveImageUrl } from '@/lib/resolve-image-url';
 
 export const getProductCartImage = (product: Product): string => {
-    return resolveImageUrl(
+    return (
         product.image_thumb
         ?? product.image_medium
         ?? product.image_original
