@@ -6,9 +6,11 @@ use App\Models\Cart;
 use App\Models\Product;
 use App\Services\PdfRollDistributionService;
 use App\Services\PriceCalculatorService;
+use App\Services\ProductMediaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -172,6 +174,34 @@ class CartController extends Controller
 
         // Récupérer les produits avec leurs détails
         $productIds = collect($data['items'])->pluck('id')->toArray();
+        $products = Product::with(['category', 'tags', 'media', 'dbProduct'])->whereIn('id', $productIds)->get()->keyBy('id');
+
+        // Avant de rendre le PDF, telecharger les images manquantes et preparer les conversions.
+        $mediaService = app(ProductMediaService::class);
+        foreach ($products as $product) {
+            try {
+                if (!$product->getFirstMedia('images')) {
+                    $result = $mediaService->downloadMissing($product);
+                    if (!($result['ok'] ?? false)) {
+                        Log::info('Cart PDF media sync skipped for product', [
+                            'product_id' => $product->id,
+                            'reason' => $result['message'] ?? 'unknown',
+                        ]);
+                    }
+                }
+
+                if ($product->getFirstMedia('images')) {
+                    $mediaService->ensureThumbnail($product);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Cart PDF media preparation failed', [
+                    'product_id' => $product->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Recharger pour utiliser les medias potentiellement crees juste avant le rendu.
         $products = Product::with(['category', 'tags', 'media', 'dbProduct'])->whereIn('id', $productIds)->get()->keyBy('id');
 
         // Construire les items avec les produits complets

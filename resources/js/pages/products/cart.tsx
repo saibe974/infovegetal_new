@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeftCircle, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { resolveImageUrl } from '@/lib/resolve-image-url';
 import { CartContext } from '@/components/cart/cart.context';
@@ -18,8 +18,17 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Props = Record<string, never>;
+
+const pdfGenerationPhases = [
+    'Verification des produits et des quantites',
+    'Recherche des images locales disponibles',
+    'Telechargement des images manquantes si necessaire',
+    'Generation des vignettes et conversions',
+    'Composition et export du PDF',
+];
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -43,6 +52,9 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
+    const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+    const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
+    const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
 
 
     const itemsPricing = useMemo(
@@ -164,6 +176,9 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
         }
 
         setIsSaving(true);
+        setIsPdfGenerating(true);
+        setPdfPhaseIndex(0);
+        setPdfCurrentGroup(null);
         setSaveMessage(null);
 
         try {
@@ -174,6 +189,14 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             )?.content;
 
             for (const group of groupedItems) {
+                const groupIndex = groupedItems.findIndex(({ id }) => id === group.id);
+                setPdfCurrentGroup({
+                    index: groupIndex + 1,
+                    total: groupedItems.length,
+                    label: group.label,
+                });
+                setPdfPhaseIndex(0);
+
                 const response = await fetch("/cart/generate-pdf", {
                     method: "POST",
                     headers: {
@@ -218,9 +241,26 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             setSaveMessage("Erreur lors de la génération du PDF");
         } finally {
             setIsSaving(false);
+            setIsPdfGenerating(false);
+            setPdfCurrentGroup(null);
+            setPdfPhaseIndex(0);
         }
     };
     const [topOffset, setTopOffset] = useState<number>(0);
+
+    useEffect(() => {
+        if (!isPdfGenerating) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setPdfPhaseIndex((current) => (current + 1) % pdfGenerationPhases.length);
+        }, 1600);
+
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [isPdfGenerating]);
 
     useEffect(() => {
         const getHeight = () => {
@@ -269,6 +309,67 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     return (
         <div className="">
             <Head title={t('Cart')} />
+            <Dialog open={isPdfGenerating} onOpenChange={() => undefined}>
+                <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-xl">
+                            <Loader2 className="h-5 w-5 animate-spin text-brand-main" />
+                            Generation du PDF en cours
+                        </DialogTitle>
+                        <DialogDescription className="text-sm leading-6">
+                            Le document peut prendre un peu de temps. Le serveur verifie les produits, telecharge les images manquantes, prepare les conversions, puis genere le PDF final.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="rounded-xl border border-brand-main/20 bg-brand-main/5 p-4">
+                            <div className="text-sm font-medium text-foreground">
+                                {pdfCurrentGroup
+                                    ? `Fournisseur ${pdfCurrentGroup.index}/${pdfCurrentGroup.total} : ${pdfCurrentGroup.label}`
+                                    : 'Preparation de la generation'}
+                            </div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                                Etape en cours : {pdfGenerationPhases[pdfPhaseIndex]}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 rounded-xl border p-4">
+                            {pdfGenerationPhases.map((phase, index) => {
+                                const isActive = index === pdfPhaseIndex;
+                                const isPassed = index < pdfPhaseIndex;
+
+                                return (
+                                    <div
+                                        key={phase}
+                                        className={cn(
+                                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                                            isActive && 'bg-brand-main/10 text-foreground',
+                                            isPassed && 'text-muted-foreground',
+                                            !isActive && !isPassed && 'text-muted-foreground/80',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold',
+                                                isActive && 'border-brand-main text-brand-main',
+                                                isPassed && 'border-green-600 text-green-600',
+                                                !isActive && !isPassed && 'border-muted-foreground/30 text-muted-foreground',
+                                            )}
+                                        >
+                                            {isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : index + 1}
+                                        </span>
+                                        <span>{phase}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                            Cette fenetre se fermera automatiquement une fois tous les PDF telecharges.
+                        </p>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <StickyBar
                 zIndex={20}
                 borderBottom={false}

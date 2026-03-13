@@ -8,6 +8,10 @@
 
          @php
             $theme = request()->query('theme') === 'dark' ? 'dark' : 'light';
+            $currentSort = $sort ?? 'name';
+            $currentDir = $dir ?? 'asc';
+            $nextDbDir = $currentSort === 'db' && $currentDir === 'asc' ? 'desc' : 'asc';
+            $dbSortIcon = $currentSort === 'db' ? ($currentDir === 'asc' ? '↑' : '↓') : '↕';
         @endphp
 
         <style>
@@ -87,6 +91,13 @@
                 letter-spacing: .04em;
                 opacity: .85;
             }
+            .sort-link {
+                color: inherit;
+                text-decoration: none;
+            }
+            .sort-link:hover {
+                text-decoration: underline;
+            }
             .muted {
                 opacity: .75;
             }
@@ -126,6 +137,8 @@
                 <!-- <h1 style="margin:0; font-size: 20px;">Images manquantes</h1> -->
                 <form method="GET" class="search">
                     <input type="hidden" name="theme" value="{{ $theme }}">
+                    <input type="hidden" name="sort" value="{{ $currentSort }}">
+                    <input type="hidden" name="dir" value="{{ $currentDir }}">
                     <input type="text" name="q" placeholder="Rechercher par nom ou SKU" value="{{ $q ?? '' }}">
                     <button type="submit">Rechercher</button>
                 </form>
@@ -150,7 +163,15 @@
                         <th>Vignette</th>
                         <th>SKU</th>
                         <th>Nom</th>
-                        <th>DB</th>
+                        <th>
+                            <a
+                                href="{{ request()->fullUrlWithQuery(['sort' => 'db', 'dir' => $nextDbDir]) }}"
+                                class="sort-link"
+                                title="Trier par DB"
+                            >
+                                DB {{ $dbSortIcon }}
+                            </a>
+                        </th>
                         <th>Actions</th>
                         <th>Etat</th>
                     </tr>

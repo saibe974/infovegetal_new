@@ -120,6 +120,19 @@
             display: block;
             background: #fff;
         }
+        .product-thumb-placeholder {
+            width: 46px;
+            height: 46px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 4px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 8px;
+            line-height: 1.2;
+            text-align: center;
+            display: table-cell;
+            vertical-align: middle;
+        }
         .ean-cell {
             min-width: 150px;
         }
@@ -446,6 +459,8 @@
                 <td>
                     @if($thumbSrc)
                         <img src="{{ $thumbSrc }}" alt="{{ $product->name }}" class="product-thumb">
+                    @else
+                        <div class="product-thumb-placeholder">Image<br>indisponible</div>
                     @endif
                 </td>
                 <td class="ean-cell">

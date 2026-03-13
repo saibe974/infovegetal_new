@@ -79,10 +79,23 @@ class MediaController extends Controller
         $search = trim((string) $request->query('q', ''));
         $dbProductsId = $this->toNullableInt($request->query('db_products_id'));
         $categoryProductsId = $this->toNullableInt($request->query('category_products_id'));
+        $sort = $request->query('sort') === 'db' ? 'db' : 'name';
+        $dir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $query = $this->missingImagesQuery($dbProductsId, $categoryProductsId)
             ->with('dbProduct')
-            ->orderBy('name');
+            ->reorder();
+
+        if ($sort === 'db') {
+            $query
+                ->leftJoin('db_products as dbp', 'dbp.id', '=', 'products.db_products_id')
+                ->select('products.*')
+                ->orderByRaw("CASE WHEN dbp.name IS NULL OR dbp.name = '' THEN 1 ELSE 0 END")
+                ->orderBy('dbp.name', $dir)
+                ->orderBy('products.name');
+        } else {
+            $query->orderBy('products.name', $dir);
+        }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -96,6 +109,8 @@ class MediaController extends Controller
         return view('images', [
             'products' => $products,
             'q' => $search,
+            'sort' => $sort,
+            'dir' => $dir,
         ]);
     }
 
