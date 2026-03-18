@@ -4,8 +4,8 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { useI18n } from '@/lib/i18n';
-import { type Product } from '@/types';
-import { take as impersonateTake } from '@/actions/Lab404/Impersonate/Controllers/ImpersonateController';
+import { type Product, type SharedData } from '@/types';
+import { leave as impersonateLeave, take as impersonateTake } from '@/actions/Lab404/Impersonate/Controllers/ImpersonateController';
 import { router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +26,7 @@ const formatCurrency = (value: number) =>
 
 export function CartsList() {
     const { t } = useI18n();
-    const { carts } = usePage<{ carts: CartSummary[] }>().props;
+    const { carts, auth } = usePage<SharedData & { carts: CartSummary[] }>().props;
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [impersonatingCartId, setImpersonatingCartId] = useState<number | null>(null);
@@ -58,6 +58,41 @@ export function CartsList() {
         localStorage.setItem(getCartStorageKey(userId), JSON.stringify(items));
     };
 
+    const switchImpersonationToUser = async (targetUserId: number) => {
+        const isImpersonating = !!auth?.impersonate_from;
+        const currentImpersonatedUserId = auth?.user?.id;
+
+        if (isImpersonating && currentImpersonatedUserId === targetUserId) {
+            return;
+        }
+
+        if (isImpersonating) {
+            const leaveResponse = await fetch(impersonateLeave().url, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            if (!leaveResponse.ok) {
+                throw new Error('Unable to leave impersonation');
+            }
+        }
+
+        const takeResponse = await fetch(impersonateTake({ id: targetUserId }).url, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!takeResponse.ok) {
+            throw new Error('Impersonation failed');
+        }
+    };
+
     const startImpersonateAndEditCart = async (cart: CartSummary) => {
         const userId = cart.user?.id;
         if (!userId) {
@@ -70,17 +105,7 @@ export function CartsList() {
         try {
             writeCartToLocalStorage(cart, userId);
 
-            const response = await fetch(impersonateTake({ id: userId }).url, {
-                method: 'GET',
-                credentials: 'include',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Impersonation failed');
-            }
+            await switchImpersonationToUser(userId);
 
             router.visit('/cart/checkout');
         } catch {
