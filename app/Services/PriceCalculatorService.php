@@ -231,7 +231,7 @@ class PriceCalculatorService
         protected function normalizePriceMode($value)
         {
             if ($value === null || $value === '') {
-                return -1;
+                return 0; // Par défaut, considérer comme "price_depart"
             }
 
             if (is_int($value) || is_float($value)) {

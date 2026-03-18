@@ -10,7 +10,6 @@ use App\Models\Carrier;
 use App\Models\Product;
 use App\Services\ProductImportService;
 use App\Services\ProductMediaService;
-use App\Services\PriceCalculatorService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -294,23 +293,8 @@ class ProductController extends Controller
             }
         }
         
-        // Calculer les prix avec marges pour les utilisateurs non-admin
-        if ($user && !$isAdminView) {
-            $priceCalculator = app(PriceCalculatorService::class);
-            $products->getCollection()->transform(function ($product) use ($priceCalculator, $user, $dbUserAttributesByDbId, $dbUserTransportByDbId) {
-                $dbId = $product->db_products_id;
-                if ($dbId) {
-                    $prices = $priceCalculator->calculatePrice($product, $user, $dbId);
-                    $product->price = $prices[0];
-                    $product->price_floor = $prices[1];
-                    $product->price_roll = $prices[2];
-                    $product->price_promo = $prices[3];
-                    $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
-                    $product->setAttribute('db_user_transport', $dbUserTransportByDbId[(int) $dbId] ?? null);
-                }
-                return $product;
-            });
-        } elseif ($user) {
+        // Les prix sont calculés dans ProductResource (toArray) pour éviter un double calcul.
+        if ($user) {
             $products->getCollection()->transform(function ($product) use ($dbUserAttributesByDbId, $dbUserTransportByDbId) {
                 $dbId = $product->db_products_id;
                 if ($dbId) {
