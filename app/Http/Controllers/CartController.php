@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -23,6 +25,114 @@ class CartController extends Controller
         $user = Auth::user();
         $cart = $user->cart()->with('products')->firstOrCreate([]);
         return response()->json($cart->load('products'));
+    }
+
+    /**
+     * Place an order: persist cart, generate PDF, store it and notify stakeholders.
+     */
+    public function placeOrder(Request $request)
+    {
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'shipping_total' => 'nullable|numeric|min:0',
+            'choice' => 'nullable|in:append,new',
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $existingProcessing = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'processing')
+            ->latest('updated_at')
+            ->first();
+
+        $choice = $data['choice'] ?? null;
+
+        if ($existingProcessing && !$choice) {
+            return response()->json([
+                'requires_choice' => true,
+                'existing_order' => [
+                    'id' => $existingProcessing->id,
+                    'number' => str_pad((string) $existingProcessing->id, 4, '0', STR_PAD_LEFT),
+                ],
+                'message' => 'Une commande est deja en cours de traitement. Choisissez ajouter ou nouvelle commande.',
+            ], 409);
+        }
+
+        $cart = null;
+        if ($existingProcessing && $choice === 'append') {
+            $cart = $existingProcessing;
+        } elseif (!$existingProcessing || $choice === 'new') {
+            $cart = Cart::create([
+                'user_id' => $user->id,
+                'status' => 'processing',
+            ]);
+        } else {
+            $cart = $existingProcessing;
+        }
+
+        $requestedByProductId = [];
+        foreach ($data['items'] as $item) {
+            $productId = (int) $item['id'];
+            $qty = (int) $item['quantity'];
+            $requestedByProductId[$productId] = ($requestedByProductId[$productId] ?? 0) + $qty;
+        }
+
+        if ($choice === 'append' && $existingProcessing) {
+            $existingByProductId = $cart->products()->pluck('quantity', 'products.id')->map(fn ($q) => (int) $q)->toArray();
+            foreach ($existingByProductId as $productId => $existingQty) {
+                $requestedByProductId[(int) $productId] = ($requestedByProductId[(int) $productId] ?? 0) + $existingQty;
+            }
+        }
+
+        $syncData = [];
+        foreach ($requestedByProductId as $productId => $qty) {
+            $syncData[(int) $productId] = ['quantity' => (int) $qty];
+        }
+        $cart->products()->sync($syncData);
+        $cart->touch();
+
+        $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+
+        $pdfPayload = $this->buildPdfPayload(
+            array_values(array_map(
+                fn ($productId, $qty) => ['id' => (int) $productId, 'quantity' => (int) $qty],
+                array_keys($requestedByProductId),
+                array_values($requestedByProductId),
+            )),
+            $user,
+            $shippingTotal,
+        );
+
+        $orderNumber = str_pad((string) $cart->id, 4, '0', STR_PAD_LEFT);
+        $pdfRelativePath = sprintf('commandes/%d/%d.pdf', $user->id, $cart->id);
+
+        Pdf::view('pdf.cart', array_merge($pdfPayload, [
+            'order_id' => $cart->id,
+            'order_number' => $orderNumber,
+        ]))
+            ->format('a4')
+            ->disk('public', 'public')
+            ->save($pdfRelativePath);
+
+        $mailCount = $this->sendOrderPdfMails(
+            $pdfPayload['mail_recipients'],
+            $pdfRelativePath,
+            $orderNumber,
+            $user,
+        );
+
+        return response()->json([
+            'status' => 'ok',
+            'order_id' => $cart->id,
+            'order_number' => $orderNumber,
+            'pdf_download_url' => asset('storage/' . $pdfRelativePath),
+            'mail_recipients_count' => $mailCount,
+            'message' => 'Commande enregistree, PDF genere et emails envoyes.',
+        ]);
     }
 
     public function checkout()
@@ -331,5 +441,143 @@ class CartController extends Controller
             $priceRoll > 0 ? $priceRoll : $fallback,
             $pricePromo > 0 ? $pricePromo : 0,
         ];
+    }
+
+    private function buildPdfPayload(array $itemsInput, \App\Models\User $user, float $shippingTotal): array
+    {
+        $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $products = Product::with(['category', 'tags', 'media', 'dbProduct'])
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $mediaService = app(ProductMediaService::class);
+        foreach ($products as $product) {
+            try {
+                if (!$product->getFirstMedia('images')) {
+                    $mediaService->downloadMissing($product);
+                }
+
+                if ($product->getFirstMedia('images')) {
+                    $mediaService->ensureThumbnail($product);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Order PDF media preparation failed', [
+                    'product_id' => $product->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $products = Product::with(['category', 'tags', 'media', 'dbProduct'])
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $priceCalculator = app(PriceCalculatorService::class);
+        $items = collect($itemsInput)
+            ->map(function ($item) use ($products, $user, $priceCalculator) {
+                $product = $products[$item['id']];
+                [$unitPrice, $lineTotal] = $this->getCartPricing($product, (int) $item['quantity'], $user, $priceCalculator);
+
+                return [
+                    'product' => $product,
+                    'quantity' => (int) $item['quantity'],
+                    'unit_price' => $unitPrice,
+                    'line_total' => $lineTotal,
+                ];
+            })
+            ->values();
+
+        $itemsTotal = $items->sum(fn ($item) => $item['line_total']);
+        $total = $itemsTotal + $shippingTotal;
+        $rollDistribution = app(PdfRollDistributionService::class)->build($items);
+
+        $dbProductIds = $items
+            ->map(fn ($item) => (int) ($item['product']->db_products_id ?? 0))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $facturantIds = [];
+        $commercialIds = [];
+        foreach ($dbProductIds as $dbProductId) {
+            $pivot = DB::table('db_products_users')
+                ->where('user_id', $user->id)
+                ->where('db_product_id', $dbProductId)
+                ->value('attributes');
+
+            if (!$pivot) {
+                continue;
+            }
+
+            $attrs = is_array($pivot) ? $pivot : json_decode($pivot, true);
+            if (!is_array($attrs)) {
+                continue;
+            }
+
+            if (!empty($attrs['fact'])) {
+                $facturantIds[] = (int) $attrs['fact'];
+            }
+
+            if (!empty($attrs['com'])) {
+                $commercialIds[] = (int) $attrs['com'];
+            }
+        }
+
+        $facturantUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($facturantIds)))->get();
+        $commercialUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($commercialIds)))->get();
+
+        $mailRecipients = collect([$user])
+            ->merge($facturantUsers)
+            ->merge($commercialUsers)
+            ->filter(fn ($u) => !empty($u?->email))
+            ->unique(fn ($u) => strtolower((string) $u->email))
+            ->values();
+
+        return [
+            'items' => $items,
+            'items_total' => $itemsTotal,
+            'shipping_total' => $shippingTotal,
+            'total' => $total,
+            'roll_distribution' => $rollDistribution,
+            'user' => $user,
+            'facturant' => $facturantUsers->first(),
+            'commercial' => $commercialUsers->first(),
+            'mail_recipients' => $mailRecipients,
+        ];
+    }
+
+    private function sendOrderPdfMails($recipients, string $pdfRelativePath, string $orderNumber, \App\Models\User $client): int
+    {
+        $sent = 0;
+        $pdfAbsolutePath = Storage::disk('public')->path($pdfRelativePath);
+
+        foreach ($recipients as $recipient) {
+            try {
+                Mail::raw(
+                    "Bonjour {$recipient->name},\n\nVeuillez trouver en piece jointe la commande n{$orderNumber} du client {$client->name}.\n\nCordialement,\nInfovegetal",
+                    function ($message) use ($recipient, $orderNumber, $pdfAbsolutePath) {
+                        $message->to($recipient->email, $recipient->name)
+                            ->subject("Commande n{$orderNumber} - Infovegetal")
+                            ->attach($pdfAbsolutePath, [
+                                'as' => "commande-{$orderNumber}.pdf",
+                                'mime' => 'application/pdf',
+                            ]);
+                    }
+                );
+
+                $sent++;
+            } catch (\Throwable $e) {
+                Log::error('Failed to send order PDF email', [
+                    'recipient_id' => $recipient->id ?? null,
+                    'recipient_email' => $recipient->email ?? null,
+                    'order_number' => $orderNumber,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $sent;
     }
 }

@@ -76,6 +76,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/add', [\App\Http\Controllers\CartController::class, 'addProduct'])->name('add');
             Route::post('/remove', [\App\Http\Controllers\CartController::class, 'removeProduct'])->name('remove');
             Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');
+            Route::post('/order', [\App\Http\Controllers\CartController::class, 'placeOrder'])->name('order');
             Route::post('/generate-pdf', [\App\Http\Controllers\CartController::class, 'generatePdf'])->name('generate-pdf');
             Route::put('/{cart}/status', [\App\Http\Controllers\CartController::class, 'updateStatus'])->name('update-status');
             Route::delete('/{cart}', [\App\Http\Controllers\CartController::class, 'destroy'])->name('destroy');

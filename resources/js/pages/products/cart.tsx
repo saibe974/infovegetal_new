@@ -18,7 +18,7 @@ import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { getProductCartImage } from '@/components/products/product-cart-image';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Props = Record<string, never>;
 
@@ -55,6 +55,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
     const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
+    const [orderConflict, setOrderConflict] = useState<{ orderNumber: string | null; resolve: (choice: 'append' | 'new') => void } | null>(null);
 
 
     const itemsPricing = useMemo(
@@ -188,57 +189,67 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                 ) as HTMLMetaElement
             )?.content;
 
-            for (const group of groupedItems) {
-                const groupIndex = groupedItems.findIndex(({ id }) => id === group.id);
-                setPdfCurrentGroup({
-                    index: groupIndex + 1,
-                    total: groupedItems.length,
-                    label: group.label,
-                });
-                setPdfPhaseIndex(0);
+            const basePayload = {
+                items: items.map((item) => ({
+                    id: item.product.id,
+                    quantity: item.quantity,
+                })),
+                shipping_total: deliveryTotal,
+            };
 
-                const response = await fetch("/cart/generate-pdf", {
-                    method: "POST",
+            const placeOrder = async (choice?: 'append' | 'new') => {
+                return fetch('/cart/order', {
+                    method: 'POST',
                     headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": csrfToken || "",
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken || '',
                     },
                     body: JSON.stringify({
-                        items: group.items.map((item) => ({
-                            id: item.product.id,
-                            quantity: item.quantity,
-                        })),
-                        shipping_total: group.deliveryTotal,
-                        group_label: group.label,
-                        group_key: group.id,
+                        ...basePayload,
+                        ...(choice ? { choice } : {}),
                     }),
                 });
+            };
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    const labelSlug = toFileSlug(group.label);
-                    link.download = `panier-${labelSlug}-${new Date().toISOString().split('T')[0]}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    const data = await response.json();
-                    setSaveMessage(
-                        data.message || "Erreur lors de la génération du PDF"
-                    );
-                    return;
+            let response = await placeOrder();
+
+            if (response.status === 409) {
+                const data = await response.json();
+                if (data?.requires_choice) {
+                    const orderNumber = data?.existing_order?.number ?? null;
+                    const choice = await new Promise<'append' | 'new'>((resolve) => {
+                        setOrderConflict({ orderNumber, resolve });
+                    });
+                    setOrderConflict(null);
+                    response = await placeOrder(choice);
                 }
             }
 
-            setSaveMessage("PDFs générés avec succès");
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                setSaveMessage(data?.message || 'Erreur lors de la commande');
+                return;
+            }
+
+            const data = await response.json();
+            const pdfUrl = data?.pdf_download_url;
+            const orderNumber = data?.order_number;
+            if (pdfUrl) {
+                const link = document.createElement('a');
+                link.href = pdfUrl;
+                link.download = orderNumber ? `commande-${orderNumber}.pdf` : 'commande.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            setSaveMessage(orderNumber
+                ? `Commande #${orderNumber} enregistree, PDF genere et emails envoyes`
+                : 'Commande enregistree, PDF genere et emails envoyes');
             setTimeout(() => setSaveMessage(null), 3000);
         } catch (error) {
-            console.error("Error generating PDF:", error);
-            setSaveMessage("Erreur lors de la génération du PDF");
+            console.error('Error placing order:', error);
+            setSaveMessage('Erreur lors de la commande');
         } finally {
             setIsSaving(false);
             setIsPdfGenerating(false);
@@ -309,6 +320,27 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     return (
         <div className="">
             <Head title={t('Cart')} />
+            <Dialog open={orderConflict !== null} onOpenChange={() => undefined}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Commande en cours</DialogTitle>
+                        <DialogDescription>
+                            {orderConflict?.orderNumber
+                                ? `La commande #${orderConflict.orderNumber} est deja en cours de traitement.`
+                                : 'Une commande est deja en cours de traitement.'}
+                            {' '}Souhaitez-vous y ajouter les articles du panier, ou creer une nouvelle commande ?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex-col gap-2 sm:flex-row">
+                        <Button variant="outline" onClick={() => orderConflict?.resolve('new')}>
+                            Nouvelle commande
+                        </Button>
+                        <Button onClick={() => orderConflict?.resolve('append')}>
+                            Ajouter a la commande en cours
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <Dialog open={isPdfGenerating} onOpenChange={() => undefined}>
                 <DialogContent className="sm:max-w-lg" showCloseButton={false}>
                     <DialogHeader>
