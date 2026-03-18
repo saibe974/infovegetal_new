@@ -32,8 +32,7 @@ class UserManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -76,7 +75,7 @@ class UserManagementController extends Controller
      */
     public function treeChildren(Request $request): JsonResponse
     {
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -177,7 +176,7 @@ class UserManagementController extends Controller
      */
     public function treeSearch(Request $request): JsonResponse
     {
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -300,8 +299,7 @@ class UserManagementController extends Controller
 
     public function show(Request $request, User $user): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -324,8 +322,8 @@ class UserManagementController extends Controller
 
     public function edit(Request $request, User $user): Response
     {
-        // Autorisation: seul l'utilisateur lui-même ou un admin peut éditer
-        if ($request->user()->id !== $user->id && !$request->user()->hasRole('admin')) {
+        // Autorisation: seul l'utilisateur lui-même, un admin ou un dev peut éditer
+        if ($request->user()->id !== $user->id && !$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -451,10 +449,12 @@ class UserManagementController extends Controller
      */
     public function update(Request $request, User $user): RedirectResponse
     {
-        // Only admin or the user itself can update
         $me = $request->user();
         Log::info("Updating user $user->id by $me->id");
-        if ($me->id !== $user->id && !$me->hasRole('admin')) {
+        $isAdmin = $me->hasRole('admin');
+        $isDev = $me->hasRole('dev');
+
+        if ($me->id !== $user->id && !$me->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -478,36 +478,51 @@ class UserManagementController extends Controller
 
         $validated = $request->validate($rules);
 
-        // Update basic fields
-        $user->name = $validated['name'];
-        $user->alias = $validated['alias'] ?? null;
-        $user->ref = $validated['ref'] ?? null;
-        $user->phone = $validated['phone'] ?? null;
-        $user->address_road = $validated['address_road'] ?? null;
-        $user->address_zip = $validated['address_zip'] ?? null;
-        $user->address_town = $validated['address_town'] ?? null;
-        $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
-        $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
-        $user->email = $validated['email'];
-        $user->save();
+        if ($me->id === $user->id || $isAdmin) {
+            $user->name = $validated['name'];
+            $user->alias = $validated['alias'] ?? null;
+            $user->ref = $validated['ref'] ?? null;
+            $user->phone = $validated['phone'] ?? null;
+            $user->address_road = $validated['address_road'] ?? null;
+            $user->address_zip = $validated['address_zip'] ?? null;
+            $user->address_town = $validated['address_town'] ?? null;
+            $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
+            $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
+            $user->email = $validated['email'];
+            $user->save();
+        }
 
-        // Roles: only admin can change roles; additionally prevent admin from removing own admin role
+        // Roles: admins can manage all roles, devs can manage non-protected roles only.
         if (isset($validated['roles'])) {
-            if (!$me->hasRole('admin')) {
-                // non-admin cannot change roles
-                // ignore
+            if (!$isAdmin && !$isDev) {
             } else {
+                $requestedRoles = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->get(['id', 'name']);
+
+                if ($isDev && !$isAdmin) {
+                    $protectedRoleNames = ['admin', 'dev'];
+                    $requestedRoleNames = $requestedRoles->pluck('name')->toArray();
+                    $targetHasProtectedRole = $user->roles()->whereIn('name', $protectedRoleNames)->exists();
+
+                    if ($targetHasProtectedRole) {
+                        return back()->with('error', 'Les comptes admin et dev ne peuvent pas être modifiés par un dev');
+                    }
+
+                    if (!empty(array_intersect($requestedRoleNames, $protectedRoleNames))) {
+                        return back()->with('error', 'Un dev ne peut pas attribuer les rôles admin ou dev');
+                    }
+                }
+
                 // If the real admin account is editing itself, disallow removing own admin role.
                 // In impersonation mode, $me is the impersonated user, so we must resolve the impersonator id.
                 $actorId = $me->id;
-                if (method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
+                if ($isAdmin && method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
                     $impersonatorId = app('impersonate')->getImpersonatorId();
                     if ($impersonatorId) {
                         $actorId = (int) $impersonatorId;
                     }
                 }
 
-                if ((int) $actorId === (int) $user->id) {
+                if ($isAdmin && (int) $actorId === (int) $user->id) {
                     // ensure admin role remains
                     $current = collect($validated['roles']);
                     $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')->value('id');
@@ -517,13 +532,12 @@ class UserManagementController extends Controller
                 }
 
                 // sync by role ids
-                $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
-                $user->syncRoles($roleNames);
+                $user->syncRoles($requestedRoles->pluck('name')->toArray());
             }
         }
 
         // Permissions: only admin can change
-        if (isset($validated['permissions']) && $me->hasRole('admin')) {
+        if (isset($validated['permissions']) && $isAdmin) {
             // Determine role ids to compute inherited permissions. If roles were provided in this update
             // use them; otherwise fall back to the user's current roles.
             $roleIds = [];

@@ -20,7 +20,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { edit as editAdminUser, update as updateAdminUser } from '@/routes/users';
 import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
-import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin, isDev } from '@/lib/roles';
 
 export default function Profile({
     mustVerifyEmail,
@@ -47,7 +47,9 @@ export default function Profile({
         },
     ];
 
-    const isAdminUser = isAdmin(getEffectiveUser(auth));
+    const effectiveUser = getEffectiveUser(auth);
+    const isAdminUser = isAdmin(effectiveUser);
+    const canManageRoles = isAdminUser || isDev(effectiveUser);
     const isAdminEditContext = page.url.startsWith('/admin/users/') || isAdminUser;
     const formAction = isAdminEditContext
         ? updateAdminUser.form({ user: targetUser!.id })
@@ -59,6 +61,10 @@ export default function Profile({
     // All possible roles/permissions provided by controller
     const allRoles = (usePage().props as any).allRoles ?? [];
     const allPermissions = (usePage().props as any).allPermissions ?? [];
+    const roleManagementLocked = !isAdminUser && (targetUser?.roles ?? []).some((role: any) => ['admin', 'dev'].includes(role.name));
+    const selectableRoles = isAdminUser
+        ? (allRoles as any[])
+        : ((allRoles as any[]) || []).filter((role) => !['admin', 'dev'].includes(role.name));
 
     const [roleSearch, setRoleSearch] = useState('');
     const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>((targetUser?.roles ?? []).map((r: any) => r.id));
@@ -189,52 +195,60 @@ export default function Profile({
                         </Card>
 
                         {/* Section Rôles */}
-                        <Card className="p-6">
-                            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                                <Shield size={20} />
-                                {t('Roles')} ({selectedRoleIds.length || 0})
-                            </h2>
+                        {canManageRoles && (
+                            <Card className="p-6">
+                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                    <Shield size={20} />
+                                    {t('Roles')} ({selectedRoleIds.length || 0})
+                                </h2>
 
-                            <SearchSelect
-                                value={roleSearch}
-                                onChange={(v) => setRoleSearch(v)}
-                                onSubmit={(s) => {
-                                    const names = s && s.trim() ? s.trim().split(/\s+/) : [];
-                                    const ids = (names || []).map((name) => {
-                                        const found = (allRoles as any[]).find((r) => r.name === name);
-                                        return found ? found.id : null;
-                                    }).filter((v) => v !== null) as number[];
-                                    setSelectedRoleIds(ids);
-                                }}
-                                propositions={((allRoles as any[]) || []).map((r) => r.name)}
-                                selection={(selectedRoleIds || []).map((id: number) => {
-                                    const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
-                                    return r ? { value: r.name, label: r.name } : { value: String(id), label: String(id) };
-                                })}
-                                loading={false}
-                                minQueryLength={0}
-                            />
-
-                            {/* Hidden inputs to submit role ids */}
-                            {selectedRoleIds.map((id: number) => (
-                                <input key={id} type="hidden" name="roles[]" value={id} />
-                            ))}
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                {selectedRoleIds.length > 0 ? (
-                                    selectedRoleIds.map((id: number) => {
+                                <SearchSelect
+                                    value={roleSearch}
+                                    onChange={(v) => setRoleSearch(v)}
+                                    onSubmit={(s) => {
+                                        const names = s && s.trim() ? s.trim().split(/\s+/) : [];
+                                        const ids = (names || []).map((name) => {
+                                            const found = selectableRoles.find((r) => r.name === name);
+                                            return found ? found.id : null;
+                                        }).filter((v) => v !== null) as number[];
+                                        setSelectedRoleIds(ids);
+                                    }}
+                                    propositions={selectableRoles.map((r) => r.name)}
+                                    selection={(selectedRoleIds || []).map((id: number) => {
                                         const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
-                                        return r ? (
-                                            <Badge key={id} variant="secondary" className="bg-blue-100 text-blue-800">
-                                                {r.name}
-                                            </Badge>
-                                        ) : null;
-                                    })
-                                ) : (
-                                    <p className="text-gray-500 text-sm">{t('No roles assigned')}</p>
+                                        return r ? { value: r.name, label: r.name } : { value: String(id), label: String(id) };
+                                    })}
+                                    loading={false}
+                                    minQueryLength={0}
+                                />
+
+                                {roleManagementLocked && (
+                                    <p className="mt-3 text-sm text-amber-700">
+                                        {t('Dev users cannot modify admin or dev accounts.')}
+                                    </p>
                                 )}
-                            </div>
-                        </Card>
+
+                                {/* Hidden inputs to submit role ids */}
+                                {!roleManagementLocked && selectedRoleIds.map((id: number) => (
+                                    <input key={id} type="hidden" name="roles[]" value={id} />
+                                ))}
+
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {selectedRoleIds.length > 0 ? (
+                                        selectedRoleIds.map((id: number) => {
+                                            const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
+                                            return r ? (
+                                                <Badge key={id} variant="secondary" className="bg-blue-100 text-blue-800">
+                                                    {r.name}
+                                                </Badge>
+                                            ) : null;
+                                        })
+                                    ) : (
+                                        <p className="text-gray-500 text-sm">{t('No roles assigned')}</p>
+                                    )}
+                                </div>
+                            </Card>
+                        )}
 
                         {/* Section Permissions (affiché si l'éditeur est admin) */}
                         {isAdminUser && (

@@ -153,7 +153,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('carriers', CarrierController::class)->middleware(['role_or_impersonator:admin']);
 });
 
-// Gestion des utilisateurs (admin uniquement)
+// Gestion des utilisateurs consultable par admin et dev
+Route::middleware(['role_or_impersonator:admin,dev'])->group(function () {
+    Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
+    Route::get('admin/users/tree-children', [UserManagementController::class, 'treeChildren'])->name('users.tree-children');
+    Route::get('admin/users/tree-search', [UserManagementController::class, 'treeSearch'])->name('users.tree-search');
+    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
+    Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
+    Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
+});
+
+// Gestion des utilisateurs réservée aux admins
 Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/media-manager', [MediaController::class, 'index'])->name('media.index');
     Route::get('admin/media-manager/images', [MediaController::class, 'images'])->name('media.images');
@@ -163,20 +173,13 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::post('admin/media-manager/images/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('media.images.action.thumbnail');
     Route::post('admin/media-manager/images/action/batch-download', [MediaController::class, 'actionBatchDownload'])->name('media.images.action.batch-download');
 
-    Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
-
     // Routes statiques d'abord (avant les routes avec {user})
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
-    Route::get('admin/users/tree-children', [UserManagementController::class, 'treeChildren'])->name('users.tree-children');
-    Route::get('admin/users/tree-search', [UserManagementController::class, 'treeSearch'])->name('users.tree-search');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
     
     // Routes avec {user} après
-    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
-    Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->name('users.edit');
-    Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
     Route::delete('admin/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
     Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->name('users.db');
     Route::post('admin/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.updateRole');

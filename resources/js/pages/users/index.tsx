@@ -109,7 +109,7 @@ export default withAppLayout(
         const user = auth?.user;
         const effectiveUser = getEffectiveUser(auth);
         const isAuthenticated = !!user;
-        const canManageUsers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage users');
+        const canManageUsers = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'manage users');
         const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
 
 
@@ -120,8 +120,7 @@ export default withAppLayout(
             },
         ];
 
-        // Vérifier que l'utilisateur est admin
-        if (!isAdmin(effectiveUser)) {
+        if (!isAdmin(effectiveUser) && !isDev(effectiveUser)) {
             return (
                 <AppLayout breadcrumbs={breadcrumbs}>
                     <Head title={t('Users management')} />
@@ -139,7 +138,7 @@ export default withAppLayout(
             );
         }
 
-        const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
+        const canEdit = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
         const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
         const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import users') || hasPermission(effectiveUser, 'export users') || hasPermission(effectiveUser, 'manage users');
 

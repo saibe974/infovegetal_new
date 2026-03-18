@@ -712,13 +712,37 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                         const id = getId(it);
                         const depth = getDepth(it);
                         const nextItem = visible[index + 1];
-                        const isEndOfSubtree = !nextItem || getDepth(nextItem) <= depth;
 
                         const isExpanded = expanded.has(id);
                         const isLoading = loading.has(id);
                         const isOver = !!activeId && overId === id;
-                        const branch = getBranch(id);
-                        const showBranchLoadMore = !!props.lazy && isExpanded && branch.initialized && branch.hasMore && isEndOfSubtree;
+
+                        const branchLoadMoreItems = !props.lazy
+                            ? []
+                            : (() => {
+                                const rows: Array<{ parentId: Id; parentItem: T; depth: number }> = [];
+                                let cursor: T | undefined = it;
+
+                                while (cursor) {
+                                    const cursorId = getId(cursor);
+                                    const cursorDepth = getDepth(cursor);
+                                    const branch = getBranch(cursorId);
+                                    const subtreeEndsHere = !nextItem || getDepth(nextItem) <= cursorDepth;
+
+                                    if (expanded.has(cursorId) && branch.initialized && branch.hasMore && subtreeEndsHere) {
+                                        rows.push({
+                                            parentId: cursorId,
+                                            parentItem: cursor,
+                                            depth: cursorDepth,
+                                        });
+                                    }
+
+                                    const parentId = getParent(cursor);
+                                    cursor = parentId != null ? idMap.get(parentId) : undefined;
+                                }
+
+                                return rows;
+                            })();
 
                         const insertLine =
                             !!activeId && dropIntent?.type === 'between' && dropIntent.overId === id ? dropIntent.where : null;
@@ -740,15 +764,16 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                                     toggleExpand={() => void toggleExpand(id)}
                                     render={props.renderItem}
                                 />
-                                {showBranchLoadMore ? (
+                                {branchLoadMoreItems.map(({ parentId, parentItem, depth: branchDepth }) => (
                                     <AutoLoadMoreRow
-                                        depth={depth}
-                                        loading={isBranchLoading(id)}
+                                        key={`load-more-${String(parentId)}`}
+                                        depth={branchDepth}
+                                        loading={isBranchLoading(parentId)}
                                         onVisible={() => {
-                                            void loadBranchPage(it, id);
+                                            void loadBranchPage(parentItem, parentId);
                                         }}
                                     />
-                                ) : null}
+                                ))}
                             </React.Fragment>
                         );
                     })}
