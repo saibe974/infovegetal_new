@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate as FacadesGate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -22,6 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\DbProducts;
 use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 use function Illuminate\Log\log;
 
@@ -365,8 +367,6 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
@@ -377,13 +377,40 @@ class UserManagementController extends Controller
             'address_town' => ['nullable', 'string', 'max:120'],
             'active' => ['sometimes', 'boolean'],
             'mailing' => ['sometimes', 'boolean'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['nullable', 'string', 'min:8'],
             'roles' => ['sometimes', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        $requestedRoleIds = array_map('intval', $validated['roles'] ?? []);
+        $requestedRoles = Role::whereIn('id', $requestedRoleIds)->get(['id', 'name']);
+        $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
+
+        $email = trim((string) ($validated['email'] ?? ''));
+        if ($email === '' && !$hasGroupRole) {
+            throw ValidationException::withMessages([
+                'email' => 'Le champ email est obligatoire sauf pour le role group.',
+            ]);
+        }
+        if ($email === '' && $hasGroupRole) {
+            // Email technique pour respecter la contrainte NOT NULL + UNIQUE.
+            $email = 'group+' . Str::uuid() . '@local.invalid';
+        }
+
+        $password = (string) ($validated['password'] ?? '');
+        if ($password === '' && !$hasGroupRole) {
+            throw ValidationException::withMessages([
+                'password' => 'Le mot de passe est obligatoire sauf pour le role group.',
+            ]);
+        }
+        if ($password === '' && $hasGroupRole) {
+            // Mot de passe aléatoire: le compte group n'est pas destiné à une connexion email/password.
+            $password = Str::random(40);
+        }
 
         // Crée le noeud racine immédiatement pour initialiser _lft/_rgt (nested set)
         $user = new User([
@@ -396,17 +423,22 @@ class UserManagementController extends Controller
             'address_town' => $validated['address_town'] ?? null,
             'active' => array_key_exists('active', $validated) ? (bool) $validated['active'] : true,
             'mailing' => array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : false,
-            'email' => $validated['email'],
-            'password' => bcrypt($validated['password']),
+            'email' => $email,
+            'password' => bcrypt($password),
         ]);
 
-        // Positionner le nouvel utilisateur comme racine par défaut
-        $user->saveAsRoot();
+        // Positionner le nouvel utilisateur dans l'arbre
+        $parentId = isset($validated['parent_id']) ? (int) $validated['parent_id'] : null;
+        if ($parentId) {
+            $parent = User::findOrFail($parentId);
+            $user->appendToNode($parent)->save();
+        } else {
+            $user->saveAsRoot();
+        }
 
         // Assign roles
-        if (isset($validated['roles'])) {
-            $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
-            $user->syncRoles($roleNames);
+        if ($requestedRoles->isNotEmpty()) {
+            $user->syncRoles($requestedRoles->pluck('name')->toArray());
         }
 
         // Assign permissions
@@ -469,14 +501,24 @@ class UserManagementController extends Controller
             'address_town' => ['nullable', 'string', 'max:120'],
             'active' => ['nullable', 'boolean'],
             'mailing' => ['nullable', 'boolean'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
         ];
 
         $validated = $request->validate($rules);
+
+        // Détecter le rôle group pour rendre l'email optionnel
+        $requestedRoleIds = array_map('intval', $validated['roles'] ?? $user->roles()->pluck('id')->toArray());
+        $hasGroupRole = \Spatie\Permission\Models\Role::whereIn('id', $requestedRoleIds)
+            ->where('name', 'group')
+            ->exists();
+        if ($hasGroupRole) {
+            $validated['email'] = $validated['email'] ?? $user->email;
+        }
 
         if ($me->id === $user->id || $isAdmin) {
             $user->name = $validated['name'];
@@ -490,6 +532,17 @@ class UserManagementController extends Controller
             $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
             $user->email = $validated['email'];
             $user->save();
+
+            // Déplacement dans l'arbre si parent_id fourni (admin uniquement)
+            if ($isAdmin && array_key_exists('parent_id', $validated)) {
+                $newParentId = $validated['parent_id'] !== null ? (int) $validated['parent_id'] : null;
+                if ($newParentId && $newParentId !== (int) $user->parent_id) {
+                    $parent = User::findOrFail($newParentId);
+                    $user->appendToNode($parent)->save();
+                } elseif ($newParentId === null && $user->parent_id !== null) {
+                    $user->saveAsRoot();
+                }
+            }
         }
 
         // Roles: admins can manage all roles, devs can manage non-protected roles only.

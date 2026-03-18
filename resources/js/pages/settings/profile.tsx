@@ -2,8 +2,9 @@ import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { useState, useEffect, useMemo } from 'react';
-import { Mail, Shield, Lock, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Mail, Shield, Lock, AlertCircle, Users2Icon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import DeleteUser from '@/components/users/delete-user';
 import HeadingSmall from '@/components/heading-small';
@@ -71,6 +72,50 @@ export default function Profile({
 
     const [permissionSearch, setPermissionSearch] = useState('');
     const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>((targetUser?.permissions ?? []).map((p: any) => p.id));
+
+    const isGroup = useMemo(
+        () => selectedRoleIds.some((id) => (allRoles as any[]).find((r) => r.id === id)?.name === 'group'),
+        [selectedRoleIds, allRoles],
+    );
+
+    // ── Parent ────────────────────────────────────────────────────────────────
+    const [parentModalOpen, setParentModalOpen] = useState(false);
+    const [parentSearch, setParentSearch] = useState('');
+    const [parentSearchItems, setParentSearchItems] = useState<{ id: number; name: string; email: string; depth: number }[]>([]);
+    const [parentSearchLoading, setParentSearchLoading] = useState(false);
+    const initialParent = (targetUser as any)?.parent_id
+        ? { id: (targetUser as any).parent_id, name: (targetUser as any).parent?.name ?? `#${(targetUser as any).parent_id}` }
+        : null;
+    const [selectedParent, setSelectedParent] = useState<{ id: number; name: string } | null>(initialParent);
+    const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const searchParents = (q: string) => {
+        setParentSearch(q);
+        if (parentSearchTimer.current) clearTimeout(parentSearchTimer.current);
+        if (!q || q.trim().length < 2) { setParentSearchItems([]); return; }
+        parentSearchTimer.current = setTimeout(async () => {
+            setParentSearchLoading(true);
+            try {
+                const res = await fetch(
+                    `/admin/users/tree-search?q=${encodeURIComponent(q.trim())}`,
+                    { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+                );
+                if (res.ok) {
+                    const payload = await res.json();
+                    setParentSearchItems(
+                        ((payload.items || []) as any[]).map((item) => ({
+                            id: item.id,
+                            name: item.name,
+                            email: item.email,
+                            depth: Number(item.depth ?? 0),
+                        })),
+                    );
+                }
+            } finally {
+                setParentSearchLoading(false);
+            }
+        }, 300);
+    };
 
     // Keep selected role/permission ids in sync when targetUser changes (e.g. admin editing another user)
     useEffect(() => {
@@ -172,25 +217,27 @@ export default function Profile({
                                 />
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">{t('Email address')}</Label>
+                            {!isGroup && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email">{t('Email address')}</Label>
 
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    className="mt-1 block w-full"
-                                    defaultValue={(targetUser as any)?.email || ''}
-                                    name="email"
-                                    required
-                                    autoComplete="username"
-                                    placeholder={t('Email address')}
-                                />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        className="mt-1 block w-full"
+                                        defaultValue={(targetUser as any)?.email || ''}
+                                        name="email"
+                                        required
+                                        autoComplete="username"
+                                        placeholder={t('Email address')}
+                                    />
 
-                                <InputError
-                                    className="mt-2"
-                                    message={errors.email}
-                                />
-                            </div>
+                                    <InputError
+                                        className="mt-2"
+                                        message={errors.email}
+                                    />
+                                </div>
+                            )}
 
                         </Card>
 
@@ -299,10 +346,80 @@ export default function Profile({
                                 </div>
                             </Card>
                         )}
+                        {/* Section Parent — visible uniquement en contexte admin */}
+                        {isAdminEditContext && (
+                            <Card className="p-6">
+                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                    <Users2Icon size={20} />
+                                    {t('Parent')}
+                                </h2>
+                                <div className="flex items-center gap-2">
+                                    {selectedParent ? (
+                                        <Badge variant="outline" className="text-sm py-1 px-3">
+                                            {selectedParent.name}
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-sm text-muted-foreground">{t('No parent selected')}</span>
+                                    )}
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setParentModalOpen(true)}>
+                                        <Users2Icon className="mr-1 h-4 w-4" />
+                                        {selectedParent ? t('Change') : t('Select')}
+                                    </Button>
+                                    {selectedParent && (
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedParent(null)}>
+                                            {t('Remove')}
+                                        </Button>
+                                    )}
+                                </div>
+                                <input type="hidden" name="parent_id" value={selectedParent?.id ?? ''} />
+                            </Card>
+                        )}
+
                         <div className="flex items-center gap-4 pt-4">
                             <Button type="submit">{t('Save')}</Button>
                         </div>
                     </Form>
+
+                    {/* Modale sélection parent */}
+                    <Dialog open={parentModalOpen} onOpenChange={setParentModalOpen}>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>{t('Select a parent')}</DialogTitle>
+                            </DialogHeader>
+                            <SearchSelect
+                                value={parentSearch}
+                                onChange={searchParents}
+                                onSubmit={searchParents}
+                                propositions={parentSearchItems.map((u) => ({ value: String(u.id), label: u.name }))}
+                                loading={parentSearchLoading}
+                                minQueryLength={2}
+                                search={true}
+                            />
+                            {parentSearchItems.length > 0 && (
+                                <ul className="mt-2 max-h-64 overflow-y-auto divide-y rounded-md border text-sm">
+                                    {parentSearchItems.map((u) => (
+                                        <li
+                                            key={u.id}
+                                            className="flex cursor-pointer items-center justify-between px-3 py-2 hover:bg-muted"
+                                            style={{ paddingLeft: `${(u.depth ?? 0) * 16 + 12}px` }}
+                                            onClick={() => {
+                                                setSelectedParent({ id: u.id, name: u.name });
+                                                setParentModalOpen(false);
+                                                setParentSearch('');
+                                                setParentSearchItems([]);
+                                            }}
+                                        >
+                                            <span>{u.name}</span>
+                                            <span className="text-muted-foreground text-xs">{u.email}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {parentSearch.trim().length >= 2 && !parentSearchLoading && parentSearchItems.length === 0 && (
+                                <p className="mt-2 text-sm text-muted-foreground">{t('No results.')}</p>
+                            )}
+                        </DialogContent>
+                    </Dialog>
 
                     {/* Delete User */}
                     <DeleteUser />
