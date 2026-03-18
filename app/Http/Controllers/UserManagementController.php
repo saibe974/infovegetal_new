@@ -766,18 +766,23 @@ class UserManagementController extends Controller
             return false;
         }
 
-        $dbIds = User::query()
-            ->select('id')
-            ->orderBy('id')
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values();
+        $submittedIdSet = array_fill_keys($submittedIds->all(), true);
+        $hasRoot = false;
 
-        if ($submittedIds->count() !== $dbIds->count()) {
-            return false;
+        foreach ($rows as $row) {
+            $parentId = $row['parent_id'] ?? null;
+
+            if ($parentId === null) {
+                $hasRoot = true;
+                continue;
+            }
+
+            if (!isset($submittedIdSet[(int) $parentId])) {
+                return false;
+            }
         }
 
-        return $submittedIds->sort()->values()->all() === $dbIds->all();
+        return $hasRoot;
     }
 
     private function buildUsersReorderTree(\Illuminate\Support\Collection $rows, ?int $parentId = null): array
