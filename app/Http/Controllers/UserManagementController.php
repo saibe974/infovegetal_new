@@ -605,6 +605,15 @@ class UserManagementController extends Controller
      */
     public function reorder(Request $request)
     {
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $startedAt = microtime(true);
+
+        Log::info('users.reorder.start', [
+            'request_id' => $requestId,
+            'user_id' => optional($request->user())->id,
+            'item_count' => count($request->input('items', [])),
+        ]);
+
         $validated = $request->validate([
             'items' => ['required','array'],
             'items.*.id' => ['required','integer','exists:users,id'],
@@ -612,88 +621,137 @@ class UserManagementController extends Controller
             'items.*.position' => ['required','integer','min:0'],
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            $rows = collect($validated['items']);
+        Log::info('users.reorder.validated', [
+            'request_id' => $requestId,
+            'item_count' => count($validated['items'] ?? []),
+        ]);
 
-            // Sécurité anti-cycles simple : parent_id != id
-            foreach ($rows as $r) {
-                if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
-                    abort(422, 'Invalid parent.');
-                }
-            }
+        try {
+            $response = DB::transaction(function () use ($validated, $requestId, $startedAt) {
+                $rows = collect($validated['items']);
 
-            // Anti-cycles basique via parcours parent -> racine
-            $rows->each(function ($r) use ($rows) {
-                $parentId = $r['parent_id'];
-                $visited = [];
-                while ($parentId !== null) {
-                    if (in_array($parentId, $visited, true)) {
-                        abort(422, 'Circular parent reference detected.');
+                // Sécurité anti-cycles simple : parent_id != id
+                foreach ($rows as $r) {
+                    if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
+                        Log::warning('users.reorder.invalid_parent', [
+                            'request_id' => $requestId,
+                            'id' => (int) $r['id'],
+                        ]);
+                        abort(422, 'Invalid parent.');
                     }
-                    $visited[] = $parentId;
-                    $parent = $rows->firstWhere('id', $parentId);
-                    $parentId = $parent ? $parent['parent_id'] : null;
-                    if (count($visited) > 1000) break; // garde-fou
                 }
-            });
 
-            if ($this->canUseOptimizedUsersReorder($rows)) {
-                User::rebuildTree($this->buildUsersReorderTree($rows));
+                // Anti-cycles basique via parcours parent -> racine
+                $rows->each(function ($r) use ($rows, $requestId) {
+                    $parentId = $r['parent_id'];
+                    $visited = [];
+                    while ($parentId !== null) {
+                        if (in_array($parentId, $visited, true)) {
+                            Log::warning('users.reorder.circular_reference', [
+                                'request_id' => $requestId,
+                                'id' => (int) $r['id'],
+                                'parent_id' => (int) $parentId,
+                            ]);
+                            abort(422, 'Circular parent reference detected.');
+                        }
+                        $visited[] = $parentId;
+                        $parent = $rows->firstWhere('id', $parentId);
+                        $parentId = $parent ? $parent['parent_id'] : null;
+                        if (count($visited) > 1000) break; // garde-fou
+                    }
+                });
+
+                if ($this->canUseOptimizedUsersReorder($rows)) {
+                    User::rebuildTree($this->buildUsersReorderTree($rows));
+
+                    $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+                    Log::info('users.reorder.done', [
+                        'request_id' => $requestId,
+                        'mode' => 'optimized',
+                        'item_count' => $rows->count(),
+                        'duration_ms' => $durationMs,
+                    ]);
+
+                    return response()->json([
+                        'ok' => true,
+                        'mode' => 'optimized',
+                    ]);
+                }
+
+                Log::warning('users.reorder.fallback', [
+                    'request_id' => $requestId,
+                    'item_count' => $rows->count(),
+                ]);
+
+                $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
+
+                // Détacher puis reconstruire l'arbre pour éviter toute corruption
+                $allIds = $rows->pluck('id')->toArray();
+                $allNodes = User::whereIn('id', $allIds)->get();
+
+                foreach ($allNodes as $node) {
+                    $node->parent_id = null;
+                    $node->save();
+                }
+
+                // Rebuild the tree using nested set helpers (same approach as categories)
+                $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
+                    $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
+                    $prev = null;
+
+                    foreach ($children as $r) {
+                        $node = User::findOrFail($r['id']);
+                        $node->refresh();
+
+                        if ($parentId === null) {
+                            $node->saveAsRoot();
+                        } else {
+                            $parent = User::findOrFail($parentId);
+                            $parent->refresh();
+                            $node->appendToNode($parent)->save();
+                        }
+
+                        if ($prev) {
+                            $prev->refresh();
+                            $node->afterNode($prev)->save();
+                        }
+
+                        $prev = $node;
+
+                        // recurse
+                        $placeChildren($node->id);
+                    }
+                };
+
+                // Démarrer par les racines
+                $placeChildren(null);
+
+                $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+                Log::info('users.reorder.done', [
+                    'request_id' => $requestId,
+                    'mode' => 'fallback',
+                    'item_count' => $rows->count(),
+                    'duration_ms' => $durationMs,
+                ]);
 
                 return response()->json([
                     'ok' => true,
-                    'mode' => 'optimized',
+                    'mode' => 'fallback',
                 ]);
-            }
+            });
 
-            $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
-
-            // Détacher puis reconstruire l'arbre pour éviter toute corruption
-            $allIds = $rows->pluck('id')->toArray();
-            $allNodes = User::whereIn('id', $allIds)->get();
-
-            foreach ($allNodes as $node) {
-                $node->parent_id = null;
-                $node->save();
-            }
-
-            // Rebuild the tree using nested set helpers (same approach as categories)
-            $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
-                $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
-                $prev = null;
-
-                foreach ($children as $r) {
-                    $node = User::findOrFail($r['id']);
-                    $node->refresh();
-
-                    if ($parentId === null) {
-                        $node->saveAsRoot();
-                    } else {
-                        $parent = User::findOrFail($parentId);
-                        $parent->refresh();
-                        $node->appendToNode($parent)->save();
-                    }
-
-                    if ($prev) {
-                        $prev->refresh();
-                        $node->afterNode($prev)->save();
-                    }
-
-                    $prev = $node;
-
-                    // recurse
-                    $placeChildren($node->id);
-                }
-            };
-
-            // Démarrer par les racines
-            $placeChildren(null);
-
-            return response()->json([
-                'ok' => true,
-                'mode' => 'fallback',
+            return $response;
+        } catch (\Throwable $e) {
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+            Log::error('users.reorder.failed', [
+                'request_id' => $requestId,
+                'duration_ms' => $durationMs,
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
             ]);
-        });
+
+            throw $e;
+        }
     }
 
     private function canUseOptimizedUsersReorder(\Illuminate\Support\Collection $rows): bool
