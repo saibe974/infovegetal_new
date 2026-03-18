@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            $table->dropIndex('users_locale_index');
             $table->dropColumn('locale');
         });
     }
@@ -22,7 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('locale', 2)->nullable()->default('fr');
+            $table->string('locale', 5)->nullable()->default('fr')->after('password');
+            $table->index('locale');
         });
     }
 };

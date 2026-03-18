@@ -637,6 +637,15 @@ class UserManagementController extends Controller
                 }
             });
 
+            if ($this->canUseOptimizedUsersReorder($rows)) {
+                User::rebuildTree($this->buildUsersReorderTree($rows));
+
+                return response()->json([
+                    'ok' => true,
+                    'mode' => 'optimized',
+                ]);
+            }
+
             $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
 
             // Détacher puis reconstruire l'arbre pour éviter toute corruption
@@ -680,8 +689,50 @@ class UserManagementController extends Controller
             // Démarrer par les racines
             $placeChildren(null);
 
-            return response()->json(['ok' => true]);
+            return response()->json([
+                'ok' => true,
+                'mode' => 'fallback',
+            ]);
         });
+    }
+
+    private function canUseOptimizedUsersReorder(\Illuminate\Support\Collection $rows): bool
+    {
+        $submittedIds = $rows
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($submittedIds->isEmpty()) {
+            return false;
+        }
+
+        $dbIds = User::query()
+            ->select('id')
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($submittedIds->count() !== $dbIds->count()) {
+            return false;
+        }
+
+        return $submittedIds->sort()->values()->all() === $dbIds->all();
+    }
+
+    private function buildUsersReorderTree(\Illuminate\Support\Collection $rows, ?int $parentId = null): array
+    {
+        return $rows
+            ->filter(fn (array $row) => ($row['parent_id'] ?? null) === $parentId)
+            ->sortBy('position')
+            ->values()
+            ->map(fn (array $row) => [
+                'id' => (int) $row['id'],
+                'children' => $this->buildUsersReorderTree($rows, (int) $row['id']),
+            ])
+            ->all();
     }
 
     public function editDb(Request $request, User $user): RedirectResponse
