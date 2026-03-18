@@ -223,7 +223,7 @@ class CartController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Cart $cart)
+    public function destroy(Request $request, Cart $cart)
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
@@ -232,6 +232,10 @@ class CartController extends Controller
         }
 
         $cart->delete();
+
+        if ($request->header('X-Inertia')) {
+            return redirect()->back(303);
+        }
 
         return response()->json(['message' => 'Commande supprimée']);
     }
@@ -251,18 +255,8 @@ class CartController extends Controller
         $cart->status = $data['status'];
         $cart->save();
 
-        if ($cart->status === 'processed') {
-            $hasOpenCart = Cart::query()
-                ->where('user_id', $cart->user_id)
-                ->where('status', 'processing')
-                ->exists();
-
-            if (!$hasOpenCart) {
-                Cart::create([
-                    'user_id' => $cart->user_id,
-                    'status' => 'processing',
-                ]);
-            }
+        if ($request->header('X-Inertia')) {
+            return redirect()->back(303);
         }
 
         return response()->json(['message' => 'Statut mis a jour', 'status' => $cart->status]);
