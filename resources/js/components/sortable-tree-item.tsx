@@ -59,6 +59,7 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
     const isHighlighted = highlightCondition?.(item) ?? false;
 
     const resolvedHref = typeof nameHref === 'function' ? nameHref(item) : nameHref;
+    const effectiveLoading = isLoading || props.isLoading;
 
     return (
         <div
@@ -133,12 +134,12 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
             {resolvedHref ? (
                 <Link href={resolvedHref} className="truncate font-medium flex-1 flex items-center gap-2 hover:underline">
                     {name}
-                    {isLoading && <Loader2Icon size={15} className="animate-spin" />}
+                    {effectiveLoading && <Loader2Icon size={15} className="animate-spin" />}
                 </Link>
             ) : (
                 <span className="truncate font-medium flex-1 flex items-center gap-2">
                     {name}
-                    {isLoading && <Loader2Icon size={15} className="animate-spin" />}
+                    {effectiveLoading && <Loader2Icon size={15} className="animate-spin" />}
                 </span>
             )}
 

@@ -423,6 +423,71 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         }
     }, [props.lazy, expanded, idMap]);
 
+    useEffect(() => {
+        if (props.lazy || !props.loadChildren || expanded.size === 0) {
+            return;
+        }
+
+        for (const expandedId of expanded) {
+            const parent = idMap.get(expandedId);
+            if (!parent) {
+                continue;
+            }
+
+            if (loading.has(expandedId)) {
+                continue;
+            }
+
+            if (items.some((item) => getParent(item) === expandedId)) {
+                continue;
+            }
+
+            if (!canHaveChildren(parent)) {
+                continue;
+            }
+
+            setLoading((current) => new Set(current).add(expandedId));
+
+            void props.loadChildren(parent)
+                .then((children) => {
+                    const parentDepth = getDepth(parent);
+
+                    setItems((prev) => {
+                        const existing = new Set(prev.map((item) => getId(item)));
+
+                        const normalized = children
+                            .filter((child) => !existing.has(getId(child)))
+                            .map((child) => {
+                                const withParent = setField(child, parentKey, expandedId);
+                                const childDepth = getField<T, number>(withParent, depthKey, NaN);
+
+                                return Number.isFinite(childDepth)
+                                    ? withParent
+                                    : setField(withParent, depthKey, parentDepth + 1);
+                            });
+
+                        if (normalized.length === 0) {
+                            return prev;
+                        }
+
+                        const parentIndex = prev.findIndex((item) => getId(item) === expandedId);
+                        if (parentIndex === -1) {
+                            return prev;
+                        }
+
+                        return [...prev.slice(0, parentIndex + 1), ...normalized, ...prev.slice(parentIndex + 1)];
+                    });
+                })
+                .finally(() => {
+                    setLoading((current) => {
+                        const next = new Set(current);
+                        next.delete(expandedId);
+                        return next;
+                    });
+                });
+        }
+    }, [props.lazy, props.loadChildren, expanded, idMap, items, loading]);
+
     // --- visibilité ---
     const isVisible = (it: T): boolean => {
         let pid = getParent(it);
@@ -720,7 +785,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                         const guideContinuations = Array.from({ length: depth }, (_, level) => nextDepth > level);
 
                         const isExpanded = expanded.has(id);
-                        const isLoading = loading.has(id);
+                        const isLoading = loading.has(id) || isBranchLoading(id);
                         const isOver = !!activeId && overId === id;
 
                         const branchLoadMoreItems = !props.lazy

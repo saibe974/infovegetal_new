@@ -272,16 +272,7 @@ export default withAppLayout(
         const renderItem = (props: RenderItemProps<ProductCategory>) => {
             const {
                 item,
-                depth,
-                isExpanded,
-                toggleExpand,
-                isDragging,
-                insertLine, // 'before' | 'after' | null
-                isInsideTarget, // true = intention “inside”
-                isOver, // survol (optionnel pour un léger highlight)
-                setNodeRef,
-                attributes,
-                listeners,
+                isLoading,
             } = props;
 
             // Chevrons dynamiques: vrai si serveur l'indique ou si un enfant est présent dans la liste courante
@@ -292,7 +283,7 @@ export default withAppLayout(
                 <SortableTreeItem
                     props={props}
                     hasChildren={hasChildren}
-                    isLoading={loadingItems.has(item.id)}
+                    isLoading={isLoading || loadingItems.has(item.id)}
                     canEdit={true}
                     onEdit={() => { }}
                     canDelete={item.id !== 1}
