@@ -257,6 +257,62 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             setPdfPhaseIndex(0);
         }
     };
+
+    const handleGenerateTcpdf = async () => {
+        if (items.length === 0) {
+            setSaveMessage('Le panier est vide');
+            setTimeout(() => setSaveMessage(null), 3000);
+            return;
+        }
+
+        setIsSaving(true);
+        setSaveMessage(null);
+
+        try {
+            const csrfToken = (
+                document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement
+            )?.content;
+
+            const response = await fetch('/cart/generate-pdf-tcpdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken || '',
+                },
+                body: JSON.stringify({
+                    items: items.map((item) => ({
+                        id: item.product.id,
+                        quantity: item.quantity,
+                    })),
+                    shipping_total: deliveryTotal,
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                setSaveMessage(data?.message || 'Erreur lors de la generation TCPDF');
+                return;
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `panier-tcpdf-${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setSaveMessage('PDF TCPDF genere avec succes');
+            setTimeout(() => setSaveMessage(null), 3000);
+        } catch (error) {
+            console.error('Error generating TCPDF:', error);
+            setSaveMessage('Erreur lors de la generation TCPDF');
+        } finally {
+            setIsSaving(false);
+        }
+    };
     const [topOffset, setTopOffset] = useState<number>(0);
 
     useEffect(() => {
@@ -639,14 +695,25 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
 
 
-                            <Button
-                                className="w-full bg-brand-main hover:bg-brand-main-hover"
-                                size="lg"
-                                disabled={items.length === 0 || isSaving}
-                                onClick={handleGeneratePdf}
-                            >
-                                {t('Commander')}
-                            </Button>
+                            <div className="grid grid-cols-1 gap-2">
+                                <Button
+                                    className="w-full bg-brand-main hover:bg-brand-main-hover"
+                                    size="lg"
+                                    disabled={items.length === 0 || isSaving}
+                                    onClick={handleGeneratePdf}
+                                >
+                                    {t('Commander')}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    size="lg"
+                                    disabled={items.length === 0 || isSaving}
+                                    onClick={handleGenerateTcpdf}
+                                >
+                                    {t('Exporter TCPDF (test)')}
+                                </Button>
+                            </div>
                         </CardContent>
                     </Card>
                 </BasicSticky>

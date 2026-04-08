@@ -446,113 +446,113 @@ export default withAppLayout(
 
 
             return (
-                <SortableTreeItem 
-                    props={props}
-                    hasChildren={(item as any)?.has_children}
-                    isLoading={false}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                    onEdit={(user) => handleEdit(user.id)}
-                    onDelete={(user) => handleDelete(user.id)}
-                />
-                // <div
-                //     ref={setNodeRef}
-                //     className={[
-                //         'relative flex items-center gap-2 px-3 py-2 text-sm',
-                //         'border-b border-border/30 transition-colors',
-                //         !isDragging ? 'hover:bg-muted/50' : '',
-                //         isOver ? 'bg-muted/20' : '',
-                //         isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
-                //         isDragging ? 'opacity-50' : '',
-                //     ].join(' ')}
-                //     style={{
-                //         marginLeft: depth * 24,
-                //     }}
-                // >
-                //     {depth > 0 && (
-                //         <div className="pointer-events-none absolute inset-y-0 left-0" aria-hidden>
-                //             {Array.from({ length: depth }).map((_, level) => (
-                //                 <span
-                //                     key={`guide-${(item as any).id}-${level}`}
-                //                     className="absolute top-[-1px] bottom-[-1px] w-px bg-emerald-600/30 dark:bg-emerald-400/35"
-                //                     style={{ left: level * 24 + 10.5 }}
-                //                 />
-                //             ))}
-                //             <span
-                //                 className="absolute h-px bg-emerald-600/30 dark:bg-emerald-400/35"
-                //                 style={{
-                //                     left: (depth - 1) * 24 + 10.5,
-                //                     top: '50%',
-                //                     width: 13,
-                //                 }}
-                //             />
-                //             <span
-                //                 className="absolute size-1 rounded-full bg-emerald-600/40 dark:bg-emerald-400/45"
-                //                 style={{
-                //                     left: depth * 24 + 8,
-                //                     top: 'calc(50% - 3px)',
-                //                 }}
-                //             />
-                //         </div>
-                //     )}
+                // <SortableTreeItem 
+                //     props={props}
+                //     hasChildren={(item as any)?.has_children}
+                //     isLoading={false}
+                //     canEdit={canEdit}
+                //     canDelete={canDelete}
+                //     onEdit={(user) => handleEdit(user.id)}
+                //     onDelete={(user) => handleDelete(user.id)}
+                // />
+                <div
+                    ref={setNodeRef}
+                    className={[
+                        'relative flex items-center gap-2 px-3 py-2 text-sm',
+                        'border-b border-border/30 transition-colors',
+                        !isDragging ? 'hover:bg-muted/50' : '',
+                        isOver ? 'bg-muted/20' : '',
+                        isInsideTarget ? 'bg-primary/10 ring-2 ring-primary/50 ring-offset-1' : '',
+                        isDragging ? 'opacity-50' : '',
+                    ].join(' ')}
+                    style={{
+                        marginLeft: depth * 24,
+                    }}
+                >
+                    {depth > 0 && (
+                        <div className="pointer-events-none absolute inset-y-0 left-0" aria-hidden>
+                            {Array.from({ length: depth }).map((_, level) => (
+                                <span
+                                    key={`guide-${(item as any).id}-${level}`}
+                                    className="absolute top-[-1px] bottom-[-1px] w-px bg-emerald-600/30 dark:bg-emerald-400/35"
+                                    style={{ left: level * 24 + 10.5 }}
+                                />
+                            ))}
+                            <span
+                                className="absolute h-px bg-emerald-600/30 dark:bg-emerald-400/35"
+                                style={{
+                                    left: (depth - 1) * 24 + 10.5,
+                                    top: '50%',
+                                    width: 13,
+                                }}
+                            />
+                            <span
+                                className="absolute size-1 rounded-full bg-emerald-600/40 dark:bg-emerald-400/45"
+                                style={{
+                                    left: depth * 24 + 8,
+                                    top: 'calc(50% - 3px)',
+                                }}
+                            />
+                        </div>
+                    )}
 
-                //     {!isDragging && Boolean((item as any)?.has_children) ? (
-                //         <button
-                //             type="button"
-                //             onClick={toggleExpand}
-                //             className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
-                //             aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                //         >
-                //             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                //         </button>
-                //     ) : (
-                //         <div className="h-6 w-6 flex-shrink-0" />
-                //     )}
+                    {!isDragging && Boolean((item as any)?.has_children) ? (
+                        <button
+                            type="button"
+                            onClick={toggleExpand}
+                            className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted flex-shrink-0"
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                    ) : (
+                        <div className="h-6 w-6 flex-shrink-0" />
+                    )}
 
-                //     <div
-                //         {...listeners}
-                //         {...attributes}
-                //         className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
-                //         aria-label="Drag"
-                //     >
-                //         <GripVertical size={14} />
-                //     </div>
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
+                        aria-label="Drag"
+                    >
+                        <GripVertical size={14} />
+                    </div>
 
-                //     <Link href={'/admin/users/' + (item as any).id} className="truncate font-medium flex-1 hover:cursor-pointer hover:underline">
-                //         {displayName}
-                //     </Link>
+                    <Link href={'/admin/users/' + (item as any).id} className="truncate font-medium flex-1 hover:cursor-pointer hover:underline">
+                        {displayName}
+                    </Link>
 
-                //     <div className="flex gap-2 justify-end flex-shrink-0">
-                //         {hasValidId && !isDragging && (
-                //             <>
-                //                 {canEdit && (
-                //                     <Button
-                //                         size="icon"
-                //                         variant="outline"
-                //                         onClick={(e: React.MouseEvent) => {
-                //                             e.stopPropagation();
-                //                             handleEdit((item as any).id);
-                //                         }}
-                //                     >
-                //                         <EditIcon size={16} />
-                //                     </Button>
-                //                 )}
-                //                 {canDelete && (
-                //                     <Button
-                //                         size="icon"
-                //                         variant="destructive-outline"
-                //                         onClick={(e: React.MouseEvent) => {
-                //                             e.stopPropagation();
-                //                             handleDelete((item as any).id);
-                //                         }}
-                //                     >
-                //                         <TrashIcon size={16} />
-                //                     </Button>
-                //                 )}
-                //             </>
-                //         )}
-                //     </div>
-                // </div>
+                    <div className="flex gap-2 justify-end flex-shrink-0">
+                        {hasValidId && !isDragging && (
+                            <>
+                                {canEdit && (
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            handleEdit((item as any).id);
+                                        }}
+                                    >
+                                        <EditIcon size={16} />
+                                    </Button>
+                                )}
+                                {canDelete && (
+                                    <Button
+                                        size="icon"
+                                        variant="destructive-outline"
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            handleDelete((item as any).id);
+                                        }}
+                                    >
+                                        <TrashIcon size={16} />
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
             );
         };
 

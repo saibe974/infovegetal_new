@@ -78,6 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/save', [\App\Http\Controllers\CartController::class, 'save'])->name('save');
             Route::post('/order', [\App\Http\Controllers\CartController::class, 'placeOrder'])->name('order');
             Route::post('/generate-pdf', [\App\Http\Controllers\CartController::class, 'generatePdf'])->name('generate-pdf');
+            Route::post('/generate-pdf-tcpdf', [\App\Http\Controllers\CartController::class, 'generatePdfTcpdf'])->name('generate-pdf-tcpdf');
             Route::put('/{cart}/status', [\App\Http\Controllers\CartController::class, 'updateStatus'])->name('update-status');
             Route::delete('/{cart}', [\App\Http\Controllers\CartController::class, 'destroy'])->name('destroy');
         });

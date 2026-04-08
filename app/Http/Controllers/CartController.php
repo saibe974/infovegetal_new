@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Services\PdfRollDistributionService;
+use App\Services\CartTcpdfService;
 use App\Services\PriceCalculatorService;
 use App\Services\ProductMediaService;
 use Illuminate\Http\Request;
@@ -373,6 +374,35 @@ class CartController extends Controller
             ->format('a4')
             ->name($safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '.pdf')
             ->download();
+    }
+
+    /**
+     * Generate PDF from cart items using TCPDF (fallback/simple renderer).
+     */
+    public function generatePdfTcpdf(Request $request, CartTcpdfService $cartTcpdfService)
+    {
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'shipping_total' => 'nullable|numeric|min:0',
+            'group_label' => 'nullable|string|max:190',
+            'group_key' => 'nullable|integer|min:0',
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+
+        $payload = $this->buildPdfPayload($data['items'], $user, $shippingTotal);
+        $payload['order_number'] = null;
+
+        $label = isset($data['group_label']) ? trim((string) $data['group_label']) : '';
+        $safeLabel = $label !== '' ? Str::slug($label) : 'panier';
+        $suffix = ((int) ($data['group_key'] ?? 0)) > 0 ? '-' . (int) $data['group_key'] : '';
+        $filename = $safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '-tcpdf.pdf';
+
+        return $cartTcpdfService->download($payload, $filename);
     }
 
     private function getCartPricing(Product $product, int $quantity, ?\App\Models\User $user, PriceCalculatorService $priceCalculator): array
