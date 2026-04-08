@@ -164,9 +164,9 @@ export default withAppLayout(
             }
         };
 
-        const handleTreeChange = (items: ProductCategory[], reason?: 'drag' | 'expand' | 'collapse') => {
+        const handleTreeChange = (items: ProductCategory[], reason?: 'drag' | 'expand' | 'collapse' | 'lazy-load') => {
             // Ignorer les changements d'expand/collapse (ne pas tracker comme "pending")
-            if (reason === 'expand' || reason === 'collapse') return;
+            if (reason === 'expand' || reason === 'collapse' || reason === 'lazy-load') return;
 
             // Pour les drags, mettre à jour le pending
             if (reason === 'drag') {

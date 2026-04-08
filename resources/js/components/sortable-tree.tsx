@@ -28,6 +28,7 @@ export type RenderItemProps<T> = {
     isExpanded: boolean;
     isLoading: boolean;
     isDragging: boolean;
+    guideContinuations: boolean[];
 
     // UX drag (on conserve pour l'inside si tu veux un highlight)
     isOver: boolean;
@@ -110,6 +111,7 @@ function Row<T extends Record<string, any>>({
     isOver,
     insertLine,
     isInsideTarget,
+    guideContinuations,
     toggleExpand,
     render,
     className,
@@ -122,6 +124,7 @@ function Row<T extends Record<string, any>>({
     isOver: boolean;
     insertLine: 'before' | 'after' | null;
     isInsideTarget: boolean;
+    guideContinuations: boolean[];
     toggleExpand: () => void;
     className?: string;
     render: (ctx: RenderItemProps<T>) => React.ReactNode;
@@ -144,6 +147,7 @@ function Row<T extends Record<string, any>>({
                 isExpanded,
                 isLoading,
                 isDragging,
+                guideContinuations,
                 isOver,
                 insertLine,
                 isInsideTarget,
@@ -712,6 +716,8 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                         const id = getId(it);
                         const depth = getDepth(it);
                         const nextItem = visible[index + 1];
+                        const nextDepth = nextItem ? getDepth(nextItem) : -1;
+                        const guideContinuations = Array.from({ length: depth }, (_, level) => nextDepth > level);
 
                         const isExpanded = expanded.has(id);
                         const isLoading = loading.has(id);
@@ -761,6 +767,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                                     isOver={isOver}
                                     insertLine={insertLine}
                                     isInsideTarget={isInsideTarget}
+                                    guideContinuations={guideContinuations}
                                     toggleExpand={() => void toggleExpand(id)}
                                     render={props.renderItem}
                                 />
