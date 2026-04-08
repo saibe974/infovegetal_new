@@ -146,8 +146,10 @@ export interface Auth {
 
 export interface SharedData {
     name: string;
+    locale: string;
     quote: { message: string; author: string };
     auth: Auth;
+    csrf_token?: string;
     cart_refresh_token?: number | string | null;
     users?: User[];
     sidebarOpen: boolean;

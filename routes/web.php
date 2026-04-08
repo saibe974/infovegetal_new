@@ -47,15 +47,6 @@ Route::middleware(['auth'])->get('/api/auth/products/{product}', function (Reque
                 $product->setAttribute('db_user_attributes', $decoded);
             }
         }
-
-        if ($product->getAttribute('db_user_attributes')) {
-            $prices = app(\App\Services\PriceCalculatorService::class)
-                ->calculatePrice($product, $user, $dbProductId);
-            $product->price = $prices[0] ?? $product->price;
-            $product->price_floor = $prices[1] ?? $product->price_floor;
-            $product->price_roll = $prices[2] ?? $product->price_roll;
-            $product->price_promo = $prices[3] ?? $product->price_promo;
-        }
     }
 
     return new ProductResource($product->load(['category', 'tags', 'dbProduct']));

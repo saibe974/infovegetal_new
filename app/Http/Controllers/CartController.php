@@ -520,7 +520,7 @@ class CartController extends Controller
         $priceRoll = (float) ($product->price_roll ?? 0);
         $pricePromo = (float) ($product->price_promo ?? 0);
 
-        if ($user && !$user->hasRole('admin') && $product->db_products_id) {
+        if ($user && $product->db_products_id) {
             $prices = $priceCalculator->calculatePrice($product, $user, (int) $product->db_products_id);
             $price = (float) ($prices[0] ?? $price);
             $priceFloor = (float) ($prices[1] ?? $priceFloor);

@@ -870,6 +870,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                         isExpanded: false,
                         isLoading: false,
                         isDragging: true,
+                        guideContinuations: [],
                         isOver: false,
                         insertLine: null,
                         isInsideTarget: false,

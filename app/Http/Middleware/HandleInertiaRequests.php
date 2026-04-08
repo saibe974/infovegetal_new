@@ -99,6 +99,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'csrf_token' => csrf_token(),
             'locale' => app()->getLocale(),
             'i18n' => $i18n,
             // 'quote' => ['message' => trim($message), 'author' => trim($author)],

@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\Cart;
 use App\Models\User;
+use App\Services\PriceCalculatorService;
 use App\Services\UserImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -944,11 +946,47 @@ class UserManagementController extends Controller
         }
 
         if ($hasChanges) {
+            $this->recalculateActiveCartTotals($user);
             Cache::put('cart:refresh:' . $user->id, now()->getTimestamp(), now()->addHour());
         }
 
         return back()->with('success', 'User DB association and attributes updated successfully');
-    }   
+    }
+
+    private function recalculateActiveCartTotals(User $user): void
+    {
+        $cart = Cart::query()
+            ->where('user_id', $user->id)
+            ->with('products')
+            ->first();
+
+        if (!$cart || $cart->products->isEmpty()) {
+            return;
+        }
+
+        $priceCalculator = app(PriceCalculatorService::class);
+        $itemsTotal = 0.0;
+
+        foreach ($cart->products as $product) {
+            $quantity = (int) ($product->pivot->quantity ?? 0);
+            if ($quantity <= 0) {
+                continue;
+            }
+
+            $unitPrice = (float) ($product->price ?? 0);
+            $dbProductId = (int) ($product->db_products_id ?? 0);
+
+            if ($dbProductId > 0) {
+                $calculated = $priceCalculator->calculatePrice($product, $user, $dbProductId);
+                $unitPrice = (float) ($calculated[0] ?? $unitPrice);
+            }
+
+            $itemsTotal += $unitPrice * $quantity;
+        }
+
+        $cart->items_total = round($itemsTotal, 2);
+        $cart->save();
+    }
 
     /**
      * Export users as CSV.

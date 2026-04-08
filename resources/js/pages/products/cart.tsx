@@ -44,13 +44,14 @@ const toText = (value: unknown): string => (value === undefined || value === nul
 
 export default withAppLayout<Props>(breadcrumbs, false, () => {
     const { t } = useI18n();
-    const { items, updateQuantity, removeFromCart, clearCart } = useContext(CartContext);
+    const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
     // console.log(user)
 
     const [deliveryDate, setDeliveryDate] = useState('');
 
     const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshingCart, setIsRefreshingCart] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
@@ -167,6 +168,26 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             setSaveMessage("Erreur lors de la sauvegarde");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleRefreshCart = async () => {
+        if (items.length === 0 || isRefreshingCart) {
+            return;
+        }
+
+        setIsRefreshingCart(true);
+        setSaveMessage(null);
+
+        try {
+            await refreshCart();
+            setSaveMessage('Panier mis a jour selon les acces DB utilisateur');
+            setTimeout(() => setSaveMessage(null), 3000);
+        } catch (error) {
+            console.error('Error refreshing cart:', error);
+            setSaveMessage('Erreur lors de la mise a jour du panier');
+        } finally {
+            setIsRefreshingCart(false);
         }
     };
 
@@ -575,8 +596,11 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                         //     </Button>
                         // </div>
                         <ButtonsActions
+                            refresh={handleRefreshCart}
                             save={handleSaveCart}
                             delete={clearCart}
+                            refreshing={isRefreshingCart}
+                            saving={isSaving}
                         />
                     )}
                 </div>

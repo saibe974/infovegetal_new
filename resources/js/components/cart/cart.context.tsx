@@ -34,6 +34,11 @@ export type CartItem = {
     quantity: number;
 };
 
+type StoredCartItem = {
+    product: Product;
+    quantity: number;
+};
+
 
 export type CartContextType = {
     items: CartItem[];
@@ -41,6 +46,7 @@ export type CartContextType = {
     removeFromCart: (productId: number) => void;
     updateQuantity: (productId: number, quantity: number) => void;
     clearCart: () => void;
+    refreshCart: () => Promise<void>;
 };
 
 export const CartContext = createContext<CartContextType>({
@@ -49,7 +55,78 @@ export const CartContext = createContext<CartContextType>({
     removeFromCart: () => { },
     updateQuantity: () => { },
     clearCart: () => { },
+    refreshCart: async () => { },
 });
+
+const sanitizeProductForStorage = (product: Product): Product => {
+    const {
+        dbProduct,
+        category,
+        tags,
+        attributes,
+        ...rest
+    } = product;
+
+    return {
+        ...rest,
+        dbProduct: dbProduct
+            ? {
+                id: typeof dbProduct.id === 'number' ? dbProduct.id : undefined,
+                name: typeof dbProduct.name === 'string' ? dbProduct.name : undefined,
+            }
+            : null,
+        category: category
+            ? {
+                id: category.id,
+                name: category.name,
+                parent_id: category.parent_id ?? null,
+                depth: category.depth,
+                has_children: category.has_children,
+            }
+            : null,
+        tags: Array.isArray(tags)
+            ? tags.map((tag) => ({ id: tag.id, name: tag.name, slug: tag.slug }))
+            : [],
+        attributes: attributes ?? null,
+    } as Product;
+};
+
+const parseStoredCart = (raw: string | null): CartItem[] => {
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .filter((entry): entry is StoredCartItem => {
+                return !!entry
+                    && typeof entry === 'object'
+                    && typeof (entry as StoredCartItem).quantity === 'number'
+                    && !!(entry as StoredCartItem).product
+                    && typeof (entry as StoredCartItem).product.id === 'number';
+            })
+            .map((entry) => ({
+                product: entry.product,
+                quantity: Math.max(1, Math.floor(entry.quantity)),
+            }));
+    } catch {
+        return [];
+    }
+};
+
+const serializeCart = (items: CartItem[]): string => {
+    const compact = items.map((item) => ({
+        product: sanitizeProductForStorage(item.product),
+        quantity: item.quantity,
+    }));
+
+    return JSON.stringify(compact);
+};
 
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -63,7 +140,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>(() => {
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem(getCartKey());
-            return stored ? JSON.parse(stored) : [];
+            return parseStoredCart(stored);
         }
         return [];
     });
@@ -118,41 +195,51 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        try {
-            const responses = await Promise.all(
-                uniqueIds.map((id) =>
-                    fetch(`/api/auth/products/${id}`, { credentials: 'include' }).then((res) => (res.ok ? res.json() : null))
-                )
-            );
+        const responses = await Promise.allSettled(
+            uniqueIds.map(async (id) => {
+                const res = await fetch(`/api/auth/products/${id}`, {
+                    credentials: 'include',
+                    cache: 'no-store',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
 
-            const productsById = new Map<number, Product>();
-            responses.forEach((product) => {
-                if (product && typeof product.id === 'number') {
-                    productsById.set(product.id, product as Product);
+                if (!res.ok) {
+                    throw new Error(`Cart refresh failed for product ${id} with status ${res.status}`);
                 }
-            });
 
+                return res.json();
+            })
+        );
 
-            setItems((prev) =>
-                prev.map((item) => {
-                    const refreshed = productsById.get(item.product.id);
-                    if (!refreshed) {
-                        return item;
-                    }
+        const productsById = new Map<number, Product>();
+        responses.forEach((result) => {
+            if (result.status !== 'fulfilled') {
+                return;
+            }
 
-                    const hadUserMeta = !!item.product.db_user_attributes || !!item.product.db_user_transport;
-                    const hasUserMeta = !!refreshed.db_user_attributes || !!refreshed.db_user_transport;
+            const product = result.value;
+            if (product && typeof product.id === 'number') {
+                productsById.set(product.id, product as Product);
+            }
+        });
 
-                    if (hadUserMeta && !hasUserMeta) {
-                        return item;
-                    }
-
-                    return { ...item, product: refreshed };
-                })
-            );
-        } catch (error) {
-            console.error('Erreur lors du rafraichissement du panier:', error);
+        if (productsById.size === 0) {
+            throw new Error('Cart refresh failed for all products');
         }
+
+        setItems((prev) =>
+            prev.map((item) => {
+                const refreshed = productsById.get(item.product.id);
+                if (!refreshed) {
+                    return item;
+                }
+
+                return { ...item, product: refreshed };
+            })
+        );
     };
 
     useEffect(() => {
@@ -168,7 +255,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const currentItems = itemsRef.current;
         if (currentItems.length === 0) {
             const stored = localStorage.getItem(getCartKey());
-            const nextItems: CartItem[] = stored ? JSON.parse(stored) : [];
+            const nextItems = parseStoredCart(stored);
             setItems(nextItems);
 
             if (nextItems.length > 0) {
@@ -181,9 +268,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         lastUserRefreshRef.current = userId;
     }, [userId]);
 
+    const refreshCart = async () => {
+        const currentItems = itemsRef.current;
+        if (!userId || currentItems.length === 0) {
+            return;
+        }
+
+        await refreshCartProducts(currentItems);
+    };
+
     useEffect(() => {
         if (!userId || !cart_refresh_token || items.length === 0) {
-            lastRefreshTokenRef.current = cart_refresh_token ?? null;
             return;
         }
 
@@ -200,10 +295,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         void refreshCartProducts(currentItems).finally(() => {
             lastRefreshTokenRef.current = cart_refresh_token ?? null;
         });
-    }, [cart_refresh_token, userId]);
+    }, [cart_refresh_token, userId, items.length]);
 
     useEffect(() => {
-        localStorage.setItem(getCartKey(), JSON.stringify(items));
+        localStorage.setItem(getCartKey(), serializeCart(items));
 
         // Synchroniser les IDs du panier avec le serveur si l'utilisateur est authentifié
         if (userId && typeof window !== 'undefined') {
@@ -218,7 +313,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             if (existing) {
                 return prev.map((item) =>
                     item.product.id === product.id
-                        ? { ...item, quantity: item.quantity + quantity }
+                        ? { ...item, product, quantity: item.quantity + quantity }
                         : item
                 );
             }
@@ -239,7 +334,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const clearCart = () => setItems([]);
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, refreshCart }}>
             {children}
         </CartContext.Provider>
     );
