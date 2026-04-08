@@ -9,6 +9,13 @@ class Cart extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'items_total',
+        'shipping_total',
+    ];
+
+    protected $casts = [
+        'items_total' => 'decimal:2',
+        'shipping_total' => 'decimal:2',
     ];
 
     public function user()

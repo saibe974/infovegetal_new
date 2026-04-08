@@ -55,6 +55,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
     const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
+    const [pdfResult, setPdfResult] = useState<{ url: string; filename: string; orderNumber: string | null } | null>(null);
     const [orderConflict, setOrderConflict] = useState<{ orderNumber: string | null; resolve: (choice: 'append' | 'new') => void } | null>(null);
 
 
@@ -266,6 +267,13 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
         }
 
         setIsSaving(true);
+        setIsPdfGenerating(true);
+        setPdfPhaseIndex(0);
+        setPdfCurrentGroup(null);
+        if (pdfResult?.url) {
+            window.URL.revokeObjectURL(pdfResult.url);
+        }
+        setPdfResult(null);
         setSaveMessage(null);
 
         try {
@@ -280,9 +288,11 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                     'X-CSRF-Token': csrfToken || '',
                 },
                 body: JSON.stringify({
-                    items: items.map((item) => ({
+                    items: itemsPricing.map((item) => ({
                         id: item.product.id,
                         quantity: item.quantity,
+                        unit_price: item.pricing.unitPrice,
+                        line_total: item.pricing.lineTotal,
                     })),
                     shipping_total: deliveryTotal,
                 }),
@@ -296,23 +306,64 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `panier-tcpdf-${new Date().toISOString().split('T')[0]}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            const contentDisposition = response.headers.get('content-disposition') || '';
+            const filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+            const extractedFilename = filenameMatch
+                ? decodeURIComponent(filenameMatch[1] || filenameMatch[2] || '')
+                : `panier-${new Date().toISOString().split('T')[0]}.pdf`;
+            const orderMatch = extractedFilename.match(/^(\d{5})-/);
 
-            setSaveMessage('PDF TCPDF genere avec succes');
+            setPdfResult({
+                url,
+                filename: extractedFilename,
+                orderNumber: orderMatch ? orderMatch[1] : null,
+            });
+
+            setSaveMessage('Commande enregistree et PDF genere avec succes');
             setTimeout(() => setSaveMessage(null), 3000);
         } catch (error) {
             console.error('Error generating TCPDF:', error);
             setSaveMessage('Erreur lors de la generation TCPDF');
         } finally {
             setIsSaving(false);
+            setIsPdfGenerating(false);
         }
     };
+
+    const closePdfModal = () => {
+        if (isPdfGenerating) {
+            return;
+        }
+
+        if (pdfResult?.url) {
+            window.URL.revokeObjectURL(pdfResult.url);
+        }
+
+        setPdfResult(null);
+        setPdfCurrentGroup(null);
+        setPdfPhaseIndex(0);
+    };
+
+    const handleDownloadGeneratedPdf = () => {
+        if (!pdfResult) {
+            return;
+        }
+
+        const link = document.createElement('a');
+        link.href = pdfResult.url;
+        link.download = pdfResult.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleClearCartFromModal = () => {
+        clearCart();
+        closePdfModal();
+        setSaveMessage('Panier vide');
+        setTimeout(() => setSaveMessage(null), 3000);
+    };
+
     const [topOffset, setTopOffset] = useState<number>(0);
 
     useEffect(() => {
@@ -397,65 +448,100 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <Dialog open={isPdfGenerating} onOpenChange={() => undefined}>
+            <Dialog open={isPdfGenerating || pdfResult !== null} onOpenChange={(open) => !open && closePdfModal()}>
                 <DialogContent className="sm:max-w-lg" showCloseButton={false}>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-3 text-xl">
-                            <Loader2 className="h-5 w-5 animate-spin text-brand-main" />
-                            Generation du PDF en cours
-                        </DialogTitle>
-                        <DialogDescription className="text-sm leading-6">
-                            Le document peut prendre un peu de temps. Le serveur verifie les produits, telecharge les images manquantes, prepare les conversions, puis genere le PDF final.
-                        </DialogDescription>
+                        {isPdfGenerating ? (
+                            <>
+                                <DialogTitle className="flex items-center gap-3 text-xl">
+                                    <Loader2 className="h-5 w-5 animate-spin text-brand-main" />
+                                    Generation du PDF en cours
+                                </DialogTitle>
+                                <DialogDescription className="text-sm leading-6">
+                                    Le document peut prendre un peu de temps. Le serveur verifie les produits, telecharge les images manquantes, prepare les conversions, puis genere le PDF final.
+                                </DialogDescription>
+                            </>
+                        ) : (
+                            <>
+                                <DialogTitle className="text-xl">Commande terminee</DialogTitle>
+                                <DialogDescription className="text-sm leading-6">
+                                    {pdfResult?.orderNumber
+                                        ? `La commande #${pdfResult.orderNumber} est prete. Choisissez l'action a effectuer.`
+                                        : 'Le PDF est pret. Choisissez l\'action a effectuer.'}
+                                </DialogDescription>
+                            </>
+                        )}
                     </DialogHeader>
 
-                    <div className="space-y-4">
-                        <div className="rounded-xl border border-brand-main/20 bg-brand-main/5 p-4">
-                            <div className="text-sm font-medium text-foreground">
-                                {pdfCurrentGroup
-                                    ? `Fournisseur ${pdfCurrentGroup.index}/${pdfCurrentGroup.total} : ${pdfCurrentGroup.label}`
-                                    : 'Preparation de la generation'}
+                    {isPdfGenerating ? (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-brand-main/20 bg-brand-main/5 p-4">
+                                <div className="text-sm font-medium text-foreground">
+                                    {pdfCurrentGroup
+                                        ? `Fournisseur ${pdfCurrentGroup.index}/${pdfCurrentGroup.total} : ${pdfCurrentGroup.label}`
+                                        : 'Preparation de la generation'}
+                                </div>
+                                <div className="mt-1 text-sm text-muted-foreground">
+                                    Etape en cours : {pdfGenerationPhases[pdfPhaseIndex]}
+                                </div>
                             </div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                                Etape en cours : {pdfGenerationPhases[pdfPhaseIndex]}
-                            </div>
-                        </div>
 
-                        <div className="space-y-2 rounded-xl border p-4">
-                            {pdfGenerationPhases.map((phase, index) => {
-                                const isActive = index === pdfPhaseIndex;
-                                const isPassed = index < pdfPhaseIndex;
+                            <div className="space-y-2 rounded-xl border p-4">
+                                {pdfGenerationPhases.map((phase, index) => {
+                                    const isActive = index === pdfPhaseIndex;
+                                    const isPassed = index < pdfPhaseIndex;
 
-                                return (
-                                    <div
-                                        key={phase}
-                                        className={cn(
-                                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                                            isActive && 'bg-brand-main/10 text-foreground',
-                                            isPassed && 'text-muted-foreground',
-                                            !isActive && !isPassed && 'text-muted-foreground/80',
-                                        )}
-                                    >
-                                        <span
+                                    return (
+                                        <div
+                                            key={phase}
                                             className={cn(
-                                                'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold',
-                                                isActive && 'border-brand-main text-brand-main',
-                                                isPassed && 'border-green-600 text-green-600',
-                                                !isActive && !isPassed && 'border-muted-foreground/30 text-muted-foreground',
+                                                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                                                isActive && 'bg-brand-main/10 text-foreground',
+                                                isPassed && 'text-muted-foreground',
+                                                !isActive && !isPassed && 'text-muted-foreground/80',
                                             )}
                                         >
-                                            {isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : index + 1}
-                                        </span>
-                                        <span>{phase}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                            <span
+                                                className={cn(
+                                                    'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold',
+                                                    isActive && 'border-brand-main text-brand-main',
+                                                    isPassed && 'border-green-600 text-green-600',
+                                                    !isActive && !isPassed && 'border-muted-foreground/30 text-muted-foreground',
+                                                )}
+                                            >
+                                                {isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : index + 1}
+                                            </span>
+                                            <span>{phase}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
 
-                        <p className="text-xs text-muted-foreground">
-                            Cette fenetre se fermera automatiquement une fois tous les PDF telecharges.
-                        </p>
-                    </div>
+                            <p className="text-xs text-muted-foreground">
+                                Veuillez patienter jusqu'a la fin de la generation.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-green-300/60 bg-green-50 p-4 text-sm text-green-800">
+                                PDF genere avec succes.
+                                {pdfResult ? (
+                                    <span className="mt-1 block text-xs text-green-700">Fichier: {pdfResult.filename}</span>
+                                ) : null}
+                            </div>
+                            <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+                                <Button variant="outline" onClick={closePdfModal}>
+                                    Fermer
+                                </Button>
+                                <Button variant="destructive" onClick={handleClearCartFromModal}>
+                                    Vider le panier
+                                </Button>
+                                <Button onClick={handleDownloadGeneratedPdf}>
+                                    Telecharger le PDF
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
             <StickyBar
@@ -700,18 +786,9 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                     className="w-full bg-brand-main hover:bg-brand-main-hover"
                                     size="lg"
                                     disabled={items.length === 0 || isSaving}
-                                    onClick={handleGeneratePdf}
-                                >
-                                    {t('Commander')}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    size="lg"
-                                    disabled={items.length === 0 || isSaving}
                                     onClick={handleGenerateTcpdf}
                                 >
-                                    {t('Exporter TCPDF (test)')}
+                                    {t('Commander')}
                                 </Button>
                             </div>
                         </CardContent>

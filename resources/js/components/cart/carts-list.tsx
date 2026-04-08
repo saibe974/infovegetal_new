@@ -17,6 +17,12 @@ type CartProduct = Product & { pivot?: { quantity: number } };
 type CartSummary = {
     id: number;
     status: CartStatus;
+    computed_total?: number;
+    items_total?: number;
+    shipping_total?: number;
+    pdf_filename?: string;
+    created_at?: string;
+    updated_at?: string;
     user?: { id?: number; name: string; email: string };
     products?: CartProduct[];
 };
@@ -134,11 +140,19 @@ export function CartsList() {
     const rows = useMemo(() => {
         return (carts ?? []).map((cart) => {
             const items = cart.products ?? [];
-            const total = items.reduce((sum, product) => {
+            const fallbackTotal = items.reduce((sum, product) => {
                 const qty = product.pivot?.quantity ?? 0;
                 const pricing = getCartPricing(product, qty);
                 return sum + pricing.lineTotal;
             }, 0);
+            const storedTotal =
+                typeof cart.items_total === 'number' || typeof cart.shipping_total === 'number'
+                    ? (Number(cart.items_total ?? 0) + Number(cart.shipping_total ?? 0))
+                    : null;
+            const total =
+                storedTotal !== null
+                    ? storedTotal
+                    : (typeof cart.computed_total === 'number' ? cart.computed_total : fallbackTotal);
             const totalQty = items.reduce((sum, product) => sum + (product.pivot?.quantity ?? 0), 0);
 
             return {
@@ -179,17 +193,40 @@ export function CartsList() {
             return;
         }
 
-        const pdfUrl = `/storage/commandes/${userId}/${cart.id}.pdf`;
+        const orderNumber = String(cart.id).padStart(5, '0');
+        const createdDate = cart.created_at ? String(cart.created_at).slice(0, 10) : null;
+        const updatedDate = cart.updated_at ? String(cart.updated_at).slice(0, 10) : null;
+        const todayDate = new Date().toISOString().slice(0, 10);
+
+        const filenameCandidates = [
+            cart.pdf_filename,
+            createdDate ? `${orderNumber}-${createdDate}.pdf` : null,
+            updatedDate ? `${orderNumber}-${updatedDate}.pdf` : null,
+            `${orderNumber}-${todayDate}.pdf`,
+        ].filter((value, index, arr): value is string => !!value && arr.indexOf(value) === index);
+
+        const legacyFilename = `${cart.id}.pdf`;
+        const candidateUrls = filenameCandidates
+            .map((filename) => `/storage/commandes/${userId}/${filename}`)
+            .concat(`/storage/commandes/${userId}/${legacyFilename}`);
         setPreviewLoadingCartId(cart.id);
 
         try {
-            const response = await fetch(pdfUrl, { method: 'HEAD', credentials: 'include' });
-            if (!response.ok) {
+            let foundUrl: string | null = null;
+            for (const url of candidateUrls) {
+                const response = await fetch(url, { method: 'HEAD', credentials: 'include' });
+                if (response.ok) {
+                    foundUrl = url;
+                    break;
+                }
+            }
+
+            if (!foundUrl) {
                 toast.error(t('Aucun PDF genere pour cette commande'));
                 return;
             }
 
-            setPreviewPdf({ url: pdfUrl, cartId: cart.id });
+            setPreviewPdf({ url: foundUrl, cartId: cart.id });
         } catch {
             toast.error(t('Erreur lors de l\'ouverture de l\'aperçu'));
         } finally {

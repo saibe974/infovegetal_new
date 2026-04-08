@@ -108,8 +108,14 @@ class CartController extends Controller
             $shippingTotal,
         );
 
-        $orderNumber = str_pad((string) $cart->id, 4, '0', STR_PAD_LEFT);
-        $pdfRelativePath = sprintf('commandes/%d/%d.pdf', $user->id, $cart->id);
+        $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
+        $cart->shipping_total = round($shippingTotal, 2);
+        $cart->save();
+
+        $orderNumber = str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT);
+        $orderDate = now()->format('Y-m-d');
+        $pdfFilename = $orderNumber . '-' . $orderDate . '.pdf';
+        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $pdfFilename);
 
         Pdf::view('pdf.cart', array_merge($pdfPayload, [
             'order_id' => $cart->id,
@@ -130,6 +136,7 @@ class CartController extends Controller
             'status' => 'ok',
             'order_id' => $cart->id,
             'order_number' => $orderNumber,
+            'pdf_filename' => $pdfFilename,
             'pdf_download_url' => asset('storage/' . $pdfRelativePath),
             'mail_recipients_count' => $mailCount,
             'message' => 'Commande enregistree, PDF genere et emails envoyes.',
@@ -385,6 +392,8 @@ class CartController extends Controller
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.line_total' => 'nullable|numeric|min:0',
             'shipping_total' => 'nullable|numeric|min:0',
             'group_label' => 'nullable|string|max:190',
             'group_key' => 'nullable|integer|min:0',
@@ -394,15 +403,85 @@ class CartController extends Controller
         $user = Auth::user();
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
 
-        $payload = $this->buildPdfPayload($data['items'], $user, $shippingTotal);
-        $payload['order_number'] = null;
+        $requestedByProductId = [];
+        foreach ($data['items'] as $item) {
+            $productId = (int) $item['id'];
+            $qty = (int) $item['quantity'];
+            $requestedByProductId[$productId] = ($requestedByProductId[$productId] ?? 0) + $qty;
+        }
 
-        $label = isset($data['group_label']) ? trim((string) $data['group_label']) : '';
-        $safeLabel = $label !== '' ? Str::slug($label) : 'panier';
-        $suffix = ((int) ($data['group_key'] ?? 0)) > 0 ? '-' . (int) $data['group_key'] : '';
-        $filename = $safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '-tcpdf.pdf';
+        $cart = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'processing')
+            ->latest('updated_at')
+            ->first();
 
-        return $cartTcpdfService->download($payload, $filename);
+        if (!$cart) {
+            $cart = Cart::create([
+                'user_id' => $user->id,
+                'status' => 'processing',
+            ]);
+        }
+
+        $syncData = [];
+        foreach ($requestedByProductId as $productId => $qty) {
+            $syncData[(int) $productId] = ['quantity' => (int) $qty];
+        }
+        $cart->products()->sync($syncData);
+        $cart->touch();
+
+        $payload = $this->buildPdfPayload($data['items'], $user, $shippingTotal, true);
+        $orderNumber = str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT);
+        $payload['order_number'] = $orderNumber;
+
+        $cart->items_total = round((float) ($payload['items_total'] ?? 0), 2);
+        $cart->shipping_total = round($shippingTotal, 2);
+        $cart->save();
+
+        $orderDate = now()->format('Y-m-d');
+        $filename = $orderNumber . '-' . $orderDate . '.pdf';
+
+        $pdfBinary = $cartTcpdfService->render($payload);
+
+        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $filename);
+        Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
+
+        $user->files()->create([
+            'file_name' => $filename,
+            'file_path' => $pdfRelativePath,
+            'file_size' => strlen($pdfBinary),
+        ]);
+
+        try {
+            $user->addMediaFromString($pdfBinary)
+                ->usingName(pathinfo($filename, PATHINFO_FILENAME))
+                ->usingFileName($filename)
+                ->withCustomProperties([
+                    'source' => 'cart-tcpdf',
+                    'shipping_total' => $shippingTotal,
+                ])
+                ->toMediaCollection('user_meta_files');
+        } catch (\Throwable $e) {
+            Log::warning('Failed to store TCPDF in media library', [
+                'user_id' => $user->id,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->sendOrderPdfMails(
+            $payload['mail_recipients'] ?? collect([$user]),
+            $pdfRelativePath,
+            $orderNumber,
+            $user,
+            'public',
+            $filename,
+        );
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     private function getCartPricing(Product $product, int $quantity, ?\App\Models\User $user, PriceCalculatorService $priceCalculator): array
@@ -467,7 +546,7 @@ class CartController extends Controller
         ];
     }
 
-    private function buildPdfPayload(array $itemsInput, \App\Models\User $user, float $shippingTotal): array
+    private function buildPdfPayload(array $itemsInput, \App\Models\User $user, float $shippingTotal, bool $preferInputPrices = false): array
     {
         $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $products = Product::with(['category', 'tags', 'media', 'dbProduct'])
@@ -500,13 +579,26 @@ class CartController extends Controller
 
         $priceCalculator = app(PriceCalculatorService::class);
         $items = collect($itemsInput)
-            ->map(function ($item) use ($products, $user, $priceCalculator) {
+            ->map(function ($item) use ($products, $user, $priceCalculator, $preferInputPrices) {
                 $product = $products[$item['id']];
-                [$unitPrice, $lineTotal] = $this->getCartPricing($product, (int) $item['quantity'], $user, $priceCalculator);
+                $quantity = (int) $item['quantity'];
+                [$unitPrice, $lineTotal] = $this->getCartPricing($product, $quantity, $user, $priceCalculator);
+
+                if ($preferInputPrices) {
+                    $providedUnitPrice = isset($item['unit_price']) ? (float) $item['unit_price'] : null;
+                    $providedLineTotal = isset($item['line_total']) ? (float) $item['line_total'] : null;
+
+                    if ($providedUnitPrice !== null && $providedUnitPrice >= 0) {
+                        $unitPrice = $providedUnitPrice;
+                        $lineTotal = $providedLineTotal !== null && $providedLineTotal >= 0
+                            ? $providedLineTotal
+                            : ($providedUnitPrice * $quantity);
+                    }
+                }
 
                 return [
                     'product' => $product,
-                    'quantity' => (int) $item['quantity'],
+                    'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                 ];
@@ -572,20 +664,28 @@ class CartController extends Controller
         ];
     }
 
-    private function sendOrderPdfMails($recipients, string $pdfRelativePath, string $orderNumber, \App\Models\User $client): int
+    private function sendOrderPdfMails(
+        $recipients,
+        string $pdfRelativePath,
+        string $orderNumber,
+        \App\Models\User $client,
+        string $disk = 'public',
+        ?string $attachmentName = null
+    ): int
     {
         $sent = 0;
-        $pdfAbsolutePath = Storage::disk('public')->path($pdfRelativePath);
+        $pdfAbsolutePath = Storage::disk($disk)->path($pdfRelativePath);
+        $attachmentFilename = $attachmentName ?: "commande-{$orderNumber}.pdf";
 
         foreach ($recipients as $recipient) {
             try {
                 Mail::raw(
                     "Bonjour {$recipient->name},\n\nVeuillez trouver en piece jointe la commande n{$orderNumber} du client {$client->name}.\n\nCordialement,\nInfovegetal",
-                    function ($message) use ($recipient, $orderNumber, $pdfAbsolutePath) {
+                    function ($message) use ($recipient, $orderNumber, $pdfAbsolutePath, $attachmentFilename) {
                         $message->to($recipient->email, $recipient->name)
                             ->subject("Commande n{$orderNumber} - Infovegetal")
                             ->attach($pdfAbsolutePath, [
-                                'as' => "commande-{$orderNumber}.pdf",
+                                'as' => $attachmentFilename,
                                 'mime' => 'application/pdf',
                             ]);
                     }

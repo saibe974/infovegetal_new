@@ -635,6 +635,28 @@ const getFillClass = (coef: number): string => {
     return 'text-rose-600';
 };
 
+const getEtageFillScore = (etage: Etage): number => {
+    const loss = Number.isFinite(etage.perte) ? Math.max(0, etage.perte) : 0;
+    const fill = 100 - loss;
+    return Math.max(0, Math.min(100, fill));
+};
+
+const sortEtagesMostFilledBottom = (etages: Etage[]): Etage[] => {
+    return [...etages].sort((a, b) => {
+        const fillDelta = getEtageFillScore(b) - getEtageFillScore(a);
+        if (Math.abs(fillDelta) > 0.0001) {
+            return fillDelta;
+        }
+
+        const yDelta = (b.y || 0) - (a.y || 0);
+        if (Math.abs(yDelta) > 0.0001) {
+            return yDelta;
+        }
+
+        return b.items.length - a.items.length;
+    });
+};
+
 const formatCurrency = (value: number): string =>
     value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
@@ -729,7 +751,8 @@ export function ProductRoll({
                     ) : (
                         <div className="flex flex-wrap items-start justify-center gap-6">
                             {supplier.rolls.map((roll, rollIndex) => {
-                                const totalY = roll.etages.reduce((sum, etage) => sum + (etage.y || 0), 0) || roll.etages.length;
+                                const sortedEtages = sortEtagesMostFilledBottom(roll.etages);
+                                const totalY = sortedEtages.reduce((sum, etage) => sum + (etage.y || 0), 0) || sortedEtages.length;
                                 const rollWidth = Math.max(160, width);
                                 const rollHeight = Math.max(220, height);
                                 const rollPrice = getRollPrice
@@ -775,7 +798,11 @@ export function ProductRoll({
                                                 style={{ width: rollWidth, height: rollHeight }}
                                             >
                                                 {[...roll.etages]
-                                                    .sort((a, b) => (b.y || 0) - (a.y || 0))
+                                                    .sort((a, b) => {
+                                                        const fillDelta = getEtageFillScore(b) - getEtageFillScore(a);
+                                                        if (Math.abs(fillDelta) > 0.0001) return fillDelta;
+                                                        return (b.y || 0) - (a.y || 0);
+                                                    })
                                                     .map((etage, etageIndex) => {
                                                         const heightRatio = totalY ? (etage.y || 0) / totalY : 1 / roll.etages.length;
                                                         const etageHeight = Math.max(18, Math.floor(rollHeight * heightRatio));
