@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->string('alias', 255)->nullable()->after('name');
             $table->string('ref', 50)->nullable()->after('alias');
-            $table->string('tel', 25)->nullable()->after('ref');
+            $table->string('phone', 25)->nullable()->after('ref');
 
-            $table->string('address_road', 255)->nullable()->after('tel');
+            $table->string('address_road', 255)->nullable()->after('phone');
             $table->string('address_zip', 32)->nullable()->after('address_road');
             $table->string('address_town', 120)->nullable()->after('address_zip');
 
@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->unique('alias');
             $table->index('ref');
-            $table->index('tel');
+            $table->index('phone');
             $table->index('address_zip');
             $table->index('active');
             $table->index('mailing');
@@ -40,7 +40,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->dropUnique(['alias']);
             $table->dropIndex(['ref']);
-            $table->dropIndex(['tel']);
+            $table->dropIndex(['phone']);
             $table->dropIndex(['address_zip']);
             $table->dropIndex(['active']);
             $table->dropIndex(['mailing']);
@@ -48,7 +48,7 @@ return new class extends Migration
             $table->dropColumn([
                 'alias',
                 'ref',
-                'tel',
+                'phone',
                 'address_road',
                 'address_zip',
                 'address_town',

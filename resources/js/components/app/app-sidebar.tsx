@@ -50,7 +50,7 @@ export function AppSidebar() {
     const canEditProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
     const canDeleteProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
     const canImportExportProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
-    const canManageUsers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage users');
+    const canManageUsers = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'manage users');
     const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
     const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage categories');
     const canManageCarriers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage carriers');

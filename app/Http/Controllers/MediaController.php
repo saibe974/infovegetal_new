@@ -2,84 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\ProductResource;
-use App\Models\CategoryProducts;
-use App\Models\DbProducts;
 use App\Models\Product;
 use App\Services\ProductMediaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class MediaController extends Controller
 {
     public function index(Request $request)
     {
-        $search = $request->get('q');
-        $dbProductsId = $this->toNullableInt($request->input('db_products_id'));
-        $categoryProductsId = $this->toNullableInt($request->input('category_products_id'));
-
-        $applySearch = function ($q, ?string $search) {
-            if (empty($search)) {
-                return;
-            }
-
-            $refCandidate = null;
-            if (str_contains($search, ':')) {
-                $refCandidate = trim((string) strtok($search, ':'));
-                if ($refCandidate === '') {
-                    $refCandidate = null;
-                }
-            }
-
-            if ($refCandidate) {
-                $q->where('products.ref', '=', $refCandidate);
-                return;
-            }
-
-            $normalized = trim($search);
-            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
-            $isSingleToken = count($tokens) === 1;
-
-            $q->where(function ($qq) use ($tokens, $isSingleNumeric, $isSingleToken) {
-                if ($isSingleNumeric) {
-                    $qq->where('products.id', '=', (int) $tokens[0]);
-                }
-
-                $qq->orWhere(function ($qqq) use ($tokens) {
-                    foreach ($tokens as $t) {
-                        $qqq->where('products.name', 'like', '%' . $t . '%');
-                    }
-                });
-
-                if ($isSingleToken) {
-                    $qq->orWhere('products.ref', '=', $tokens[0]);
-                }
-            });
-        };
-
-        $query = $this->missingImagesQuery($dbProductsId, $categoryProductsId)
-            ->with(['category', 'tags', 'dbProduct']);
-        $applySearch($query, $search);
-        $query->orderBy('name');
-
-        $products = $query->paginate(24)->withQueryString();
-
-        return Inertia::render('media/index', [
-            'q' => $search,
-            'filters' => [
-                'db_products_id' => $dbProductsId,
-                'category_products_id' => $categoryProductsId,
-            ],
-            'collection' => Inertia::scroll(fn() => ProductResource::collection($products)),
-            'dbProducts' => DbProducts::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'categories' => CategoryProducts::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
-        ]);
+        return Inertia::render('media/index');
     }
 
     public function syncMissingImages(Request $request, ProductMediaService $mediaService): JsonResponse
@@ -135,9 +69,134 @@ class MediaController extends Controller
         ]);
     }
 
+    public function images(Request $request)
+    {
+        return Inertia::render('media/missing-images');
+    }
+
+    public function imagesFrame(Request $request)
+    {
+        $search = trim((string) $request->query('q', ''));
+        $dbProductsId = $this->toNullableInt($request->query('db_products_id'));
+        $categoryProductsId = $this->toNullableInt($request->query('category_products_id'));
+        $sort = $request->query('sort') === 'db' ? 'db' : 'name';
+        $dir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $query = $this->missingImagesQuery($dbProductsId, $categoryProductsId)
+            ->with('dbProduct')
+            ->reorder();
+
+        if ($sort === 'db') {
+            $query
+                ->leftJoin('db_products as dbp', 'dbp.id', '=', 'products.db_products_id')
+                ->select('products.*')
+                ->orderByRaw("CASE WHEN dbp.name IS NULL OR dbp.name = '' THEN 1 ELSE 0 END")
+                ->orderBy('dbp.name', $dir)
+                ->orderBy('products.name');
+        } else {
+            $query->orderBy('products.name', $dir);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('sku', 'like', '%' . $search . '%');
+            });
+        }
+
+        $products = $query->paginate(60)->withQueryString();
+
+        return view('images', [
+            'products' => $products,
+            'q' => $search,
+            'sort' => $sort,
+            'dir' => $dir,
+        ]);
+    }
+
+    public function actionDownload(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        return response()->json($mediaService->downloadMissing($product));
+    }
+
+    public function actionCompare(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        try {
+            return response()->json($mediaService->compareRemoteWithLocal($product));
+        } catch (\Throwable $e) {
+            Log::warning('Media compare failed', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'message' => 'Comparaison impossible'], 500);
+        }
+    }
+
+    public function actionThumbnail(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        return response()->json($mediaService->ensureThumbnail($product));
+    }
+
+    public function actionBatchDownload(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $data['ids'])));
+        $products = Product::query()->whereIn('id', $ids)->get()->keyBy('id');
+
+        $processed = 0;
+        $downloaded = 0;
+        $failed = 0;
+        $results = [];
+
+        foreach ($ids as $id) {
+            $product = $products->get($id);
+            if (!$product) {
+                $failed++;
+                $results[] = ['id' => $id, 'ok' => false, 'message' => 'Produit introuvable'];
+                continue;
+            }
+
+            $processed++;
+            $result = $mediaService->downloadMissing($product);
+            if (!empty($result['downloaded'])) {
+                $downloaded++;
+            }
+            if (empty($result['ok'])) {
+                $failed++;
+            }
+
+            $results[] = array_merge(['id' => $id], $result);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'processed' => $processed,
+            'downloaded' => $downloaded,
+            'failed' => $failed,
+            'results' => $results,
+        ]);
+    }
+
     private function missingImagesQuery(?int $dbProductsId, ?int $categoryProductsId)
     {
         $query = Product::query()
+            ->where('active', true)
             ->whereNotNull('img_link')
             ->where('img_link', '!=', '')
             ->whereDoesntHave('media', function ($q) {
@@ -181,5 +240,14 @@ class MediaController extends Controller
 
         $int = (int) $value;
         return $int > 0 ? $int : null;
+    }
+
+    private function findProductForAction(Request $request): ?Product
+    {
+        $data = $request->validate([
+            'id' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return Product::query()->find((int) $data['id']);
     }
 }

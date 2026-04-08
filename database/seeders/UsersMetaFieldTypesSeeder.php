@@ -16,9 +16,10 @@ class UsersMetaFieldTypesSeeder extends Seeder
             ['value' => 'custom', 'label' => 'input', 'type' => 'string', 'sort_order' => 10],
             ['value' => 'mail', 'label' => 'mail', 'type' => 'email', 'sort_order' => 20],
             ['value' => 'logo', 'label' => 'file/image', 'type' => 'image', 'sort_order' => 30],
-            ['value' => 'tel', 'label' => 'tel', 'type' => 'phone', 'sort_order' => 40],
-            ['value' => 'adress', 'label' => 'json', 'type' => 'address', 'sort_order' => 50],
-            ['value' => 'sales_conditions', 'label' => 'textarea', 'type' => 'text', 'sort_order' => 60],
+            ['value' => 'phone', 'label' => 'phone', 'type' => 'phone', 'sort_order' => 40],
+            ['value' => 'mobile', 'label' => 'mobile', 'type' => 'phone', 'sort_order' => 50],
+            ['value' => 'adress', 'label' => 'json', 'type' => 'address', 'sort_order' => 60],
+            ['value' => 'sales_conditions', 'label' => 'textarea', 'type' => 'text', 'sort_order' => 70],
         ];
 
         foreach ($kinds as $item) {
@@ -44,7 +45,7 @@ class UsersMetaFieldTypesSeeder extends Seeder
             [
                 'label' => 'number,road,zip,town',
                 'type' => 'json_fields',
-                'sort_order' => 50,
+                'sort_order' => 60,
                 'active' => true,
             ]
         );

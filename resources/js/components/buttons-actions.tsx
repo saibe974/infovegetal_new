@@ -1,14 +1,15 @@
-import { CirclePlus, DownloadIcon, Loader2Icon, RotateCcw, SaveIcon, TrashIcon, UploadIcon } from "lucide-react";
+import { CirclePlus, DownloadIcon, EyeIcon, Loader2Icon, PencilIcon, RotateCcw, SaveIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { useI18n } from "@/lib/i18n";
-import { on } from "events";
 import { ReactNode } from "react";
 
 type Props = {
     import?: ReactNode;
     export?: string | (() => void);
+    preview?: () => void;
     save?: () => void;
     cancel?: () => void;
+    edit?: () => void;
     add?: () => void;
     delete?: () => void;
     saving?: boolean;
@@ -18,8 +19,10 @@ type Props = {
 export function ButtonsActions({
     import: onImport,
     export: onExport,
+    preview: onPreview,
     save: onSave,
     cancel: onCancel,
+    edit: onEdit,
     add: onAdd,
     delete: onDelete,
     saving,
@@ -53,6 +56,18 @@ export function ButtonsActions({
             {onDelete &&
                 <Button onClick={onDelete} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
                     <TrashIcon />
+                </Button>
+            }
+
+            {onPreview &&
+                <Button onClick={onPreview} variant={'outline'} title={t('Preview')} disabled={saving} size={'icon'}>
+                    <EyeIcon />
+                </Button>
+            }
+
+            {onEdit &&
+                <Button onClick={onEdit} variant={'outline'} title={t('Edit')} disabled={saving} size={'icon'}>
+                    <PencilIcon />
                 </Button>
             }
 

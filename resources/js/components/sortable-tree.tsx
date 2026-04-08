@@ -40,6 +40,17 @@ export type RenderItemProps<T> = {
     toggleExpand: () => void;
 };
 
+export type LazyLoadPageArgs = {
+    offset: number;
+    limit: number;
+};
+
+export type LazyLoadPageResult<T> = {
+    items: T[];
+    hasMore: boolean;
+    nextOffset?: number;
+};
+
 export type SortableTreeProps<T extends Record<string, any>> = {
     items: T[];
     idKey?: ItemKey<T>;
@@ -54,9 +65,16 @@ export type SortableTreeProps<T extends Record<string, any>> = {
     hasChildren?: (item: T, all: T[]) => boolean;
     loadChildren?: (item: T) => Promise<T[]>;
 
-    onChange?: (next: T[], reason?: 'drag' | 'expand' | 'collapse') => void;
+    onChange?: (next: T[], reason?: 'drag' | 'expand' | 'collapse' | 'lazy-load') => void;
     renderItem: (props: RenderItemProps<T>) => React.ReactNode;
-    
+
+    lazy?: {
+        pageSize?: number;
+        loadPage: (parent: T | null, args: LazyLoadPageArgs) => Promise<LazyLoadPageResult<T>>;
+    };
+
+    forcedExpandedIds?: Id[];
+
     storageKey?: string; // Clé pour le localStorage (ex: "categories", "users")
 };
 
@@ -138,6 +156,53 @@ function Row<T extends Record<string, any>>({
     );
 }
 
+function AutoLoadMoreRow({
+    onVisible,
+    loading,
+    depth,
+}: {
+    onVisible: () => void;
+    loading: boolean;
+    depth: number;
+}) {
+    const ref = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const node = ref.current;
+        if (!node || loading) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    onVisible();
+                }
+            },
+            {
+                rootMargin: '120px',
+                threshold: 0.1,
+            },
+        );
+
+        observer.observe(node);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [onVisible, loading]);
+
+    return (
+        <div
+            ref={ref}
+            className="px-3 py-2 text-xs text-muted-foreground"
+            style={{ marginLeft: (depth + 1) * 24 }}
+        >
+            {loading ? 'Chargement...' : 'Charger plus...'}
+        </div>
+    );
+}
+
 export default function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
     // console.log(props);
     const { idKey, parentKey, depthKey } = useKeys(props);
@@ -163,10 +228,24 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         return new Set();
     });
     const [loading, setLoading] = useState<Set<Id>>(new Set());
+    const [branchState, setBranchState] = useState<Record<string, { offset: number; hasMore: boolean; initialized: boolean }>>({});
+    const [branchLoading, setBranchLoading] = useState<Record<string, boolean>>({});
 
     const [activeId, setActiveId] = useState<Id | null>(null);
     const [overId, setOverId] = useState<Id | null>(null);
     const [dropIntent, setDropIntent] = useState<DropIntent>(null);
+
+    const branchKey = (parentId: Id | null) => (parentId === null ? '__root__' : String(parentId));
+    const pageSize = props.lazy?.pageSize ?? 30;
+
+    const getBranch = (parentId: Id | null) => {
+        const key = branchKey(parentId);
+        return branchState[key] ?? { offset: 0, hasMore: true, initialized: false };
+    };
+
+    const isBranchLoading = (parentId: Id | null) => {
+        return branchLoading[branchKey(parentId)] === true;
+    };
 
     const insideTimerRef = useRef<number | null>(null);
     const clearInsideTimer = () => {
@@ -198,8 +277,90 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
     const canHaveChildren = (it: T) => {
         if (props.hasChildren) return props.hasChildren(it, items);
+        const fromPayload = getField<T, boolean | null>(it, 'has_children' as ItemKey<T>, null);
+        if (typeof fromPayload === 'boolean') {
+            return fromPayload;
+        }
         const id = getId(it);
         return items.some((x) => getParent(x) === id);
+    };
+
+    const loadBranchPage = async (parentItem: T | null, parentId: Id | null) => {
+        if (!props.lazy) {
+            return;
+        }
+
+        const key = branchKey(parentId);
+        const state = getBranch(parentId);
+
+        if (isBranchLoading(parentId) || (!state.hasMore && state.initialized)) {
+            return;
+        }
+
+        setBranchLoading((prev) => ({ ...prev, [key]: true }));
+
+        try {
+            const result = await props.lazy.loadPage(parentItem, {
+                offset: state.offset,
+                limit: pageSize,
+            });
+
+            const parentDepth = parentItem ? getDepth(parentItem) : -1;
+
+            setItems((prev) => {
+                const existingIds = new Set(prev.map((item) => getId(item)));
+
+                const normalized = (result.items ?? [])
+                    .filter((item) => !existingIds.has(getId(item)))
+                    .map((item) => {
+                        const withParent = setField(item, parentKey, parentId);
+                        const incomingDepth = getField<T, number>(withParent, depthKey, Number.NaN);
+
+                        if (Number.isFinite(incomingDepth)) {
+                            return withParent;
+                        }
+
+                        return setField(withParent, depthKey, parentDepth + 1);
+                    });
+
+                if (normalized.length === 0) {
+                    return prev;
+                }
+
+                if (parentId === null) {
+                    return [...prev, ...normalized];
+                }
+
+                const parentIndex = prev.findIndex((item) => getId(item) === parentId);
+                if (parentIndex === -1) {
+                    return [...prev, ...normalized];
+                }
+
+                let insertAt = parentIndex + 1;
+                while (insertAt < prev.length && getDepth(prev[insertAt]) > parentDepth) {
+                    insertAt += 1;
+                }
+
+                const next = [...prev.slice(0, insertAt), ...normalized, ...prev.slice(insertAt)];
+                props.onChange?.(next, 'lazy-load');
+                return next;
+            });
+
+            const nextOffset = typeof result.nextOffset === 'number'
+                ? result.nextOffset
+                : state.offset + (result.items?.length ?? 0);
+
+            setBranchState((prev) => ({
+                ...prev,
+                [key]: {
+                    offset: nextOffset,
+                    hasMore: !!result.hasMore,
+                    initialized: true,
+                },
+            }));
+        } finally {
+            setBranchLoading((prev) => ({ ...prev, [key]: false }));
+        }
     };
 
     // Sauvegarder dans le localStorage quand expanded change
@@ -212,56 +373,51 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         }
     }, [expanded, storageKey]);
 
-    // Charger les enfants des items expanded au chargement initial
     useEffect(() => {
-        if (!props.loadChildren || expanded.size === 0) return;
-        
-        const loadMissingChildren = async () => {
-            for (const expandedId of expanded) {
-                const parent = idMap.get(expandedId);
-                if (!parent) continue;
-                
-                // Vérifier si cet item a déjà des enfants dans items
-                const hasLoadedChildren = items.some((x) => getParent(x) === expandedId);
-                if (hasLoadedChildren) continue;
-                
-                // Si pas d'enfants, les charger
-                setLoading((s) => new Set(s).add(expandedId));
-                try {
-                    const parentDepth = getDepth(parent);
-                    if (!props.loadChildren) continue;
-                    const children = await props.loadChildren(parent);
+        if (!props.forcedExpandedIds) {
+            return;
+        }
 
-                    setItems((prev) => {
-                        const existing = new Set(prev.map((p) => getId(p)));
+        setExpanded(new Set(props.forcedExpandedIds));
+    }, [props.forcedExpandedIds?.join('|')]);
 
-                        const normalized = children
-                            .filter((c) => !existing.has(getId(c)))
-                            .map((c) => {
-                                const withParent = setField(c, parentKey, expandedId);
-                                const d = getField<T, number>(withParent, depthKey, NaN);
-                                return Number.isFinite(d) ? withParent : setField(withParent, depthKey, parentDepth + 1);
-                            });
+    // Charger les racines par page si le mode lazy est actif.
+    useEffect(() => {
+        if (!props.lazy) {
+            return;
+        }
 
-                        const idx = prev.findIndex((x) => getId(x) === expandedId);
-                        if (idx === -1) return [...prev, ...normalized];
+        if (items.length > 0) {
+            return;
+        }
 
-                        return [...prev.slice(0, idx + 1), ...normalized, ...prev.slice(idx + 1)];
-                    });
-                } catch (e) {
-                    console.error('Failed to load children for', expandedId, e);
-                } finally {
-                    setLoading((s) => {
-                        const n = new Set(s);
-                        n.delete(expandedId);
-                        return n;
-                    });
-                }
+        const root = getBranch(null);
+        if (root.initialized || isBranchLoading(null)) {
+            return;
+        }
+
+        void loadBranchPage(null, null);
+    }, [props.lazy, items.length]);
+
+    useEffect(() => {
+        if (!props.lazy || expanded.size === 0) {
+            return;
+        }
+
+        for (const expandedId of expanded) {
+            const parent = idMap.get(expandedId);
+            if (!parent) {
+                continue;
             }
-        };
 
-        void loadMissingChildren();
-    }, [expanded, items.length]);
+            const branch = getBranch(expandedId);
+            if (branch.initialized || isBranchLoading(expandedId)) {
+                continue;
+            }
+
+            void loadBranchPage(parent, expandedId);
+        }
+    }, [props.lazy, expanded, idMap]);
 
     // --- visibilité ---
     const isVisible = (it: T): boolean => {
@@ -290,6 +446,19 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
         setExpanded((s) => new Set(s).add(id));
         props.onChange?.(items, 'expand');
+
+        const parent = idMap.get(id);
+        if (!parent) {
+            return;
+        }
+
+        if (props.lazy) {
+            const branch = getBranch(id);
+            if (!branch.initialized) {
+                await loadBranchPage(parent, id);
+            }
+            return;
+        }
 
         if (items.some((x) => getParent(x) === id)) return;
         if (!props.loadChildren) return;
@@ -539,13 +708,41 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         >
             <SortableContext items={visible.map((x) => getId(x))} strategy={verticalListSortingStrategy}>
                 <div className='bg-card rounded-lg'>
-                    {visible.map((it) => {
+                    {visible.map((it, index) => {
                         const id = getId(it);
                         const depth = getDepth(it);
+                        const nextItem = visible[index + 1];
 
                         const isExpanded = expanded.has(id);
                         const isLoading = loading.has(id);
                         const isOver = !!activeId && overId === id;
+
+                        const branchLoadMoreItems = !props.lazy
+                            ? []
+                            : (() => {
+                                const rows: Array<{ parentId: Id; parentItem: T; depth: number }> = [];
+                                let cursor: T | undefined = it;
+
+                                while (cursor) {
+                                    const cursorId = getId(cursor);
+                                    const cursorDepth = getDepth(cursor);
+                                    const branch = getBranch(cursorId);
+                                    const subtreeEndsHere = !nextItem || getDepth(nextItem) <= cursorDepth;
+
+                                    if (expanded.has(cursorId) && branch.initialized && branch.hasMore && subtreeEndsHere) {
+                                        rows.push({
+                                            parentId: cursorId,
+                                            parentItem: cursor,
+                                            depth: cursorDepth,
+                                        });
+                                    }
+
+                                    const parentId = getParent(cursor);
+                                    cursor = parentId != null ? idMap.get(parentId) : undefined;
+                                }
+
+                                return rows;
+                            })();
 
                         const insertLine =
                             !!activeId && dropIntent?.type === 'between' && dropIntent.overId === id ? dropIntent.where : null;
@@ -554,22 +751,41 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                             !!activeId && dropIntent?.type === 'inside' && dropIntent.overId === id;
 
                         return (
-                            <Row<T>
-                                key={String(id)}
-                                item={it}
-                                sortableId={id}
-                                depth={depth}
-                                isExpanded={isExpanded}
-                                isLoading={isLoading}
-                                isOver={isOver}
-                                insertLine={insertLine}
-                                isInsideTarget={isInsideTarget}
-                                toggleExpand={() => void toggleExpand(id)}
-                                render={props.renderItem}
-                                
-                            />
+                            <React.Fragment key={String(id)}>
+                                <Row<T>
+                                    item={it}
+                                    sortableId={id}
+                                    depth={depth}
+                                    isExpanded={isExpanded}
+                                    isLoading={isLoading}
+                                    isOver={isOver}
+                                    insertLine={insertLine}
+                                    isInsideTarget={isInsideTarget}
+                                    toggleExpand={() => void toggleExpand(id)}
+                                    render={props.renderItem}
+                                />
+                                {branchLoadMoreItems.map(({ parentId, parentItem, depth: branchDepth }) => (
+                                    <AutoLoadMoreRow
+                                        key={`load-more-${String(parentId)}`}
+                                        depth={branchDepth}
+                                        loading={isBranchLoading(parentId)}
+                                        onVisible={() => {
+                                            void loadBranchPage(parentItem, parentId);
+                                        }}
+                                    />
+                                ))}
+                            </React.Fragment>
                         );
                     })}
+                    {props.lazy && getBranch(null).initialized && getBranch(null).hasMore ? (
+                        <AutoLoadMoreRow
+                            depth={-1}
+                            loading={isBranchLoading(null)}
+                            onVisible={() => {
+                                void loadBranchPage(null, null);
+                            }}
+                        />
+                    ) : null}
                 </div>
             </SortableContext>
 

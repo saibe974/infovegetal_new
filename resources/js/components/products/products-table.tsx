@@ -12,7 +12,6 @@ import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ComponentType } from "react";
-import { resolveImageUrl } from "../../lib/resolve-image-url";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
 
 const formatCurrency = (value: number): string =>
@@ -101,9 +100,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             <TableCell>
                                 <div className="relative w-20">
                                     {item.img_link ? (
-                                        <img src={resolveImageUrl(item.img_link)} className="w-20 object-cover" alt={item.name} />
+                                        <img src={item.image_thumb ?? item.img_link} className="w-20 object-cover" alt={item.name} />
                                     ) : (
-                                        <img src={resolveImageUrl('/placeholder.png')} className="w-20 object-cover" alt="Placeholder" />
+                                        <img src={'/placeholder.png'} className="w-20 object-cover" alt="Placeholder" />
                                     )}
                                     {CountryFlag ? (
                                         <span className="absolute right-1 top-1">

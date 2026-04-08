@@ -122,6 +122,16 @@ class ProductResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'img_link' => $this->img_link,
+            'image_original' => $this->resource->getFirstMediaUrl('images') ?: $this->img_link,
+            'image_medium' => $this->resource->getFirstMediaUrl('images', 'medium')
+                ?: $this->resource->getFirstMediaUrl('images', 'small')
+                ?: $this->resource->getFirstMediaUrl('images')
+                ?: $this->img_link,
+            'image_thumb' => $this->resource->getFirstMediaUrl('images', 'thumb')
+                ?: $this->resource->getFirstMediaUrl('images', 'small')
+                ?: $this->resource->getFirstMediaUrl('images', 'medium')
+                ?: $this->resource->getFirstMediaUrl('images')
+                ?: $this->img_link,
             'price' => $price,
             'active' => $this->active,
             'attributes' => $this->attributes,

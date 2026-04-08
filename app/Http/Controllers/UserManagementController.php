@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserImportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate as FacadesGate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Role;
@@ -21,6 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\DbProducts;
 use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
+use Illuminate\Validation\ValidationException;
 
 use function Illuminate\Log\log;
 
@@ -31,8 +34,7 @@ class UserManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -70,10 +72,236 @@ class UserManagementController extends Controller
         ]);
     }
 
+    /**
+     * Lazy-load direct children for a branch of the users tree.
+     */
+    public function treeChildren(Request $request): JsonResponse
+    {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $parentId = array_key_exists('parent_id', $validated)
+            ? ($validated['parent_id'] !== null ? (int) $validated['parent_id'] : null)
+            : null;
+
+        $offset = (int) ($validated['offset'] ?? 0);
+        $limit = (int) ($validated['limit'] ?? 30);
+        $search = trim((string) ($validated['q'] ?? ''));
+
+        $query = User::query()
+            ->select([
+                'id',
+                'name',
+                'email',
+                'active',
+                'parent_id',
+                '_lft',
+                '_rgt',
+            ])
+            ->where('parent_id', $parentId)
+            ->orderBy('_lft', 'asc');
+
+        if ($search !== '') {
+            $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+            $query->where(function ($q) use ($tokens, $isSingleNumeric) {
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $qq->where('name', 'like', '%' . $token . '%');
+                    }
+                });
+            });
+        }
+
+        $total = (clone $query)->count();
+        $users = $query->offset($offset)->limit($limit)->get();
+
+        $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $parentsWithChildren = [];
+
+        if (!empty($userIds)) {
+            $parentsWithChildren = User::query()
+                ->whereIn('parent_id', $userIds)
+                ->whereNotNull('parent_id')
+                ->distinct()
+                ->pluck('parent_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        $hasChildrenLookup = array_fill_keys($parentsWithChildren, true);
+
+        $items = $users->map(function (User $user) use ($parentId) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'active' => (bool) $user->active,
+                'parent_id' => $user->parent_id,
+                '_lft' => $user->_lft,
+                '_rgt' => $user->_rgt,
+                'depth' => $parentId === null ? 0 : null,
+                'has_children' => false,
+            ];
+        })->map(function (array $item) use ($hasChildrenLookup) {
+            $item['has_children'] = isset($hasChildrenLookup[(int) $item['id']]);
+            return $item;
+        })->values();
+
+        $nextOffset = $offset + $items->count();
+
+        return response()->json([
+            'items' => $items,
+            'offset' => $offset,
+            'next_offset' => $nextOffset,
+            'limit' => $limit,
+            'total' => $total,
+            'has_more' => $nextOffset < $total,
+        ]);
+    }
+
+    /**
+     * Return only matching users and their ancestor chain as a tree fragment.
+     */
+    public function treeSearch(Request $request): JsonResponse
+    {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'max:255'],
+        ]);
+
+        $search = trim((string) $validated['q']);
+        if ($search === '') {
+            return response()->json([
+                'items' => [],
+                'expanded_ids' => [],
+                'matched_ids' => [],
+            ]);
+        }
+
+        $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
+
+        $matchedIds = User::query()
+            ->select('id')
+            ->where(function ($q) use ($tokens, $isSingleNumeric) {
+                if ($isSingleNumeric) {
+                    $q->where('id', '=', (int) $tokens[0]);
+                }
+
+                $q->orWhere(function ($qq) use ($tokens) {
+                    foreach ($tokens as $token) {
+                        $qq->where('name', 'like', '%' . $token . '%');
+                    }
+                });
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($matchedIds)) {
+            return response()->json([
+                'items' => [],
+                'expanded_ids' => [],
+                'matched_ids' => [],
+            ]);
+        }
+
+        $allUsers = User::query()
+            ->select(['id', 'name', 'email', 'active', 'parent_id', '_lft', '_rgt'])
+            ->orderBy('_lft', 'asc')
+            ->get();
+
+        $byId = $allUsers->keyBy('id');
+        $keepIds = [];
+
+        foreach ($matchedIds as $matchedId) {
+            $cursor = $matchedId;
+
+            while ($cursor !== null && !isset($keepIds[$cursor])) {
+                $keepIds[$cursor] = true;
+                $node = $byId->get($cursor);
+
+                if (!$node) {
+                    break;
+                }
+
+                $cursor = $node->parent_id !== null ? (int) $node->parent_id : null;
+            }
+        }
+
+        $subset = $allUsers
+            ->filter(fn (User $user) => isset($keepIds[(int) $user->id]))
+            ->values();
+
+        $subsetChildrenByParent = [];
+        foreach ($subset as $node) {
+            $pid = $node->parent_id !== null ? (int) $node->parent_id : null;
+            if ($pid === null) {
+                continue;
+            }
+
+            $subsetChildrenByParent[$pid] = true;
+        }
+
+        $items = $subset->map(function (User $user) use ($keepIds, $subsetChildrenByParent, $byId) {
+            $depth = 0;
+            $cursor = $user->parent_id !== null ? (int) $user->parent_id : null;
+
+            while ($cursor !== null && isset($keepIds[$cursor])) {
+                $depth++;
+                $parent = $byId->get($cursor);
+                if (!$parent) {
+                    break;
+                }
+                $cursor = $parent->parent_id !== null ? (int) $parent->parent_id : null;
+            }
+
+            return [
+                'id' => (int) $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'active' => (bool) $user->active,
+                'parent_id' => $user->parent_id,
+                '_lft' => $user->_lft,
+                '_rgt' => $user->_rgt,
+                'depth' => $depth,
+                'has_children' => isset($subsetChildrenByParent[(int) $user->id]),
+            ];
+        })->values();
+
+        $expandedIds = collect($items)
+            ->filter(fn (array $item) => (bool) ($item['has_children'] ?? false))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        return response()->json([
+            'items' => $items,
+            'expanded_ids' => $expandedIds,
+            'matched_ids' => array_values(array_unique($matchedIds)),
+        ]);
+    }
+
     public function show(Request $request, User $user): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -96,8 +324,8 @@ class UserManagementController extends Controller
 
     public function edit(Request $request, User $user): Response
     {
-        // Autorisation: seul l'utilisateur lui-même ou un admin peut éditer
-        if ($request->user()->id !== $user->id && !$request->user()->hasRole('admin')) {
+        // Autorisation: seul l'utilisateur lui-même, un admin ou un dev peut éditer
+        if ($request->user()->id !== $user->id && !$request->user()->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -139,48 +367,78 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],
             'active' => ['sometimes', 'boolean'],
             'mailing' => ['sometimes', 'boolean'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['nullable', 'string', 'min:8'],
             'roles' => ['sometimes', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        $requestedRoleIds = array_map('intval', $validated['roles'] ?? []);
+        $requestedRoles = Role::whereIn('id', $requestedRoleIds)->get(['id', 'name']);
+        $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
+
+        $email = trim((string) ($validated['email'] ?? ''));
+        if ($email === '' && !$hasGroupRole) {
+            throw ValidationException::withMessages([
+                'email' => 'Le champ email est obligatoire sauf pour le role group.',
+            ]);
+        }
+        if ($email === '' && $hasGroupRole) {
+            // Email technique pour respecter la contrainte NOT NULL + UNIQUE.
+            $email = 'group+' . Str::uuid() . '@local.invalid';
+        }
+
+        $password = (string) ($validated['password'] ?? '');
+        if ($password === '' && !$hasGroupRole) {
+            throw ValidationException::withMessages([
+                'password' => 'Le mot de passe est obligatoire sauf pour le role group.',
+            ]);
+        }
+        if ($password === '' && $hasGroupRole) {
+            // Mot de passe aléatoire: le compte group n'est pas destiné à une connexion email/password.
+            $password = Str::random(40);
+        }
 
         // Crée le noeud racine immédiatement pour initialiser _lft/_rgt (nested set)
         $user = new User([
             'name' => $validated['name'],
             'alias' => $validated['alias'] ?? null,
             'ref' => $validated['ref'] ?? null,
-            'tel' => $validated['tel'] ?? null,
+            'phone' => $validated['phone'] ?? null,
             'address_road' => $validated['address_road'] ?? null,
             'address_zip' => $validated['address_zip'] ?? null,
             'address_town' => $validated['address_town'] ?? null,
             'active' => array_key_exists('active', $validated) ? (bool) $validated['active'] : true,
             'mailing' => array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : false,
-            'email' => $validated['email'],
-            'password' => bcrypt($validated['password']),
+            'email' => $email,
+            'password' => bcrypt($password),
         ]);
 
-        // Positionner le nouvel utilisateur comme racine par défaut
-        $user->saveAsRoot();
+        // Positionner le nouvel utilisateur dans l'arbre
+        $parentId = isset($validated['parent_id']) ? (int) $validated['parent_id'] : null;
+        if ($parentId) {
+            $parent = User::findOrFail($parentId);
+            $user->appendToNode($parent)->save();
+        } else {
+            $user->saveAsRoot();
+        }
 
         // Assign roles
-        if (isset($validated['roles'])) {
-            $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
-            $user->syncRoles($roleNames);
+        if ($requestedRoles->isNotEmpty()) {
+            $user->syncRoles($requestedRoles->pluck('name')->toArray());
         }
 
         // Assign permissions
@@ -223,10 +481,12 @@ class UserManagementController extends Controller
      */
     public function update(Request $request, User $user): RedirectResponse
     {
-        // Only admin or the user itself can update
         $me = $request->user();
         Log::info("Updating user $user->id by $me->id");
-        if ($me->id !== $user->id && !$me->hasRole('admin')) {
+        $isAdmin = $me->hasRole('admin');
+        $isDev = $me->hasRole('dev');
+
+        if ($me->id !== $user->id && !$me->hasAnyRole(['admin', 'dev'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -235,51 +495,87 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias,' . $user->id],
             'ref' => ['nullable', 'string', 'max:50'],
-            'tel' => ['nullable', 'string', 'max:25'],
+            'phone' => ['nullable', 'string', 'max:25'],
             'address_road' => ['nullable', 'string', 'max:255'],
             'address_zip' => ['nullable', 'string', 'max:32'],
             'address_town' => ['nullable', 'string', 'max:120'],
             'active' => ['nullable', 'boolean'],
             'mailing' => ['nullable', 'boolean'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'roles' => ['nullable', 'array'],
             'roles.*' => ['integer', 'exists:roles,id'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
+            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
         ];
 
         $validated = $request->validate($rules);
 
-        // Update basic fields
-        $user->name = $validated['name'];
-        $user->alias = $validated['alias'] ?? null;
-        $user->ref = $validated['ref'] ?? null;
-        $user->tel = $validated['tel'] ?? null;
-        $user->address_road = $validated['address_road'] ?? null;
-        $user->address_zip = $validated['address_zip'] ?? null;
-        $user->address_town = $validated['address_town'] ?? null;
-        $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
-        $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
-        $user->email = $validated['email'];
-        $user->save();
+        // Détecter le rôle group pour rendre l'email optionnel
+        $requestedRoleIds = array_map('intval', $validated['roles'] ?? $user->roles()->pluck('id')->toArray());
+        $hasGroupRole = \Spatie\Permission\Models\Role::whereIn('id', $requestedRoleIds)
+            ->where('name', 'group')
+            ->exists();
+        if ($hasGroupRole) {
+            $validated['email'] = $validated['email'] ?? $user->email;
+        }
 
-        // Roles: only admin can change roles; additionally prevent admin from removing own admin role
+        if ($me->id === $user->id || $isAdmin) {
+            $user->name = $validated['name'];
+            $user->alias = $validated['alias'] ?? null;
+            $user->ref = $validated['ref'] ?? null;
+            $user->phone = $validated['phone'] ?? null;
+            $user->address_road = $validated['address_road'] ?? null;
+            $user->address_zip = $validated['address_zip'] ?? null;
+            $user->address_town = $validated['address_town'] ?? null;
+            $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
+            $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
+            $user->email = $validated['email'];
+            $user->save();
+
+            // Déplacement dans l'arbre si parent_id fourni (admin uniquement)
+            if ($isAdmin && array_key_exists('parent_id', $validated)) {
+                $newParentId = $validated['parent_id'] !== null ? (int) $validated['parent_id'] : null;
+                if ($newParentId && $newParentId !== (int) $user->parent_id) {
+                    $parent = User::findOrFail($newParentId);
+                    $user->appendToNode($parent)->save();
+                } elseif ($newParentId === null && $user->parent_id !== null) {
+                    $user->saveAsRoot();
+                }
+            }
+        }
+
+        // Roles: admins can manage all roles, devs can manage non-protected roles only.
         if (isset($validated['roles'])) {
-            if (!$me->hasRole('admin')) {
-                // non-admin cannot change roles
-                // ignore
+            if (!$isAdmin && !$isDev) {
             } else {
+                $requestedRoles = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->get(['id', 'name']);
+
+                if ($isDev && !$isAdmin) {
+                    $protectedRoleNames = ['admin', 'dev'];
+                    $requestedRoleNames = $requestedRoles->pluck('name')->toArray();
+                    $targetHasProtectedRole = $user->roles()->whereIn('name', $protectedRoleNames)->exists();
+
+                    if ($targetHasProtectedRole) {
+                        return back()->with('error', 'Les comptes admin et dev ne peuvent pas être modifiés par un dev');
+                    }
+
+                    if (!empty(array_intersect($requestedRoleNames, $protectedRoleNames))) {
+                        return back()->with('error', 'Un dev ne peut pas attribuer les rôles admin ou dev');
+                    }
+                }
+
                 // If the real admin account is editing itself, disallow removing own admin role.
                 // In impersonation mode, $me is the impersonated user, so we must resolve the impersonator id.
                 $actorId = $me->id;
-                if (method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
+                if ($isAdmin && method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
                     $impersonatorId = app('impersonate')->getImpersonatorId();
                     if ($impersonatorId) {
                         $actorId = (int) $impersonatorId;
                     }
                 }
 
-                if ((int) $actorId === (int) $user->id) {
+                if ($isAdmin && (int) $actorId === (int) $user->id) {
                     // ensure admin role remains
                     $current = collect($validated['roles']);
                     $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')->value('id');
@@ -289,13 +585,12 @@ class UserManagementController extends Controller
                 }
 
                 // sync by role ids
-                $roleNames = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
-                $user->syncRoles($roleNames);
+                $user->syncRoles($requestedRoles->pluck('name')->toArray());
             }
         }
 
         // Permissions: only admin can change
-        if (isset($validated['permissions']) && $me->hasRole('admin')) {
+        if (isset($validated['permissions']) && $isAdmin) {
             // Determine role ids to compute inherited permissions. If roles were provided in this update
             // use them; otherwise fall back to the user's current roles.
             $roleIds = [];
@@ -363,6 +658,15 @@ class UserManagementController extends Controller
      */
     public function reorder(Request $request)
     {
+        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $startedAt = microtime(true);
+
+        Log::info('users.reorder.start', [
+            'request_id' => $requestId,
+            'user_id' => optional($request->user())->id,
+            'item_count' => count($request->input('items', [])),
+        ]);
+
         $validated = $request->validate([
             'items' => ['required','array'],
             'items.*.id' => ['required','integer','exists:users,id'],
@@ -370,76 +674,181 @@ class UserManagementController extends Controller
             'items.*.position' => ['required','integer','min:0'],
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            $rows = collect($validated['items']);
+        Log::info('users.reorder.validated', [
+            'request_id' => $requestId,
+            'item_count' => count($validated['items'] ?? []),
+        ]);
 
-            // Sécurité anti-cycles simple : parent_id != id
-            foreach ($rows as $r) {
-                if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
-                    abort(422, 'Invalid parent.');
-                }
-            }
+        try {
+            $response = DB::transaction(function () use ($validated, $requestId, $startedAt) {
+                $rows = collect($validated['items']);
 
-            // Anti-cycles basique via parcours parent -> racine
-            $rows->each(function ($r) use ($rows) {
-                $parentId = $r['parent_id'];
-                $visited = [];
-                while ($parentId !== null) {
-                    if (in_array($parentId, $visited, true)) {
-                        abort(422, 'Circular parent reference detected.');
+                // Sécurité anti-cycles simple : parent_id != id
+                foreach ($rows as $r) {
+                    if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
+                        Log::warning('users.reorder.invalid_parent', [
+                            'request_id' => $requestId,
+                            'id' => (int) $r['id'],
+                        ]);
+                        abort(422, 'Invalid parent.');
                     }
-                    $visited[] = $parentId;
-                    $parent = $rows->firstWhere('id', $parentId);
-                    $parentId = $parent ? $parent['parent_id'] : null;
-                    if (count($visited) > 1000) break; // garde-fou
                 }
+
+                // Anti-cycles basique via parcours parent -> racine
+                $rows->each(function ($r) use ($rows, $requestId) {
+                    $parentId = $r['parent_id'];
+                    $visited = [];
+                    while ($parentId !== null) {
+                        if (in_array($parentId, $visited, true)) {
+                            Log::warning('users.reorder.circular_reference', [
+                                'request_id' => $requestId,
+                                'id' => (int) $r['id'],
+                                'parent_id' => (int) $parentId,
+                            ]);
+                            abort(422, 'Circular parent reference detected.');
+                        }
+                        $visited[] = $parentId;
+                        $parent = $rows->firstWhere('id', $parentId);
+                        $parentId = $parent ? $parent['parent_id'] : null;
+                        if (count($visited) > 1000) break; // garde-fou
+                    }
+                });
+
+                if ($this->canUseOptimizedUsersReorder($rows)) {
+                    User::rebuildTree($this->buildUsersReorderTree($rows));
+
+                    $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+                    Log::info('users.reorder.done', [
+                        'request_id' => $requestId,
+                        'mode' => 'optimized',
+                        'item_count' => $rows->count(),
+                        'duration_ms' => $durationMs,
+                    ]);
+
+                    return response()->json([
+                        'ok' => true,
+                        'mode' => 'optimized',
+                    ]);
+                }
+
+                Log::warning('users.reorder.fallback', [
+                    'request_id' => $requestId,
+                    'item_count' => $rows->count(),
+                ]);
+
+                $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
+
+                // Détacher puis reconstruire l'arbre pour éviter toute corruption
+                $allIds = $rows->pluck('id')->toArray();
+                $allNodes = User::whereIn('id', $allIds)->get();
+
+                foreach ($allNodes as $node) {
+                    $node->parent_id = null;
+                    $node->save();
+                }
+
+                // Rebuild the tree using nested set helpers (same approach as categories)
+                $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
+                    $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
+                    $prev = null;
+
+                    foreach ($children as $r) {
+                        $node = User::findOrFail($r['id']);
+                        $node->refresh();
+
+                        if ($parentId === null) {
+                            $node->saveAsRoot();
+                        } else {
+                            $parent = User::findOrFail($parentId);
+                            $parent->refresh();
+                            $node->appendToNode($parent)->save();
+                        }
+
+                        if ($prev) {
+                            $prev->refresh();
+                            $node->afterNode($prev)->save();
+                        }
+
+                        $prev = $node;
+
+                        // recurse
+                        $placeChildren($node->id);
+                    }
+                };
+
+                // Démarrer par les racines
+                $placeChildren(null);
+
+                $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+                Log::info('users.reorder.done', [
+                    'request_id' => $requestId,
+                    'mode' => 'fallback',
+                    'item_count' => $rows->count(),
+                    'duration_ms' => $durationMs,
+                ]);
+
+                return response()->json([
+                    'ok' => true,
+                    'mode' => 'fallback',
+                ]);
             });
 
-            $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
+            return $response;
+        } catch (\Throwable $e) {
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+            Log::error('users.reorder.failed', [
+                'request_id' => $requestId,
+                'duration_ms' => $durationMs,
+                'message' => $e->getMessage(),
+                'exception' => get_class($e),
+            ]);
 
-            // Détacher puis reconstruire l'arbre pour éviter toute corruption
-            $allIds = $rows->pluck('id')->toArray();
-            $allNodes = User::whereIn('id', $allIds)->get();
+            throw $e;
+        }
+    }
 
-            foreach ($allNodes as $node) {
-                $node->parent_id = null;
-                $node->save();
+    private function canUseOptimizedUsersReorder(\Illuminate\Support\Collection $rows): bool
+    {
+        $submittedIds = $rows
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($submittedIds->isEmpty()) {
+            return false;
+        }
+
+        $submittedIdSet = array_fill_keys($submittedIds->all(), true);
+        $hasRoot = false;
+
+        foreach ($rows as $row) {
+            $parentId = $row['parent_id'] ?? null;
+
+            if ($parentId === null) {
+                $hasRoot = true;
+                continue;
             }
 
-            // Rebuild the tree using nested set helpers (same approach as categories)
-            $placeChildren = function ($parentId) use (&$placeChildren, $groups) {
-                $children = ($groups->get($parentId, collect()))->sortBy('position')->values();
-                $prev = null;
+            if (!isset($submittedIdSet[(int) $parentId])) {
+                return false;
+            }
+        }
 
-                foreach ($children as $r) {
-                    $node = User::findOrFail($r['id']);
-                    $node->refresh();
+        return $hasRoot;
+    }
 
-                    if ($parentId === null) {
-                        $node->saveAsRoot();
-                    } else {
-                        $parent = User::findOrFail($parentId);
-                        $parent->refresh();
-                        $node->appendToNode($parent)->save();
-                    }
-
-                    if ($prev) {
-                        $prev->refresh();
-                        $node->afterNode($prev)->save();
-                    }
-
-                    $prev = $node;
-
-                    // recurse
-                    $placeChildren($node->id);
-                }
-            };
-
-            // Démarrer par les racines
-            $placeChildren(null);
-
-            return response()->json(['ok' => true]);
-        });
+    private function buildUsersReorderTree(\Illuminate\Support\Collection $rows, ?int $parentId = null): array
+    {
+        return $rows
+            ->filter(fn (array $row) => ($row['parent_id'] ?? null) === $parentId)
+            ->sortBy('position')
+            ->values()
+            ->map(fn (array $row) => [
+                'id' => (int) $row['id'],
+                'children' => $this->buildUsersReorderTree($rows, (int) $row['id']),
+            ])
+            ->all();
     }
 
     public function editDb(Request $request, User $user): RedirectResponse

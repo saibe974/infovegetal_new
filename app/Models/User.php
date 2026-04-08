@@ -40,7 +40,7 @@ class User extends Authenticatable implements HasMedia
         'name',
         'alias',
         'ref',
-        'tel',
+        'phone',
         'address_road',
         'address_zip',
         'address_town',

@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { Badge } from "../ui/badge";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ComponentType } from "react";
-import { resolveImageUrl } from "@/lib/resolve-image-url";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
 
 const formatCurrency = (value: number): string =>
@@ -49,7 +48,11 @@ export function ProductCard({
 
     const name = String(product?.name ?? "");
     const description = String(product?.description ?? "");
-    const img = resolveImageUrl(product?.img_link ?? "/placeholder.png");
+    const img = (
+        product?.image_medium
+        ?? product?.img_link
+        ?? "/placeholder.png"
+    );
 
     const handleEdit = (id: number) => {
         if (editProduct) return editProduct(id);

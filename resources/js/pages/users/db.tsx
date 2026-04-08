@@ -33,6 +33,40 @@ type DbProductAttributes = {
     fact: number | null; // id facturant
 };
 
+const normalizePriceMode = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') {
+        return '-1';
+    }
+
+    const raw = String(value).trim().toLowerCase();
+
+    if (raw === 'price_depart') {
+        return 'price_depart';
+    }
+
+    if (raw === 'price_render') {
+        return 'price_render';
+    }
+
+    if (raw === '-1') {
+        return '-1';
+    }
+
+    if (raw === '0') {
+        return 'price_depart';
+    }
+
+    if (raw === '1') {
+        return 'price_render';
+    }
+
+    if (raw === 'price' || raw === 'price_floor' || raw === 'price_roll' || raw === 'price_promo') {
+        return raw;
+    }
+
+    return '-1';
+};
+
 const DEFAULT_ATTRIBUTES: DbProductAttributes = {
     m: 0,
     mm: 0,
@@ -93,7 +127,9 @@ export default function UserDbPage() {
         if (dbUserAttributes && typeof dbUserAttributes === 'object') {
             Object.entries(dbUserAttributes).forEach(([dbId, attrs]) => {
                 if (attrs && typeof attrs === 'object') {
-                    initial[Number(dbId)] = { ...DEFAULT_ATTRIBUTES, ...attrs as Partial<DbProductAttributes> };
+                    const merged = { ...DEFAULT_ATTRIBUTES, ...attrs as Partial<DbProductAttributes> };
+                    merged.p = normalizePriceMode((attrs as Partial<DbProductAttributes>).p);
+                    initial[Number(dbId)] = merged;
                 } else {
                     initial[Number(dbId)] = { ...DEFAULT_ATTRIBUTES };
                 }
@@ -137,11 +173,12 @@ export default function UserDbPage() {
     ];
 
     const updateAttribute = (dbId: number, key: keyof DbProductAttributes, value: any) => {
+        const nextValue = key === 'p' ? normalizePriceMode(value) : value;
         setAttributesByDbId(prev => ({
             ...prev,
             [dbId]: {
                 ...prev[dbId],
-                [key]: value
+                [key]: nextValue
             }
         }));
     };
@@ -366,7 +403,7 @@ export default function UserDbPage() {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <FormField label={t('Price mode')} htmlFor={`p-${dbId}`}>
                                                         <Select
-                                                            value={attrs.p}
+                                                            value={normalizePriceMode(attrs.p)}
                                                             onValueChange={(value) => updateAttribute(dbId, 'p', value)}
                                                         >
                                                             <SelectTrigger id={`p-${dbId}`}>
@@ -374,8 +411,8 @@ export default function UserDbPage() {
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
-                                                                <SelectItem value="0">{t('Departure price')}</SelectItem>
-                                                                <SelectItem value="1">{t('Rendered price')}</SelectItem>
+                                                                <SelectItem value="price_depart">{t('Departure price')}</SelectItem>
+                                                                <SelectItem value="price_render">{t('Rendered price')}</SelectItem>
                                                                 <SelectItem value="price">{t('Base price')}</SelectItem>
                                                                 <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
                                                                 <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
@@ -411,7 +448,7 @@ export default function UserDbPage() {
                                                             type="checkbox"
                                                             // step="0.01"
                                                             checked={attrs.h === 1}
-                                                            defaultChecked={attrs.h === 1}
+                                                            // defaultChecked={attrs.h === 1}
                                                             value={attrs.h}
                                                             onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
                                                         />

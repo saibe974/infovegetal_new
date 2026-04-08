@@ -5,9 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeftCircle, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { resolveImageUrl } from '@/lib/resolve-image-url';
 import { CartContext } from '@/components/cart/cart.context';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -18,8 +17,18 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
+import { getProductCartImage } from '@/components/products/product-cart-image';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Props = Record<string, never>;
+
+const pdfGenerationPhases = [
+    'Verification des produits et des quantites',
+    'Recherche des images locales disponibles',
+    'Telechargement des images manquantes si necessaire',
+    'Generation des vignettes et conversions',
+    'Composition et export du PDF',
+];
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -43,6 +52,10 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
 
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
+    const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+    const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
+    const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
+    const [orderConflict, setOrderConflict] = useState<{ orderNumber: string | null; resolve: (choice: 'append' | 'new') => void } | null>(null);
 
 
     const itemsPricing = useMemo(
@@ -164,6 +177,9 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
         }
 
         setIsSaving(true);
+        setIsPdfGenerating(true);
+        setPdfPhaseIndex(0);
+        setPdfCurrentGroup(null);
         setSaveMessage(null);
 
         try {
@@ -173,54 +189,89 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                 ) as HTMLMetaElement
             )?.content;
 
-            for (const group of groupedItems) {
-                const response = await fetch("/cart/generate-pdf", {
-                    method: "POST",
+            const basePayload = {
+                items: items.map((item) => ({
+                    id: item.product.id,
+                    quantity: item.quantity,
+                })),
+                shipping_total: deliveryTotal,
+            };
+
+            const placeOrder = async (choice?: 'append' | 'new') => {
+                return fetch('/cart/order', {
+                    method: 'POST',
                     headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": csrfToken || "",
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken || '',
                     },
                     body: JSON.stringify({
-                        items: group.items.map((item) => ({
-                            id: item.product.id,
-                            quantity: item.quantity,
-                        })),
-                        shipping_total: group.deliveryTotal,
-                        group_label: group.label,
-                        group_key: group.id,
+                        ...basePayload,
+                        ...(choice ? { choice } : {}),
                     }),
                 });
+            };
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    const labelSlug = toFileSlug(group.label);
-                    link.download = `panier-${labelSlug}-${new Date().toISOString().split('T')[0]}.pdf`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                } else {
-                    const data = await response.json();
-                    setSaveMessage(
-                        data.message || "Erreur lors de la génération du PDF"
-                    );
-                    return;
+            let response = await placeOrder();
+
+            if (response.status === 409) {
+                const data = await response.json();
+                if (data?.requires_choice) {
+                    const orderNumber = data?.existing_order?.number ?? null;
+                    const choice = await new Promise<'append' | 'new'>((resolve) => {
+                        setOrderConflict({ orderNumber, resolve });
+                    });
+                    setOrderConflict(null);
+                    response = await placeOrder(choice);
                 }
             }
 
-            setSaveMessage("PDFs générés avec succès");
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                setSaveMessage(data?.message || 'Erreur lors de la commande');
+                return;
+            }
+
+            const data = await response.json();
+            const pdfUrl = data?.pdf_download_url;
+            const orderNumber = data?.order_number;
+            if (pdfUrl) {
+                const link = document.createElement('a');
+                link.href = pdfUrl;
+                link.download = orderNumber ? `commande-${orderNumber}.pdf` : 'commande.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            setSaveMessage(orderNumber
+                ? `Commande #${orderNumber} enregistree, PDF genere et emails envoyes`
+                : 'Commande enregistree, PDF genere et emails envoyes');
             setTimeout(() => setSaveMessage(null), 3000);
         } catch (error) {
-            console.error("Error generating PDF:", error);
-            setSaveMessage("Erreur lors de la génération du PDF");
+            console.error('Error placing order:', error);
+            setSaveMessage('Erreur lors de la commande');
         } finally {
             setIsSaving(false);
+            setIsPdfGenerating(false);
+            setPdfCurrentGroup(null);
+            setPdfPhaseIndex(0);
         }
     };
     const [topOffset, setTopOffset] = useState<number>(0);
+
+    useEffect(() => {
+        if (!isPdfGenerating) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setPdfPhaseIndex((current) => (current + 1) % pdfGenerationPhases.length);
+        }, 1600);
+
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [isPdfGenerating]);
 
     useEffect(() => {
         const getHeight = () => {
@@ -269,6 +320,88 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     return (
         <div className="">
             <Head title={t('Cart')} />
+            <Dialog open={orderConflict !== null} onOpenChange={() => undefined}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Commande en cours</DialogTitle>
+                        <DialogDescription>
+                            {orderConflict?.orderNumber
+                                ? `La commande #${orderConflict.orderNumber} est deja en cours de traitement.`
+                                : 'Une commande est deja en cours de traitement.'}
+                            {' '}Souhaitez-vous y ajouter les articles du panier, ou creer une nouvelle commande ?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex-col gap-2 sm:flex-row">
+                        <Button variant="outline" onClick={() => orderConflict?.resolve('new')}>
+                            Nouvelle commande
+                        </Button>
+                        <Button onClick={() => orderConflict?.resolve('append')}>
+                            Ajouter a la commande en cours
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isPdfGenerating} onOpenChange={() => undefined}>
+                <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-xl">
+                            <Loader2 className="h-5 w-5 animate-spin text-brand-main" />
+                            Generation du PDF en cours
+                        </DialogTitle>
+                        <DialogDescription className="text-sm leading-6">
+                            Le document peut prendre un peu de temps. Le serveur verifie les produits, telecharge les images manquantes, prepare les conversions, puis genere le PDF final.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="rounded-xl border border-brand-main/20 bg-brand-main/5 p-4">
+                            <div className="text-sm font-medium text-foreground">
+                                {pdfCurrentGroup
+                                    ? `Fournisseur ${pdfCurrentGroup.index}/${pdfCurrentGroup.total} : ${pdfCurrentGroup.label}`
+                                    : 'Preparation de la generation'}
+                            </div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                                Etape en cours : {pdfGenerationPhases[pdfPhaseIndex]}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 rounded-xl border p-4">
+                            {pdfGenerationPhases.map((phase, index) => {
+                                const isActive = index === pdfPhaseIndex;
+                                const isPassed = index < pdfPhaseIndex;
+
+                                return (
+                                    <div
+                                        key={phase}
+                                        className={cn(
+                                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                                            isActive && 'bg-brand-main/10 text-foreground',
+                                            isPassed && 'text-muted-foreground',
+                                            !isActive && !isPassed && 'text-muted-foreground/80',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold',
+                                                isActive && 'border-brand-main text-brand-main',
+                                                isPassed && 'border-green-600 text-green-600',
+                                                !isActive && !isPassed && 'border-muted-foreground/30 text-muted-foreground',
+                                            )}
+                                        >
+                                            {isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : index + 1}
+                                        </span>
+                                        <span>{phase}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                            Cette fenetre se fermera automatiquement une fois tous les PDF telecharges.
+                        </p>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <StickyBar
                 zIndex={20}
                 borderBottom={false}
@@ -343,7 +476,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                                 <div className="flex items-center gap-4 md:w-1/2">
                                                     <div className="h-20 w-20 rounded relative shrink-0">
                                                         <img
-                                                            src={resolveImageUrl(product.img_link || '/images/placeholder.png')}
+                                                            src={getProductCartImage(product)}
                                                             alt={product.name}
                                                             className="h-full w-full object-cover"
                                                         />

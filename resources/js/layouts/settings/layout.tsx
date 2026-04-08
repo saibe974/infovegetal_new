@@ -13,7 +13,7 @@ import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, isAdmin, isDev } from '@/lib/roles';
 import { ArrowLeftCircle, Menu } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -42,6 +42,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         },
     ];
 
+    const canManageOtherUserSections = isAdmin(effectiveUser);
+
     if (isSelf) {
         sidebarNavItems.push({
             title: 'Password',
@@ -65,7 +67,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             }
         );
 
-    } else {
+    } else if (canManageOtherUserSections) {
         sidebarNavItems.push({
             title: 'Password',
             href: editAdminPassword(userId),
