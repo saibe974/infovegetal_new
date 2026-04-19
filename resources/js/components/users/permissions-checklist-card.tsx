@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Icon, TrashIcon } from 'lucide-react';
 
 export type PermissionItem = { id: number; name: string };
 
@@ -68,8 +69,20 @@ export default function PermissionsChecklistCard({
                         <h3 className='text-sm font-semibold mb-2'>{domain}</h3>
                         <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
                             {items.map((permission) => (
-                                <div key={permission.id} className='flex items-center justify-between border rounded-md px-3 py-2'>
-                                    <Label htmlFor={`perm-${permission.id}`} className='cursor-pointer'>
+                                <div
+                                    key={permission.id}
+                                    className={`flex items-center justify-between border rounded-md px-3 py-2 ${selectedPermissionIds.includes(permission.id)
+                                        ? 'border-green-200'
+                                        : 'border-red-200'
+                                        }`}
+                                >
+                                    <Label
+                                        htmlFor={`perm-${permission.id}`}
+                                        className={`cursor-pointer ${selectedPermissionIds.includes(permission.id)
+                                            ? 'text-green-700 dark:text-green-200'
+                                            : 'text-red-700 dark:text-red-200'
+                                            }`}
+                                    >
                                         {translate(permission.name)}
                                     </Label>
                                     <div className='flex items-center gap-2'>
@@ -85,7 +98,7 @@ export default function PermissionsChecklistCard({
                                                 size='sm'
                                                 onClick={() => onDeletePermission(permission)}
                                             >
-                                                {translate('Delete')}
+                                                <TrashIcon size={16} />
                                             </Button>
                                         )}
                                     </div>

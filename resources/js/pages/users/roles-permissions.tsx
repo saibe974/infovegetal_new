@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PermissionsChecklistCard from '@/components/users/permissions-checklist-card';
+import { TrashIcon } from 'lucide-react';
 
 type RoleItem = { id: number; name: string; permissions?: Array<{ id: number; name: string }> };
 type PermissionItem = { id: number; name: string };
@@ -45,9 +46,18 @@ function permissionDomain(permissionName: string): string {
     return 'Autres';
 }
 
+function getInitialRoleId(roles: RoleItem[]): number | null {
+    const param = new URLSearchParams(window.location.search).get('role');
+    const fromUrl = param ? parseInt(param, 10) : null;
+    if (fromUrl && roles.find((r) => r.id === fromUrl)) {
+        return fromUrl;
+    }
+    return roles[0]?.id ?? null;
+}
+
 export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions }) => {
     const { t } = useI18n();
-    const [selectedRoleId, setSelectedRoleId] = useState<number | null>(roles[0]?.id ?? null);
+    const [selectedRoleId, setSelectedRoleId] = useState<number | null>(() => getInitialRoleId(roles));
     const [newRoleName, setNewRoleName] = useState('');
     const [newPermissionName, setNewPermissionName] = useState('');
 
@@ -82,6 +92,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
             permissions: selectedPermissionIds,
         }, {
             preserveScroll: true,
+            preserveState: true,
         });
     };
 
@@ -134,6 +145,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
     const onSelectRole = (role: RoleItem) => {
         setSelectedRoleId(role.id);
         setSelectedPermissionIds((role.permissions ?? []).map((p) => p.id));
+        window.history.replaceState(null, '', `?role=${role.id}`);
     };
 
     const onTogglePermission = (permissionId: number, checked: boolean) => {
@@ -171,7 +183,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
                         </div>
 
                         <div className='space-y-2 max-h-[420px] overflow-y-auto'>
-                            {roles.map((role) => (
+                            {[...roles].sort((a, b) => (b.permissions?.length ?? 0) - (a.permissions?.length ?? 0)).map((role) => (
                                 <div key={role.id} className='flex items-center justify-between gap-2'>
                                     <button
                                         type='button'
@@ -183,8 +195,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
                                     </button>
 
                                     {!['admin', 'dev'].includes(role.name) && (
-                                        <Button type='button' variant='destructive-outline' size='sm' onClick={() => deleteRole(role)}>
-                                            {t('Delete')}
+                                        <Button
+                                            type='button'
+                                            variant='destructive-outline'
+                                            size='icon'
+                                            onClick={() => deleteRole(role)}
+                                            aria-label={t('Delete')}
+                                        >
+                                            <TrashIcon className='h-4 w-4' />
                                         </Button>
                                     )}
                                 </div>
