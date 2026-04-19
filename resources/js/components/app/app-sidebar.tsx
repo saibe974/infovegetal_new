@@ -17,7 +17,7 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended, type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon } from 'lucide-react';
+import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
@@ -142,11 +142,29 @@ export function AppSidebar() {
         }
 
         if (canManageUsers) {
-            mainNavItems.push({
+            const userMenu: NavItemExtended = {
                 title: t('Users'),
                 href: users.index(),
                 icon: User2Icon,
-            });
+                subItems: [
+                    {
+                        title: t('All users'),
+                        href: users.index(),
+                        icon: ListIcon,
+                    },
+                ],
+            };
+
+            if (isAdmin(effectiveUser)) {
+                userMenu.subItems?.push({
+                    title: t('Roles & permissions'),
+                    href: '/admin/users/roles-permissions',
+                    icon: ShieldCheck,
+                    target: '_self',
+                });
+            }
+
+            mainNavItems.push(userMenu);
         }
 
         if (canManageCarriers) {

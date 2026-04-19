@@ -11,6 +11,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\CarrierController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\RolePermissionManagementController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -186,6 +187,12 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
 
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
+    Route::get('admin/users/roles-permissions', [RolePermissionManagementController::class, 'index'])->name('users.roles_permissions.index');
+    Route::post('admin/users/roles-permissions/roles', [RolePermissionManagementController::class, 'storeRole'])->name('users.roles_permissions.roles.store');
+    Route::put('admin/users/roles-permissions/roles/{role}', [RolePermissionManagementController::class, 'updateRolePermissions'])->whereNumber('role')->name('users.roles_permissions.roles.update');
+    Route::delete('admin/users/roles-permissions/roles/{role}', [RolePermissionManagementController::class, 'destroyRole'])->whereNumber('role')->name('users.roles_permissions.roles.destroy');
+    Route::post('admin/users/roles-permissions/permissions', [RolePermissionManagementController::class, 'storePermission'])->name('users.roles_permissions.permissions.store');
+    Route::delete('admin/users/roles-permissions/permissions/{permission}', [RolePermissionManagementController::class, 'destroyPermission'])->whereNumber('permission')->name('users.roles_permissions.permissions.destroy');
     
     // CSV import/export endpoints for users
     Route::post('admin/users/import/process', [UserManagementController::class, 'process'])->name('users.import.process');
