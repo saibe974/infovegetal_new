@@ -25,6 +25,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
     const effectiveUser = getEffectiveUser(auth);
+    const userAbilities = (pageProps as any).userAbilities ?? {};
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
@@ -94,7 +95,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const currentPath = window.location.pathname;
 
     // Ajout de lien si l'utilisateur est admin
-    if (isAdmin(effectiveUser)) {
+    if (!isSelf && userAbilities.manage_db) {
         sidebarNavItems.push({
             title: 'Database access',
             href: editingUser ? `/admin/users/${editingUser.id}/db` : '#',

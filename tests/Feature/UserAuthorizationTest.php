@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DbProducts;
 use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -152,4 +153,130 @@ test('a user with commercial creation rights can access the users tree for its o
     expect($commercial->can('viewAny', User::class))->toBeTrue();
     expect($commercial->can('view', $client))->toBeTrue();
     expect($commercial->can('view', $outsider))->toBeFalse();
+});
+
+test('a branch manager can manage database access for its own client descendants', function () {
+    /** @var \Tests\TestCase $this */
+
+    $commercialRole = createRoleWithPermissions('commercial-db', ['create clients']);
+    $clientRole = createRoleWithPermissions('client');
+
+    $commercial = User::factory()->withoutTwoFactor()->create();
+    $client = User::factory()->withoutTwoFactor()->create();
+    $outsider = User::factory()->withoutTwoFactor()->create();
+
+    $commercial->assignRole($commercialRole);
+    $client->assignRole($clientRole);
+    $outsider->assignRole($clientRole);
+
+    $commercial->saveAsRoot();
+    $client->appendToNode($commercial)->save();
+    $outsider->saveAsRoot();
+
+    $dbProduct = DbProducts::query()->create([
+        'name' => 'Test DB',
+    ]);
+
+    $this
+        ->actingAs($commercial)
+        ->get(route('users.db', ['user' => $client->id], false))
+        ->assertOk();
+
+    $this
+        ->actingAs($commercial)
+        ->post(route('users.editDb', ['user' => $client->id], false), [
+            'db_ids' => [$dbProduct->id],
+            'attributes' => [
+                $dbProduct->id => ['m' => 12],
+            ],
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($client->fresh()->dbProducts()->pluck('db_products.id')->all())
+        ->toContain($dbProduct->id);
+
+    $this
+        ->actingAs($commercial)
+        ->get(route('users.db', ['user' => $outsider->id], false))
+        ->assertForbidden();
+});
+
+test('a manage-users branch manager can assign only roles that do not exceed its permissions', function () {
+    $managerRole = createRoleWithPermissions('manager-branch', ['manage users', 'create clients']);
+    $clientRole = createRoleWithPermissions('client-limited', ['create clients']);
+    $powerRole = createRoleWithPermissions('power-role', ['delete products']);
+
+    $manager = User::factory()->withoutTwoFactor()->create();
+    $target = User::factory()->withoutTwoFactor()->create();
+
+    $manager->assignRole($managerRole);
+    $target->assignRole($clientRole);
+
+    $manager->saveAsRoot();
+    $target->appendToNode($manager)->save();
+
+    expect($manager->can('assignRoles', [$target, ['client-limited']]))->toBeTrue();
+    expect($manager->can('assignRoles', [$target, ['power-role']]))->toBeFalse();
+});
+
+test('a manage-users branch manager can update explicit permissions within its own rights only', function () {
+    /** @var \Tests\TestCase $this */
+
+    $managerRole = createRoleWithPermissions('manager-explicit', ['manage users', 'create clients']);
+    $clientRole = createRoleWithPermissions('client-explicit', ['create clients']);
+
+    $manager = User::factory()->withoutTwoFactor()->create();
+    $target = User::factory()->withoutTwoFactor()->create();
+
+    $manager->assignRole($managerRole);
+    $target->assignRole($clientRole);
+
+    $manager->saveAsRoot();
+    $target->appendToNode($manager)->save();
+
+    $createClientsPermission = Permission::firstOrCreate([
+        'name' => 'create clients',
+        'guard_name' => 'web',
+    ]);
+
+    $deleteProductsPermission = Permission::firstOrCreate([
+        'name' => 'delete products',
+        'guard_name' => 'web',
+    ]);
+
+    $this
+        ->actingAs($manager)
+        ->put(route('users.update', ['user' => $target->id], false), [
+            'name' => $target->name,
+            'alias' => $target->alias,
+            'ref' => $target->ref,
+            'phone' => $target->phone,
+            'address_road' => $target->address_road,
+            'address_zip' => $target->address_zip,
+            'address_town' => $target->address_town,
+            'email' => $target->email,
+            'roles' => [$clientRole->id],
+            'permissions' => [$createClientsPermission->id],
+        ])
+        ->assertRedirect();
+
+    expect($target->fresh()->getDirectPermissions()->pluck('name')->all())
+        ->toContain('create clients');
+
+    $this
+        ->actingAs($manager)
+        ->put(route('users.update', ['user' => $target->id], false), [
+            'name' => $target->name,
+            'alias' => $target->alias,
+            'ref' => $target->ref,
+            'phone' => $target->phone,
+            'address_road' => $target->address_road,
+            'address_zip' => $target->address_zip,
+            'address_town' => $target->address_town,
+            'email' => $target->email,
+            'roles' => [$clientRole->id],
+            'permissions' => [$deleteProductsPermission->id],
+        ])
+        ->assertForbidden();
 });

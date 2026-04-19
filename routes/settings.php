@@ -4,6 +4,8 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\UserAdditionalInfoController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
+use App\Models\User;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -68,9 +70,14 @@ Route::middleware('auth')->group(function () {
       ->name('password.update');
 
     Route::get('admin/users/{user}/appearance', function (Request $request) {
-        $user = \App\Models\User::findOrFail($request->route('user'));
+        $user = User::findOrFail($request->route('user'));
+        $authorization = app(UserManagementAuthorizationService::class);
+
         return Inertia::render('settings/appearance', [
             'editingUser' => $user->load(['roles', 'permissions']),
+            'userAbilities' => [
+                'manage_db' => $authorization->canManageClientDatabase($request->user(), $user),
+            ],
         ]);
     })->name('appearance.edit');
 

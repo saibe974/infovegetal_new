@@ -12,9 +12,17 @@ use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\User;
+use App\Services\UserManagementAuthorizationService;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class ProfileController extends Controller
 {
+    public function __construct(
+        private readonly UserManagementAuthorizationService $authorization,
+    ) {
+    }
+
     /**
      * Show the user's profile settings page.
      */
@@ -28,14 +36,20 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $target instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'editingUser' => $target->loadMissing(['roles', 'permissions']),
-            'allRoles' => \Spatie\Permission\Models\Role::with('permissions:id,name')->get(['id', 'name']),
-            'allPermissions' => \Spatie\Permission\Models\Permission::all(['id', 'name']),
+            'allRoles' => Role::query()
+                ->with('permissions:id,name')
+                ->whereIn('name', $this->authorization->assignableRoleNames($request->user(), $target))
+                ->get(['id', 'name']),
+            'allPermissions' => Permission::query()
+                ->whereIn('name', $this->authorization->assignablePermissionNames($request->user(), $target))
+                ->get(['id', 'name']),
             'userAbilities' => [
                 'update' => $request->user()->can('update', $target),
                 'assign_roles' => $request->user()->can('assignRoles', $target),
                 'assign_permissions' => $request->user()->can('assignPermissions', $target),
                 'move' => $request->user()->can('move', $target),
                 'delete' => $request->user()->can('delete', $target),
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
             ],
         ]);
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use App\Models\User;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Inertia\Inertia;
@@ -13,6 +14,11 @@ use Laravel\Fortify\Features;
 
 class TwoFactorAuthenticationController extends Controller implements HasMiddleware
 {
+    public function __construct(
+        private readonly UserManagementAuthorizationService $authorization,
+    ) {
+    }
+
     /**
      * Get the middleware that should be assigned to the controller.
      */
@@ -37,6 +43,9 @@ class TwoFactorAuthenticationController extends Controller implements HasMiddlew
             'editingUser' => $targetUser->load(['roles', 'permissions']),
             'twoFactorEnabled' => $targetUser->hasEnabledTwoFactorAuthentication(),
             'requiresConfirmation' => Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm'),
+            'userAbilities' => [
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $targetUser),
+            ],
         ]);
     }
 }

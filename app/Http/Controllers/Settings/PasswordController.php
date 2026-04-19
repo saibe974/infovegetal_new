@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,11 @@ use Inertia\Response;
 
 class PasswordController extends Controller
 {
+    public function __construct(
+        private readonly UserManagementAuthorizationService $authorization,
+    ) {
+    }
+
     /**
      * Show the user's password settings page.
      */
@@ -21,6 +27,9 @@ class PasswordController extends Controller
         $targetUser = $user ? (is_object($user) ? $user : \App\Models\User::findOrFail($user)) : $request->user();
         return Inertia::render('settings/password', [
             'editingUser' => $targetUser->load(['roles', 'permissions']),
+            'userAbilities' => [
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $targetUser),
+            ],
         ]);
     }
 

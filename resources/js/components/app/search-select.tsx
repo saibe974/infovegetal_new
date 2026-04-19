@@ -80,7 +80,7 @@ export default function SearchSelect({
     }, [JSON.stringify(selection || [])]);
 
     const handleSelectOption = (option: Option) => {
-        const selection = { value: option.value, label: option.value };
+        const selection = { value: option.value, label: option.label };
         if (!selected.some((s) => s.value === selection.value)) {
             const newSelected = [...selected, selection];
             setSelected(newSelected);

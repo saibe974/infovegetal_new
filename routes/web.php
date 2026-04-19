@@ -170,6 +170,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->whereNumber('user')->name('users.update');
     Route::delete('admin/users/{user}', [UserManagementController::class, 'destroy'])->whereNumber('user')->name('users.destroy');
     Route::post('admin/users/{user}/role', [UserManagementController::class, 'updateRole'])->whereNumber('user')->name('users.updateRole');
+    Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->whereNumber('user')->name('users.db');
+    Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->whereNumber('user')->name('users.editDb');
 });
 
 // Gestion des utilisateurs réservée aux admins
@@ -184,10 +186,6 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
 
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
-    
-    // Routes avec {user} après
-    Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->whereNumber('user')->name('users.db');
-    Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->whereNumber('user')->name('users.editDb');
     
     // CSV import/export endpoints for users
     Route::post('admin/users/import/process', [UserManagementController::class, 'process'])->name('users.import.process');

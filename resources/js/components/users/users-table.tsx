@@ -82,7 +82,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                                             : 'outline'
                                             }
                                         >
-                                            {role.name}
+                                            {t(role.name)}
                                         </Badge>
                                     ))
                                 ) : (
@@ -110,7 +110,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                             key={role.id}
                                             value={role.name}
                                         >
-                                            {role.name}
+                                            {t(role.name)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

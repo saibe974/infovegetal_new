@@ -107,7 +107,7 @@ export function UserCard({
                                                         : 'outline'
                                         }
                                     >
-                                        {role.name}
+                                        {t(role.name)}
                                     </Badge>
                                 ))
                             ) : (
@@ -136,7 +136,7 @@ export function UserCard({
                                             key={role.id}
                                             value={role.name}
                                         >
-                                            {role.name}
+                                            {t(role.name)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

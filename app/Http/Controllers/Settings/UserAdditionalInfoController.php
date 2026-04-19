@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserMeta;
 use App\Models\UserOption;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,11 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserAdditionalInfoController extends Controller
 {
+    public function __construct(
+        private readonly UserManagementAuthorizationService $authorization,
+    ) {
+    }
+
     public function edit(Request $request, ?User $user = null): Response
     {
         $target = $user ?? $request->user();
@@ -23,6 +29,9 @@ class UserAdditionalInfoController extends Controller
 
         return Inertia::render('settings/additional-info', [
             'editingUser' => $target->loadMissing(['roles', 'permissions']),
+            'userAbilities' => [
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
+            ],
             'userMeta' => $target->usersMeta()
                 ->orderBy('sort_order')
                 ->orderBy('id')

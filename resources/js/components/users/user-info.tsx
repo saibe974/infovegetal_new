@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useInitials } from '@/hooks/use-initials';
+import { useI18n } from '@/lib/i18n';
 import { type User } from '@/types';
 
 export function UserInfo({
@@ -13,6 +14,7 @@ export function UserInfo({
     showRoles?: boolean;
 }) {
     const getInitials = useInitials();
+    const { t } = useI18n();
 
     return (
         <>
@@ -43,7 +45,7 @@ export function UserInfo({
                                 }
                                 className="text-[10px] px-1 py-0 h-4"
                             >
-                                {role.name}
+                                {t(role.name)}
                             </Badge>
                         ))}
                     </div>

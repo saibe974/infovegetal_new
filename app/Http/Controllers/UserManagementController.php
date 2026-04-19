@@ -349,9 +349,11 @@ class UserManagementController extends Controller
             'editingUser' => $user->setAttribute('permissions', $permissions),
             'isEditingOther' => $request->user()->id !== $user->id,
             // Provide lists for roles and permissions to populate selects
-            'allRoles' => $this->assignableRolesQuery($request)->get(['id', 'name']),
+            'allRoles' => $this->assignableRolesQuery($request, $user)->get(['id', 'name']),
             'allPermissions' => $request->user()->can('assignPermissions', $user)
-                ? Permission::all(['id', 'name'])
+                ? Permission::query()
+                    ->whereIn('name', $this->authorization()->assignablePermissionNames($request->user(), $user))
+                    ->get(['id', 'name'])
                 : collect(),
             'userAbilities' => $this->userAbilities($request, $user),
         ]);
@@ -558,6 +560,18 @@ class UserManagementController extends Controller
         if (isset($validated['permissions'])) {
             $this->authorize('assignPermissions', $user);
 
+            $assignablePermissionNames = $this->authorization()->assignablePermissionNames($me, $user);
+            $assignablePermissionIds = Permission::query()
+                ->whereIn('name', $assignablePermissionNames)
+                ->pluck('id')
+                ->map(fn ($v) => (int) $v)
+                ->all();
+
+            $selectedPermIds = array_map('intval', $validated['permissions']);
+            if (array_diff($selectedPermIds, $assignablePermissionIds) !== []) {
+                abort(403, 'Unauthorized');
+            }
+
             // Determine role ids to compute inherited permissions. If roles were provided in this update
             // use them; otherwise fall back to the user's current roles.
             $roleIds = [];
@@ -573,7 +587,6 @@ class UserManagementController extends Controller
             })->pluck('id')->map(fn($v) => (int)$v)->toArray();
 
             // Compute explicit permissions = selected permissions minus inherited ones
-            $selectedPermIds = array_map('intval', $validated['permissions']);
             $explicitIds = array_values(array_diff($selectedPermIds, $inheritedPermissionIds));
 
             // Sync only explicit permissions on the model (so model_has_permissions contains only overrides)
@@ -817,8 +830,7 @@ class UserManagementController extends Controller
 
     public function editDb(Request $request, User $user): RedirectResponse
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$this->authorization()->canManageClientDatabase($request->user(), $user)) {
             abort(403, 'Unauthorized');
         }
 
@@ -989,16 +1001,16 @@ class UserManagementController extends Controller
      */
     public function db(Request $request, User $user): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (!$this->authorization()->canManageClientDatabase($request->user(), $user)) {
             abort(403, 'Unauthorized');
         }
 
         $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
-        $eligibleUsers = User::query()
+        $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+            ->orderBy('name');
+        $this->authorization()->scopeManageableUsers($request->user(), $eligibleUsersQuery);
+        $eligibleUsers = $eligibleUsersQuery->get(['id', 'name', 'email']);
         $carriers = \App\Models\Carrier::query()
             ->with(['zones:id,carrier_id,name'])
             ->orderBy('name')
@@ -1025,6 +1037,7 @@ class UserManagementController extends Controller
         return Inertia::render('users/db', [
             'user' => $user->load(['roles', 'permissions']),
             'editingUser' => $user,
+            'userAbilities' => $this->userAbilities($request, $user),
             'dbProducts' => $dbProducts,
             'eligibleUsers' => $eligibleUsers,
             'carriers' => $carriers,
@@ -1243,9 +1256,9 @@ class UserManagementController extends Controller
         return app(UserManagementAuthorizationService::class);
     }
 
-    private function assignableRolesQuery(Request $request)
+    private function assignableRolesQuery(Request $request, ?User $target = null)
     {
-        $assignableRoleNames = $this->authorization()->assignableRoleNames($request->user());
+        $assignableRoleNames = $this->authorization()->assignableRoleNames($request->user(), $target);
 
         return Role::with('permissions:id,name')
             ->when(
@@ -1264,6 +1277,7 @@ class UserManagementController extends Controller
             'assign_roles' => $request->user()->can('assignRoles', $user),
             'assign_permissions' => $request->user()->can('assignPermissions', $user),
             'move' => $request->user()->can('move', $user),
+            'manage_db' => $this->authorization()->canManageClientDatabase($request->user(), $user),
         ];
     }
 
