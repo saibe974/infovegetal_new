@@ -22,6 +22,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('settings/profile', [ProfileController::class, 'update'])
         ->name('profile.update');
 
+    Route::get('settings/permissions', [ProfileController::class, 'editPermissions'])
+        ->name('settings.permissions.edit');
+
+    Route::patch('settings/permissions', [ProfileController::class, 'updatePermissions'])
+        ->name('settings.permissions.update');
+
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
 
@@ -63,6 +69,12 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/users/{user}/password', function (Request $request, PasswordController $controller) {
         return $controller->edit($request);
     })->name('password.edit');
+
+    Route::get('admin/users/{user}/permissions', [ProfileController::class, 'editPermissions'])
+        ->name('permissions.edit');
+
+    Route::patch('admin/users/{user}/permissions', [ProfileController::class, 'updatePermissions'])
+        ->name('permissions.update');
 
     Route::put('admin/users/{user}/password', function (Request $request, PasswordController $controller) {
         return $controller->update($request);

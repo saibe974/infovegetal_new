@@ -46,11 +46,12 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const canManageOtherUserSections = isAdmin(effectiveUser);
 
     if (isSelf) {
-        sidebarNavItems.push({
-            title: 'Password',
-            href: editSettingsPassword(),
-            icon: null,
-        },
+        sidebarNavItems.push(
+            {
+                title: 'Password',
+                href: editSettingsPassword(),
+                icon: null,
+            },
             {
                 title: 'Two-Factor Auth',
                 href: showSettingsTwoFactor(),
@@ -69,11 +70,17 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         );
 
     } else if (canManageOtherUserSections) {
-        sidebarNavItems.push({
-            title: 'Password',
-            href: editAdminPassword(userId),
-            icon: null,
-        },
+        sidebarNavItems.push(
+            {
+                title: 'Password',
+                href: editAdminPassword(userId),
+                icon: null,
+            },
+            {
+                title: 'Permissions',
+                href: `/admin/users/${userId}/permissions`,
+                icon: null,
+            },
             {
                 title: 'Two-Factor Auth',
                 href: showAdminTwoFactor(userId),

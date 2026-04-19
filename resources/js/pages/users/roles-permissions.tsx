@@ -6,10 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
+import PermissionsChecklistCard from '@/components/users/permissions-checklist-card';
 
 type RoleItem = { id: number; name: string; permissions?: Array<{ id: number; name: string }> };
 type PermissionItem = { id: number; name: string };
@@ -195,60 +192,27 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
                         </div>
                     </Card>
 
-                    <Card className='p-6 xl:col-span-2 space-y-4'>
-                        <h2 className='text-lg font-medium'>
-                            {t('Permissions for role')}: {selectedRole ? t(selectedRole.name) : '-'}
-                        </h2>
-
-                        <div className='flex gap-2'>
-                            <Input
-                                value={newPermissionName}
-                                onChange={(e) => setNewPermissionName(e.target.value)}
-                                placeholder={t('Permission name')}
-                            />
-                            <Button type='button' onClick={createPermission}>{t('Add')}</Button>
-                        </div>
-
-                        <Separator />
-
-                        <div className='space-y-6'>
-                            {permissionsByDomain.map(([domain, items]) => (
-                                <div key={domain}>
-                                    <h3 className='text-sm font-semibold mb-2'>{domain}</h3>
-                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
-                                        {items.map((permission) => (
-                                            <div key={permission.id} className='flex items-center justify-between border rounded-md px-3 py-2'>
-                                                <Label htmlFor={`perm-${permission.id}`} className='cursor-pointer'>
-                                                    {t(permission.name)}
-                                                </Label>
-                                                <div className='flex items-center gap-2'>
-                                                    <Checkbox
-                                                        id={`perm-${permission.id}`}
-                                                        checked={selectedPermissionIds.includes(permission.id)}
-                                                        onCheckedChange={(checked) => onTogglePermission(permission.id, !!checked)}
-                                                    />
-                                                    <Button
-                                                        type='button'
-                                                        variant='ghost'
-                                                        size='sm'
-                                                        onClick={() => deletePermission(permission)}
-                                                    >
-                                                        {t('Delete')}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className='pt-2'>
-                            <Button type='button' onClick={syncRolePermissions} disabled={!selectedRoleId}>
-                                {t('Save')}
-                            </Button>
-                        </div>
-                    </Card>
+                    <PermissionsChecklistCard
+                        title={`${t('Permissions for role')}: ${selectedRole ? t(selectedRole.name) : '-'}`}
+                        permissionsByDomain={permissionsByDomain}
+                        selectedPermissionIds={selectedPermissionIds}
+                        onTogglePermission={onTogglePermission}
+                        translate={t}
+                        createPermission={{
+                            value: newPermissionName,
+                            onChange: setNewPermissionName,
+                            onCreate: createPermission,
+                            placeholder: t('Permission name'),
+                            addLabel: t('Add'),
+                        }}
+                        onDeletePermission={deletePermission}
+                        submit={{
+                            label: 'Save',
+                            disabled: !selectedRoleId,
+                            onClick: syncRolePermissions,
+                            type: 'button',
+                        }}
+                    />
                 </div>
             </div>
         </>

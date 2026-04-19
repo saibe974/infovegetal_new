@@ -36,6 +36,28 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $target instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'editingUser' => $target->loadMissing(['roles', 'permissions']),
+            'userAbilities' => [
+                'update' => $request->user()->can('update', $target),
+                'assign_roles' => $request->user()->can('assignRoles', $target),
+                'assign_permissions' => $request->user()->can('assignPermissions', $target),
+                'move' => $request->user()->can('move', $target),
+                'delete' => $request->user()->can('delete', $target),
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
+            ],
+        ]);
+    }
+
+    /**
+     * Show the dedicated roles/permissions page.
+     */
+    public function editPermissions(Request $request, ?User $user = null): Response
+    {
+        $target = $user ?? $request->user();
+
+        $this->authorize('update', $target);
+
+        return Inertia::render('settings/permissions', [
+            'editingUser' => $target->loadMissing(['roles', 'permissions']),
             'allRoles' => Role::query()
                 ->with('permissions:id,name')
                 ->whereIn('name', $this->authorization->assignableRoleNames($request->user(), $target))
@@ -79,6 +101,70 @@ class ProfileController extends Controller
         // Redirect back to the same edit page (preserve route name)
         return to_route('profile.edit', ['user' => $target->id])
             ->with('success', 'Profil mis a jour avec succes');
+    }
+
+    /**
+     * Update only roles and permissions for a target user.
+     */
+    public function updatePermissions(Request $request, ?User $user = null): RedirectResponse
+    {
+        $target = $user ?? $request->user();
+        $actor = $request->user();
+
+        $this->authorize('update', $target);
+
+        $validated = $request->validate([
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['integer', 'exists:roles,id'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['integer', 'exists:permissions,id'],
+        ]);
+
+        if (isset($validated['roles'])) {
+            $requestedRoles = Role::query()->whereIn('id', $validated['roles'])->get(['id', 'name']);
+            $requestedRoleNames = $requestedRoles->pluck('name')->all();
+
+            $this->authorize('assignRoles', [$target, $requestedRoleNames]);
+
+            $target->syncRoles($requestedRoleNames);
+        }
+
+        if (isset($validated['permissions'])) {
+            $this->authorize('assignPermissions', $target);
+
+            $assignablePermissionNames = $this->authorization->assignablePermissionNames($actor, $target);
+            $assignablePermissionIds = Permission::query()
+                ->whereIn('name', $assignablePermissionNames)
+                ->pluck('id')
+                ->map(fn ($v) => (int) $v)
+                ->all();
+
+            $selectedPermIds = array_map('intval', $validated['permissions']);
+            if (array_diff($selectedPermIds, $assignablePermissionIds) !== []) {
+                abort(403, 'Unauthorized');
+            }
+
+            $roleIds = isset($validated['roles'])
+                ? array_map('intval', $validated['roles'])
+                : $target->roles()->pluck('id')->map(fn ($v) => (int) $v)->all();
+
+            $inheritedPermissionIds = Permission::query()
+                ->whereHas('roles', fn ($query) => $query->whereIn('id', $roleIds))
+                ->pluck('id')
+                ->map(fn ($v) => (int) $v)
+                ->all();
+
+            $explicitIds = array_values(array_diff($selectedPermIds, $inheritedPermissionIds));
+
+            $permissionNames = Permission::query()
+                ->whereIn('id', $explicitIds)
+                ->pluck('name')
+                ->all();
+
+            $target->syncPermissions($permissionNames);
+        }
+
+        return back()->with('success', 'Roles and permissions updated successfully');
     }
 
     /**
