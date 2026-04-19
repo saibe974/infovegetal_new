@@ -14,6 +14,8 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $actor = $request->user();
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -37,6 +39,14 @@ class UserResource extends JsonResource
                 'id' => $permission->id,
                 'name' => $permission->name,
             ]),
+            'abilities' => $actor ? [
+                'view' => $actor->can('view', $this->resource),
+                'update' => $actor->can('update', $this->resource),
+                'delete' => $actor->can('delete', $this->resource),
+                'assign_roles' => $actor->can('assignRoles', $this->resource),
+                'assign_permissions' => $actor->can('assignPermissions', $this->resource),
+                'move' => $actor->can('move', $this->resource),
+            ] : null,
         ];
     }
 }

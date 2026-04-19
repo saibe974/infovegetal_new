@@ -21,7 +21,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { edit as editAdminUser, update as updateAdminUser } from '@/routes/users';
 import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
-import { getEffectiveUser, isAdmin, isDev } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
 
 export default function Profile({
     mustVerifyEmail,
@@ -50,7 +50,10 @@ export default function Profile({
 
     const effectiveUser = getEffectiveUser(auth);
     const isAdminUser = isAdmin(effectiveUser);
-    const canManageRoles = isAdminUser || isDev(effectiveUser);
+    const userAbilities = (usePage().props as any).userAbilities ?? {};
+    const canManageRoles = !!userAbilities.assign_roles;
+    const canManagePermissions = !!userAbilities.assign_permissions;
+    const canManageParent = !!userAbilities.move;
     const isAdminEditContext = page.url.startsWith('/admin/users/') || isAdminUser;
     const formAction = isAdminEditContext
         ? updateAdminUser.form({ user: targetUser!.id })
@@ -62,10 +65,8 @@ export default function Profile({
     // All possible roles/permissions provided by controller
     const allRoles = (usePage().props as any).allRoles ?? [];
     const allPermissions = (usePage().props as any).allPermissions ?? [];
-    const roleManagementLocked = !isAdminUser && (targetUser?.roles ?? []).some((role: any) => ['admin', 'dev'].includes(role.name));
-    const selectableRoles = isAdminUser
-        ? (allRoles as any[])
-        : ((allRoles as any[]) || []).filter((role) => !['admin', 'dev'].includes(role.name));
+    const roleManagementLocked = !canManageRoles;
+    const selectableRoles = (allRoles as any[]) || [];
 
     const [roleSearch, setRoleSearch] = useState('');
     const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>((targetUser?.roles ?? []).map((r: any) => r.id));
@@ -298,7 +299,7 @@ export default function Profile({
                         )}
 
                         {/* Section Permissions (affiché si l'éditeur est admin) */}
-                        {isAdminUser && (
+                        {canManagePermissions && (
                             <Card className="p-6">
                                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                     <Lock size={20} />
@@ -347,7 +348,7 @@ export default function Profile({
                             </Card>
                         )}
                         {/* Section Parent — visible uniquement en contexte admin */}
-                        {isAdminEditContext && (
+                        {isAdminEditContext && canManageParent && (
                             <Card className="p-6">
                                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                     <Users2Icon size={20} />

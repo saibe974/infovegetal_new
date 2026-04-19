@@ -150,20 +150,7 @@ class UserAdditionalInfoController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        if ((int) $actor->id === (int) $target->id) {
-            return;
-        }
-
-        if ($actor->hasRole('admin')) {
-            return;
-        }
-
-        // Parent users can manage descendants.
-        if (method_exists($actor, 'isAncestorOf') && $actor->isAncestorOf($target)) {
-            return;
-        }
-
-        abort(403, 'Unauthorized');
+        $this->authorize('update', $target);
     }
 
     private function metaKeyOptions(): array

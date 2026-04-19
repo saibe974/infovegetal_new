@@ -17,6 +17,10 @@ import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
 
 type Props = {
     user: User;
+    userAbilities?: {
+        update?: boolean;
+        delete?: boolean;
+    };
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -37,13 +41,13 @@ const formatDate = (date: string | null) => {
     });
 };
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ user }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }) => {
     const { t } = useI18n();
 
     const { auth, locale } = usePage<SharedData>().props;
     const effectiveUser = getEffectiveUser(auth);
-    const canEdit = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
-    const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
+    const canEdit = userAbilities?.update ?? user.abilities?.update ?? isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
+    const canDelete = userAbilities?.delete ?? user.abilities?.delete ?? isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
 
     const handleDelete = (userId: number) => {
         if (confirm(t('Are you sure?'))) {

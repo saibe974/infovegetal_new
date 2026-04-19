@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Cart;
 use App\Models\User;
 use App\Services\PriceCalculatorService;
+use App\Services\UserManagementAuthorizationService;
 use App\Services\UserImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -36,11 +37,10 @@ class UserManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('viewAny', User::class);
 
         $query = User::with(['roles', 'permissions']);
+        $this->authorization()->scopeManageableUsers($request->user(), $query);
         
         $search = $request->get('q');
         if ($search) {
@@ -64,7 +64,7 @@ class UserManagementController extends Controller
         }
 
         $users = $query->orderBy('_lft', 'asc')->paginate(24);
-        $roles = Role::with('permissions:id,name')->get(['id', 'name']);
+        $roles = $this->assignableRolesQuery($request)->get(['id', 'name']);
 
         return Inertia::render('users/index', [
             'q' => $search,
@@ -79,9 +79,7 @@ class UserManagementController extends Controller
      */
     public function treeChildren(Request $request): JsonResponse
     {
-        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('viewAny', User::class);
 
         $validated = $request->validate([
             'parent_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -90,9 +88,15 @@ class UserManagementController extends Controller
             'q' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $treeRootParentId = $this->authorization()->treeRootParentId($request->user());
+
         $parentId = array_key_exists('parent_id', $validated)
             ? ($validated['parent_id'] !== null ? (int) $validated['parent_id'] : null)
             : null;
+
+        if ($parentId === null && $treeRootParentId !== null) {
+            $parentId = $treeRootParentId;
+        }
 
         $offset = (int) ($validated['offset'] ?? 0);
         $limit = (int) ($validated['limit'] ?? 30);
@@ -110,6 +114,8 @@ class UserManagementController extends Controller
             ])
             ->where('parent_id', $parentId)
             ->orderBy('_lft', 'asc');
+
+        $this->authorization()->scopeManageableUsers($request->user(), $query);
 
         if ($search !== '') {
             $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -146,7 +152,7 @@ class UserManagementController extends Controller
 
         $hasChildrenLookup = array_fill_keys($parentsWithChildren, true);
 
-        $items = $users->map(function (User $user) use ($parentId) {
+        $items = $users->map(function (User $user) use ($parentId, $treeRootParentId) {
             return [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -155,7 +161,7 @@ class UserManagementController extends Controller
                 'parent_id' => $user->parent_id,
                 '_lft' => $user->_lft,
                 '_rgt' => $user->_rgt,
-                'depth' => $parentId === null ? 0 : null,
+                'depth' => $parentId === null || $parentId === $treeRootParentId ? 0 : null,
                 'has_children' => false,
             ];
         })->map(function (array $item) use ($hasChildrenLookup) {
@@ -180,9 +186,7 @@ class UserManagementController extends Controller
      */
     public function treeSearch(Request $request): JsonResponse
     {
-        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('viewAny', User::class);
 
         $validated = $request->validate([
             'q' => ['required', 'string', 'max:255'],
@@ -200,7 +204,10 @@ class UserManagementController extends Controller
         $tokens = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
 
-        $matchedIds = User::query()
+        $matchedQuery = User::query()->select('id');
+        $this->authorization()->scopeManageableUsers($request->user(), $matchedQuery);
+
+        $matchedIds = $matchedQuery
             ->select('id')
             ->where(function ($q) use ($tokens, $isSingleNumeric) {
                 if ($isSingleNumeric) {
@@ -225,10 +232,13 @@ class UserManagementController extends Controller
             ]);
         }
 
-        $allUsers = User::query()
+        $allUsersQuery = User::query()
             ->select(['id', 'name', 'email', 'active', 'parent_id', '_lft', '_rgt'])
-            ->orderBy('_lft', 'asc')
-            ->get();
+            ->orderBy('_lft', 'asc');
+
+        $this->authorization()->scopeManageableUsers($request->user(), $allUsersQuery);
+
+        $allUsers = $allUsersQuery->get();
 
         $byId = $allUsers->keyBy('id');
         $keepIds = [];
@@ -303,9 +313,7 @@ class UserManagementController extends Controller
 
     public function show(Request $request, User $user): Response
     {
-        if (!$request->user()->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('view', $user);
 
         $user->load(['roles.permissions']);
         
@@ -320,16 +328,14 @@ class UserManagementController extends Controller
 
         return Inertia::render('users/show', [
             'user' => $user,
+            'userAbilities' => $this->userAbilities($request, $user),
         ]);
     }
 
 
     public function edit(Request $request, User $user): Response
     {
-        // Autorisation: seul l'utilisateur lui-même, un admin ou un dev peut éditer
-        if ($request->user()->id !== $user->id && !$request->user()->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('update', $user);
 
         // Charger les rôles avec leurs permissions (role_has_permissions)
         $user->load('roles.permissions');
@@ -343,32 +349,27 @@ class UserManagementController extends Controller
             'editingUser' => $user->setAttribute('permissions', $permissions),
             'isEditingOther' => $request->user()->id !== $user->id,
             // Provide lists for roles and permissions to populate selects
-            'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),
-            'allPermissions' => Permission::all(['id', 'name']),
+            'allRoles' => $this->assignableRolesQuery($request)->get(['id', 'name']),
+            'allPermissions' => $request->user()->can('assignPermissions', $user)
+                ? Permission::all(['id', 'name'])
+                : collect(),
+            'userAbilities' => $this->userAbilities($request, $user),
         ]);
     }
 
     public function create(Request $request): Response
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('create', User::class);
 
         return Inertia::render('users/form', [
             // Provide lists for roles and permissions to populate selects
-            'allRoles' => Role::with('permissions:id,name')->get(['id', 'name']),
+            'allRoles' => $this->assignableRolesQuery($request)->get(['id', 'name']),
             'allPermissions' => Permission::all(['id', 'name']),
         ]);
     }   
 
     public function store(Request $request): HttpFoundationRedirectResponse
     {Log::info("Creating new user by " . $request->user()->id);
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
@@ -390,6 +391,11 @@ class UserManagementController extends Controller
 
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? []);
         $requestedRoles = Role::whereIn('id', $requestedRoleIds)->get(['id', 'name']);
+    $requestedRoleNames = $requestedRoles->pluck('name')->all();
+    $parent = !empty($validated['parent_id']) ? User::findOrFail((int) $validated['parent_id']) : null;
+
+    $this->authorize('create', [User::class, $parent, $requestedRoleNames]);
+
         $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
 
         $email = trim((string) ($validated['email'] ?? ''));
@@ -432,7 +438,6 @@ class UserManagementController extends Controller
         // Positionner le nouvel utilisateur dans l'arbre
         $parentId = isset($validated['parent_id']) ? (int) $validated['parent_id'] : null;
         if ($parentId) {
-            $parent = User::findOrFail($parentId);
             $user->appendToNode($parent)->save();
         } else {
             $user->saveAsRoot();
@@ -445,6 +450,8 @@ class UserManagementController extends Controller
 
         // Assign permissions
         if (isset($validated['permissions'])) {
+            $this->authorize('assignPermissions', $user);
+
             $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
             $user->syncPermissions($permNames);
         }
@@ -458,19 +465,11 @@ class UserManagementController extends Controller
      */
     public function updateRole(Request $request, User $user): RedirectResponse
     {
-        // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
-
-        // Ne pas permettre à un admin de modifier son propre rôle
-        if ($user->id === $request->user()->id) {
-            return back()->with('error', 'You cannot modify your own role');
-        }
-
         $request->validate([
             'role' => ['required', 'string', 'exists:roles,name'],
         ]);
+
+        $this->authorize('assignRoles', [$user, [$request->role]]);
 
         // Supprimer tous les rôles existants et assigner le nouveau
         $user->syncRoles([$request->role]);
@@ -485,12 +484,10 @@ class UserManagementController extends Controller
     {
         $me = $request->user();
         Log::info("Updating user $user->id by $me->id");
-        $isAdmin = $me->hasRole('admin');
-        $isDev = $me->hasRole('dev');
+        $this->authorize('update', $user);
 
-        if ($me->id !== $user->id && !$me->hasAnyRole(['admin', 'dev'])) {
-            abort(403, 'Unauthorized');
-        }
+        $authorizationActor = $this->authorization()->resolveActor($me);
+        $isAdmin = $authorizationActor->hasRole('admin');
 
 
         $rules = [
@@ -522,77 +519,45 @@ class UserManagementController extends Controller
             $validated['email'] = $validated['email'] ?? $user->email;
         }
 
-        if ($me->id === $user->id || $isAdmin) {
-            $user->name = $validated['name'];
-            $user->alias = $validated['alias'] ?? null;
-            $user->ref = $validated['ref'] ?? null;
-            $user->phone = $validated['phone'] ?? null;
-            $user->address_road = $validated['address_road'] ?? null;
-            $user->address_zip = $validated['address_zip'] ?? null;
-            $user->address_town = $validated['address_town'] ?? null;
-            $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
-            $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
-            $user->email = $validated['email'];
-            $user->save();
+        $user->name = $validated['name'];
+        $user->alias = $validated['alias'] ?? null;
+        $user->ref = $validated['ref'] ?? null;
+        $user->phone = $validated['phone'] ?? null;
+        $user->address_road = $validated['address_road'] ?? null;
+        $user->address_zip = $validated['address_zip'] ?? null;
+        $user->address_town = $validated['address_town'] ?? null;
+        $user->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $user->active;
+        $user->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $user->mailing;
+        $user->email = $validated['email'];
+        $user->save();
 
-            // Déplacement dans l'arbre si parent_id fourni (admin uniquement)
-            if ($isAdmin && array_key_exists('parent_id', $validated)) {
-                $newParentId = $validated['parent_id'] !== null ? (int) $validated['parent_id'] : null;
-                if ($newParentId && $newParentId !== (int) $user->parent_id) {
-                    $parent = User::findOrFail($newParentId);
-                    $user->appendToNode($parent)->save();
-                } elseif ($newParentId === null && $user->parent_id !== null) {
+        if (array_key_exists('parent_id', $validated)) {
+            $newParentId = $validated['parent_id'] !== null ? (int) $validated['parent_id'] : null;
+            $newParent = $newParentId ? User::findOrFail($newParentId) : null;
+
+            if ($newParentId !== (int) $user->parent_id || ($newParent === null && $user->parent_id !== null)) {
+                $this->authorize('move', [$user, $newParent]);
+
+                if ($newParent) {
+                    $user->appendToNode($newParent)->save();
+                } elseif ($user->parent_id !== null) {
                     $user->saveAsRoot();
                 }
             }
         }
 
-        // Roles: admins can manage all roles, devs can manage non-protected roles only.
         if (isset($validated['roles'])) {
-            if (!$isAdmin && !$isDev) {
-            } else {
-                $requestedRoles = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->get(['id', 'name']);
+            $requestedRoles = \Spatie\Permission\Models\Role::whereIn('id', $validated['roles'])->get(['id', 'name']);
+            $requestedRoleNames = $requestedRoles->pluck('name')->toArray();
 
-                if ($isDev && !$isAdmin) {
-                    $protectedRoleNames = ['admin', 'dev'];
-                    $requestedRoleNames = $requestedRoles->pluck('name')->toArray();
-                    $targetHasProtectedRole = $user->roles()->whereIn('name', $protectedRoleNames)->exists();
+            $this->authorize('assignRoles', [$user, $requestedRoleNames]);
 
-                    if ($targetHasProtectedRole) {
-                        return back()->with('error', 'Les comptes admin et dev ne peuvent pas être modifiés par un dev');
-                    }
-
-                    if (!empty(array_intersect($requestedRoleNames, $protectedRoleNames))) {
-                        return back()->with('error', 'Un dev ne peut pas attribuer les rôles admin ou dev');
-                    }
-                }
-
-                // If the real admin account is editing itself, disallow removing own admin role.
-                // In impersonation mode, $me is the impersonated user, so we must resolve the impersonator id.
-                $actorId = $me->id;
-                if ($isAdmin && method_exists($me, 'isImpersonated') && $me->isImpersonated()) {
-                    $impersonatorId = app('impersonate')->getImpersonatorId();
-                    if ($impersonatorId) {
-                        $actorId = (int) $impersonatorId;
-                    }
-                }
-
-                if ($isAdmin && (int) $actorId === (int) $user->id) {
-                    // ensure admin role remains
-                    $current = collect($validated['roles']);
-                    $adminRole = \Spatie\Permission\Models\Role::where('name', 'admin')->value('id');
-                    if ($adminRole && !$current->contains((int)$adminRole)) {
-                        return back()->with('error', 'You cannot remove your own admin role');
-                    }
-                }
-
-                // sync by role ids
-                $user->syncRoles($requestedRoles->pluck('name')->toArray());
-            }
+            $user->syncRoles($requestedRoleNames);
         }
 
-        // Permissions: only admin can change
-        if (isset($validated['permissions']) && $isAdmin) {
+        if (isset($validated['permissions'])) {
+            $this->authorize('assignPermissions', $user);
+
             // Determine role ids to compute inherited permissions. If roles were provided in this update
             // use them; otherwise fall back to the user's current roles.
             $roleIds = [];
@@ -632,10 +597,7 @@ class UserManagementController extends Controller
     public function destroy(Request $request, User $user): RedirectResponse
     {
         $me = $request->user();
-        // Seul l'utilisateur lui-même ou un admin peut supprimer
-        if ($me->id !== $user->id && !$me->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('delete', $user);
 
         // Si suppression de son propre compte, demander le mot de passe et déconnecter
         if ($me->id === $user->id) {
@@ -1274,6 +1236,35 @@ class UserManagementController extends Controller
         $current = Cache::get("import:$id", []);
         $merged = array_merge($current, $state);
         Cache::put("import:$id", $merged, now()->addHour());
+    }
+
+    private function authorization(): UserManagementAuthorizationService
+    {
+        return app(UserManagementAuthorizationService::class);
+    }
+
+    private function assignableRolesQuery(Request $request)
+    {
+        $assignableRoleNames = $this->authorization()->assignableRoleNames($request->user());
+
+        return Role::with('permissions:id,name')
+            ->when(
+                empty($assignableRoleNames),
+                fn ($query) => $query->whereRaw('1 = 0'),
+                fn ($query) => $query->whereIn('name', $assignableRoleNames)
+            );
+    }
+
+    private function userAbilities(Request $request, User $user): array
+    {
+        return [
+            'view' => $request->user()->can('view', $user),
+            'update' => $request->user()->can('update', $user),
+            'delete' => $request->user()->can('delete', $user),
+            'assign_roles' => $request->user()->can('assignRoles', $user),
+            'assign_permissions' => $request->user()->can('assignPermissions', $user),
+            'move' => $request->user()->can('move', $user),
+        ];
     }
 
     /**

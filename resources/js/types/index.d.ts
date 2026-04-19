@@ -180,6 +180,14 @@ export interface User {
     updated_at: string;
     roles?: { id: number; name: string }[];
     permissions?: { id: number; name: string }[];
+    abilities?: {
+        view?: boolean;
+        update?: boolean;
+        delete?: boolean;
+        assign_roles?: boolean;
+        assign_permissions?: boolean;
+        move?: boolean;
+    };
     [key: string]: unknown; // This allows for additional properties...
 }
 

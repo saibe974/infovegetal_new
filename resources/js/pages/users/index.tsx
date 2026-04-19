@@ -28,7 +28,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
-import { getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
 import usersRoutes from '@/routes/users';
@@ -108,7 +108,7 @@ export default withAppLayout(
         const user = auth?.user;
         const effectiveUser = getEffectiveUser(auth);
         const isAuthenticated = !!user;
-        const canManageUsers = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'manage users');
+        const canManageUsers = canAccessUsers(effectiveUser);
         const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
 
 
@@ -119,7 +119,7 @@ export default withAppLayout(
             },
         ];
 
-        if (!isAdmin(effectiveUser) && !isDev(effectiveUser)) {
+        if (!canManageUsers) {
             return (
                 <AppLayout breadcrumbs={breadcrumbs}>
                     <Head title={t('Users management')} />
@@ -140,6 +140,7 @@ export default withAppLayout(
         const canEdit = isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
         const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
         const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import users') || hasPermission(effectiveUser, 'export users') || hasPermission(effectiveUser, 'manage users');
+        const canAddUsers = canCreateUsers(effectiveUser);
 
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -464,12 +465,12 @@ export default withAppLayout(
                         />
                     </div>
 
-                    {canImportExport && (
+                    {(canImportExport || canAddUsers || hasChanges) && (
                         <ButtonsActions
                             cancel={hasChanges ? cancel : undefined}
                             save={hasChanges ? save : undefined}
                             saving={saving}
-                            import={
+                            import={canImportExport ? (
                                 <CsvUploadFilePond
                                     title="Upload CSV"
                                     description="Uploadez un fichier CSV"
@@ -482,11 +483,11 @@ export default withAppLayout(
                                     successRedirectUrl={usersRoutes.index().url}
                                     buttonLabel=""
                                 />
-                            }
-                            export={"/admin/users/export"}
-                            add={() => {
+                            ) : undefined}
+                            export={canImportExport ? "/admin/users/export" : undefined}
+                            add={canAddUsers ? () => {
                                 router.visit('/admin/users/create');
-                            }}
+                            } : undefined}
                         />
 
                     )}

@@ -50,6 +50,30 @@ export function hasAnyPermission(user: User | null | undefined, permissions: str
     return user.permissions.some(p => permissions.includes(p.name));
 }
 
+const hierarchicalUserPermissions = [
+    'manage users',
+    'create clients',
+    'create suppliers',
+    'create commercials',
+    'create guests',
+    'link commercials clients',
+    'link commercials suppliers',
+];
+
+export function canAccessUsers(user: User | null | undefined): boolean {
+    return isAdmin(user) || isDev(user) || hasAnyPermission(user, hierarchicalUserPermissions);
+}
+
+export function canCreateUsers(user: User | null | undefined): boolean {
+    return isAdmin(user) || isDev(user) || hasAnyPermission(user, [
+        'create clients',
+        'create suppliers',
+        'create commercials',
+        'create guests',
+        'create adminstrators',
+    ]);
+}
+
 
 /**
  * Vérifie si l'utilisateur a un rôle spécifique (Raccourci pour 'dev')

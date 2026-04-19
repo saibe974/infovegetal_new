@@ -22,10 +22,7 @@ class ProfileController extends Controller
     {
         $target = $user ?? $request->user();
 
-        // Only the user themself or an admin can view/edit
-        if ($request->user()->id !== $target->id && !$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('update', $target);
 
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $target instanceof MustVerifyEmail,
@@ -33,6 +30,13 @@ class ProfileController extends Controller
             'editingUser' => $target->loadMissing(['roles', 'permissions']),
             'allRoles' => \Spatie\Permission\Models\Role::with('permissions:id,name')->get(['id', 'name']),
             'allPermissions' => \Spatie\Permission\Models\Permission::all(['id', 'name']),
+            'userAbilities' => [
+                'update' => $request->user()->can('update', $target),
+                'assign_roles' => $request->user()->can('assignRoles', $target),
+                'assign_permissions' => $request->user()->can('assignPermissions', $target),
+                'move' => $request->user()->can('move', $target),
+                'delete' => $request->user()->can('delete', $target),
+            ],
         ]);
     }
 
@@ -48,10 +52,7 @@ class ProfileController extends Controller
             'route' => $request->path(),
         ]);
 
-        // Authorization: only self or admin
-        if ($request->user()->id !== $target->id && !$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('update', $target);
 
         $target->fill($request->validated());
 
@@ -89,10 +90,7 @@ class ProfileController extends Controller
             return redirect('/');
         }
 
-        // Otherwise only admin can delete other users
-        if (!$request->user()->hasRole('admin')) {
-            abort(403, 'Unauthorized');
-        }
+        $this->authorize('delete', $target);
 
         $target->delete();
         return back()->with('success', 'User deleted');

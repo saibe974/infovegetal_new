@@ -170,15 +170,41 @@ class User extends Authenticatable implements HasMedia
         return $impersonator ? $impersonator->hasRole($roles, $guard) : false;
     }
 
-    public function hasAnyRole($roles, ?string $guard = null): bool
+    public function hasAnyRole(...$roles): bool
     {
-        if ($this->hasAnyRoleTrait($roles, $guard)) {
+        if ($this->hasAnyRoleTrait(...$roles)) {
             return true;
         }
 
         $impersonator = $this->resolveImpersonator();
 
-        return $impersonator ? $impersonator->hasAnyRole($roles, $guard) : false;
+        return $impersonator ? $impersonator->hasAnyRole(...$roles) : false;
+    }
+
+    public function authorizationActor(): self
+    {
+        return $this->resolveImpersonator() ?? $this;
+    }
+
+    public function isSameAs(self $other): bool
+    {
+        return (int) $this->id === (int) $other->id;
+    }
+
+    public function isSameOrAncestorOf(self $other): bool
+    {
+        return $this->isSameAs($other) || $this->isAncestorOf($other);
+    }
+
+    public function hasProtectedManagementRole(): bool
+    {
+        $protectedRoleNames = ['admin', 'dev'];
+
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->contains(fn ($role) => in_array($role->name, $protectedRoleNames, true));
+        }
+
+        return $this->roles()->whereIn('name', $protectedRoleNames)->exists();
     }
 
     private function resolveImpersonator(): ?self
