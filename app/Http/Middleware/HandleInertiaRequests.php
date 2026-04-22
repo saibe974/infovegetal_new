@@ -60,6 +60,7 @@ class HandleInertiaRequests extends Middleware
         $userArray = null;
         $impersonatorId = null;
         $impersonatorArray = null;
+        $impersonationStrictMode = false;
 
         $formatUser = function (User $user) {
             $user->loadMissing(['roles', 'permissions']);
@@ -84,6 +85,7 @@ class HandleInertiaRequests extends Middleware
             // Utiliser le service du package laravel-impersonate
             if ($user->isImpersonated()) {
                 $impersonatorId = app('impersonate')->getImpersonatorId();
+                $impersonationStrictMode = (bool) $request->session()->get('impersonation.strict_mode', false);
                 if ($impersonatorId) {
                     $impersonator = User::find($impersonatorId);
                     if ($impersonator) {
@@ -107,6 +109,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user ? $userArray : null,
                 'impersonate_from' => $impersonatorId,
                 'impersonator' => $impersonatorArray,
+                'impersonation_strict_mode' => $impersonationStrictMode,
             ],
             'cart_refresh_token' => $user ? Cache::get('cart:refresh:' . $user->id) : null,
             'users' => $users,

@@ -206,6 +206,10 @@ class User extends Authenticatable implements HasMedia
 
     private function resolveImpersonator(): ?self
     {
+        if ($this->isImpersonationStrictModeEnabled()) {
+            return null;
+        }
+
         if (!method_exists($this, 'isImpersonated') || !$this->isImpersonated()) {
             return null;
         }
@@ -217,5 +221,20 @@ class User extends Authenticatable implements HasMedia
         }
 
         return self::find($impersonatorId);
+    }
+
+    private function isImpersonationStrictModeEnabled(): bool
+    {
+        if (!app()->bound('request')) {
+            return false;
+        }
+
+        $request = request();
+
+        if (!$request || !$request->hasSession()) {
+            return false;
+        }
+
+        return (bool) $request->session()->get('impersonation.strict_mode', false);
     }
 }

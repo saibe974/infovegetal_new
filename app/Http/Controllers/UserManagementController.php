@@ -599,6 +599,36 @@ class UserManagementController extends Controller
             'items.*.position' => ['required','integer','min:0'],
         ]);
 
+        $allReferencedIds = collect($validated['items'])
+            ->flatMap(fn (array $item) => [(int) $item['id'], $item['parent_id'] !== null ? (int) $item['parent_id'] : null])
+            ->filter(fn ($id) => $id !== null)
+            ->unique()
+            ->values();
+
+        $usersById = User::query()
+            ->whereIn('id', $allReferencedIds)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($validated['items'] as $item) {
+            $target = $usersById->get((int) $item['id']);
+
+            if (!$target instanceof User) {
+                abort(422, 'Invalid target user.');
+            }
+
+            $newParent = null;
+            if ($item['parent_id'] !== null) {
+                $newParent = $usersById->get((int) $item['parent_id']);
+
+                if (!$newParent instanceof User) {
+                    abort(422, 'Invalid parent user.');
+                }
+            }
+
+            $this->authorize('move', [$target, $newParent]);
+        }
+
         Log::info('users.reorder.validated', [
             'request_id' => $requestId,
             'item_count' => count($validated['items'] ?? []),

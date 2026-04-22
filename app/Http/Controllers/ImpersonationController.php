@@ -10,6 +10,8 @@ use Lab404\Impersonate\Services\ImpersonateManager;
 
 class ImpersonationController extends Controller
 {
+    private const STRICT_MODE_SESSION_KEY = 'impersonation.strict_mode';
+
     public function __construct(private readonly ImpersonateManager $manager)
     {
     }
@@ -36,6 +38,9 @@ class ImpersonationController extends Controller
         }
 
         if ($this->manager->take($request->user(), $target, $guardName)) {
+            // Par defaut, on reste en mode gestion (droits admin conserves).
+            $request->session()->put(self::STRICT_MODE_SESSION_KEY, false);
+
             Log::info('users.impersonation.started', [
                 'actor_id' => $request->user()->authorizationActor()->id,
                 'effective_user_id' => $request->user()->id,
@@ -61,6 +66,7 @@ class ImpersonationController extends Controller
         $effectiveUser = $request->user();
 
         $this->manager->leave();
+        $request->session()->forget(self::STRICT_MODE_SESSION_KEY);
 
         Log::info('users.impersonation.ended', [
             'actor_id' => $actor->id,
@@ -71,6 +77,28 @@ class ImpersonationController extends Controller
         if ($leaveRedirect !== 'back') {
             return redirect()->to($leaveRedirect);
         }
+
+        return redirect()->back();
+    }
+
+    public function setMode(Request $request): RedirectResponse
+    {
+        if (!$this->manager->isImpersonating()) {
+            abort(403, 'Not impersonating');
+        }
+
+        $validated = $request->validate([
+            'strict' => ['required', 'boolean'],
+        ]);
+
+        $strict = (bool) $validated['strict'];
+        $request->session()->put(self::STRICT_MODE_SESSION_KEY, $strict);
+
+        Log::info('users.impersonation.mode.changed', [
+            'actor_id' => $request->user()->authorizationActor()->id,
+            'effective_user_id' => $request->user()->id,
+            'strict' => $strict,
+        ]);
 
         return redirect()->back();
     }

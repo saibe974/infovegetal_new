@@ -13,7 +13,6 @@ import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings, UserCheck } from 'lucide-react';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
-import { useState } from 'react';
 
 interface UserMenuContentProps {
     user: User;
@@ -39,7 +38,6 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     };
 
     const isImpersonating = !!auth.impersonate_from;
-
     return (
         <>
             <DropdownMenuLabel className="p-0 font-normal">

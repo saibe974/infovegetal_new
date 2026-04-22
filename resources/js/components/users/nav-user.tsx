@@ -3,6 +3,7 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     SidebarMenu,
     SidebarMenuButton,
@@ -13,9 +14,8 @@ import { UserInfo } from '@/components/users/user-info';
 import { UserMenuContent } from '@/components/users/user-menu-content';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { type SharedData, type User } from '@/types';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ChevronDown, UserCheck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 export function NavUser() {
     const pageData = usePage<SharedData>().props;
@@ -27,6 +27,17 @@ export function NavUser() {
     // L'utilisateur actuellement connecté (peut être impersoné)
     const currentUser = auth.user as User;
     const isImpersonating = !!auth.impersonate_from;
+    const isStrictMode = !!auth.impersonation_strict_mode;
+
+    const toggleStrictMode = (checked: boolean | 'indeterminate') => {
+        router.post('/impersonate/mode', {
+            strict: checked === true,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
+    };
 
     return (
         <SidebarMenu>
@@ -42,6 +53,20 @@ export function NavUser() {
                             <UserInfo user={currentUser} showRoles={isImpersonating ? true : false} />
                             {isImpersonating && (
                                 <UserCheck size={16} className="ml-1 text-amber-500" />
+                            )}
+                            {isImpersonating && (
+                                <div
+                                    className="ml-2 flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    <Checkbox
+                                        checked={isStrictMode}
+                                        onCheckedChange={toggleStrictMode}
+                                        aria-label="Mode strict d'impersonation"
+                                    />
+                                    <span className="text-xs text-muted-foreground">Strict</span>
+                                </div>
                             )}
                             <ChevronDown className="ml-auto size-4" />
                         </SidebarMenuButton>

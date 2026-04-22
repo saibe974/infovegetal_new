@@ -48,6 +48,11 @@ class ImpersonateRoleMiddleware
 
     private function resolveImpersonator(User $user): ?User
     {
+        $request = request();
+        if ($request && $request->hasSession() && (bool) $request->session()->get('impersonation.strict_mode', false)) {
+            return null;
+        }
+
         if (!method_exists($user, 'isImpersonated') || !$user->isImpersonated()) {
             return null;
         }

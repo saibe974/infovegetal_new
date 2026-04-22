@@ -1,10 +1,17 @@
 import { User } from '@/types';
 
-type AuthLike = { user?: User | null; impersonator?: User | null } | null | undefined;
+type AuthLike = {
+    user?: User | null;
+    impersonator?: User | null;
+    impersonation_strict_mode?: boolean;
+} | null | undefined;
 
 export function getEffectiveUser(auth: AuthLike): User | null | undefined {
     if (!auth) return undefined;
     if (typeof auth === 'object' && 'user' in auth) {
+        if (auth.impersonation_strict_mode) {
+            return auth.user ?? null;
+        }
         return auth.impersonator ?? auth.user ?? null;
     }
     return auth as User;

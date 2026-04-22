@@ -142,6 +142,7 @@ export interface Auth {
     user?: User | null;
     impersonate_from?: number | null;
     impersonator?: User | null;
+    impersonation_strict_mode?: boolean;
 }
 
 export interface SharedData {

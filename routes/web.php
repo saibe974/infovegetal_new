@@ -213,6 +213,10 @@ Route::middleware(['auth'])->group(function () {
     // Leave: possible uniquement quand une impersonation est active.
     Route::get('/impersonate/leave', [ImpersonationController::class, 'leave'])
         ->name('impersonate.leave');
+
+    // Toggle mode strict/gestion pendant une impersonation.
+    Route::post('/impersonate/mode', [ImpersonationController::class, 'setMode'])
+        ->name('impersonate.mode');
 });
 
 
