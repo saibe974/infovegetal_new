@@ -12,6 +12,7 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\CarrierController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\RolePermissionManagementController;
+use App\Http\Controllers\ImpersonationController;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -201,14 +202,18 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/users/import/progress/{id}', [UserManagementController::class, 'progress'])->name('users.import.progress');
     Route::get('admin/users/import/report/{id}', [UserManagementController::class, 'report'])->name('users.import.report');
 
-    // Route d'impersonation - take (nécessite admin)
-    Route::get('/impersonate/take/{id}/{guardName?}',
-        '\Lab404\Impersonate\Controllers\ImpersonateController@take')->name('impersonate');
 });
 
-// Route de leave - sans vérification de rôle (le contrôleur fait sa propre vérification)
-Route::get('/impersonate/leave',
-    '\Lab404\Impersonate\Controllers\ImpersonateController@leave')->name('impersonate.leave');
+Route::middleware(['auth'])->group(function () {
+    // Route d'impersonation - la policy users.impersonate.* pilote l'autorisation.
+    Route::get('/impersonate/take/{id}/{guardName?}', [ImpersonationController::class, 'take'])
+        ->whereNumber('id')
+        ->name('impersonate');
+
+    // Leave: possible uniquement quand une impersonation est active.
+    Route::get('/impersonate/leave', [ImpersonationController::class, 'leave'])
+        ->name('impersonate.leave');
+});
 
 
 Route::get('/csrf-refresh', function () {

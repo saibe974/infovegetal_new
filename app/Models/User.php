@@ -16,6 +16,7 @@ use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use App\Services\UserManagementAuthorizationService;
 
 class User extends Authenticatable implements HasMedia
 {
@@ -141,13 +142,9 @@ class User extends Authenticatable implements HasMedia
      */
     public function canImpersonate(): bool
     {
-        if ($this->hasRoleTrait('admin')) {
-            return true;
-        }
+        $authorization = app(UserManagementAuthorizationService::class);
 
-        $impersonator = $this->resolveImpersonator();
-
-        return $impersonator ? $impersonator->hasRoleTrait('admin') : false;
+        return $authorization->canImpersonateAny($this) || $this->hasRoleTrait('admin');
     }
 
     /**
@@ -156,7 +153,7 @@ class User extends Authenticatable implements HasMedia
      */
     public function canBeImpersonated(): bool
     {
-        return !$this->hasRole('admin');
+        return !$this->hasProtectedManagementRole();
     }
 
     public function hasRole($roles, ?string $guard = null): bool

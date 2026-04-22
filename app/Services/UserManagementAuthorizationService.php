@@ -15,6 +15,86 @@ class UserManagementAuthorizationService
     private const PROTECTED_ROLE_NAMES = ['admin', 'dev'];
 
     /**
+     * @var array<int, string>
+     */
+    private const NON_DELEGABLE_PERMISSION_NAMES = [
+        'users.assign_roles.all',
+        'users.assign_permissions.all',
+        'users.impersonate.all',
+        'users.delete.all',
+        'users.move.all',
+    ];
+
+    /**
+     * @var array<string, array{all: string, branch: string, legacy: array<int, string>}>
+     */
+    private const USER_ACTION_PERMISSIONS = [
+        'view' => [
+            'all' => 'users.view.all',
+            'branch' => 'users.view.branch',
+            'legacy' => [
+                'manage users',
+                'create clients',
+                'create suppliers',
+                'create commercials',
+                'create guests',
+                'link commercials clients',
+                'link commercials suppliers',
+            ],
+        ],
+        'create' => [
+            'all' => 'users.create.all',
+            'branch' => 'users.create.branch',
+            'legacy' => [
+                'manage users',
+                'create clients',
+                'create suppliers',
+                'create commercials',
+                'create guests',
+                'create adminstrators',
+            ],
+        ],
+        'update' => [
+            'all' => 'users.update.all',
+            'branch' => 'users.update.branch',
+            'legacy' => [
+                'manage users',
+            ],
+        ],
+        'delete' => [
+            'all' => 'users.delete.all',
+            'branch' => 'users.delete.branch',
+            'legacy' => [
+                'manage users',
+            ],
+        ],
+        'move' => [
+            'all' => 'users.move.all',
+            'branch' => 'users.move.branch',
+            'legacy' => [],
+        ],
+        'assign_roles' => [
+            'all' => 'users.assign_roles.all',
+            'branch' => 'users.assign_roles.branch',
+            'legacy' => [
+                'manage users',
+            ],
+        ],
+        'assign_permissions' => [
+            'all' => 'users.assign_permissions.all',
+            'branch' => 'users.assign_permissions.branch',
+            'legacy' => [
+                'manage users',
+            ],
+        ],
+        'impersonate' => [
+            'all' => 'users.impersonate.all',
+            'branch' => 'users.impersonate.branch',
+            'legacy' => [],
+        ],
+    ];
+
+    /**
      * @var array<string, string>
      */
     private const ROLE_CREATION_PERMISSION_MAP = [
@@ -56,19 +136,34 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        return $this->isGlobalManager($actor) || $this->hasHierarchicalUserAccess($actor);
+        $scope = $this->resolveUserActionScope($actor, 'view');
+
+        return $scope['all'] || $scope['branch'];
     }
 
     public function canView(User $actor, User $target): bool
     {
-        return $this->canManageTarget($actor, $target, allowSelf: true);
+        $actor = $this->resolveActor($actor);
+
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        return $this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'view',
+            allowSelf: true,
+            forbidAncestorTargets: false,
+        );
     }
 
     public function canCreate(User $actor, ?User $parent = null, array $requestedRoleNames = []): bool
     {
         $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'create');
 
-        if (!$this->canViewAny($actor)) {
+        if (!$scope['all'] && !$scope['branch']) {
             return false;
         }
 
@@ -76,7 +171,15 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if ($this->isGlobalManager($actor)) {
+        if ($parent && $parent->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        if ($parent && $parent->isAncestorOf($actor)) {
+            return false;
+        }
+
+        if ($scope['all']) {
             return true;
         }
 
@@ -84,24 +187,72 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        return $actor->isSameOrAncestorOf($parent) && !$parent->hasProtectedManagementRole();
+        if ($actor->isSameAs($parent)) {
+            // scope['branch'] est vrai ici (all a déjà été géré) :
+            // un acteur avec le droit de créer dans sa branche peut se choisir comme parent.
+            return true;
+        }
+
+        return $actor->isAncestorOf($parent);
+    }
+
+    public function canCreateAny(User $actor): bool
+    {
+        $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'create');
+
+        return $scope['all'] || $scope['branch'];
     }
 
     public function canUpdate(User $actor, User $target): bool
     {
-        return $this->canManageTarget($actor, $target, allowSelf: true);
+        $actor = $this->resolveActor($actor);
+
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        return $this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'update',
+            allowSelf: true,
+            forbidAncestorTargets: true,
+        );
     }
 
     public function canDelete(User $actor, User $target): bool
     {
-        return $this->canManageTarget($actor, $target, allowSelf: true);
+        $actor = $this->resolveActor($actor);
+
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        return $this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'delete',
+            allowSelf: true,
+            forbidAncestorTargets: true,
+        );
     }
 
     public function canAssignRoles(User $actor, User $target, array $requestedRoleNames = []): bool
     {
         $actor = $this->resolveActor($actor);
 
-        if (!$this->canManageTarget($actor, $target, allowSelf: true)) {
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        if (!$this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'assign_roles',
+            allowSelf: false,
+            forbidAncestorTargets: true,
+        )) {
             return false;
         }
 
@@ -112,31 +263,44 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if (!$this->canManageTarget($actor, $target, allowSelf: true)) {
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
             return false;
         }
 
-        if ($this->isGlobalManager($actor)) {
-            return true;
-        }
-
-        return $this->hasPermission($actor, 'manage users');
+        return $this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'assign_permissions',
+            allowSelf: false,
+            forbidAncestorTargets: true,
+        );
     }
 
     public function canMove(User $actor, User $target, ?User $newParent = null): bool
     {
         $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'move');
 
-        if (!$actor->hasRole('admin')) {
+        if (!$scope['all'] && !$scope['branch']) {
             return false;
         }
 
-        if (!$this->canManageTarget($actor, $target, allowSelf: true)) {
+        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        if (!$this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'move',
+            allowSelf: false,
+            forbidAncestorTargets: true,
+        )) {
             return false;
         }
 
         if ($newParent === null) {
-            return true;
+            return $scope['all'];
         }
 
         if ((int) $newParent->id === (int) $target->id) {
@@ -147,7 +311,57 @@ class UserManagementAuthorizationService
             return false;
         }
 
+        if ($newParent->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+            return false;
+        }
+
+        if ($newParent->isAncestorOf($actor)) {
+            return false;
+        }
+
+        if ($scope['all']) {
+            return true;
+        }
+
+        if ($actor->isSameAs($newParent)) {
+            return false;
+        }
+
+        if (!$actor->isAncestorOf($newParent)) {
+            return false;
+        }
+
         return true;
+    }
+
+    public function canImpersonate(User $actor, User $target): bool
+    {
+        $actor = $this->resolveActor($actor);
+
+        if ($actor->isSameAs($target)) {
+            return false;
+        }
+
+        // Les comptes techniques/protegés ne doivent jamais être impersonés.
+        if ($target->hasProtectedManagementRole()) {
+            return false;
+        }
+
+        return $this->canAccessTargetByScope(
+            $actor,
+            $target,
+            'impersonate',
+            allowSelf: false,
+            forbidAncestorTargets: true,
+        );
+    }
+
+    public function canImpersonateAny(User $actor): bool
+    {
+        $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'impersonate');
+
+        return $scope['all'] || $scope['branch'];
     }
 
     public function canManageClientDatabase(User $actor, User $target): bool
@@ -222,22 +436,61 @@ class UserManagementAuthorizationService
             return [];
         }
 
-        if ($actor->hasRole('admin')) {
-            return Permission::query()->pluck('name')->all();
+        return $actor->getAllPermissions()
+            ->pluck('name')
+            ->filter(fn (string $name) => !in_array($name, self::NON_DELEGABLE_PERMISSION_NAMES, true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, int> $selectedPermissionIds
+     */
+    public function arePermissionIdsDelegable(User $actor, User $target, array $selectedPermissionIds): bool
+    {
+        $selectedPermissionIds = array_values(array_unique(array_map('intval', $selectedPermissionIds)));
+
+        if (empty($selectedPermissionIds)) {
+            return true;
         }
 
-        return $actor->getAllPermissions()->pluck('name')->unique()->values()->all();
+        $assignablePermissionNames = $this->assignablePermissionNames($actor, $target);
+        $assignablePermissionIds = Permission::query()
+            ->whereIn('name', $assignablePermissionNames)
+            ->pluck('id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
+
+        return array_diff($selectedPermissionIds, $assignablePermissionIds) === [];
+    }
+
+    /**
+     * @param array<int, int> $selectedPermissionIds
+     * @param array<int, int> $roleIds
+     * @return array<int, string>
+     */
+    public function explicitPermissionNames(array $selectedPermissionIds, array $roleIds): array
+    {
+        $selectedPermissionIds = array_values(array_unique(array_map('intval', $selectedPermissionIds)));
+
+        if (empty($selectedPermissionIds)) {
+            return [];
+        }
+
+        return Permission::query()->whereIn('id', $selectedPermissionIds)->pluck('name')->all();
     }
 
     public function scopeManageableUsers(User $actor, Builder $query): Builder
     {
         $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'view');
 
-        if ($this->isGlobalManager($actor)) {
+        if ($scope['all']) {
             return $query;
         }
 
-        if (!$this->hasHierarchicalUserAccess($actor)) {
+        if (!$scope['branch']) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -252,12 +505,13 @@ class UserManagementAuthorizationService
     public function treeRootParentId(User $actor): ?int
     {
         $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'view');
 
-        if ($this->isGlobalManager($actor)) {
+        if ($scope['all']) {
             return null;
         }
 
-        if (!$this->hasHierarchicalUserAccess($actor)) {
+        if (!$scope['branch']) {
             return null;
         }
 
@@ -270,6 +524,10 @@ class UserManagementAuthorizationService
 
         if ($allowSelf && $actor->isSameAs($target)) {
             return true;
+        }
+
+        if ($target->isAncestorOf($actor)) {
+            return false;
         }
 
         if ($target->hasProtectedManagementRole() && !$actor->hasRole('admin')) {
@@ -319,7 +577,16 @@ class UserManagementAuthorizationService
 
     private function hasRoleManagementCapability(User $actor): bool
     {
-        return $actor->hasAnyRole(['admin', 'dev']) || $this->hasPermission($actor, 'manage users');
+        $scope = $this->resolveUserActionScope($actor, 'assign_roles');
+
+        return $scope['all'] || $scope['branch'];
+    }
+
+    private function hasLegacyCreateSelfParentCapability(User $actor): bool
+    {
+        $createConfig = self::USER_ACTION_PERMISSIONS['create'];
+
+        return $actor->getAllPermissions()->pluck('name')->intersect($createConfig['legacy'])->isNotEmpty();
     }
 
     private function hasOwnClientManagementCapability(User $actor): bool
@@ -336,9 +603,9 @@ class UserManagementAuthorizationService
 
     private function hasHierarchicalUserAccess(User $actor): bool
     {
-        $permissionNames = $actor->getAllPermissions()->pluck('name');
+        $scope = $this->resolveUserActionScope($actor, 'view');
 
-        return $permissionNames->intersect(self::HIERARCHICAL_USER_PERMISSION_NAMES)->isNotEmpty();
+        return $scope['branch'];
     }
 
     private function hasPermission(User $actor, string $permissionName): bool
@@ -353,5 +620,60 @@ class UserManagementAuthorizationService
         }
 
         return $user->roles()->where('name', $roleName)->exists();
+    }
+
+    /**
+     * @return array{all: bool, branch: bool}
+     */
+    private function resolveUserActionScope(User $actor, string $action): array
+    {
+        $config = self::USER_ACTION_PERMISSIONS[$action] ?? null;
+        if ($config === null) {
+            return ['all' => false, 'branch' => false];
+        }
+
+        $hasAll = $this->hasPermission($actor, $config['all']) || $this->isGlobalManager($actor);
+
+        $hasBranch = $hasAll
+            || $this->hasPermission($actor, $config['branch'])
+            || $actor->getAllPermissions()->pluck('name')->intersect($config['legacy'])->isNotEmpty();
+
+        return [
+            'all' => $hasAll,
+            'branch' => $hasBranch,
+        ];
+    }
+
+    private function canManageProtectedTarget(User $actor): bool
+    {
+        // Compatibilite: seuls les admins globaux peuvent gerer des comptes proteges.
+        return $actor->hasRole('admin');
+    }
+
+    private function canAccessTargetByScope(
+        User $actor,
+        User $target,
+        string $action,
+        bool $allowSelf,
+        bool $forbidAncestorTargets,
+    ): bool {
+        if ($allowSelf && $actor->isSameAs($target)) {
+            return true;
+        }
+
+        if ($forbidAncestorTargets && $target->isAncestorOf($actor)) {
+            return false;
+        }
+
+        $scope = $this->resolveUserActionScope($actor, $action);
+        if ($scope['all']) {
+            return true;
+        }
+
+        if (!$scope['branch']) {
+            return false;
+        }
+
+        return $actor->isAncestorOf($target);
     }
 }

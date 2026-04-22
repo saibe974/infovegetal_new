@@ -27,6 +27,11 @@ class UserPolicy
         return $this->authorization->canCreate($user, $parent, $requestedRoleNames);
     }
 
+    public function createAny(User $user): bool
+    {
+        return $this->authorization->canCreateAny($user);
+    }
+
     public function update(User $user, User $target): bool
     {
         return $this->authorization->canUpdate($user, $target);
@@ -50,5 +55,10 @@ class UserPolicy
     public function move(User $user, User $target, ?User $newParent = null): bool
     {
         return $this->authorization->canMove($user, $target, $newParent);
+    }
+
+    public function impersonate(User $user, User $target): bool
+    {
+        return $this->authorization->canImpersonate($user, $target);
     }
 }

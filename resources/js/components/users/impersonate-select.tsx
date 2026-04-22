@@ -4,7 +4,7 @@ import SearchSelect from '@/components/app/search-select';
 import { type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
-import { take as impersonateTake } from '@/actions/Lab404/Impersonate/Controllers/ImpersonateController';
+import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui/button';
 

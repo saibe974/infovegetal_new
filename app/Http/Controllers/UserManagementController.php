@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Users\UserStoreRequest;
+use App\Http\Requests\Users\UserUpdateRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Cart;
 use App\Models\User;
@@ -361,7 +363,7 @@ class UserManagementController extends Controller
 
     public function create(Request $request): Response
     {
-        $this->authorize('create', User::class);
+        $this->authorize('createAny', User::class);
 
         return Inertia::render('users/form', [
             // Provide lists for roles and permissions to populate selects
@@ -370,33 +372,16 @@ class UserManagementController extends Controller
         ]);
     }   
 
-    public function store(Request $request): HttpFoundationRedirectResponse
+    public function store(UserStoreRequest $request): HttpFoundationRedirectResponse
     {Log::info("Creating new user by " . $request->user()->id);
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias'],
-            'ref' => ['nullable', 'string', 'max:50'],
-            'phone' => ['nullable', 'string', 'max:25'],
-            'address_road' => ['nullable', 'string', 'max:255'],
-            'address_zip' => ['nullable', 'string', 'max:32'],
-            'address_town' => ['nullable', 'string', 'max:120'],
-            'active' => ['sometimes', 'boolean'],
-            'mailing' => ['sometimes', 'boolean'],
-            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['nullable', 'string', 'min:8'],
-            'roles' => ['sometimes', 'array'],
-            'roles.*' => ['integer', 'exists:roles,id'],
-            'permissions' => ['sometimes', 'array'],
-            'permissions.*' => ['integer', 'exists:permissions,id'],
-            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
-        ]);
+        $validated = $request->validated();
 
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? []);
         $requestedRoles = Role::whereIn('id', $requestedRoleIds)->get(['id', 'name']);
-    $requestedRoleNames = $requestedRoles->pluck('name')->all();
-    $parent = !empty($validated['parent_id']) ? User::findOrFail((int) $validated['parent_id']) : null;
+        $requestedRoleNames = $requestedRoles->pluck('name')->all();
+        $parent = !empty($validated['parent_id']) ? User::findOrFail((int) $validated['parent_id']) : $request->user();
 
-    $this->authorize('create', [User::class, $parent, $requestedRoleNames]);
+        $this->authorize('create', [User::class, $parent, $requestedRoleNames]);
 
         $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
 
@@ -437,9 +422,8 @@ class UserManagementController extends Controller
             'password' => bcrypt($password),
         ]);
 
-        // Positionner le nouvel utilisateur dans l'arbre
-        $parentId = isset($validated['parent_id']) ? (int) $validated['parent_id'] : null;
-        if ($parentId) {
+        // Positionner le nouvel utilisateur dans l'arbre en utilisant le parent resolu.
+        if ($parent) {
             $user->appendToNode($parent)->save();
         } else {
             $user->saveAsRoot();
@@ -454,8 +438,13 @@ class UserManagementController extends Controller
         if (isset($validated['permissions'])) {
             $this->authorize('assignPermissions', $user);
 
-            $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $validated['permissions'])->pluck('name')->toArray();
-            $user->syncPermissions($permNames);
+            $selectedPermIds = array_map('intval', $validated['permissions']);
+            if (!$this->authorization()->arePermissionIdsDelegable($request->user(), $user, $selectedPermIds)) {
+                abort(403, 'Unauthorized');
+            }
+
+            $permissionNames = $this->authorization()->explicitPermissionNames($selectedPermIds, $requestedRoleIds);
+            $user->syncPermissions($permissionNames);
         }
 
         // Redirige vers la page d'édition du nouvel utilisateur
@@ -482,35 +471,13 @@ class UserManagementController extends Controller
     /**
      * Update user's basic info, roles and permissions (admin or self limited).
      */
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(UserUpdateRequest $request, User $user): RedirectResponse
     {
         $me = $request->user();
         Log::info("Updating user $user->id by $me->id");
         $this->authorize('update', $user);
 
-        $authorizationActor = $this->authorization()->resolveActor($me);
-        $isAdmin = $authorizationActor->hasRole('admin');
-
-
-        $rules = [
-            'name' => ['required', 'string', 'max:255'],
-            'alias' => ['nullable', 'string', 'max:255', 'unique:users,alias,' . $user->id],
-            'ref' => ['nullable', 'string', 'max:50'],
-            'phone' => ['nullable', 'string', 'max:25'],
-            'address_road' => ['nullable', 'string', 'max:255'],
-            'address_zip' => ['nullable', 'string', 'max:32'],
-            'address_town' => ['nullable', 'string', 'max:120'],
-            'active' => ['nullable', 'boolean'],
-            'mailing' => ['nullable', 'boolean'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'roles' => ['nullable', 'array'],
-            'roles.*' => ['integer', 'exists:roles,id'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['integer', 'exists:permissions,id'],
-            'parent_id' => ['nullable', 'integer', 'exists:users,id'],
-        ];
-
-        $validated = $request->validate($rules);
+        $validated = $request->validated();
 
         // Détecter le rôle group pour rendre l'email optionnel
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? $user->roles()->pluck('id')->toArray());
@@ -559,16 +526,8 @@ class UserManagementController extends Controller
 
         if (isset($validated['permissions'])) {
             $this->authorize('assignPermissions', $user);
-
-            $assignablePermissionNames = $this->authorization()->assignablePermissionNames($me, $user);
-            $assignablePermissionIds = Permission::query()
-                ->whereIn('name', $assignablePermissionNames)
-                ->pluck('id')
-                ->map(fn ($v) => (int) $v)
-                ->all();
-
             $selectedPermIds = array_map('intval', $validated['permissions']);
-            if (array_diff($selectedPermIds, $assignablePermissionIds) !== []) {
+            if (!$this->authorization()->arePermissionIdsDelegable($me, $user, $selectedPermIds)) {
                 abort(403, 'Unauthorized');
             }
 
@@ -581,21 +540,8 @@ class UserManagementController extends Controller
                 $roleIds = $user->roles()->pluck('id')->map(fn($v) => (int)$v)->toArray();
             }
 
-            // Permissions inherited from the selected/current roles
-            $inheritedPermissionIds = \Spatie\Permission\Models\Permission::whereHas('roles', function ($q) use ($roleIds) {
-                $q->whereIn('id', $roleIds);
-            })->pluck('id')->map(fn($v) => (int)$v)->toArray();
-
-            // Compute explicit permissions = selected permissions minus inherited ones
-            $explicitIds = array_values(array_diff($selectedPermIds, $inheritedPermissionIds));
-
-            // Sync only explicit permissions on the model (so model_has_permissions contains only overrides)
-            $permNames = [];
-            if (!empty($explicitIds)) {
-                $permNames = \Spatie\Permission\Models\Permission::whereIn('id', $explicitIds)->pluck('name')->toArray();
-            }
-
-            $user->syncPermissions($permNames);
+            $permissionNames = $this->authorization()->explicitPermissionNames($selectedPermIds, $roleIds);
+            $user->syncPermissions($permissionNames);
         }
 
         // Redirection vers la page d'édition du profil avec confirmation visuelle
@@ -1277,6 +1223,7 @@ class UserManagementController extends Controller
             'assign_roles' => $request->user()->can('assignRoles', $user),
             'assign_permissions' => $request->user()->can('assignPermissions', $user),
             'move' => $request->user()->can('move', $user),
+            'impersonate' => $request->user()->can('impersonate', $user),
             'manage_db' => $this->authorization()->canManageClientDatabase($request->user(), $user),
         ];
     }

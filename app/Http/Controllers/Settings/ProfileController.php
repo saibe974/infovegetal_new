@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Http\Requests\Users\UserPermissionsUpdateRequest;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class ProfileController extends Controller
                 'assign_roles' => $request->user()->can('assignRoles', $target),
                 'assign_permissions' => $request->user()->can('assignPermissions', $target),
                 'move' => $request->user()->can('move', $target),
+                'impersonate' => $request->user()->can('impersonate', $target),
                 'delete' => $request->user()->can('delete', $target),
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
             ],
@@ -70,6 +72,7 @@ class ProfileController extends Controller
                 'assign_roles' => $request->user()->can('assignRoles', $target),
                 'assign_permissions' => $request->user()->can('assignPermissions', $target),
                 'move' => $request->user()->can('move', $target),
+                'impersonate' => $request->user()->can('impersonate', $target),
                 'delete' => $request->user()->can('delete', $target),
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
             ],
@@ -106,19 +109,14 @@ class ProfileController extends Controller
     /**
      * Update only roles and permissions for a target user.
      */
-    public function updatePermissions(Request $request, ?User $user = null): RedirectResponse
+    public function updatePermissions(UserPermissionsUpdateRequest $request, ?User $user = null): RedirectResponse
     {
         $target = $user ?? $request->user();
         $actor = $request->user();
 
         $this->authorize('update', $target);
 
-        $validated = $request->validate([
-            'roles' => ['nullable', 'array'],
-            'roles.*' => ['integer', 'exists:roles,id'],
-            'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['integer', 'exists:permissions,id'],
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['roles'])) {
             $requestedRoles = Role::query()->whereIn('id', $validated['roles'])->get(['id', 'name']);
@@ -131,16 +129,8 @@ class ProfileController extends Controller
 
         if (isset($validated['permissions'])) {
             $this->authorize('assignPermissions', $target);
-
-            $assignablePermissionNames = $this->authorization->assignablePermissionNames($actor, $target);
-            $assignablePermissionIds = Permission::query()
-                ->whereIn('name', $assignablePermissionNames)
-                ->pluck('id')
-                ->map(fn ($v) => (int) $v)
-                ->all();
-
             $selectedPermIds = array_map('intval', $validated['permissions']);
-            if (array_diff($selectedPermIds, $assignablePermissionIds) !== []) {
+            if (!$this->authorization->arePermissionIdsDelegable($actor, $target, $selectedPermIds)) {
                 abort(403, 'Unauthorized');
             }
 
@@ -148,18 +138,7 @@ class ProfileController extends Controller
                 ? array_map('intval', $validated['roles'])
                 : $target->roles()->pluck('id')->map(fn ($v) => (int) $v)->all();
 
-            $inheritedPermissionIds = Permission::query()
-                ->whereHas('roles', fn ($query) => $query->whereIn('id', $roleIds))
-                ->pluck('id')
-                ->map(fn ($v) => (int) $v)
-                ->all();
-
-            $explicitIds = array_values(array_diff($selectedPermIds, $inheritedPermissionIds));
-
-            $permissionNames = Permission::query()
-                ->whereIn('id', $explicitIds)
-                ->pluck('name')
-                ->all();
+            $permissionNames = $this->authorization->explicitPermissionNames($selectedPermIds, $roleIds);
 
             $target->syncPermissions($permissionNames);
         }

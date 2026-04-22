@@ -46,6 +46,7 @@ class UserResource extends JsonResource
                 'assign_roles' => $actor->can('assignRoles', $this->resource),
                 'assign_permissions' => $actor->can('assignPermissions', $this->resource),
                 'move' => $actor->can('move', $this->resource),
+                'impersonate' => $actor->can('impersonate', $this->resource),
             ] : null,
         ];
     }

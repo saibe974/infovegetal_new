@@ -55,6 +55,22 @@ class RoleSeeder extends Seeder
             'link commercials suppliers',
             'link commercials clients',
             'preview',
+            'users.view.branch',
+            'users.view.all',
+            'users.create.branch',
+            'users.create.all',
+            'users.update.branch',
+            'users.update.all',
+            'users.delete.branch',
+            'users.delete.all',
+            'users.move.branch',
+            'users.move.all',
+            'users.assign_roles.branch',
+            'users.assign_roles.all',
+            'users.assign_permissions.branch',
+            'users.assign_permissions.all',
+            'users.impersonate.branch',
+            'users.impersonate.all',
         ];
 
         foreach ($permissions as $permission) {
@@ -105,6 +121,12 @@ class RoleSeeder extends Seeder
             'view own orders', 
             'create clients',
             'create guests',
+            'users.view.branch',
+            'users.create.branch',
+            'users.update.branch',
+            'users.delete.branch',
+            'users.assign_roles.branch',
+            'users.assign_permissions.branch',
         ]);
 
         // Fournisseur peut travailler avec produits et ses commerciaux
@@ -128,6 +150,12 @@ class RoleSeeder extends Seeder
             'register orders',
             'view own orders', 
             'create guests',
+            'users.view.branch',
+            'users.create.branch',
+            'users.update.branch',
+            'users.delete.branch',
+            'users.assign_roles.branch',
+            'users.assign_permissions.branch',
         ]);
 
 

@@ -187,6 +187,7 @@ export interface User {
         assign_roles?: boolean;
         assign_permissions?: boolean;
         move?: boolean;
+        impersonate?: boolean;
         manage_db?: boolean;
     };
     [key: string]: unknown; // This allows for additional properties...

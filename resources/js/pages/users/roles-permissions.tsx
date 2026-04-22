@@ -15,6 +15,7 @@ type PermissionItem = { id: number; name: string };
 type Props = {
     roles: RoleItem[];
     permissions: PermissionItem[];
+    officialPermissionNames: string[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -55,7 +56,7 @@ function getInitialRoleId(roles: RoleItem[]): number | null {
     return roles[0]?.id ?? null;
 }
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions, officialPermissionNames }) => {
     const { t } = useI18n();
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(() => getInitialRoleId(roles));
     const [newRoleName, setNewRoleName] = useState('');
@@ -82,6 +83,27 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
 
         return Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     }, [permissions]);
+
+    const creatablePermissionsByDomain = useMemo(() => {
+        const existing = new Set(permissions.map((p) => p.name));
+        const grouped = new Map<string, Array<{ value: string; label: string }>>();
+
+        officialPermissionNames
+            .filter((name) => !existing.has(name))
+            .forEach((name) => {
+                const domain = permissionDomain(name);
+                const current = grouped.get(domain) ?? [];
+                current.push({ value: name, label: name });
+                grouped.set(domain, current);
+            });
+
+        return Array.from(grouped.entries())
+            .map(([domain, items]): [string, Array<{ value: string; label: string }>] => [
+                domain,
+                items.sort((a, b) => a.label.localeCompare(b.label)),
+            ])
+            .sort((a, b) => a[0].localeCompare(b[0]));
+    }, [officialPermissionNames, permissions]);
 
     const syncRolePermissions = () => {
         if (!selectedRoleId) {
@@ -110,12 +132,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
     };
 
     const createPermission = () => {
-        if (!newPermissionName.trim()) {
+        if (!newPermissionName) {
             return;
         }
 
         router.post('/admin/users/roles-permissions/permissions', {
-            name: newPermissionName.trim(),
+            name: newPermissionName,
         }, {
             preserveScroll: true,
             onSuccess: () => setNewPermissionName(''),
@@ -220,8 +242,11 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions })
                             value: newPermissionName,
                             onChange: setNewPermissionName,
                             onCreate: createPermission,
-                            placeholder: t('Permission name'),
+                            placeholder: t('Select permission'),
                             addLabel: t('Add'),
+                            helpText: t('Only official permissions not yet created are proposed.'),
+                            optionsByDomain: creatablePermissionsByDomain,
+                            disabled: !newPermissionName,
                         }}
                         onDeletePermission={deletePermission}
                         submit={{

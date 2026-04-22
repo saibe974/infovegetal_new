@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { useI18n } from '@/lib/i18n';
 import { type Product, type SharedData } from '@/types';
-import { leave as impersonateLeave, take as impersonateTake } from '@/actions/Lab404/Impersonate/Controllers/ImpersonateController';
+import { leave as impersonateLeave, take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import { router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';

@@ -66,6 +66,8 @@ export function canAccessUsers(user: User | null | undefined): boolean {
 
 export function canCreateUsers(user: User | null | undefined): boolean {
     return isAdmin(user) || isDev(user) || hasAnyPermission(user, [
+        'users.create.branch',
+        'users.create.all',
         'create clients',
         'create suppliers',
         'create commercials',
