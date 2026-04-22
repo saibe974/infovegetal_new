@@ -581,6 +581,8 @@ class UserManagementController extends Controller
      */
     public function reorder(Request $request)
     {
+        $this->authorize('moveAny', User::class);
+
         $requestId = (string) \Illuminate\Support\Str::uuid();
         $startedAt = microtime(true);
 

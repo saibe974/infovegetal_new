@@ -276,6 +276,13 @@ class UserManagementAuthorizationService
         );
     }
 
+    public function canMoveAny(User $actor): bool
+    {
+        $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'move');
+        return $scope['all'] || $scope['branch'];
+    }
+
     public function canMove(User $actor, User $target, ?User $newParent = null): bool
     {
         $actor = $this->resolveActor($actor);

@@ -37,6 +37,11 @@ class UserPolicy
         return $this->authorization->canUpdate($user, $target);
     }
 
+    public function moveAny(User $user): bool
+    {
+        return $this->authorization->canMoveAny($user);
+    }
+
     public function delete(User $user, User $target): bool
     {
         return $this->authorization->canDelete($user, $target);
