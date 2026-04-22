@@ -9,9 +9,11 @@ interface UsersCardsListProps {
     canEdit?: boolean;
     canDelete?: boolean;
     canChangeRole?: boolean;
+    canImpersonate?: boolean;
     editUser?: (userId: number) => void;
     deleteUser?: (userId: number) => void;
     changeUserRole?: (userId: number, roleName: string) => void;
+    impersonateUser?: (userId: number) => void;
     className?: string;
     gridClassName?: string;
 }
@@ -23,9 +25,11 @@ export default function UsersCardsList({
     canEdit = false,
     canDelete = false,
     canChangeRole = false,
+    canImpersonate = false,
     editUser,
     deleteUser,
     changeUserRole,
+    impersonateUser,
     className = "",
     gridClassName = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
 }: UsersCardsListProps) {
@@ -42,9 +46,11 @@ export default function UsersCardsList({
                             canEdit={canEdit}
                             canDelete={canDelete}
                             canChangeRole={canChangeRole}
+                            canImpersonate={canImpersonate}
                             editUser={editUser}
                             deleteUser={deleteUser}
                             changeUserRole={changeUserRole}
+                            impersonateUser={impersonateUser}
                         />
                     ))}
                 </div>

@@ -1,7 +1,7 @@
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, TrashIcon, UserCheck } from 'lucide-react';
 import { type User, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,9 +14,11 @@ interface UsersTableProps {
     canEdit?: boolean;
     canDelete?: boolean;
     canPreview?: boolean;
+    canImpersonate?: boolean;
+    onImpersonate?: (userId: number) => void;
 }
 
-export default function UsersTable({ users, roles, auth, canEdit = false, canDelete = false, canPreview = false }: UsersTableProps) {
+export default function UsersTable({ users, roles, auth, canEdit = false, canDelete = false, canPreview = false, canImpersonate = false, onImpersonate }: UsersTableProps) {
 
     const { t } = useI18n();
 
@@ -56,7 +58,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                     <TableHead>{t('Current roles')}</TableHead>
                     {/* {canPreview && <TableHead>{t('Change role')}</TableHead>} */}
                     <TableHead>{t('Joined')}</TableHead>
-                    {(canEdit || canDelete) && <TableHead className="text-end">Actions</TableHead>}
+                    {(canEdit || canDelete || canImpersonate) && <TableHead className="text-end">Actions</TableHead>}
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -127,9 +129,21 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                 user.created_at
                             ).toLocaleDateString()}
                         </TableCell>
-                        {(canEdit || canDelete) && (
+                        {(canEdit || canDelete || canImpersonate) && (
                             <TableCell>
                                 <div className="flex gap-2 justify-end">
+                                    {canImpersonate && user.abilities?.impersonate && onImpersonate && (
+                                        <Button
+                                            size="icon"
+                                            variant="secondary"
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.stopPropagation();
+                                                onImpersonate(user.id);
+                                            }}
+                                        >
+                                            <UserCheck size={16} />
+                                        </Button>
+                                    )}
                                     {canEdit && (
                                         <Button
                                             size="icon"

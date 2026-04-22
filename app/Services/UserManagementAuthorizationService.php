@@ -95,6 +95,16 @@ class UserManagementAuthorizationService
     ];
 
     /**
+     * @var array<string, array{all: string, branch: string}>
+     */
+    private const ORDER_ACTION_PERMISSIONS = [
+        'view' => [
+            'all' => 'orders.view.all',
+            'branch' => 'orders.view.branch',
+        ],
+    ];
+
+    /**
      * @var array<string, string>
      */
     private const ROLE_CREATION_PERMISSION_MAP = [
@@ -156,6 +166,37 @@ class UserManagementAuthorizationService
             allowSelf: true,
             forbidAncestorTargets: false,
         );
+    }
+
+    public function canViewAnyOrders(User $actor): bool
+    {
+        // Compatibilite: tout utilisateur authentifie peut consulter ses propres commandes.
+        // Les permissions orders.view.* etendent uniquement la portee (branche/tout).
+        return $this->resolveActor($actor) instanceof User;
+    }
+
+    public function scopeManageableOrders(User $actor, Builder $query): Builder
+    {
+        $actor = $this->resolveActor($actor);
+        $scope = $this->resolveOrderActionScope($actor, 'view');
+
+        if ($scope['all']) {
+            return $query;
+        }
+
+        if ($scope['branch']) {
+            return $query->whereHas('user', function (Builder $userQuery) use ($actor) {
+                $userQuery
+                    ->where('_lft', '>=', $actor->_lft)
+                    ->where('_rgt', '<=', $actor->_rgt)
+                    ->whereDoesntHave('roles', function (Builder $roleQuery) {
+                        $roleQuery->whereIn('name', self::PROTECTED_ROLE_NAMES);
+                    });
+            });
+        }
+
+        // Compatibilite legacy: sans permission explicite, on limite a ses propres commandes.
+        return $query->where('user_id', $actor->id);
     }
 
     public function canCreate(User $actor, ?User $parent = null, array $requestedRoleNames = []): bool
@@ -644,6 +685,27 @@ class UserManagementAuthorizationService
         $hasBranch = $hasAll
             || $this->hasPermission($actor, $config['branch'])
             || $actor->getAllPermissions()->pluck('name')->intersect($config['legacy'])->isNotEmpty();
+
+        return [
+            'all' => $hasAll,
+            'branch' => $hasBranch,
+        ];
+    }
+
+    /**
+     * @return array{all: bool, branch: bool}
+     */
+    private function resolveOrderActionScope(User $actor, string $action): array
+    {
+        $config = self::ORDER_ACTION_PERMISSIONS[$action] ?? null;
+        if ($config === null) {
+            return ['all' => false, 'branch' => false];
+        }
+
+        $hasAll = $this->hasPermission($actor, $config['all']) || $this->isGlobalManager($actor);
+
+        $hasBranch = $hasAll
+            || $this->hasPermission($actor, $config['branch']);
 
         return [
             'all' => $hasAll,

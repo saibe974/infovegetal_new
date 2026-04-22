@@ -3,7 +3,7 @@ import { Link, router } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon } from "lucide-react";
+import { Edit as EditIcon, Trash as TrashIcon, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type Product, User } from "@/types";
@@ -17,9 +17,11 @@ type UserCardProps = {
     canEdit?: boolean;
     canDelete?: boolean;
     canChangeRole?: boolean;
+    canImpersonate?: boolean;
     editUser?: (userId: number) => void;
     deleteUser?: (userId: number) => void;
     changeUserRole?: (userId: number, roleName: string) => void;
+    impersonateUser?: (userId: number) => void;
     className?: string;
 };
 
@@ -30,9 +32,11 @@ export function UserCard({
     canEdit = false,
     canDelete = false,
     canChangeRole = false,
+    canImpersonate = false,
     editUser,
     deleteUser,
     changeUserRole,
+    impersonateUser,
     className
 }: UserCardProps) {
     const { t } = useI18n();
@@ -167,6 +171,20 @@ export function UserCard({
 
                 <CardFooter className="w-full flex justify-end gap-2 p-0">
                     <div className="flex gap-2">
+                        {canImpersonate && user.abilities?.impersonate && impersonateUser && (
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                onClick={(e: React.MouseEvent) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    impersonateUser(user.id);
+                                }}
+                                title={t('Impersonate')}
+                            >
+                                <UserCheck size={16} />
+                            </Button>
+                        )}
                         {canEdit && (
                             <Button
                                 size="icon"

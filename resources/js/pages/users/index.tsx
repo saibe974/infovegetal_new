@@ -25,7 +25,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon, UserCheck } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
 import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
@@ -41,6 +41,7 @@ import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
 import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -141,6 +142,7 @@ export default withAppLayout(
         const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
         const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import users') || hasPermission(effectiveUser, 'export users') || hasPermission(effectiveUser, 'manage users');
         const canAddUsers = canCreateUsers(effectiveUser);
+        const canImpersonateUsers = !auth?.impersonate_from;
 
         // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -227,6 +229,15 @@ export default withAppLayout(
                     onError: () => toast.error(t('Error while deleting user')),
                 });
             }
+        };
+
+        const handleImpersonate = (targetUserId: number) => {
+            if (!canImpersonateUsers) {
+                return;
+            }
+
+            const url = impersonateTake({ id: targetUserId }).url;
+            window.location.href = url;
         };
 
         const hasChanges = useMemo(() => !isTreeSearchMode && pending !== null, [pending, isTreeSearchMode]);
@@ -432,6 +443,22 @@ export default withAppLayout(
                 canDelete={canDelete}
                 onEdit={(item) => handleEdit(item.id)}
                 onDelete={(item) => handleDelete(item.id)}
+                extraContent={(item) => (
+                    canImpersonateUsers && item.abilities?.impersonate ? (
+                        <Button
+                            size="icon"
+                            variant="secondary"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleImpersonate(item.id);
+                            }}
+                            title={t('Impersonate')}
+                        >
+                            <UserCheck size={16} />
+                        </Button>
+                    ) : null
+                )}
             />
         );
 
@@ -502,6 +529,8 @@ export default withAppLayout(
                             canEdit={canEdit}
                             canDelete={canDelete}
                             canPreview={canPreview}
+                            canImpersonate={canImpersonateUsers}
+                            onImpersonate={handleImpersonate}
                         />
                     </InfiniteScroll>
                 ) : viewMode === 'grid' ? (
@@ -513,6 +542,8 @@ export default withAppLayout(
                             canEdit={canEdit}
                             canDelete={canDelete}
                             canChangeRole={canPreview}
+                            canImpersonate={canImpersonateUsers}
+                            impersonateUser={handleImpersonate}
                         />
                     </InfiniteScroll>
                 ) : (

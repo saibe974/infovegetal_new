@@ -13,6 +13,7 @@ use App\Http\Controllers\CarrierController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\RolePermissionManagementController;
 use App\Http\Controllers\ImpersonationController;
+use App\Services\UserManagementAuthorizationService;
 
 Route::get('/', [homeController::class, 'index'])->name('home');
 Route::get('/documentation', [homeController::class, 'documentation'])->name('documentation');
@@ -77,6 +78,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         });
     Route::get('dashboard', function (Request $request) {
         $user = $request->user();
+        $authorization = app(UserManagementAuthorizationService::class);
+
+        abort_unless($authorization->canViewAnyOrders($user), 403);
+
         $query = \App\Models\Cart::query()
             ->select(['id', 'user_id', 'status', 'items_total', 'shipping_total', 'created_at', 'updated_at'])
             ->with([
@@ -95,9 +100,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 },
             ]);
 
-        if (!$user->hasRole('admin')) {
-            $query->where('user_id', $user->id);
-        }
+        $authorization->scopeManageableOrders($user, $query);
 
         $carts = $query->latest('updated_at')->limit(200)->get()->map(function ($cart) {
             $itemsTotal = round((float) ($cart->items_total ?? 0), 2);
