@@ -46,8 +46,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }
 
     const { auth, locale } = usePage<SharedData>().props;
     const effectiveUser = getEffectiveUser(auth);
-    const canEdit = userAbilities?.update ?? user.abilities?.update ?? isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users');
-    const canDelete = userAbilities?.delete ?? user.abilities?.delete ?? isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users');
+    const canEdit = userAbilities?.update ?? user.abilities?.update ?? (isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users'));
+    const canDelete = userAbilities?.delete ?? user.abilities?.delete ?? (isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users'));
 
     const handleDelete = (userId: number) => {
         if (confirm(t('Are you sure?'))) {

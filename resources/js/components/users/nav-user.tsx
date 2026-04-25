@@ -3,12 +3,10 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    useSidebar,
 } from '@/components/ui/sidebar';
 import { UserInfo } from '@/components/users/user-info';
 import { UserMenuContent } from '@/components/users/user-menu-content';
@@ -21,7 +19,6 @@ export function NavUser() {
     const pageData = usePage<SharedData>().props;
     const auth = pageData.auth;
     const users = (pageData.users as any[]) || [];
-    const { state } = useSidebar();
     const isMobile = useIsMobile();
 
     // L'utilisateur actuellement connecté (peut être impersoné)
@@ -29,9 +26,9 @@ export function NavUser() {
     const isImpersonating = !!auth.impersonate_from;
     const isStrictMode = !!auth.impersonation_strict_mode;
 
-    const toggleStrictMode = (checked: boolean | 'indeterminate') => {
+    const toggleStrictMode = (checked: boolean) => {
         router.post('/impersonate/mode', {
-            strict: checked === true,
+            strict: checked,
         }, {
             preserveScroll: true,
             preserveState: true,
@@ -56,16 +53,36 @@ export function NavUser() {
                             )}
                             {isImpersonating && (
                                 <div
-                                    className="ml-2 flex items-center gap-1"
+                                    className="ml-2 flex flex-col items-center gap-0.5"
                                     onClick={(e) => e.stopPropagation()}
                                     onPointerDown={(e) => e.stopPropagation()}
                                 >
-                                    <Checkbox
-                                        checked={isStrictMode}
-                                        onCheckedChange={toggleStrictMode}
+                                    <div
+                                        role="switch"
+                                        aria-checked={isStrictMode}
                                         aria-label="Mode strict d'impersonation"
-                                    />
-                                    <span className="text-xs text-muted-foreground">Strict</span>
+                                        tabIndex={0}
+                                        className={`h-5 w-9 rounded-full border transition-colors ${isStrictMode
+                                            ? 'bg-amber-500 border-amber-500 dark:bg-amber-400 dark:border-amber-400'
+                                            : 'bg-muted border-border'
+                                            }`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleStrictMode(!isStrictMode);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                toggleStrictMode(!isStrictMode);
+                                            }
+                                        }}
+                                    >
+                                        <span
+                                            className={`mt-[1px] ml-[1px] block h-3.5 w-3.5 rounded-full bg-white transition-transform ${isStrictMode ? 'translate-x-4' : ''}`}
+                                        />
+                                    </div>
+                                    <span className="text-[10px] leading-none text-muted-foreground">Strict</span>
                                 </div>
                             )}
                             <ChevronDown className="ml-auto size-4" />

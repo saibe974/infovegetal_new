@@ -220,6 +220,12 @@ class User extends Authenticatable implements HasMedia
             return null;
         }
 
+        // Garde-fou: si l'ID impersonateur pointe sur l'utilisateur courant,
+        // on évite la récursion hasRole/hasAnyRole -> resolveImpersonator -> hasRole...
+        if ((int) $impersonatorId === (int) $this->id) {
+            return null;
+        }
+
         return self::find($impersonatorId);
     }
 
