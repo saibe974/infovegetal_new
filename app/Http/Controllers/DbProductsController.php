@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryProducts;
 use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ class DbProductsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(DbProducts $dbProducts)
+    public function show(DbProducts $db_product)
     {
         //
     }
@@ -56,23 +57,49 @@ class DbProductsController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(DbProducts $dbProducts)
+    public function edit(DbProducts $db_product)
     {
-        //
+        return Inertia::render('products/db-edit', [
+            'dbProduct' => DbProductsResource::make($db_product)->resolve(),
+            'categoryOptions' => CategoryProducts::query()
+                ->select(['id', 'name'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (CategoryProducts $category) => [
+                    'id' => (int) $category->id,
+                    'name' => (string) $category->name,
+                ])
+                ->values()
+                ->all(),
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, DbProducts $dbProducts)
+    public function update(Request $request, DbProducts $db_product)
     {
-        //
+        $validated = $request->validate([
+            'name'        => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('db_products', 'name')->ignore($db_product->id)],
+            'description' => ['nullable', 'string', 'max:500'],
+            'champs'      => ['nullable', 'array'],
+            'champs.*'    => ['nullable', 'string'],
+            'categories'  => ['nullable', 'array'],
+            'categories.*'=> ['nullable', 'string'],
+            'country'     => ['nullable', 'string', 'size:2'],
+            'mod_liv'     => ['nullable', 'string', 'max:100'],
+            'mini'        => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $db_product->update($validated);
+
+        return redirect()->route('db-products.index')->with('success', __('Database updated.'));
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(DbProducts $dbProducts)
+    public function destroy(DbProducts $db_product)
     {
         //
     }
