@@ -13,38 +13,10 @@ import {
 
 // FilePond imports
 import { FilePond } from 'react-filepond';
-import type { FilePondProps } from 'react-filepond';
 import 'filepond/dist/filepond.min.css';
 import { Button } from './ui/button';
 
-type CsvUploadConfig = {
-    /** Titre de la boîte de dialogue */
-    title: string;
-    /** Description affichée dans la boîte de dialogue */
-    description: string;
-    /** URL pour uploader le fichier */
-    uploadUrl: string;
-    /** URL de redirection après succès */
-    successRedirectUrl?: string;
-    /** URL à appeler pour lancer l'import après upload réussi */
-    importProcessUrl?: string;
-    /** URL à appeler pour annuler l'import en cours */
-    importCancelUrl?: string;
-    /** Nom du champ envoyé à importProcessUrl (défaut: id) */
-    importPayloadKey?: string;
-    /** Générateur de lien de suivi après mise en file de l'import */
-    importProgressUrl?: (id: string) => string;
-    /** Callback invoqué quand l'import est mis en file */
-    onImportQueued?: (id: string) => void;
-    /** Callback invoqué si le déclenchement d'import échoue */
-    onImportError?: (error: unknown) => void;
-    /** Libellé du bouton (optionnel, par défaut "Importer") */
-    buttonLabel?: string;
-    /** Classe CSS personnalisée pour le bouton (optionnel) */
-    buttonClassName?: string;
-};
-
-type CsvUploadFilePondProps = {
+type DialogUploadProps = {
     title: string;
     description?: string;
     uploadUrl: string;
@@ -89,7 +61,7 @@ type ImportProgressPayload = {
     has_more?: boolean;
 };
 
-export function CsvUploadFilePond({
+export function DialogUpload({
     title,
     description,
     uploadUrl,
@@ -106,7 +78,7 @@ export function CsvUploadFilePond({
     postTreatmentComponent,
     postTreatmentProps,
     disableProgressTracking = false,
-}: CsvUploadFilePondProps) {
+}: DialogUploadProps) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<any[]>([]);
     const [uploadComplete, setUploadComplete] = useState(false);
@@ -929,7 +901,15 @@ export function CsvUploadFilePond({
                             }}
                             name="file"
                             labelIdle='Glissez-déposez votre fichier ou <span class="filepond--label-action">Parcourir</span>'
-                            // acceptedFileTypes={['text/csv', 'application/vnd.ms-excel', '.csv']}
+                            acceptedFileTypes={[
+                                'text/csv',
+                                'application/csv',
+                                'application/vnd.ms-excel',
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                '.csv',
+                                '.xls',
+                                '.xlsx',
+                            ]}
                             credits={false}
                         />
                     )}
@@ -944,6 +924,7 @@ export function CsvUploadFilePond({
                                     displayProgress,
                                     handleRetryImport,
                                     uploadId,
+                                    fileSize: files?.[0]?.file?.size ?? null,
                                     onStartImport: (settings: any) => {
                                         // Déclencher l'import avec les paramètres choisis
                                         if (uploadId) {

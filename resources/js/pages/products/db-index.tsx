@@ -12,7 +12,7 @@ import SearchSelect from '@/components/app/search-select';
 import dbProducts from '@/routes/db-products';
 import { useI18n } from '@/lib/i18n';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
+import { DialogUpload } from '@/components/dialog-upload';
 import ProductsImportTreatment from '@/components/products/import';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -148,7 +148,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
-                                        <CsvUploadFilePond
+                                        <DialogUpload
                                             title={`Mettre à jour la base de données ${item.name}`}
                                             uploadUrl='/upload'
                                             importProcessUrl={products.admin.import.process.url()}

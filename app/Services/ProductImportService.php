@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Route;
 use League\Csv\Reader;
 use League\Csv\Writer;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use Symfony\Component\String\Slugger\AsciiSlugger;
 
 class ProductImportService
@@ -98,7 +100,7 @@ class ProductImportService
                     return;
                 }
 
-                if ($completed % 500 !== 0 && $completed !== $total) {
+                if ($completed % 50 !== 0 && $completed !== $total) {
                     return;
                 }
 
@@ -429,6 +431,8 @@ class ProductImportService
 
     private function splitIntoTempFiles(string $id, string $fullPath, int $limit): void
     {
+        $sourcePath = $this->ensureCsvSource($id, $fullPath);
+
         $normalizeKey = function ($value): string {
             $string = (string) $value;
             $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
@@ -437,7 +441,7 @@ class ProductImportService
             return $slugger->slug($string)->lower()->toString();
         };
 
-        $reader = Reader::from($fullPath, 'r');
+        $reader = Reader::from($sourcePath, 'r');
         $reader->setDelimiter(';');
         $reader->setHeaderOffset(0);
 
@@ -472,6 +476,7 @@ class ProductImportService
         Log::info("[Import][Split][$id] db_products_id from cache: $dbProductsId");
 
         $defaultsMap = null;
+        $traitement = null;
         if ($dbProductsId) {
             try {
                 /** @var \App\Models\DbProducts|null $dbp */
@@ -479,6 +484,9 @@ class ProductImportService
                 if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
                     $defaultsMap = $dbp->champs;
                     Log::info("[Import][Split][$id] Loaded defaultsMap", ['map' => $defaultsMap]);
+                }
+                if ($dbp && !empty($dbp->traitement)) {
+                    $traitement = $dbp->traitement;
                 }
             } catch (\Throwable $e) {
                 Log::warning('Unable to load DbProducts defaults in split: ' . $e->getMessage());
@@ -518,10 +526,18 @@ class ProductImportService
                 continue;
             }
 
-            // Utiliser le mapping pour déterminer la présence d'un SKU
-            $skuSource = $resolve($mapped, $defaultsMap, 'sku');
-            $sku = trim((string) ($skuSource ?? ''));
-            
+            // Utiliser le mapping pour déterminer la présence d'un identifiant de ligne valide.
+            // Quand un traitement est défini, le SKU peut être calculé à partir d'autres champs
+            // (ex. DDK: ean13 + ref), donc on accepte aussi ean13 ou ref comme fallback.
+            $skuSource  = $resolve($mapped, $defaultsMap, 'sku');
+            $sku        = trim((string) ($skuSource ?? ''));
+
+            if ($sku === '' && $traitement !== null) {
+                $ean13Fallback = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
+                $refFallback   = trim((string) ($resolve($mapped, $defaultsMap, 'ref')   ?? ''));
+                $sku = $ean13Fallback !== '' ? $ean13Fallback : $refFallback;
+            }
+
             if ($lineCount <= 3) {
                 Log::info("[Import][Split][$id] Line $lineCount: sku resolved", [
                     'sku_source' => $skuSource,
@@ -529,7 +545,7 @@ class ProductImportService
                     'mapped_keys' => array_keys($mapped)
                 ]);
             }
-            
+
             if ($sku === '') {
                 Log::info("[Import][Split][$id] Line $lineCount: empty SKU, skipped");
                 continue;
@@ -559,6 +575,98 @@ class ProductImportService
             'total' => $total,
             'chunks_count' => $chunkIndex + ($rowsInChunk > 0 ? 1 : 0),
         ]);
+    }
+
+    private function ensureCsvSource(string $id, string $fullPath): string
+    {
+        $extension = strtolower((string) pathinfo($fullPath, PATHINFO_EXTENSION));
+
+        if (in_array($extension, ['csv', 'txt'], true)) {
+            return $fullPath;
+        }
+
+        if (!in_array($extension, ['xls', 'xlsx'], true)) {
+            throw new \InvalidArgumentException("Unsupported import format: {$extension}");
+        }
+
+        $tempDir = Storage::path('imports/tmp/' . $id);
+        if (!is_dir($tempDir)) {
+            @mkdir($tempDir, 0777, true);
+        }
+
+        $normalizedCsvPath = $tempDir . DIRECTORY_SEPARATOR . 'source_normalized.csv';
+
+        $handle = fopen($normalizedCsvPath, 'w');
+        if ($handle === false) {
+            throw new \RuntimeException('Unable to create temporary CSV file for spreadsheet import.');
+        }
+
+        // Lecture par chunks de 500 lignes pour éviter l'épuisement mémoire sur les grands fichiers.
+        // Chaque passe relit le fichier avec un ReadFilter limité aux lignes du chunk.
+        $chunkSize    = 500;
+        $startRow     = 1;  // 1 = ligne d'en-têtes Excel
+        $headerWritten = false;
+
+        do {
+            $endRow = $startRow + $chunkSize - 1;
+
+            $chunkFilter = new class($startRow, $endRow) implements IReadFilter {
+                public function __construct(private int $start, private int $end) {}
+
+                public function readCell($columnAddress, $row, $worksheetName = '')
+                {
+                    // Toujours lire la ligne 1 (en-têtes) pour que les colonnes soient correctement indexées.
+                    return $row === 1 || ($row >= $this->start && $row <= $this->end);
+                }
+            };
+
+            $reader = IOFactory::createReaderForFile($fullPath);
+            $reader->setReadDataOnly(true);
+            $reader->setReadFilter($chunkFilter);
+
+            $spreadsheet = $reader->load($fullPath);
+            $sheet       = $spreadsheet->getActiveSheet();
+
+            $rowsFound = 0;
+
+            foreach ($sheet->getRowIterator($startRow, $endRow) as $sheetRow) {
+                $cellIterator = $sheetRow->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rowData = [];
+                foreach ($cellIterator as $cell) {
+                    $value    = $cell->getFormattedValue();
+                    $value    = is_scalar($value) ? (string) $value : '';
+                    $rowData[] = str_replace(["\r\n", "\r"], "\n", $value);
+                }
+
+                // Ignorer les lignes entièrement vides (sauf la ligne d'en-têtes)
+                if ($sheetRow->getRowIndex() !== 1 && array_filter($rowData, fn ($v) => $v !== '') === []) {
+                    continue;
+                }
+
+                if (!$headerWritten) {
+                    // Première ligne rencontrée = en-têtes
+                    fputcsv($handle, $rowData, ';');
+                    $headerWritten = true;
+                } else {
+                    fputcsv($handle, $rowData, ';');
+                }
+
+                $rowsFound++;
+            }
+
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+            gc_collect_cycles();
+
+            $startRow += $chunkSize;
+
+        } while ($rowsFound >= $chunkSize);
+
+        fclose($handle);
+
+        return $normalizedCsvPath;
     }
 
     private function updateImportState(string $id, array $payload): void

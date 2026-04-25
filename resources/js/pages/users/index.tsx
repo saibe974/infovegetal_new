@@ -27,7 +27,7 @@ import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon, UserCheck } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
-import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
+import { DialogUpload } from '@/components/dialog-upload';
 import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
@@ -498,7 +498,7 @@ export default withAppLayout(
                             save={hasChanges ? save : undefined}
                             saving={saving}
                             import={canImportExport ? (
-                                <CsvUploadFilePond
+                                <DialogUpload
                                     title="Upload CSV"
                                     description="Uploadez un fichier CSV"
                                     uploadUrl="/upload"

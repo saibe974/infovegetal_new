@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { UploadIcon, EditIcon, TrashIcon, LoaderIcon, Loader2Icon } from 'lucide-react';
 import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
-import { CsvUploadFilePond } from '@/components/csv-upload-filepond';
+import { DialogUpload } from '@/components/dialog-upload';
 import { getEffectiveUser, isAdmin, isClient, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
@@ -354,9 +354,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     <ButtonsActions
                         className='hidden md:flex'
                         import={
-                            <CsvUploadFilePond
-                                title='Upload CSV'
-                                description='Uploadez un fichier CSV'
+                            <DialogUpload
+                                title='Upload'
+                                description='Uploadez un fichier'
                                 uploadUrl='/upload'
                                 importProcessUrl={products.admin.import.process.url()}
                                 importProcessChunkUrl={products.admin.import.process_chunk.url()}
