@@ -15,6 +15,8 @@ class DbProducts extends Model
         'champs',
         'categories',
         'traitement',
+        'header_row_index',
+        'source_delimiter',
         'mergins',
         'country',
         'mod_liv',
@@ -33,6 +35,7 @@ class DbProducts extends Model
         'champs' => 'array',
         'categories' => 'array',
         'mergins' => 'array',
+        'header_row_index' => 'integer',
         'mini' => 'integer',
     ];
 

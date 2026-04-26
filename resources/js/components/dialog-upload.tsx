@@ -90,11 +90,15 @@ export function DialogUpload({
     const [isCancellingImport, setIsCancellingImport] = useState(false);
 
     const isRequestingChunkRef = useRef(false);
+    const lastImportSettingsRef = useRef<
+        { dbProductsId?: number; strategy?: string } | undefined
+    >(undefined);
     const pondRef = useRef<any>(null); // any pour accéder à setOptions sans friction TS
     const progressPollRef = useRef<number | null>(null);
     const shouldPollRef = useRef<boolean>(false);
 
     const hasImportFlow = Boolean(importProcessUrl);
+    const hasLargePostTreatment = Boolean(postTreatmentComponent);
     const isProcessingLocked =
         hasImportFlow &&
         uploadComplete &&
@@ -188,6 +192,8 @@ export function DialogUpload({
                 return;
             }
 
+            lastImportSettingsRef.current = settings;
+
             // console.log('[UsersImport] startImport:', { id, settings });
             setImportError(null);
             setProgressInfo(null);
@@ -206,10 +212,10 @@ export function DialogUpload({
                 };
 
                 // Ajouter les paramètres supplémentaires si fournis
-                if (settings?.dbProductsId) {
+                if (typeof settings?.dbProductsId === 'number') {
                     body.db_products_id = settings.dbProductsId;
                 }
-                if (settings?.strategy) {
+                if (typeof settings?.strategy === 'string' && settings.strategy !== '') {
                     body.strategy = settings.strategy;
                 }
 
@@ -302,7 +308,7 @@ export function DialogUpload({
             setImportStatus('idle');
             setImportError(null);
             setProgressInfo(null);
-            void startImport(uploadId);
+            void startImport(uploadId, lastImportSettingsRef.current);
         }
     };
 
@@ -840,7 +846,9 @@ export function DialogUpload({
             </DialogTrigger>
 
             <DialogContent
-                className="sm:max-w-xl"
+                className={hasLargePostTreatment
+                    ? 'flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-6xl flex-col overflow-hidden p-0'
+                    : 'sm:max-w-xl'}
                 onEscapeKeyDown={(event) => {
                     if (isProcessingLocked) {
                         event.preventDefault();
@@ -852,12 +860,12 @@ export function DialogUpload({
                     }
                 }}
             >
-                <DialogHeader>
+                <DialogHeader className={hasLargePostTreatment ? 'shrink-0 px-6 pt-6' : undefined}>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-3">
+                <div className={hasLargePostTreatment ? 'min-h-0 flex-1 overflow-y-auto px-6 py-4' : 'space-y-3'}>
                     {!uploadComplete && importStatus !== 'processing' && importStatus !== 'cancelling' && (
                         <FilePond
                             ref={pondRef}
@@ -914,8 +922,8 @@ export function DialogUpload({
                         />
                     )}
                     {uploadComplete && (
-                        <div className="text-center py-4 space-y-3">
-                            {importProcessUrl && postTreatmentComponent && (
+                        <div className={hasLargePostTreatment ? 'w-full space-y-3 py-2' : 'space-y-3 py-4 text-center'}>
+                            {postTreatmentComponent && (
                                 React.createElement(postTreatmentComponent, {
                                     ...postTreatmentProps,
                                     importStatus,
@@ -937,7 +945,7 @@ export function DialogUpload({
                     )}
                 </div>
 
-                <DialogFooter className="flex items-center justify-between gap-2">
+                <DialogFooter className={hasLargePostTreatment ? 'shrink-0 border-t px-6 py-4' : 'flex items-center justify-between gap-2'}>
                     {uploadComplete ? (
                         <>
                             {importProcessUrl &&

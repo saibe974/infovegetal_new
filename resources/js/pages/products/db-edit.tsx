@@ -9,6 +9,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ProductImportConfigPanel from '@/components/products/import-config-panel';
 import { useI18n } from '@/lib/i18n';
 import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
@@ -171,7 +172,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
             mini: d.mini === '' ? null : Number(d.mini),
         }));
         const submit = isCreate ? post : put;
-        const url = isCreate ? dbProducts.store().url : dbProducts.update(dbProduct.id).url;
+        const url = isCreate
+            ? dbProducts.store().url
+            : dbProducts.update(dbProduct.id as number).url;
 
         submit(url, {
             onFinish: () => transform((d) => d),
@@ -243,6 +246,27 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                             />
                             <InputError message={errors.traitement} />
                         </FormField>
+
+                        {isCreate ? (
+                            <div className="rounded border p-4 space-y-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold">{t('Supplier import format')}</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        {t('Create the supplier first, then upload a sample file to configure its import format.')}
+                                    </p>
+                                </div>
+
+                                <Button type="button" variant="outline" className="w-full" disabled>
+                                    {t('Upload sample file')}
+                                </Button>
+                            </div>
+                        ) : (
+                            <ProductImportConfigPanel
+                                dbProductId={dbProduct.id as number}
+                                headerRowIndex={dbProduct.header_row_index}
+                                sourceDelimiter={dbProduct.source_delimiter}
+                            />
+                        )}
                     </Card>
 
                     {/* Livraison */}

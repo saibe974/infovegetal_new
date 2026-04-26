@@ -22,6 +22,8 @@ class DbProductsResource extends JsonResource
             'champs' => $this->champs,
             'categories' => $this->categories,
             'traitement' => $this->traitement,
+            'header_row_index' => $this->header_row_index,
+            'source_delimiter' => $this->source_delimiter,
             'mergins' => $this->mergins,
             'country' => $this->country,
             'mod_liv' => $this->mod_liv,

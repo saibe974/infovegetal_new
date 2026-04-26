@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\CategoryProducts;
 use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
+use App\Services\ProductImportPreAnalyzer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -44,6 +47,8 @@ class DbProductsController extends Controller
                 'champs' => [],
                 'categories' => [],
                 'traitement' => null,
+                'header_row_index' => null,
+                'source_delimiter' => null,
                 'country' => null,
                 'mod_liv' => null,
                 'mini' => null,
@@ -105,6 +110,52 @@ class DbProductsController extends Controller
         $db_product->delete();
 
         return redirect()->route('db-products.index')->with('success', __('Database deleted.'));
+    }
+
+    public function analyzeSample(Request $request, ProductImportPreAnalyzer $analyzer)
+    {
+        $data = $request->validate([
+            'id' => ['required', 'string'],
+            'header_row_index' => ['nullable', 'integer', 'min:0'],
+            'source_delimiter' => ['nullable', 'string', 'max:8'],
+        ]);
+
+        $state = Cache::get('import:' . $data['id'], []);
+        if (!$state || empty($state['path'])) {
+            return response()->json(['message' => 'Fichier exemple introuvable.'], 404);
+        }
+
+        $fullPath = Storage::path((string) $state['path']);
+        if (!is_file($fullPath)) {
+            return response()->json(['message' => 'Impossible d’accéder au fichier exemple.'], 400);
+        }
+
+        return response()->json($analyzer->analyze(
+            $fullPath,
+            isset($data['header_row_index']) ? (int) $data['header_row_index'] : null,
+            $data['source_delimiter'] ?? null,
+        ));
+    }
+
+    public function updateImportConfig(Request $request, DbProducts $db_product)
+    {
+        $validated = $request->validate([
+            'champs' => ['required', 'array'],
+            'champs.*' => ['nullable', 'string'],
+            'header_row_index' => ['required', 'integer', 'min:0'],
+            'source_delimiter' => ['nullable', 'string', 'max:8'],
+        ]);
+
+        $db_product->update([
+            'champs' => $validated['champs'],
+            'header_row_index' => $validated['header_row_index'],
+            'source_delimiter' => $validated['source_delimiter'] ?: null,
+        ]);
+
+        return response()->json([
+            'message' => __('Import configuration updated.'),
+            'dbProduct' => DbProductsResource::make($db_product->fresh())->resolve(),
+        ]);
     }
 
     /**
@@ -197,6 +248,8 @@ class DbProductsController extends Controller
             'categories' => ['nullable', 'array'],
             'categories.*' => ['nullable', 'string'],
             'traitement' => ['nullable', 'string', 'max:255'],
+            'header_row_index' => ['nullable', 'integer', 'min:0'],
+            'source_delimiter' => ['nullable', 'string', 'max:8'],
             'country' => ['nullable', 'string', 'size:2'],
             'mod_liv' => ['nullable', 'string', 'max:100'],
             'mini' => ['nullable', 'integer', 'min:0'],

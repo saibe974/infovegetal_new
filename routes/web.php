@@ -158,6 +158,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('products.categories.move')
         ->middleware(['role_or_impersonator:admin']);
     Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role_or_impersonator:admin']);
+    Route::post('db-products/analyze-sample', [\App\Http\Controllers\DbProductsController::class, 'analyzeSample'])
+        ->name('db-products.analyze-sample')
+        ->middleware(['role_or_impersonator:admin']);
+    Route::put('db-products/{db_product}/import-config', [\App\Http\Controllers\DbProductsController::class, 'updateImportConfig'])
+        ->name('db-products.import-config')
+        ->middleware(['role_or_impersonator:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role_or_impersonator:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role_or_impersonator:admin']);
     Route::resource('carriers', CarrierController::class)->middleware(['role_or_impersonator:admin']);

@@ -341,11 +341,18 @@ class ProductController extends Controller
 
     public function importProcess(Request $request, ProductImportService $importService)
     {
-        $data = $request->validate(['id' => 'required|string']);
+        $data = $request->validate([
+            'id' => 'required|string',
+            'db_products_id' => 'nullable|integer|min:1',
+        ]);
         $id = $data['id'];
-        $dbProductsId = $request->integer('db_products_id'); // optionnel
 
         $state = Cache::get("import:$id", []);
+        $dbProductsId = isset($data['db_products_id'])
+            ? (int) $data['db_products_id']
+            : ((isset($state['db_products_id']) && is_numeric($state['db_products_id']) && (int) $state['db_products_id'] > 0)
+                ? (int) $state['db_products_id']
+                : null);
         
         if (!$state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);

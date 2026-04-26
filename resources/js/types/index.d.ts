@@ -37,17 +37,19 @@ export interface ProductCategory {
 }
 
 export interface dbProduct {
-    id: number;
+    id: number | null;
     name: string;
     description: string | null;
     champs: Record<string, any> | null;
     categories: Record<string, any> | null;
     traitement: string | null;
+    header_row_index?: number | null;
+    source_delimiter?: string | null;
     country?: string | null;
     mod_liv?: string | null;
     mini?: number | null;
-    created_at: string;
-    updated_at: string;
+    created_at: string | null;
+    updated_at: string | null;
 }
 
 export interface CarrierZone {
