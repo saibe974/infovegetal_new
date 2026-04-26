@@ -6,6 +6,7 @@ use App\Models\CategoryProducts;
 use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DbProductsController extends Controller
@@ -35,7 +36,22 @@ class DbProductsController extends Controller
      */
     public function create()
     {
-        //
+        return Inertia::render('products/db-edit', [
+            'dbProduct' => [
+                'id' => null,
+                'name' => '',
+                'description' => null,
+                'champs' => [],
+                'categories' => [],
+                'traitement' => null,
+                'country' => null,
+                'mod_liv' => null,
+                'mini' => null,
+                'created_at' => null,
+                'updated_at' => null,
+            ],
+            'categoryOptions' => $this->categoryOptions(),
+        ]);
     }
 
     /**
@@ -43,7 +59,11 @@ class DbProductsController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $this->validatePayload($request);
+
+        DbProducts::create($validated);
+
+        return redirect()->route('db-products.index')->with('success', __('Database created.'));
     }
 
     /**
@@ -61,16 +81,7 @@ class DbProductsController extends Controller
     {
         return Inertia::render('products/db-edit', [
             'dbProduct' => DbProductsResource::make($db_product)->resolve(),
-            'categoryOptions' => CategoryProducts::query()
-                ->select(['id', 'name'])
-                ->orderBy('name')
-                ->get()
-                ->map(fn (CategoryProducts $category) => [
-                    'id' => (int) $category->id,
-                    'name' => (string) $category->name,
-                ])
-                ->values()
-                ->all(),
+            'categoryOptions' => $this->categoryOptions(),
         ]);
     }
 
@@ -79,17 +90,7 @@ class DbProductsController extends Controller
      */
     public function update(Request $request, DbProducts $db_product)
     {
-        $validated = $request->validate([
-            'name'        => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('db_products', 'name')->ignore($db_product->id)],
-            'description' => ['nullable', 'string', 'max:500'],
-            'champs'      => ['nullable', 'array'],
-            'champs.*'    => ['nullable', 'string'],
-            'categories'  => ['nullable', 'array'],
-            'categories.*'=> ['nullable', 'string'],
-            'country'     => ['nullable', 'string', 'size:2'],
-            'mod_liv'     => ['nullable', 'string', 'max:100'],
-            'mini'        => ['nullable', 'integer', 'min:0'],
-        ]);
+        $validated = $this->validatePayload($request, $db_product);
 
         $db_product->update($validated);
 
@@ -101,7 +102,9 @@ class DbProductsController extends Controller
      */
     public function destroy(DbProducts $db_product)
     {
-        //
+        $db_product->delete();
+
+        return redirect()->route('db-products.index')->with('success', __('Database deleted.'));
     }
 
     /**
@@ -177,5 +180,40 @@ class DbProductsController extends Controller
         // dd($items);
         // Prend les 7 premiers
         return array_slice($items, 0, 7);
+    }
+
+    private function validatePayload(Request $request, ?DbProducts $dbProduct = null): array
+    {
+        return $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('db_products', 'name')->ignore($dbProduct?->id),
+            ],
+            'description' => ['nullable', 'string', 'max:500'],
+            'champs' => ['nullable', 'array'],
+            'champs.*' => ['nullable', 'string'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['nullable', 'string'],
+            'traitement' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'size:2'],
+            'mod_liv' => ['nullable', 'string', 'max:100'],
+            'mini' => ['nullable', 'integer', 'min:0'],
+        ]);
+    }
+
+    private function categoryOptions(): array
+    {
+        return CategoryProducts::query()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CategoryProducts $category) => [
+                'id' => (int) $category->id,
+                'name' => (string) $category->name,
+            ])
+            ->values()
+            ->all();
     }
 }

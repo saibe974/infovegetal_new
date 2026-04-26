@@ -103,16 +103,8 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                     />
                 </div>
 
-                {/* <div className="ml-auto flex items-center gap-2">
-                    <Button asChild size="sm">
-                        <Link href={dbProducts.create().url}>
-                            <PlusIcon size={16} className="mr-2" />
-                            {t('Add Database')}
-                        </Link>
-                    </Button>
-                </div> */}
                 <ButtonsActions
-                    add={() => { }}
+                    add={() => router.visit(dbProducts.create().url)}
                 />
             </StickyBar>
 

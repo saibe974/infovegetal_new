@@ -139,6 +139,7 @@ function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder =
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOptions }) => {
     const { t } = useI18n();
+    const isCreate = dbProduct.id == null;
     const categoriesById = useMemo<Record<string, string>>(
         () => Object.fromEntries(categoryOptions.map((category) => [String(category.id), category.name])),
         [categoryOptions],
@@ -148,11 +149,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
         [categoryOptions],
     );
 
-    const { data, setData, put, processing, errors, transform } = useForm({
+    const { data, setData, post, put, processing, errors, transform } = useForm({
         name: dbProduct.name ?? '',
         description: dbProduct.description ?? '',
         champs: objectToKV(dbProduct.champs),
         categories: objectToKV(dbProduct.categories),
+        traitement: dbProduct.traitement ?? '',
         country: dbProduct.country ?? '',
         mod_liv: dbProduct.mod_liv ?? '',
         mini: dbProduct.mini !== null && dbProduct.mini !== undefined ? String(dbProduct.mini) : '',
@@ -168,7 +170,10 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
             categories: kvToObject(d.categories),
             mini: d.mini === '' ? null : Number(d.mini),
         }));
-        put(dbProducts.update(dbProduct.id).url, {
+        const submit = isCreate ? post : put;
+        const url = isCreate ? dbProducts.store().url : dbProducts.update(dbProduct.id).url;
+
+        submit(url, {
             onFinish: () => transform((d) => d),
         });
     };
@@ -185,7 +190,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
 
     return (
         <>
-            <Head title={`${t('Edit')} — ${dbProduct.name}`} />
+            <Head title={isCreate ? t('Add Database') : `${t('Edit')} — ${dbProduct.name}`} />
 
             <form onSubmit={handleSubmit}>
                 <StickyBar className="mb-4">
@@ -199,7 +204,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                     <div className="ml-auto flex items-center gap-2">
                         <Button type="submit" size="sm" disabled={processing}>
                             <SaveIcon size={16} className="mr-2" />
-                            {t('Save')}
+                            {isCreate ? t('Create') : t('Save')}
                         </Button>
                     </div>
                 </StickyBar>
@@ -227,6 +232,16 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                 onChange={(e) => setData('description', e.target.value)}
                             />
                             <InputError message={errors.description} />
+                        </FormField>
+
+                        <FormField label={t('Treatment file')} htmlFor="db-traitement">
+                            <Input
+                                id="db-traitement"
+                                placeholder="peplant"
+                                value={data.traitement}
+                                onChange={(e) => setData('traitement', e.target.value)}
+                            />
+                            <InputError message={errors.traitement} />
                         </FormField>
                     </Card>
 
