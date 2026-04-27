@@ -179,6 +179,42 @@ class ProductMediaService
         ];
     }
 
+    public function removeImgLinkIfMissing(Product $product): array
+    {
+        $imgLink = (string) $product->getRawOriginal('img_link');
+
+        if (!$this->isRemoteUrl($imgLink)) {
+            $product->forceFill(['img_link' => null])->save();
+            $product->refresh();
+
+            return [
+                'ok' => true,
+                'removed' => true,
+                'message' => 'img_link supprime: URL invalide',
+                'preview_url' => $this->previewUrl($product),
+            ];
+        }
+
+        if ($this->remoteImageExists($imgLink)) {
+            return [
+                'ok' => false,
+                'removed' => false,
+                'message' => 'Image distante encore accessible',
+                'preview_url' => $this->previewUrl($product),
+            ];
+        }
+
+        $product->forceFill(['img_link' => null])->save();
+        $product->refresh();
+
+        return [
+            'ok' => true,
+            'removed' => true,
+            'message' => 'img_link supprime: image distante introuvable',
+            'preview_url' => $this->previewUrl($product),
+        ];
+    }
+
     private function buildProductFileName(Product $product, string $imgLink): string
     {
         $path = parse_url($imgLink, PHP_URL_PATH);
@@ -204,5 +240,51 @@ class ProductMediaService
         }
 
         return (bool) preg_match('#^https?://#i', $value);
+    }
+
+    private function remoteImageExists(string $imgLink): bool
+    {
+        try {
+            $headResponse = Http::timeout(15)
+                ->connectTimeout(10)
+                ->withHeaders([
+                    'User-Agent' => 'Infovegetal Media Sync',
+                    'Accept' => 'image/*,*/*;q=0.8',
+                ])
+                ->head($imgLink);
+
+            if ($headResponse->successful()) {
+                return true;
+            }
+
+            if ($headResponse->status() !== 405) {
+                return false;
+            }
+
+            $getResponse = Http::timeout(15)
+                ->connectTimeout(10)
+                ->withHeaders([
+                    'User-Agent' => 'Infovegetal Media Sync',
+                    'Accept' => 'image/*,*/*;q=0.8',
+                    'Range' => 'bytes=0-0',
+                ])
+                ->get($imgLink);
+
+            return $getResponse->successful();
+        } catch (\Throwable $e) {
+            Log::warning('Product image existence check failed', [
+                'url' => $imgLink,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function previewUrl(Product $product): ?string
+    {
+        return $product->getFirstMediaUrl('images')
+            ?: $product->getFirstMediaUrl('images', 'medium')
+            ?: $product->getRawOriginal('img_link');
     }
 }

@@ -197,6 +197,7 @@
                                 <button type="button" class="btn-sm js-action" data-action="download">Upload</button>
                                 <button type="button" class="btn-sm js-action" data-action="thumbnail">Vignette</button>
                                 <button type="button" class="btn-sm js-action" data-action="compare">Comparer</button>
+                                <button type="button" class="btn-sm js-action" data-action="removeMissingImgLink">Suppr. img_link</button>
                             </td>
                             <td class="status js-row-status">-</td>
                         </tr>
@@ -219,6 +220,7 @@
                     download: '/admin/media-manager/images/action/download',
                     thumbnail: '/admin/media-manager/images/action/thumbnail',
                     compare: '/admin/media-manager/images/action/compare',
+                    removeMissingImgLink: '/admin/media-manager/images/action/remove-missing-img-link',
                 };
 
                 const statusEl = document.getElementById('batch-status');
@@ -282,7 +284,7 @@
                                     const img = row.querySelector('.thumb');
                                     if (img) img.src = result.thumb_url;
                                 }
-                                if (action === 'download') {
+                                if (action === 'download' || action === 'removeMissingImgLink') {
                                     row.remove();
                                 }
                             } else {
@@ -315,7 +317,7 @@
                                     const img = row.querySelector('.thumb');
                                     if (img) img.src = result.thumb_url;
                                 }
-                                if (action === 'download') {
+                                if (action === 'download' || action === 'removeMissingImgLink') {
                                     row.remove();
                                 }
                                 setBatchStatus(result.message || 'OK');

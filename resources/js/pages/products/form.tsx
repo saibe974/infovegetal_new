@@ -22,6 +22,7 @@ import SearchSelect from '@/components/app/search-select';
 import { useState, FormEvent } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
+import { toast } from 'sonner';
 // import { StepsField } from '@/components/forms/steps-field';
 // import { useState } from 'react';
 
@@ -45,11 +46,61 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const { t } = useI18n();
     const [tag, setTag] = useState('')
     const [tags, setTags] = useState((product as any).tags.map((t: any) => t.name) || [])
+    const [previewImage, setPreviewImage] = useState(product.image_original ?? product.image_medium ?? product.img_link ?? '/images/placeholder.png');
+    const [imgLinkRemoved, setImgLinkRemoved] = useState(!product.img_link);
+    const [removeImgLinkProcessing, setRemoveImgLinkProcessing] = useState(false);
+    const [removeImgLinkStatus, setRemoveImgLinkStatus] = useState<string | null>(null);
 
     console.log('[FORM] Component rendered with product:', product.id, product.name);
 
     const writeTags = (t: string) => {
         setTag(t)
+    }
+
+    const handleRemoveMissingImgLink = async () => {
+        if (!product.id || removeImgLinkProcessing || imgLinkRemoved) {
+            return;
+        }
+
+        setRemoveImgLinkProcessing(true);
+        setRemoveImgLinkStatus(null);
+
+        try {
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const response = await fetch('/admin/media-manager/images/action/remove-missing-img-link', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ id: product.id }),
+            });
+
+            const payload = await response.json().catch(() => ({ ok: false, message: 'Reponse invalide' }));
+
+            if (!response.ok || !payload.ok) {
+                const message = payload?.message || 'Suppression impossible';
+                setRemoveImgLinkStatus(message);
+                toast.error(message);
+                return;
+            }
+
+            const message = payload?.message || 'img_link supprime';
+            setImgLinkRemoved(true);
+            setRemoveImgLinkStatus(message);
+
+            setPreviewImage(payload?.preview_url || '/images/placeholder.png');
+
+            toast.success(message);
+        } catch {
+            const message = 'Erreur reseau';
+            setRemoveImgLinkStatus(message);
+            toast.error(message);
+        } finally {
+            setRemoveImgLinkProcessing(false);
+        }
     }
 
     const { data, setData, post, put, processing, errors, transform } = useForm<{
@@ -331,9 +382,23 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                             <aside className="space-y-4">
                                 <Card className="overflow-hidden">
                                     <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                                        <img src={product.image_original ?? product.image_medium ?? product.img_link ?? '/images/placeholder.png'} alt={product.name} className="h-full w-full object-contain" />
+                                        <img src={previewImage} alt={product.name} className="h-full w-full object-contain" />
                                     </div>
                                     <div className="p-4 space-y-2">
+                                        <div className="space-y-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="w-full"
+                                                disabled={!product.id || imgLinkRemoved || removeImgLinkProcessing}
+                                                onClick={handleRemoveMissingImgLink}
+                                            >
+                                                {removeImgLinkProcessing ? 'Verification...' : 'Supprimer img_link si image absente'}
+                                            </Button>
+                                            {removeImgLinkStatus && (
+                                                <p className="text-xs text-muted-foreground">{removeImgLinkStatus}</p>
+                                            )}
+                                        </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-muted-foreground">{t('Status')}</span>
                                             <Badge variant={product.active ? 'default' : 'destructive'}>

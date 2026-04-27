@@ -149,6 +149,16 @@ class MediaController extends Controller
         return response()->json($mediaService->ensureThumbnail($product));
     }
 
+    public function actionRemoveMissingImgLink(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (!$product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        return response()->json($mediaService->removeImgLinkIfMissing($product));
+    }
+
     public function actionBatchDownload(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $data = $request->validate([

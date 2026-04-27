@@ -194,6 +194,7 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::post('admin/media-manager/images/action/download', [MediaController::class, 'actionDownload'])->name('media.images.action.download');
     Route::post('admin/media-manager/images/action/compare', [MediaController::class, 'actionCompare'])->name('media.images.action.compare');
     Route::post('admin/media-manager/images/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('media.images.action.thumbnail');
+    Route::post('admin/media-manager/images/action/remove-missing-img-link', [MediaController::class, 'actionRemoveMissingImgLink'])->name('media.images.action.remove-missing-img-link');
     Route::post('admin/media-manager/images/action/batch-download', [MediaController::class, 'actionBatchDownload'])->name('media.images.action.batch-download');
 
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
