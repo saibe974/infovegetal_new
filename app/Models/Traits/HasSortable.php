@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * @property array<int, string> $sortable
+ */
 trait HasSortable
 {
     #[Scope]

@@ -9,10 +9,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { withAppLayout } from '@/layouts/app-layout';
 import carriers from '@/routes/carriers';
+import carrierZones from '@/routes/carriers/zones';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
 
@@ -170,6 +171,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         zones: mapZones(carrier?.zones),
     });
     const [newRoll, setNewRoll] = useState('');
+    const [importingZones, setImportingZones] = useState(false);
+    const [importZonesError, setImportZonesError] = useState<string | null>(null);
+    const importInputRef = useRef<HTMLInputElement | null>(null);
     const errorBag = errors as Record<string, string>;
 
     const daysError = useMemo(() => {
@@ -342,6 +346,64 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
 
     const getZoneRowId = useCallback((row: ZoneRow) => (row.id ? `id-${row.id}` : `new-${row.__index}`), []);
 
+    const getCsrfToken = useCallback(() => {
+        const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+        if (meta?.content) {
+            return meta.content;
+        }
+
+        const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }, []);
+
+    const handleImportClick = () => {
+        importInputRef.current?.click();
+    };
+
+    const handleImportFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+
+        if (!file || !carrier.id) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setImportingZones(true);
+        setImportZonesError(null);
+
+        try {
+            const response = await fetch(carrierZones.import.url({ carrier: carrier.id as number }), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: formData,
+            });
+
+            const payload = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                const message = typeof payload?.message === 'string'
+                    ? payload.message
+                    : (payload?.errors?.file?.[0] ?? t('Import failed'));
+                throw new Error(message);
+            }
+
+            const nextZones = payload?.carrier?.zones ?? [];
+            setData('zones', mapZones(nextZones));
+        } catch (error) {
+            setImportZonesError(error instanceof Error ? error.message : t('Import failed'));
+        } finally {
+            setImportingZones(false);
+        }
+    }, [carrier.id, getCsrfToken, setData, t]);
+
     const headerControls = useCallback((columnId: string) => {
         if (!columnId.startsWith('roll-')) {
             return null;
@@ -461,9 +523,30 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                             {isNew ? t('Create carrier') : t('Edit carrier')}
                         </h2>
                     </div>
-                    <Button type="submit" disabled={processing}>
-                        <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {!isNew && (
+                            <>
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".csv,text/csv,application/csv"
+                                    className="hidden"
+                                    onChange={handleImportFile}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleImportClick}
+                                    disabled={processing || importingZones}
+                                >
+                                    {importingZones ? t('Importing...') : t('Import CSV')}
+                                </Button>
+                            </>
+                        )}
+                        <Button type="submit" disabled={processing || importingZones}>
+                            <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
+                        </Button>
+                    </div>
                 </div>
             </StickyBar>
 
@@ -539,6 +622,11 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                     </Card>
 
                     <Card className="p-4 space-y-4">
+                        {importZonesError && (
+                            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                {importZonesError}
+                            </div>
+                        )}
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h3 className="text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
                             <div className="flex flex-wrap items-center gap-2">

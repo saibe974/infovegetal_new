@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\CarrierResource;
 use App\Models\Carrier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -109,6 +110,127 @@ class CarrierController extends Controller
         }
     }
 
+    public function importZones(Request $request, Carrier $carrier)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+        ]);
+
+        $handle = fopen($validated['file']->getRealPath(), 'rb');
+
+        if ($handle === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Impossible de lire le fichier CSV.',
+            ]);
+        }
+
+        try {
+            $headerLine = fgets($handle);
+            if ($headerLine === false) {
+                throw ValidationException::withMessages([
+                    'file' => 'Le fichier CSV est vide.',
+                ]);
+            }
+
+            $delimiter = $this->detectDelimiter($headerLine);
+            rewind($handle);
+
+            $header = fgetcsv($handle, 0, $delimiter);
+            if ($header === false) {
+                throw ValidationException::withMessages([
+                    'file' => 'Le fichier CSV est invalide.',
+                ]);
+            }
+
+            $header = array_map(static fn ($value) => trim((string) $value), $header);
+            $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]) ?? $header[0];
+
+            $zoneIndex = $this->findHeaderIndex($header, ['zone', 'zones']);
+            $miniIndex = $this->findHeaderIndex($header, ['mini', 'minimum']);
+
+            if ($zoneIndex === null || $miniIndex === null) {
+                throw ValidationException::withMessages([
+                    'file' => 'Le CSV doit contenir les colonnes "zone" et "mini".',
+                ]);
+            }
+
+            $rollColumns = [];
+            foreach ($header as $index => $name) {
+                if ($index === $zoneIndex || $index === $miniIndex) {
+                    continue;
+                }
+
+                $roll = trim((string) $name);
+                if ($roll === '') {
+                    continue;
+                }
+
+                $rollColumns[$index] = $roll;
+            }
+
+            $zones = [];
+            $lineNumber = 1;
+
+            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+                $lineNumber++;
+
+                if ($this->rowIsEmpty($row)) {
+                    continue;
+                }
+
+                $zoneName = trim((string) ($row[$zoneIndex] ?? ''));
+                if ($zoneName === '') {
+                    throw ValidationException::withMessages([
+                        'file' => 'La ligne ' . $lineNumber . ' ne contient pas de zone.',
+                    ]);
+                }
+
+                $tariffs = [];
+                $mini = trim((string) ($row[$miniIndex] ?? ''));
+                if ($mini !== '') {
+                    $tariffs['mini'] = $this->normalizeDecimal($mini);
+                }
+
+                foreach ($rollColumns as $index => $roll) {
+                    $value = trim((string) ($row[$index] ?? ''));
+                    if ($value === '') {
+                        continue;
+                    }
+
+                    $tariffs['roll:' . $roll] = $this->normalizeDecimal($value);
+                }
+
+                $zones[$zoneName] = [
+                    'name' => $zoneName,
+                    'tariffs' => $tariffs,
+                ];
+            }
+
+            if ($zones === []) {
+                throw ValidationException::withMessages([
+                    'file' => 'Aucune zone exploitable n\'a été trouvée dans ce CSV.',
+                ]);
+            }
+
+            DB::transaction(function () use ($carrier, $zones): void {
+                $carrier->zones()->delete();
+
+                foreach (array_values($zones) as $zone) {
+                    $carrier->zones()->create($zone);
+                }
+            });
+
+            $carrier->load('zones');
+
+            return response()->json([
+                'message' => 'Zones importées.',
+                'carrier' => CarrierResource::make($carrier),
+            ]);
+        } finally {
+            fclose($handle);
+        }
+    }
+
     /**
      * Remove the specified resource from storage.
      */
@@ -179,6 +301,51 @@ class CarrierController extends Controller
         }
 
         return $normalized;
+    }
+
+    private function detectDelimiter(string $line): string
+    {
+        $delimiters = [',', ';', "\t", '|'];
+        $bestDelimiter = ',';
+        $bestCount = -1;
+
+        foreach ($delimiters as $delimiter) {
+            $count = substr_count($line, $delimiter);
+            if ($count > $bestCount) {
+                $bestCount = $count;
+                $bestDelimiter = $delimiter;
+            }
+        }
+
+        return $bestDelimiter;
+    }
+
+    private function findHeaderIndex(array $header, array $candidates): ?int
+    {
+        foreach ($header as $index => $value) {
+            $normalized = strtolower(trim($value));
+            if (in_array($normalized, $candidates, true)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function rowIsEmpty(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function normalizeDecimal(string $value): string
+    {
+        return str_replace(',', '.', trim($value));
     }
 
     private function syncZones(Carrier $carrier, array $zones): void

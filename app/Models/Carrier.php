@@ -32,6 +32,7 @@ class Carrier extends Model
         'days',
         'minimum',
         'taxgo',
+        'zones_count',
         'created_at',
         'updated_at',
     ];

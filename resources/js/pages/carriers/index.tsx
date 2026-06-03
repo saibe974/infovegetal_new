@@ -115,7 +115,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                             <SortableTableHead field="days">{t('Days')}</SortableTableHead>
                             <SortableTableHead field="minimum">{t('Minimum')}</SortableTableHead>
                             <SortableTableHead field="taxgo">{t('Taxgo')}</SortableTableHead>
-                            <TableHead>{t('Zones')}</TableHead>
+                            <SortableTableHead field="zones_count">{t('Zones')}</SortableTableHead>
                             <TableHead className="text-end">{t('Actions')}</TableHead>
                         </TableRow>
                     </TableHeader>

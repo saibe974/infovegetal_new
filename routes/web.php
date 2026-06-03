@@ -166,6 +166,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware(['role_or_impersonator:admin']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role_or_impersonator:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role_or_impersonator:admin']);
+    Route::post('carriers/{carrier}/zones/import', [CarrierController::class, 'importZones'])
+        ->whereNumber('carrier')
+        ->name('carriers.zones.import')
+        ->middleware(['role_or_impersonator:admin']);
     Route::resource('carriers', CarrierController::class)->middleware(['role_or_impersonator:admin']);
 });
 
