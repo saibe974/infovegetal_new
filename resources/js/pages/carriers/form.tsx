@@ -524,25 +524,6 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                         </h2>
                     </div>
                     <div className="flex items-center gap-2">
-                        {!isNew && (
-                            <>
-                                <input
-                                    ref={importInputRef}
-                                    type="file"
-                                    accept=".csv,text/csv,application/csv"
-                                    className="hidden"
-                                    onChange={handleImportFile}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleImportClick}
-                                    disabled={processing || importingZones}
-                                >
-                                    {importingZones ? t('Importing...') : t('Import CSV')}
-                                </Button>
-                            </>
-                        )}
                         <Button type="submit" disabled={processing || importingZones}>
                             <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
                         </Button>
@@ -622,6 +603,15 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                     </Card>
 
                     <Card className="p-4 space-y-4">
+                        {!isNew && (
+                            <input
+                                ref={importInputRef}
+                                type="file"
+                                accept=".csv,text/csv,application/csv"
+                                className="hidden"
+                                onChange={handleImportFile}
+                            />
+                        )}
                         {importZonesError && (
                             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                                 {importZonesError}
@@ -631,6 +621,17 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                             <h3 className="text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-2">
+                                    {!isNew && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleImportClick}
+                                            disabled={processing || importingZones}
+                                        >
+                                            {importingZones ? t('Importing...') : t('Import CSV')}
+                                        </Button>
+                                    )}
                                     <Input
                                         value={newRoll}
                                         onChange={(e) => setNewRoll(e.target.value)}
