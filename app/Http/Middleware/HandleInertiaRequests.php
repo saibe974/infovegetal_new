@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Services\UserManagementAuthorizationService;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -95,8 +96,16 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
-        // Get list of users for impersonation dropdown
-        $users = \App\Models\User::select('id', 'name', 'email')->get();
+        // Get scoped list of users for impersonation dropdown
+        $users = collect();
+        if ($user) {
+            $users = User::query()
+                ->select('id', 'name', 'email', '_lft', '_rgt')
+                ->tap(fn ($query) => app(UserManagementAuthorizationService::class)->scopeImpersonatableUsers($user, $query))
+                ->where('id', '!=', $user->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+        }
 
         return [
             ...parent::share($request),

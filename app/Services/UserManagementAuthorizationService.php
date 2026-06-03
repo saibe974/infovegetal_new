@@ -550,6 +550,28 @@ class UserManagementAuthorizationService
             });
     }
 
+    public function scopeImpersonatableUsers(User $actor, Builder $query): Builder
+    {
+        $actor = $this->resolveActor($actor);
+        $scope = $this->resolveUserActionScope($actor, 'impersonate');
+
+        if (!$scope['all'] && !$scope['branch']) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->whereDoesntHave('roles', function (Builder $roleQuery) {
+            $roleQuery->whereIn('name', self::PROTECTED_ROLE_NAMES);
+        });
+
+        if ($scope['all']) {
+            return $query;
+        }
+
+        return $query
+            ->where('_lft', '>', $actor->_lft)
+            ->where('_rgt', '<', $actor->_rgt);
+    }
+
     public function treeRootParentId(User $actor): ?int
     {
         $actor = $this->resolveActor($actor);

@@ -12,7 +12,7 @@ import { edit as editProfile } from '@/routes/profile';
 import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings, UserCheck } from 'lucide-react';
-import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, hasAnyPermission, isAdmin } from '@/lib/roles';
 
 interface UserMenuContentProps {
     user: User;
@@ -25,6 +25,10 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     // const [showImpersonate, setShowImpersonate] = useState(false);
     const effectiveUser = getEffectiveUser(auth);
     const isCurrentUserAdmin = isAdmin(effectiveUser);
+    const canImpersonate = isCurrentUserAdmin || hasAnyPermission(effectiveUser, [
+        'users.impersonate.branch',
+        'users.impersonate.all',
+    ]);
 
     const handleLogout = () => {
         cleanup();
@@ -38,6 +42,7 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
     };
 
     const isImpersonating = !!auth.impersonate_from;
+
     return (
         <>
             <DropdownMenuLabel className="p-0 font-normal">
@@ -46,7 +51,7 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {isCurrentUserAdmin && (
+            {canImpersonate && (
                 // <>
                 //     {showImpersonate ? (
                 //         <ImpersonateSelect

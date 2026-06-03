@@ -3,7 +3,7 @@ import { usePage } from '@inertiajs/react';
 import SearchSelect from '@/components/app/search-select';
 import { type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
-import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, hasAnyPermission, isAdmin } from '@/lib/roles';
 import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,11 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const effectiveUser = getEffectiveUser(auth);
-    const isCurrentUserAdmin = isAdmin(effectiveUser);
-    if (!isCurrentUserAdmin) return null;
+    const canImpersonate = isAdmin(effectiveUser) || hasAnyPermission(effectiveUser, [
+        'users.impersonate.branch',
+        'users.impersonate.all',
+    ]);
+    if (!canImpersonate) return null;
     const isImpersonating = !!auth.impersonate_from;
 
     // Use passed `users` prop if present, otherwise fall back to Inertia shared `users` prop

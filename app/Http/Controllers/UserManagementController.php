@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PriceCalculatorService;
 use App\Services\UserManagementAuthorizationService;
 use App\Services\UserImportService;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1263,7 +1264,7 @@ class UserManagementController extends Controller
     /**
      * Génère les propositions de recherche triées selon la logique.
      */
-    private function getSearchPropositions($query, ?string $search)
+    private function getSearchPropositions(EloquentBuilder $query, ?string $search)
     {
         if (empty($search)) {
             return [];
