@@ -52,7 +52,7 @@ export function AppSidebar() {
     const canImportExportProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
     const canManageUsers = canAccessUsers(effectiveUser);
     const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
-    const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage categories');
+    const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'products.categories.manage');
     const canManageCarriers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage carriers');
     const canManageMedia = isAdmin(effectiveUser);
 
@@ -146,13 +146,13 @@ export function AppSidebar() {
                 title: t('Users'),
                 href: users.index(),
                 icon: User2Icon,
-                subItems: [
-                    {
-                        title: t('All users'),
-                        href: users.index(),
-                        icon: ListIcon,
-                    },
-                ],
+                // subItems: [
+                //     {
+                //         title: t('All users'),
+                //         href: users.index(),
+                //         icon: ListIcon,
+                //     },
+                // ],
             };
 
             if (isAdmin(effectiveUser)) {

@@ -44,6 +44,7 @@ class RolePermissionManagementController extends Controller
         'products.import',
         'products.export',
         'products.associate_cart',
+        'products.categories.manage',
 
         // Orders
         'orders.view.branch',
