@@ -146,22 +146,17 @@ export function AppSidebar() {
                 title: t('Users'),
                 href: users.index(),
                 icon: User2Icon,
-                // subItems: [
-                //     {
-                //         title: t('All users'),
-                //         href: users.index(),
-                //         icon: ListIcon,
-                //     },
-                // ],
             };
 
-            if (isAdmin(effectiveUser)) {
-                userMenu.subItems?.push({
-                    title: t('Roles & permissions'),
-                    href: '/admin/users/roles-permissions',
-                    icon: ShieldCheck,
-                    target: '_self',
-                });
+            if (isAdmin(effectiveUser) || isDev(effectiveUser)) {
+                userMenu.subItems = [
+                    {
+                        title: t('Roles & permissions'),
+                        href: '/admin/users/roles-permissions',
+                        icon: ShieldCheck,
+                        target: '_self',
+                    },
+                ];
             }
 
             mainNavItems.push(userMenu);
