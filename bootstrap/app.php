@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'role_or_impersonator' => \App\Http\Middleware\ImpersonateRoleMiddleware::class,
+            'role_or_permission_or_impersonator' => \App\Http\Middleware\ImpersonateRoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

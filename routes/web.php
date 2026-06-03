@@ -151,13 +151,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
     });
 
-    Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role_or_impersonator:admin']);
-    Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role_or_impersonator:admin']);
+    
+    Route::post('category-products/reorder', [\App\Http\Controllers\CategoryProductsController::class, 'reorder'])->name('category-products.reorder')->middleware(['role_or_permission_or_impersonator:admin|products.categories.manage|manage categories']);
+    Route::get('category-products/children', [\App\Http\Controllers\CategoryProductsController::class, 'children'])->name('category-products.children')->middleware(['role_or_permission_or_impersonator:admin|products.categories.manage|manage categories']);
     // Move endpoint pour dnd-kit (déplacement granulaire)
     Route::post('products/categories/move', [\App\Http\Controllers\CategoryProductsController::class, 'move'])
         ->name('products.categories.move')
-        ->middleware(['role_or_impersonator:admin']);
-    Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role_or_impersonator:admin']);
+        ->middleware(['role_or_permission_or_impersonator:admin|products.categories.manage|manage categories']);
+    Route::resource('category-products', \App\Http\Controllers\CategoryProductsController::class)->middleware(['role_or_permission_or_impersonator:admin|products.categories.manage|manage categories']);
+    
+    
     Route::post('db-products/analyze-sample', [\App\Http\Controllers\DbProductsController::class, 'analyzeSample'])
         ->name('db-products.analyze-sample')
         ->middleware(['role_or_impersonator:admin']);
