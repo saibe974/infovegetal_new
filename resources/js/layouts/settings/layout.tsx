@@ -1,6 +1,4 @@
-import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { edit as editAdminAppearance } from '@/routes/appearance';
 import { edit as editAdminPassword } from '@/routes/password';
@@ -13,7 +11,7 @@ import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { getEffectiveUser, isAdmin, isDev } from '@/lib/roles';
+import { getEffectiveUser, isAdmin } from '@/lib/roles';
 import { ArrowLeftCircle, Menu } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -25,7 +23,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
     const effectiveUser = getEffectiveUser(auth);
-    const userAbilities = (pageProps as any).userAbilities ?? {};
+    const userAbilities = (pageProps.userAbilities as { manage_db?: boolean } | undefined) ?? {};
+    useIsMobile();
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
@@ -115,8 +114,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         //     icon: null,
         // });
     }
-
-    const isMobile = useIsMobile();
 
     return (
         <div className="p-2 lg:p-4 space-y-6">

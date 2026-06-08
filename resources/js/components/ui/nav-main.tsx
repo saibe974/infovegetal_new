@@ -8,7 +8,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { type NavItem, type NavItemExtended } from '@/types';
-import { useState, useEffect, useRef, use } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 
 function NavMain({ items = [] }: { items: NavItem[] }) {
@@ -51,16 +51,21 @@ export function NavMainExtended({
     menuButtonClassName?: string;
 }) {
     const page = usePage();
-    const { state, isOpenId } = useSidebar();
+    const { isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
 
     // console.log(isOpenId);
 
+    const getCandidateUrl = (href: NavItem['href'] | undefined): string => {
+        if (!href) return '';
+        if (typeof href === 'string') return href;
+        return typeof href.url === 'string' ? href.url : '';
+    };
+
     // initialize open state per item key (use title as key)
     const initialOpenMap = items.reduce((acc: Record<string, boolean>, item) => {
-        const itemMatch = (href: any) => {
-            if (!href) return false;
-            const candidate = typeof href === 'string' ? href : href.url ?? '';
+        const itemMatch = (href: NavItem['href'] | undefined) => {
+            const candidate = getCandidateUrl(href);
             return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
         };
 
@@ -76,7 +81,7 @@ export function NavMainExtended({
             const raw = localStorage.getItem(storageKey);
             if (!raw) return null;
             return JSON.parse(raw);
-        } catch (e) {
+        } catch {
             return null;
         }
     };
@@ -104,16 +109,15 @@ export function NavMainExtended({
         measure();
         window.addEventListener('resize', measure);
         return () => window.removeEventListener('resize', measure);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [items]);
 
     useEffect(() => {
         // when path changes, ensure matching item is opened
         const newMap = { ...openMap };
         items.forEach((item) => {
-            const itemMatch = (href: any) => {
-                if (!href) return false;
-                const candidate = typeof href === 'string' ? href : href.url ?? '';
+            const itemMatch = (href: NavItem['href'] | undefined) => {
+                const candidate = getCandidateUrl(href);
                 return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
             };
             if (itemMatch(item.href) || (item.subItems || []).some((s) => itemMatch(s.href))) {
@@ -129,7 +133,7 @@ export function NavMainExtended({
         if (typeof window === 'undefined') return;
         try {
             localStorage.setItem(storageKey, JSON.stringify(openMap));
-        } catch (e) {
+        } catch {
             // ignore
         }
     }, [openMap]);
@@ -179,8 +183,9 @@ export function NavMainExtended({
                                     </SidebarMenuButton>
 
                                     <div
-                                        // @ts-ignore
-                                        ref={(el) => (subRefs.current[item.title] = el)}
+                                        ref={(el: HTMLDivElement | null) => {
+                                            subRefs.current[item.title] = el;
+                                        }}
                                         className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out mt-2 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
                                         style={{ maxHeight: isOpen ? heights[item.title] ?? 400 : 0 }}
                                     >

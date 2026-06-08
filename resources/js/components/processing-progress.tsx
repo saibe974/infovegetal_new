@@ -41,9 +41,17 @@ export function ProcessingProgress({ id, progressUrl, reportUrl, percent, onDone
                 if (json.status === 'done' || (typeof json.progress === 'number' && json.progress >= 100)) {
                     setStatus('done');
                     stop();
-                    try { onDone && onDone(); } catch { }
+                    if (onDone) {
+                        try {
+                            onDone();
+                        } catch {
+                            // ignore optional callback errors
+                        }
+                    }
                 }
-            } catch (_) { }
+            } catch {
+                // polling errors are transient; keep interval alive
+            }
         }, 600);
         return stop;
     }, [id, progressUrl, onDone]);

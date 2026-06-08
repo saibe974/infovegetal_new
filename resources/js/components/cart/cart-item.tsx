@@ -2,7 +2,6 @@ import React, { ComponentType, useContext } from 'react';
 import { type Product } from '@/types';
 import { CartContext } from './cart.context';
 import { Trash2, Minus, Plus } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -22,12 +21,6 @@ export function CartItem({ product, quantity }: CartItemProps) {
 
     const pricing = getCartPricing(product, quantity);
     const total = pricing.lineTotal.toFixed(2);
-    const tierLabels: Record<typeof pricing.tier, string> = {
-        roll: t('Roll'),
-        floor: t('Floor'),
-        tray: t('Tray'),
-        unit: t('Unit'),
-    };
 
     const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
     const CountryFlag = countryCode.length === 2

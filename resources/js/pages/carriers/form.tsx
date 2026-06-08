@@ -302,19 +302,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         };
     };
 
-    const rollsSignature = useMemo(
-        () =>
-            data.zones
-                .map((zone) =>
-                    zone.tiers
-                        .map((tier) => tier.roll.trim())
-                        .sort()
-                        .join(','),
-                )
-                .join('|'),
-        [data.zones],
-    );
-    const rolls = useMemo(() => getUniqueRolls(data.zones), [rollsSignature]);
+    const rolls = useMemo(() => getUniqueRolls(data.zones), [data.zones]);
     const zoneRows = useMemo<ZoneRow[]>(
         () => data.zones.map((zone, index) => ({ ...zone, __index: index })),
         [data.zones],
@@ -487,7 +475,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
                 ),
             },
         ];
-    }, [minimumPriceHeader, rolls, removeZone, updateTierPrice, updateZone, zonesHeader]);
+    }, [minimumPriceHeader, rolls, removeZone, updateTierPrice, updateZone, zonesHeader, getZoneNameError]);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();

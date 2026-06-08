@@ -1,13 +1,13 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
+import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { PaginatedCollection, ProductCategory } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, LoaderIcon } from 'lucide-react';
+import { EditIcon, Loader2Icon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import { useI18n } from '@/lib/i18n';
@@ -15,7 +15,6 @@ import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
 import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 
 type Props = {
     collection: PaginatedCollection<ProductCategory>;
@@ -45,12 +44,6 @@ export default withAppLayout(
         const [saving, setSaving] = useState(false);
 
 
-        const [viewMode, setViewMode] = useState<ViewMode>(() => {
-            if (typeof window === 'undefined') return 'tree';
-            const views = JSON.parse(localStorage.getItem('views') || '{}');
-            return (views.categories || 'tree') as ViewMode;
-        });
-
         const page = usePage<{ searchPropositions?: string[] }>();
         const initialSearchPropositions = page.props.searchPropositions ?? [];
 
@@ -67,18 +60,18 @@ export default withAppLayout(
             // On ne veut QUE children.data si présent, sinon children si déjà un tableau
             const childrenArray = Array.isArray(children)
                 ? children
-                : (children && Array.isArray((children as any).data)
-                    ? ((children as any).data as ProductCategory[])
+                : (children && Array.isArray((children as { data?: ProductCategory[] }).data)
+                    ? ((children as { data: ProductCategory[] }).data as ProductCategory[])
                     : []);
 
             // Filtrage strict: on garde uniquement les objets avec un id numérique
-            const roots = (collection?.data ?? []).filter((x: any): x is ProductCategory => x && typeof x.id === 'number');
-            const childs = (childrenArray ?? []).filter((x: any): x is ProductCategory => x && typeof x.id === 'number');
+            const roots = (collection?.data ?? []).filter((x: ProductCategory | undefined): x is ProductCategory => Boolean(x && typeof x.id === 'number'));
+            const childs = (childrenArray ?? []).filter((x: ProductCategory | undefined): x is ProductCategory => Boolean(x && typeof x.id === 'number'));
 
             // Regrouper les enfants par parent_id
             const byParent = new Map<number, ProductCategory[]>();
             for (const c of childs) {
-                const pid = (c as any).parent_id as number | undefined;
+                const pid = c.parent_id as number | undefined;
                 if (typeof pid === 'number') {
                     const arr = byParent.get(pid) ?? [];
                     arr.push(c);
@@ -90,16 +83,16 @@ export default withAppLayout(
             const ordered: ProductCategory[] = [];
             const seenChildIds = new Set<number>();
             for (const p of roots) {
-                const pDepth = typeof (p as any).depth === 'number' ? (p as any).depth : 0;
-                const pNorm: ProductCategory = { ...(p as any), depth: pDepth };
+                const pDepth = typeof p.depth === 'number' ? p.depth : 0;
+                const pNorm: ProductCategory = { ...p, depth: pDepth };
                 ordered.push(pNorm);
                 const arr = byParent.get(p.id) ?? [];
                 for (const ch of arr) {
-                    const chDepth = typeof (ch as any).depth === 'number' ? (ch as any).depth : pDepth + 1;
+                    const chDepth = typeof ch.depth === 'number' ? ch.depth : pDepth + 1;
                     const chNorm: ProductCategory = {
-                        ...(ch as any),
+                        ...ch,
                         depth: chDepth,
-                        parent_id: (ch as any).parent_id ?? p.id,
+                        parent_id: ch.parent_id ?? p.id,
                     };
                     ordered.push(chNorm);
                     if (typeof chNorm.id === 'number') seenChildIds.add(chNorm.id);
@@ -134,7 +127,7 @@ export default withAppLayout(
             const source = pending ?? allItems;
             const set = new Set<number>();
             source.forEach((it) => {
-                const pid = (it as any)?.parent_id;
+                const pid = it?.parent_id;
                 if (pid != null) set.add(pid as number);
             });
             return set;
@@ -197,7 +190,6 @@ export default withAppLayout(
             }, 300);
         };
 
-        // @ts-ignore
         const onSelect = (mysearch: string, options?: { force?: boolean }) => {
             const trimmed = (mysearch ?? '').trim();
 
@@ -276,7 +268,7 @@ export default withAppLayout(
             } = props;
 
             // Chevrons dynamiques: vrai si serveur l'indique ou si un enfant est présent dans la liste courante
-            const hasChildren = (item as any).has_children === true || parentsWithChildren.has(item.id);
+            const hasChildren = (item as ProductCategory & { has_children?: boolean }).has_children === true || parentsWithChildren.has(item.id);
 
             // console.log(item)
             return (

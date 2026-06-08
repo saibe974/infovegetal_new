@@ -1,19 +1,15 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
+import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import { useEffect, useRef, useState } from 'react';
 import { SharedData, type BreadcrumbItem, Product, PaginatedCollection, type ProductCategory } from '@/types';
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { UploadIcon, EditIcon, TrashIcon, LoaderIcon, Loader2Icon } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
 import { DialogUpload } from '@/components/dialog-upload';
-import { getEffectiveUser, isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { getEffectiveUser, isAdmin, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
-import { useSidebar } from '@/components/ui/sidebar';
 import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -75,13 +71,11 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [], dbProducts = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [] }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [] }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
-    const user = auth?.user;
     const effectiveUser = getEffectiveUser(auth);
-    const isAuthenticated = !!user;
     const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
     const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
     const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
@@ -101,11 +95,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const [filtersState, setFiltersState] = useState<FiltersState & CartFilter>(() => normalizeFilters(incomingFilters, { cart: cartParam ? '1' : undefined }));
 
     // Récupérer le contexte du panier pour afficher le badge
-    const { items: cartItems, clearCart } = useCart();
+    const { items: cartItems } = useCart();
 
     useEffect(() => {
         setFiltersState(normalizeFilters(incomingFilters, { cart: cartParam ? '1' : undefined }));
-    }, [incomingFilters?.active, incomingFilters?.category, incomingFilters?.country, incomingFilters?.pot, incomingFilters?.height, cartParam]);
+    }, [incomingFilters, cartParam]);
 
     const getCategoryName = (categoryId: number | null) => {
         const category = categories.find((cat) => cat.id === categoryId);
@@ -120,7 +114,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
 
     const getCountryLabel = (value: string) => {
         const normalized = normalizeCountry(value) ?? value;
-        if (normalized.length === 2 && typeof Intl !== 'undefined' && (Intl as any).DisplayNames) {
+        if (normalized.length === 2 && typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined') {
             const displayNames = new Intl.DisplayNames([locale ?? 'fr'], { type: 'region' });
             return displayNames.of(normalized) ?? normalized;
         }
@@ -149,7 +143,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     });
 
     const buildQueryParams = (nextFilters: FiltersState & CartFilter, searchOverride: string | null = q ?? '') => {
-        const params: Record<string, any> = {};
+        const params: Record<string, string | number> = {};
         const qValue = (searchOverride ?? '').trim();
 
         if (qValue.length > 0) {
@@ -222,34 +216,14 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         applyFilters(nextFilters);
     }
 
-    const clearAllFilters = () => {
-        // Effacer aussi le panier de la session et côté client
-        clearCart();
-        fetch('/products/save-cart-filter', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify({ cart_ids: [] }),
-        }).catch(err => console.error('Erreur clear cart:', err));
-        applyFilters({
-            active: 'all',
-            category: null,
-            country: null,
-            pot: null,
-            height: null,
-        });
-    }
-
     // Local state for client-fetched propositions to avoid Inertia refresh
     const [searchPropositionsState, setSearchPropositions] = useState<Array<string | SearchOption>>(searchPropositions ?? []);
 
     const handleSearch = (s: string) => {
         setSearch(s);
-        // @ts-ignore
-        clearTimeout(timerRef.current);
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
         router.cancelAll();
         if (s.length < 2) {
             return;
@@ -266,7 +240,6 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         }, 300);
     }
 
-    // @ts-ignore
     const onSelect = (mysearch: string, options?: { force?: boolean }) => {
         const trimmed = (mysearch ?? '').trim();
         // If explicit clear requested, remove q from URL instead of setting q=""

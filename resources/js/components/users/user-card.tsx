@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { type Product, User } from "@/types";
+import { User } from "@/types";
 
 
 // UserCard types and component
@@ -79,7 +79,7 @@ export function UserCard({
             key={user.id}
             href={'/admin/users/' + user.id}
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
-            aria-label={`Voir ${name}`}
+            aria-label={`Voir ${user.name}`}
         >
             <Card className={`relative h-105 w-75 flex flex-col p-4 gap-4 ${className ?? ""}`}>
                 <CardHeader className="p-0">

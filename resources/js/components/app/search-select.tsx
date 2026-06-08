@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect, ReactNode, ReactElement, cloneElement, isValidElement, type ComponentType } from "react";
-import { Input } from "@/components/ui/input";
-import { Loader2, X, Search, SearchIcon, SlidersVerticalIcon, SlidersHorizontalIcon } from "lucide-react";
+import { Loader2, X, SearchIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { Button } from "../ui/button";
-import Heading from "../heading";
 import * as Flags from "country-flag-icons/react/3x2";
 
 interface SearchBarProps {
@@ -190,7 +187,7 @@ export default function SearchSelect({
         if (lastSubmittedRef.current === next) return;
         lastSubmittedRef.current = next;
         onSubmit(next);
-    }, [selected]);
+    }, [selected, onSubmit]);
 
     useEffect(() => {
         const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -233,7 +230,7 @@ export default function SearchSelect({
                 {hasFilters && (
                     <button
                         type="button"
-                        onMouseDown={(e) => { setOpenFilters((v) => !v); }}
+                        onMouseDown={() => { setOpenFilters((v) => !v); }}
                         // onClick={(e) => { e.stopPropagation(); }}
                         className="text-muted-foreground hover:text-foreground px-1"
                         title="Filters"

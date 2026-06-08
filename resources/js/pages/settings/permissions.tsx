@@ -3,7 +3,6 @@ import { Form, Head, usePage } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
 import { Shield } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
@@ -57,13 +56,22 @@ const permissionDomain = (permissionName: string): string => {
     return 'Autres';
 };
 
+type RolePermission = { id: number; name: string };
+type RoleItem = { id: number; name: string; permissions?: RolePermission[] };
+type PermissionsPageProps = SharedData & {
+    userAbilities?: { assign_roles?: boolean; assign_permissions?: boolean };
+    allRoles?: RoleItem[];
+    allPermissions?: RolePermission[];
+};
+
 export default function PermissionsSettings({
     editingUser,
 }: {
     editingUser?: User;
 }) {
-    const page = usePage<SharedData>();
-    const { auth } = page.props as SharedData;
+    const page = usePage<PermissionsPageProps>();
+    const pageProps = page.props;
+    const { auth } = pageProps;
     const { t } = useI18n();
     const targetUser = editingUser ?? auth.user;
     const isSelf = !editingUser || editingUser.id === auth.user?.id;
@@ -79,34 +87,34 @@ export default function PermissionsSettings({
         },
     ];
 
-    const userAbilities = (usePage().props as any).userAbilities ?? {};
+    const userAbilities = pageProps.userAbilities ?? {};
     const canManageRoles = !!userAbilities.assign_roles;
     const canManagePermissions = !!userAbilities.assign_permissions;
 
-    const allRoles = (usePage().props as any).allRoles ?? [];
-    const allPermissions = (usePage().props as any).allPermissions ?? [];
+    const allRoles = useMemo(() => pageProps.allRoles ?? [], [pageProps.allRoles]);
+    const allPermissions = useMemo(() => pageProps.allPermissions ?? [], [pageProps.allPermissions]);
     const roleManagementLocked = !canManageRoles;
-    const selectableRoles = (allRoles as any[]) || [];
+    const selectableRoles = allRoles;
     const roleLabel = (name: string) => t(name);
 
     const [roleSearch, setRoleSearch] = useState('');
-    const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>((targetUser?.roles ?? []).map((r: any) => r.id));
+    const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>((targetUser?.roles ?? []).map((r) => r.id));
 
-    const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>((targetUser?.permissions ?? []).map((p: any) => p.id));
+    const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>((targetUser?.permissions ?? []).map((p) => p.id));
     const [removedPermissionIds, setRemovedPermissionIds] = useState<number[]>([]);
 
     useEffect(() => {
-        setSelectedRoleIds((targetUser?.roles ?? []).map((r: any) => r.id));
-        setSelectedPermissionIds((targetUser?.permissions ?? []).map((p: any) => p.id));
+        setSelectedRoleIds((targetUser?.roles ?? []).map((r) => r.id));
+        setSelectedPermissionIds((targetUser?.permissions ?? []).map((p) => p.id));
         setRemovedPermissionIds([]);
-    }, [targetUser?.id]);
+    }, [targetUser?.id, targetUser?.roles, targetUser?.permissions]);
 
     const inheritedPermissionIds = useMemo(() => {
         const set = new Set<number>();
         (selectedRoleIds || []).forEach((rid) => {
-            const role = (allRoles as any[]).find((r) => r.id === rid);
+            const role = allRoles.find((r) => r.id === rid);
             if (role && role.permissions) {
-                role.permissions.forEach((p: any) => set.add(p.id));
+                role.permissions.forEach((p) => set.add(p.id));
             }
         });
         return Array.from(set);
@@ -121,7 +129,7 @@ export default function PermissionsSettings({
     const permissionsByDomain = useMemo(() => {
         const grouped = new Map<string, Array<{ id: number; name: string }>>();
 
-        (allPermissions as any[]).forEach((permission) => {
+        allPermissions.forEach((permission) => {
             const domain = permissionDomain(String(permission.name));
             const current = grouped.get(domain) ?? [];
             current.push({ id: Number(permission.id), name: String(permission.name) });
@@ -181,7 +189,7 @@ export default function PermissionsSettings({
                                     }}
                                     propositions={selectableRoles.map((r) => ({ value: r.name, label: roleLabel(r.name) }))}
                                     selection={(selectedRoleIds || []).map((id: number) => {
-                                        const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
+                                        const r = allRoles.find((x) => x.id === id) || (targetUser?.roles ?? []).find((x) => x.id === id);
                                         return r ? { value: r.name, label: roleLabel(r.name) } : { value: String(id), label: String(id) };
                                     })}
                                     loading={false}
@@ -201,7 +209,7 @@ export default function PermissionsSettings({
                                 <div className='mt-4 flex flex-wrap gap-2'>
                                     {selectedRoleIds.length > 0 ? (
                                         selectedRoleIds.map((id: number) => {
-                                            const r = (allRoles as any[]).find((x) => x.id === id) || (targetUser?.roles ?? []).find((x: any) => x.id === id);
+                                            const r = allRoles.find((x) => x.id === id) || (targetUser?.roles ?? []).find((x) => x.id === id);
                                             return r ? (
                                                 <Badge key={id} variant='secondary' className='bg-blue-100 text-blue-800'>
                                                     {roleLabel(r.name)}

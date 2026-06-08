@@ -1,24 +1,19 @@
 import { Breadcrumbs } from '@/components/app/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { SharedData, type BreadcrumbItem as BreadcrumbItemType, Product, PaginatedCollection } from '@/types';
+import { SharedData, type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import { NavUser } from '../users/nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { dashboard, home, login, register } from '@/routes';
+import { login, register } from '@/routes';
 import products from '@/routes/products';
 import SearchSelect from '@/components/app/search-select';
-import { useContext, useRef, useState } from 'react';
-import { SelectWithItems } from '../ui/select-with-items';
+import { type CSSProperties, useContext, useRef, useState } from 'react';
 import { SelectLang } from '../ui/selectLang';
 import AppearanceToggleDropdown from '../appearance-dropdown';
-import {  ChevronDownIcon, EllipsisVertical, Settings2Icon, SettingsIcon, ShoppingBasket, ShoppingCart, UserIcon } from 'lucide-react';
-import { AlignJustify } from 'lucide-react'; // optionnel : icône pour le trigger
+import { ChevronDownIcon, EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from '../ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import BasicSticky from 'react-sticky-el';
 import { useSidebar } from '@/components/ui/sidebar';
-import { ProductsFilters } from '../products/products-filters';
 import { CartContext } from '../cart/cart.context';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -29,21 +24,20 @@ export function AppSidebarHeader({
     breadcrumbs = [],
 }: {
     breadcrumbs?: BreadcrumbItemType[];
-    collection?: PaginatedCollection<Product>;
 }) {
-    const { auth, locale } = usePage<SharedData>().props;
+    const page = usePage<SharedData & { searchPropositions?: string[]; collection?: { meta?: { total?: number } } }>();
+    const { auth } = page.props;
     const { t } = useI18n();
     const { isOpenId } = useSidebar(); // récupère l'état du sidebar
 
-    const isMobile = useIsMobile()
-    const page = usePage<{ searchPropositions?: string[] }>();
+    const isMobile = useIsMobile();
     const searchPropositions = page.props.searchPropositions ?? [];
     const collection = page.props.collection ?? { meta: { total: 0 } };
     const timerRef = useRef<number | null>(null);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
-    const isHomePage = usePage().component === 'home';
+    const isHomePage = page.component === 'home';
 
     const { items } = useContext(CartContext);
 
@@ -115,6 +109,11 @@ export function AppSidebarHeader({
 
     };
 
+    const headerStyle: CSSProperties & { '--app-header-height': string } = {
+        width: headerWidth,
+        '--app-header-height': '64px',
+    };
+
     return (
         <>
             <header
@@ -122,10 +121,7 @@ export function AppSidebarHeader({
                     "top-sticky z-30 flex justify-between h-16 shrink-0 items-center gap-2 " +
                     "border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,left] ease-linear md:px-4 fixed top-0 bg-sidebar"
                 }
-                style={{
-                    width: headerWidth,
-                    ['--app-header-height' as any]: '64px',
-                }}
+                style={headerStyle}
             >
 
                 <div className='flex items-center gap-2'>
@@ -141,8 +137,7 @@ export function AppSidebarHeader({
                             onSubmit={onSelect}
                             propositions={searchPropositions}
                             loading={fetching}
-                            //@ts-ignore
-                            count={collection?.meta.total ?? 0}
+                            count={collection?.meta?.total ?? 0}
                             query={''}
                             search={true}
                         // filters={(

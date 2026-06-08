@@ -1,21 +1,17 @@
 import React, { useContext } from "react";
 import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { Link, router, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BadgeEuro, Box, CirclePlus, CircleSlash2, Container, EditIcon, Layers, MoveVertical, TrashIcon, Zap } from 'lucide-react';
+import { CircleSlash2, EditIcon, MoveVertical, TrashIcon, Zap } from 'lucide-react';
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
-import * as Flags from "country-flag-icons/react/3x2";
-import { type ComponentType } from "react";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
-
-const formatCurrency = (value: number): string =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+import { formatCurrency } from '@/lib/utils';
+import { CountryFlag } from '@/components/ui/country-flag';
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -87,9 +83,6 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     const isInCart = items.some((cartItem) => cartItem.product.id === item.id);
                     const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(item);
                     const countryCode = (item.dbProduct?.country ?? '').trim().toUpperCase();
-                    const CountryFlag = countryCode.length === 2
-                        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
-                        : undefined;
                     return (
                         <TableRow
                             key={item.id}
@@ -104,9 +97,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                     ) : (
                                         <img src={'/placeholder.png'} className="w-20 object-cover" alt="Placeholder" />
                                     )}
-                                    {CountryFlag ? (
+                                    {countryCode ? (
                                         <span className="absolute right-1 top-1">
-                                            <CountryFlag title={countryCode} className="w-4" />
+                                            <CountryFlag countryCode={countryCode} title={countryCode} className="w-4" />
                                         </span>
                                     ) : null}
                                     {item?.price_promo && Number(item.price_promo) > 0 ? (
@@ -155,7 +148,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond));
-                                                        !isOpenId('right') && toggleSidebar('right');
+                                                        if (!isOpenId('right')) {
+                                                            toggleSidebar('right');
+                                                        }
                                                     }}
                                                     title={t('Add a tray')}
                                                 >
@@ -176,7 +171,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond) * Number(item.floor));
-                                                        !isOpenId('right') && toggleSidebar('right');
+                                                        if (!isOpenId('right')) {
+                                                            toggleSidebar('right');
+                                                        }
                                                     }}
                                                     title={t('Add a floor')}
                                                 >
@@ -197,7 +194,9 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond) * Number(item.floor) * Number(item.roll));
-                                                        !isOpenId('right') && toggleSidebar('right');
+                                                        if (!isOpenId('right')) {
+                                                            toggleSidebar('right');
+                                                        }
                                                     }}
                                                     title={t('Add a roll')}
                                                 >

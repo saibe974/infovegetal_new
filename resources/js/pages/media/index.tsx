@@ -15,7 +15,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type MediaPageProps = Record<string, never>;
 
-export default withAppLayout<MediaPageProps>(breadcrumbs, true, ({ }) => {
+export default withAppLayout<MediaPageProps>(breadcrumbs, true, () => {
     const { t } = useI18n();
     const [libraryTheme, setLibraryTheme] = useState<'light' | 'dark'>('light');
 

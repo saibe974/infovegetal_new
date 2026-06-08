@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -101,7 +101,7 @@ export function ProductImportConfigurator({ dbProductId, uploadId, importError }
         );
     };
 
-    const analyze = async (headerRowIndex?: number) => {
+    const analyze = useCallback(async (headerRowIndex?: number) => {
         if (!uploadId) {
             return;
         }
@@ -138,13 +138,13 @@ export function ProductImportConfigurator({ dbProductId, uploadId, importError }
         } finally {
             setLoading(false);
         }
-    };
+    }, [csrfToken, t, uploadId]);
 
     useEffect(() => {
         if (uploadId) {
             void analyze();
         }
-    }, [uploadId]);
+    }, [uploadId, analyze]);
 
     const missingRequiredFields = useMemo(() => {
         const mappedTargets = Object.values(mapping);

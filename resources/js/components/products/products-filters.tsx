@@ -29,7 +29,6 @@ type ProductsFiltersProps = {
     pot?: string | null;
     height?: string | null;
     onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
-    onFilterAdd?: (filter: { key: string; label: string; value: string }) => void;
     closeFilters?: () => void;
 };
 
@@ -45,7 +44,6 @@ export function ProductsFilters({
     pot,
     height,
     onApply,
-    onFilterAdd,
     closeFilters,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
@@ -157,7 +155,7 @@ export function ProductsFilters({
 
     const getCountryLabel = (value: string) => {
         const normalized = normalizeCountry(value) ?? value;
-        if (normalized.length === 2 && typeof Intl !== 'undefined' && (Intl as any).DisplayNames) {
+        if (normalized.length === 2 && typeof Intl !== 'undefined' && typeof Intl.DisplayNames !== 'undefined') {
             const displayLocale = typeof locale === 'string' ? locale : 'fr';
             const displayNames = new Intl.DisplayNames([displayLocale], { type: 'region' });
             return displayNames.of(normalized) ?? normalized;

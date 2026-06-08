@@ -1,43 +1,23 @@
-import { PaginatedCollection, type BreadcrumbItem, type SharedData, type User } from '@/types';
-import { Head, Link, router, usePage, InfiniteScroll } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData, type User } from '@/types';
+import { Head, router, usePage, InfiniteScroll } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import HeadingSmall from '@/components/heading-small';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { EditIcon, Loader2Icon, TrashIcon, ChevronDown, ChevronRight, GripVertical, SaveIcon, Undo2, Undo2Icon, RotateCcw, UploadIcon, UserCheck } from 'lucide-react';
+import { Loader2Icon, UserCheck } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { DialogUpload } from '@/components/dialog-upload';
-import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
-import ProductsTable from '@/components/products/products-table';
-import { ProductsCardsList } from '@/components/products/products-cards-list';
+import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, hasPermission } from '@/lib/roles';
 import usersRoutes from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
 import UsersImportTreatment from '@/components/users/import';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
-import SortableTree, { RenderItemProps } from '@/components/sortable-tree';
+import SortableTree, { type RenderItemProps } from '@/components/sortable-tree';
 import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
@@ -105,10 +85,8 @@ export default withAppLayout(
             setAllUsers(dedupeUsersById(collection?.data || []));
         }, [collection]);
 
-        const { auth, locale } = usePage<SharedData>().props;
-        const user = auth?.user;
+        const { auth } = usePage<SharedData>().props;
         const effectiveUser = getEffectiveUser(auth);
-        const isAuthenticated = !!user;
         const canManageUsers = canAccessUsers(effectiveUser);
         const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
 
@@ -158,8 +136,9 @@ export default withAppLayout(
 
         const handleSearch = (s: string) => {
             setSearch(s);
-            // @ts-ignore
-            clearTimeout(timerRef.current);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
             router.cancelAll();
             if (s.length < 2) {
                 return;
@@ -176,7 +155,6 @@ export default withAppLayout(
             }, 300);
         }
 
-        // @ts-ignore
         const onSelect = (mysearch: string, options?: { force?: boolean }) => {
             const trimmed = (mysearch ?? '').trim();
             // If explicit clear requested, remove q from URL instead of setting q=""
@@ -203,20 +181,6 @@ export default withAppLayout(
 
             // console.log("selected:", trimmed);
         };
-
-
-        const handleRoleChange = (userId: number, roleName: string) => {
-            // setUpdating(userId);
-            // router.post(
-            //     `/settings/users/${userId}/role`,
-            //     { role: roleName },
-            //     {
-            //         preserveScroll: true,
-            //         onFinish: () => setUpdating(null),
-            //     }
-            // );
-        };
-
         const handleEdit = (userId: number) => {
             router.visit(`/admin/users/${userId}/edit`);
         };
@@ -267,9 +231,9 @@ export default withAppLayout(
                     return response.json();
                 })
                 .then((payload) => {
-                    const nextItems = ((payload.items || []) as any[]).map((item) => ({
+                    const nextItems = ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
                         ...item,
-                        parent_id: item.parent_id ?? null,
+                        parent_id: (item.parent_id as number | null | undefined) ?? null,
                         depth: Number(item.depth ?? 0),
                         has_children: Boolean(item.has_children),
                     })) as TreeUser[];
@@ -297,7 +261,7 @@ export default withAppLayout(
             return () => {
                 controller.abort();
             };
-        }, [isTreeSearchMode, treeSearchQuery]);
+        }, [isTreeSearchMode, treeSearchQuery, t]);
 
         const loadTreePage = async (
             parent: TreeUser | null,
@@ -329,9 +293,9 @@ export default withAppLayout(
 
             const payload = await response.json();
             const parentDepth = parent?.depth ?? -1;
-            const items = (payload.items || []).map((item: any) => ({
+            const items = (payload.items || []).map((item: Record<string, unknown>) => ({
                 ...item,
-                parent_id: item.parent_id ?? (parent ? parent.id : null),
+                parent_id: (item.parent_id as number | null | undefined) ?? (parent ? parent.id : null),
                 depth:
                     item.depth !== null &&
                         item.depth !== undefined &&
@@ -385,7 +349,7 @@ export default withAppLayout(
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
                 const payload = (() => {
-                    const items = pending.map((i: any) => ({
+                    const items = pending.map((i) => ({
                         id: i.id,
                         parent_id: i.parent_id ?? null,
                         position: 0,
@@ -437,7 +401,7 @@ export default withAppLayout(
         const renderItem = (props: RenderItemProps<User>) => (
             <SortableTreeItem
                 props={props}
-                hasChildren={(item) => Boolean((item as any)?.has_children)}
+                hasChildren={(item) => Boolean((item as User & { has_children?: boolean })?.has_children)}
                 nameHref={(item) => '/admin/users/' + item.id}
                 canEdit={canEdit}
                 canDelete={canDelete}
@@ -486,7 +450,7 @@ export default withAppLayout(
                             onSubmit={onSelect}
                             propositions={searchPropositionsState}
                             loading={fetching}
-                            count={(collection as any)?.meta?.total ?? collection?.data?.length ?? 0}
+                            count={collection.meta?.total ?? collection.data?.length ?? 0}
                             query={q ?? ''}
                             minQueryLength={2}
                         />
@@ -582,12 +546,3 @@ export default withAppLayout(
         );
 
     })
-
-
-function DownloadCsvButton() {
-    return (
-        <a href="/admin/users/export" className="clickable inline-flex items-center border px-3 py-1 rounded text-sm">
-            <UploadIcon />
-        </a>
-    );
-}

@@ -6,21 +6,17 @@ import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, hasAnyPermission, isAdmin } from '@/lib/roles';
 import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Button } from '@/components/ui/button';
 
 interface ImpersonateSelectProps {
     users: User[];
     onClose?: () => void;
 }
 
-const PAGE_SIZE = 12;
-
 export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     const { t } = useI18n();
     const pageProps = usePage<SharedData>().props;
     const { auth } = pageProps;
     const [search, setSearch] = useState<string>('');
-    const [currentPage, setCurrentPage] = useState<number>(1);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const effectiveUser = getEffectiveUser(auth);
@@ -32,14 +28,11 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     const isImpersonating = !!auth.impersonate_from;
 
     // Use passed `users` prop if present, otherwise fall back to Inertia shared `users` prop
-    const sharedUsers: User[] = (users && users.length > 0) ? users : ((pageProps as any).users || []);
+    const sharedUsers: User[] = users && users.length > 0 ? users : pageProps.users ?? [];
     const availableUsers: User[] = sharedUsers.filter((u: User) => u.id !== auth.user?.id);
-
-    const handleLoadMore = () => setCurrentPage((p: number) => p + 1);
 
     const handleSearch = (s: string) => {
         setSearch(s);
-        setCurrentPage(1);
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
@@ -48,7 +41,6 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
             return;
         }
         setSearch('');
-        setCurrentPage(1);
         if (onClose) onClose();
         const url = impersonateTake({ id: targetUser.id }).url;
         window.location.href = url;
@@ -61,38 +53,6 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
             (u: User) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q),
         );
     }
-
-    const displayedUsers = filteredUsers.slice(0, currentPage * PAGE_SIZE);
-    const hasMore = filteredUsers.length > displayedUsers.length;
-
-    const UserListFilters = () => (
-        <div className="w-full">
-            <div className="max-h-96 overflow-y-auto">
-                {displayedUsers.length > 0 ? (
-                    displayedUsers.map((user: User) => (
-                        <button
-                            key={user.id}
-                            onClick={() => handleSelect(user)}
-                            className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0"
-                        >
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-sm text-muted-foreground">{user.email}</div>
-                        </button>
-                    ))
-                ) : (
-                    <div className="px-4 py-2 text-sm text-muted-foreground text-center">{t('No results.')}</div>
-                )}
-            </div>
-
-            {hasMore && (
-                <div className="px-4 py-2 border-t">
-                    <Button variant="ghost" size="sm" onClick={handleLoadMore} className="w-full">
-                        Load more...
-                    </Button>
-                </div>
-            )}
-        </div>
-    );
 
     if (isImpersonating) {
         return null;

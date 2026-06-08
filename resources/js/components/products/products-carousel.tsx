@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import {
     Carousel,
     CarouselContent,
@@ -8,7 +7,6 @@ import {
     CarouselPrevious,
 } from "@/components/ui/carousel"
 import { type Product } from '@/types';
-import Autoplay from "embla-carousel-autoplay";
 import { ProductCard } from "./product-card";
 
 type Props = {
@@ -16,11 +14,6 @@ type Props = {
 };
 
 export function ProductsCarousel({ products }: Props) {
-
-    const plugin = React.useRef(
-        Autoplay({ delay: 7000, stopOnInteraction: true })
-    )
-
     return (
         <Carousel
             // plugins={[plugin.current]}

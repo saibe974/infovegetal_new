@@ -1,4 +1,4 @@
-import { router, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { type SharedData } from '@/types';
 import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ export function ImpersonationBanner() {
         return null;
     }
 
-    const originalAdmin = users.find((u: any) => u.id === auth.impersonate_from);
+    const originalAdmin = users.find((u) => u?.id === auth.impersonate_from);
     const currentUser = auth.user;
 
     const handleStopImpersonate = () => {

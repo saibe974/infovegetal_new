@@ -1,6 +1,6 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
+import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { type BreadcrumbItem, Product, SharedData } from '@/types';
+import { type BreadcrumbItem, Product } from '@/types';
 import ProductDetails from '@/components/products/product-details';
 import { usePage } from '@inertiajs/react';
 
@@ -22,7 +22,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
     return (
         <>
-            <ProductDetails product={product} showBackLink={true} />
+            <ProductDetails product={product} showBackLink={showBackLink} />
         </>
     );
 });

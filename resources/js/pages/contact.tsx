@@ -1,9 +1,7 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
-import { ReactNode, useRef, useState } from 'react';
-import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
-import { InfiniteScroll, usePage, router, Form, Head } from '@inertiajs/react';
-import { Loader2, DownloadIcon, ArrowLeftCircle } from 'lucide-react';
-import { useI18n } from '@/lib/i18n';
+import { withAppLayout } from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Form, Head } from '@inertiajs/react';
+import { ArrowLeftCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from "@inertiajs/react"
 import { FormField } from '@/components/ui/form-field';
@@ -23,10 +21,6 @@ const RECIPIENT: { value: string; label: string; }[] = [
 
 
 export default withAppLayout(breadcrumbs, false, () => {
-    const { t } = useI18n();
-
-
-
     return (
         <div className='flex flex-col gap-30'>
             <Form className="space-y-4 w-full">

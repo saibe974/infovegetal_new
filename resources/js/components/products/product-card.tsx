@@ -3,19 +3,14 @@ import { Link, router, usePage } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Box, Layers, Container, BadgePercent, Tag, Zap, BadgeEuro } from "lucide-react";
+import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Zap } from "lucide-react";
 import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
 import { useSidebar } from "../ui/sidebar";
-import { cn } from "@/lib/utils";
-import { Badge } from "../ui/badge";
-import * as Flags from "country-flag-icons/react/3x2";
-import { type ComponentType } from "react";
+import { cn, formatCurrency } from "@/lib/utils";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
-
-const formatCurrency = (value: number): string =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+import { CountryFlag } from "@/components/ui/country-flag";
 
 
 
@@ -71,7 +66,9 @@ export function ProductCard({
     const { addToCart, items } = useContext(CartContext);
     const handleAddToCart = (id: number, quantity: number) => {
         addToCart(product, quantity);
-        !isOpenId('right') && toggleSidebar('right');
+        if (!isOpenId('right')) {
+            toggleSidebar('right');
+        }
     };
 
     const isInCart = items.some((item) => item.product.id === product.id);
@@ -87,9 +84,6 @@ export function ProductCard({
 
     const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
     const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
-    const CountryFlag = countryCode.length === 2
-        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
-        : undefined;
 
     // console.log(product)
 
@@ -107,9 +101,9 @@ export function ProductCard({
                     className,
                 )}
             >
-                {CountryFlag ? (
+                {countryCode ? (
                     <span className="absolute top-2 right-2 rounded-md border bg-white/90 px-1.5 py-1 shadow-sm">
-                        <CountryFlag title={countryCode} className="w-5" />
+                        <CountryFlag countryCode={countryCode} title={countryCode} className="w-5" />
                     </span>
                 ) : null}
                 {product?.price_promo && Number(product.price_promo) > 0 ? (

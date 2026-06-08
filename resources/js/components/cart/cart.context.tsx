@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useCallback, useState, useEffect, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
 import { type SharedData } from '@/types';
@@ -133,9 +133,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const { auth, cart_refresh_token } = usePage<SharedData & { cart_refresh_token?: number | string | null }>().props;
     const userId = auth?.user?.id;
 
-    const getCartKey = () => {
+    const getCartKey = useCallback(() => {
         return userId ? `cart:${userId}` : 'cart';
-    };
+    }, [userId]);
 
     const [items, setItems] = useState<CartItem[]>(() => {
         if (typeof window !== 'undefined') {
@@ -162,7 +162,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 sessionStorage.removeItem('pendingCartAdd');
             }
         }
-    }, [userId]);
+    }, [userId, getCartKey]);
 
     // Récupérer le produit et l'ajouter au panier
     useEffect(() => {
@@ -266,7 +266,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         lastUserRefreshRef.current = userId;
-    }, [userId]);
+    }, [userId, getCartKey]);
 
     const refreshCart = async () => {
         const currentItems = itemsRef.current;
@@ -305,7 +305,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             const cartIds = items.map(item => item.product.id);
             syncCartToServer(cartIds);
         }
-    }, [items, userId]);
+    }, [items, userId, getCartKey]);
 
     const addToCart = (product: Product, quantity: number = 1) => {
         setItems((prev) => {

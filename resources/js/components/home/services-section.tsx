@@ -1,20 +1,20 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import DrawSVGPlugin from "gsap/DrawSVGPlugin";
 import AnimatedSVG from "../ui/animatedSVG";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { services } from '../../lib/services'
 import { SplitText } from "gsap/SplitText";
-import { MousePointer, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
 
 if (typeof window !== "undefined") {
     gsap.registerPlugin(DrawSVGPlugin);
     gsap.registerPlugin(ScrollTrigger);
 }
 
-export default function servicesSection({ active }: { active: boolean }) {
+export default function ServicesSection() {
     const [activeId, setActiveId] = useState(1);
-    const activeItem = services.find((d: any) => d.id === activeId)!;
+    const activeItem = services.find((d) => d.id === activeId) ?? services[0];
     const sectionRef = useRef<HTMLDivElement>(null);
 
 

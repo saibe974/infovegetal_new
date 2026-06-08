@@ -1,6 +1,5 @@
-import NavFooterExtended, { NavFooter } from '@/components/ui/nav-footer';
-import NavMain, { NavMainExtended } from '@/components/ui/nav-main';
-import { NavUser } from '@/components/users/nav-user';
+import NavFooterExtended from '@/components/ui/nav-footer';
+import { NavMainExtended } from '@/components/ui/nav-main';
 import {
     Sidebar,
     SidebarContent,
@@ -9,25 +8,19 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarMenuSubItem,
-    SidebarGroup,
-    SidebarGroupLabel
 } from '@/components/ui/sidebar';
 import { contact, dashboard, documentation } from '@/routes';
-import { SharedData, NavItemExtended, type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
-import { List as ListIcon, BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
+import { SharedData, NavItemExtended } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
 import dbProducts from '@/routes/db-products';
 import tagsProducts from '@/routes/tags-products';
 import carriers from '@/routes/carriers';
-import { useState, useEffect } from 'react';
-import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { canAccessUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission, hasAnyPermission } from '@/lib/roles';
+import { canAccessUsers, getEffectiveUser, isDev, isAdmin, hasPermission, hasAnyPermission } from '@/lib/roles';
 
 import users from '@/routes/users';
 import legal from '@/routes/legal';
@@ -35,11 +28,9 @@ import legal from '@/routes/legal';
 // Items are built inside the component to access the t() helper
 
 export function AppSidebar() {
-    const page = usePage();
-    // console.log(page.props);
     const { t } = useI18n();
 
-    const { auth, locale } = usePage<SharedData>().props;
+    const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
     const effectiveUser = getEffectiveUser(auth);
     const isImpersonating = !!auth?.impersonate_from;
@@ -47,9 +38,6 @@ export function AppSidebar() {
         ? 'text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200'
         : undefined;
     const isAuthenticated = !!user;
-    const canEditProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
-    const canDeleteProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
-    const canImportExportProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
     const canManageUsers = canAccessUsers(effectiveUser);
     const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
     const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'products.categories.manage');
@@ -62,12 +50,7 @@ export function AppSidebar() {
     ]);
     const canManageMedia = isAdmin(effectiveUser);
 
-    // derive active state from current url/path
-    const currentPath = page.props?.url ?? page.props?.current ?? '';
-    const isProductsRoute = typeof currentPath === 'string' && currentPath.includes('/products');
-    const [productsOpen, setProductsOpen] = useState<boolean>(isProductsRoute);
-
-    let title: string = '';
+    const title: string = '';
     let mainNavItems: NavItemExtended[] = [];
     let footerNavItems: NavItemExtended[] = [];
 
@@ -113,33 +96,31 @@ export function AppSidebar() {
             },
         ];
 
-        if (canManageCategories) {
-            //@ts-ignore
-            mainNavItems[1].subItems.push({
+        const productsMenu = mainNavItems[1];
+
+        if (canManageCategories && productsMenu?.subItems) {
+            productsMenu.subItems.push({
                 title: t('Categories'),
                 href: categoryProducts.index(),
                 icon: FolderTreeIcon,
             });
         }
 
-        if (canPreview) {
-            //@ts-ignore
-            mainNavItems[1].subItems.push({
+        if (canPreview && productsMenu?.subItems) {
+            productsMenu.subItems.push({
                 title: t('Tags'),
                 href: tagsProducts.index(),
                 icon: TagIcon,
             });
-            //@ts-ignore
-            mainNavItems[1].subItems.push({
+            productsMenu.subItems.push({
                 title: t('Database'),
                 href: dbProducts.index().url,
                 icon: ServerIcon,
             });
         }
 
-        if (canManageMedia) {
-            //@ts-ignore
-            mainNavItems[1].subItems.push({
+        if (canManageMedia && productsMenu?.subItems) {
+            productsMenu.subItems.push({
                 title: t('Media library'),
                 href: '/admin/media-manager',
                 icon: ImageIcon,
@@ -220,13 +201,6 @@ export function AppSidebar() {
             legalRoutes,
         ];
     }
-
-
-    useEffect(() => {
-        if (isProductsRoute) setProductsOpen(true);
-    }, [isProductsRoute]);
-
-
     return (
         <Sidebar collapsible="icon" variant="inset" id='main'>
             <SidebarHeader>

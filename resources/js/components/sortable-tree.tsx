@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     DndContext,
     DragEndEvent,
@@ -36,8 +36,8 @@ export type RenderItemProps<T> = {
     isInsideTarget: boolean;
 
     setNodeRef: (el: HTMLElement | null) => void;
-    attributes: any;
-    listeners: any;
+    attributes: unknown;
+    listeners: unknown;
     toggleExpand: () => void;
 };
 
@@ -52,7 +52,7 @@ export type LazyLoadPageResult<T> = {
     nextOffset?: number;
 };
 
-export type SortableTreeProps<T extends Record<string, any>> = {
+export type SortableTreeProps<T extends Record<string, unknown>> = {
     items: T[];
     idKey?: ItemKey<T>;
     parentKey?: ItemKey<T>;
@@ -84,25 +84,25 @@ type DropIntent =
     | { type: 'inside'; overId: Id }
     | null;
 
-function getField<T extends Record<string, any>, R = any>(obj: T, key: ItemKey<T>, fallback?: R): R {
+function getField<T extends Record<string, unknown>, R = unknown>(obj: T, key: ItemKey<T>, fallback?: R): R {
     const v = obj[key];
     return (v as unknown as R) ?? (fallback as R);
 }
 
-function setField<T extends Record<string, any>>(obj: T, key: ItemKey<T>, value: any): T {
-    const result = Object.assign({}, obj as any);
-    result[key as string] = value;
+function setField<T extends Record<string, unknown>>(obj: T, key: ItemKey<T>, value: unknown): T {
+    const result = { ...obj } as T;
+    (result as Record<string, unknown>)[key as string] = value;
     return result as T;
 }
 
-function useKeys<T extends Record<string, any>>(props: SortableTreeProps<T>) {
+function useKeys<T extends Record<string, unknown>>(props: SortableTreeProps<T>) {
     const idKey = props.idKey ?? ('id' as ItemKey<T>);
     const parentKey = props.parentKey ?? ('parent_id' as ItemKey<T>);
     const depthKey = props.depthKey ?? ('depth' as ItemKey<T>);
     return { idKey, parentKey, depthKey } as const;
 }
 
-function Row<T extends Record<string, any>>({
+function Row<T extends Record<string, unknown>>({
     item,
     sortableId,
     depth,
@@ -207,15 +207,20 @@ function AutoLoadMoreRow({
     );
 }
 
-export default function SortableTree<T extends Record<string, any>>(props: SortableTreeProps<T>) {
+export default function SortableTree<T extends Record<string, unknown>>(props: SortableTreeProps<T>) {
     // console.log(props);
     const { idKey, parentKey, depthKey } = useKeys(props);
 
     const maxDepth = props.maxDepth ?? 3;
     const insideDelayMs = props.insideDelayMs ?? 750;
-    const edgeRatio = props.edgeRatio ?? 0.25;
     const expandOnInside = props.expandOnInside ?? true;
     const storageKey = props.storageKey;
+    const forcedExpandedIds = props.forcedExpandedIds;
+    const itemsProp = props.items;
+    const lazy = props.lazy;
+    const hasChildrenProp = props.hasChildren;
+    const loadChildrenProp = props.loadChildren;
+    const onChange = props.onChange;
 
     const [items, setItems] = useState<T[]>([]);
     const [expanded, setExpanded] = useState<Set<Id>>(() => {
@@ -239,17 +244,17 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     const [overId, setOverId] = useState<Id | null>(null);
     const [dropIntent, setDropIntent] = useState<DropIntent>(null);
 
-    const branchKey = (parentId: Id | null) => (parentId === null ? '__root__' : String(parentId));
+    const branchKey = useCallback((parentId: Id | null) => (parentId === null ? '__root__' : String(parentId)), []);
     const pageSize = props.lazy?.pageSize ?? 30;
 
-    const getBranch = (parentId: Id | null) => {
+    const getBranch = useCallback((parentId: Id | null) => {
         const key = branchKey(parentId);
         return branchState[key] ?? { offset: 0, hasMore: true, initialized: false };
-    };
+    }, [branchKey, branchState]);
 
-    const isBranchLoading = (parentId: Id | null) => {
+    const isBranchLoading = useCallback((parentId: Id | null) => {
         return branchLoading[branchKey(parentId)] === true;
-    };
+    }, [branchKey, branchLoading]);
 
     const insideTimerRef = useRef<number | null>(null);
     const clearInsideTimer = () => {
@@ -262,35 +267,35 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     // --- merge stable props.items + extras ---
     useEffect(() => {
         setItems((prev) => {
-            const incoming = props.items ?? [];
+            const incoming = itemsProp ?? [];
             const incomingIds = new Set(incoming.map((x) => getField<T, Id>(x, idKey) as Id));
             const extras = prev.filter((x) => !incomingIds.has(getField<T, Id>(x, idKey) as Id));
             const merged = [...incoming, ...extras];
             return Array.from(new Map(merged.map((c) => [getField(c, idKey) as Id, c])).values());
         });
-    }, [props.items, idKey]);
+    }, [itemsProp, idKey]);
 
     const idMap = useMemo(
         () => new Map<Id, T>(items.map((x) => [getField<T, Id>(x, idKey) as Id, x])),
         [items, idKey],
     );
 
-    const getId = (x: T) => getField<T, Id>(x, idKey) as Id;
-    const getParent = (x: T) => getField<T, Id | null>(x, parentKey, null) as Id | null;
-    const getDepth = (x: T) => getField<T, number>(x, depthKey, 0) as number;
+    const getId = useCallback((x: T) => getField<T, Id>(x, idKey) as Id, [idKey]);
+    const getParent = useCallback((x: T) => getField<T, Id | null>(x, parentKey, null) as Id | null, [parentKey]);
+    const getDepth = useCallback((x: T) => getField<T, number>(x, depthKey, 0) as number, [depthKey]);
 
-    const canHaveChildren = (it: T) => {
-        if (props.hasChildren) return props.hasChildren(it, items);
+    const canHaveChildren = useCallback((it: T) => {
+        if (hasChildrenProp) return hasChildrenProp(it, items);
         const fromPayload = getField<T, boolean | null>(it, 'has_children' as ItemKey<T>, null);
         if (typeof fromPayload === 'boolean') {
             return fromPayload;
         }
         const id = getId(it);
         return items.some((x) => getParent(x) === id);
-    };
+    }, [hasChildrenProp, items, getId, getParent]);
 
-    const loadBranchPage = async (parentItem: T | null, parentId: Id | null) => {
-        if (!props.lazy) {
+    const loadBranchPage = useCallback(async (parentItem: T | null, parentId: Id | null) => {
+        if (!lazy) {
             return;
         }
 
@@ -304,7 +309,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         setBranchLoading((prev) => ({ ...prev, [key]: true }));
 
         try {
-            const result = await props.lazy.loadPage(parentItem, {
+            const result = await lazy.loadPage(parentItem, {
                 offset: state.offset,
                 limit: pageSize,
             });
@@ -346,7 +351,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                 }
 
                 const next = [...prev.slice(0, insertAt), ...normalized, ...prev.slice(insertAt)];
-                props.onChange?.(next, 'lazy-load');
+                onChange?.(next, 'lazy-load');
                 return next;
             });
 
@@ -365,7 +370,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         } finally {
             setBranchLoading((prev) => ({ ...prev, [key]: false }));
         }
-    };
+    }, [lazy, onChange, pageSize, getBranch, isBranchLoading, branchKey, getDepth, getId, parentKey, depthKey]);
 
     // Sauvegarder dans le localStorage quand expanded change
     useEffect(() => {
@@ -378,16 +383,17 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     }, [expanded, storageKey]);
 
     useEffect(() => {
-        if (!props.forcedExpandedIds) {
+        if (!forcedExpandedIds) {
             return;
         }
 
-        setExpanded(new Set(props.forcedExpandedIds));
-    }, [props.forcedExpandedIds?.join('|')]);
+        setExpanded(new Set(forcedExpandedIds));
+    }, [forcedExpandedIds]);
 
     // Charger les racines par page si le mode lazy est actif.
+
     useEffect(() => {
-        if (!props.lazy) {
+        if (!lazy) {
             return;
         }
 
@@ -401,10 +407,11 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         }
 
         void loadBranchPage(null, null);
-    }, [props.lazy, items.length]);
+    }, [lazy, items.length, getBranch, isBranchLoading, loadBranchPage]);
+
 
     useEffect(() => {
-        if (!props.lazy || expanded.size === 0) {
+        if (!lazy || expanded.size === 0) {
             return;
         }
 
@@ -421,10 +428,11 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
             void loadBranchPage(parent, expandedId);
         }
-    }, [props.lazy, expanded, idMap]);
+    }, [lazy, expanded, idMap, getBranch, isBranchLoading, loadBranchPage]);
+
 
     useEffect(() => {
-        if (props.lazy || !props.loadChildren || expanded.size === 0) {
+        if (lazy || !loadChildrenProp || expanded.size === 0) {
             return;
         }
 
@@ -448,7 +456,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
             setLoading((current) => new Set(current).add(expandedId));
 
-            void props.loadChildren(parent)
+            void loadChildrenProp(parent)
                 .then((children) => {
                     const parentDepth = getDepth(parent);
 
@@ -486,10 +494,10 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                     });
                 });
         }
-    }, [props.lazy, props.loadChildren, expanded, idMap, items, loading]);
+    }, [lazy, loadChildrenProp, expanded, idMap, items, loading, canHaveChildren, depthKey, getDepth, getId, getParent, parentKey]);
 
     // --- visibilité ---
-    const isVisible = (it: T): boolean => {
+    const isVisible = useCallback((it: T): boolean => {
         let pid = getParent(it);
         while (pid != null) {
             if (!expanded.has(pid)) return false;
@@ -498,8 +506,8 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             pid = getParent(p);
         }
         return true;
-    };
-    const visible = useMemo(() => items.filter(isVisible), [items, expanded, idMap]);
+    }, [expanded, idMap, getParent]);
+    const visible = useMemo(() => items.filter(isVisible), [items, isVisible]);
 
     // --- expand/collapse + lazy-load ---
     const toggleExpand = async (id: Id) => {
@@ -509,19 +517,19 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
                 n.delete(id);
                 return n;
             });
-            props.onChange?.(items, 'collapse');
+            onChange?.(items, 'collapse');
             return;
         }
 
         setExpanded((s) => new Set(s).add(id));
-        props.onChange?.(items, 'expand');
+        onChange?.(items, 'expand');
 
         const parent = idMap.get(id);
         if (!parent) {
             return;
         }
 
-        if (props.lazy) {
+        if (lazy) {
             const branch = getBranch(id);
             if (!branch.initialized) {
                 await loadBranchPage(parent, id);
@@ -530,7 +538,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
         }
 
         if (items.some((x) => getParent(x) === id)) return;
-        if (!props.loadChildren) return;
+        if (!loadChildrenProp) return;
 
         setLoading((s) => new Set(s).add(id));
         try {
@@ -538,7 +546,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
             if (!parent) return;
 
             const parentDepth = getDepth(parent);
-            const children = await props.loadChildren(parent);
+            const children = await loadChildrenProp(parent);
 
             setItems((prev) => {
                 const existing = new Set(prev.map((p) => getId(p)));
@@ -579,7 +587,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
     };
 
     const onDragOver = (e: DragOverEvent) => {
-        const { active, over } = e;
+        const { over } = e;
 
         // const over = e.over;
         const oid = (over?.id as Id) ?? null;
@@ -756,7 +764,7 @@ export default function SortableTree<T extends Record<string, any>>(props: Sorta
 
         const next = remaining;
         setItems(next);
-        props.onChange?.(next, 'drag');
+        onChange?.(next, 'drag');
 
         setDropIntent(null);
     };

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type ImportProgressPayload = {
     status?: string;
@@ -35,7 +35,7 @@ export function useImportProgress(
         return 0;
     };
 
-    const computeInitialSpeedPerSec = () => {
+    const computeInitialSpeedPerSec = useCallback(() => {
         const bytes = typeof fileSize === 'number' && fileSize > 0 ? fileSize : null;
         if (bytes !== null) {
             const mb = bytes / (1024 * 1024);
@@ -53,7 +53,7 @@ export function useImportProgress(
         if (total <= 5000) return 3.1;
         if (total <= 15000) return 2.2;
         return 1.5;
-    };
+    }, [fileSize, progressInfo?.total]);
 
     const hasBackendProgressSignal = () => {
         const p = progressInfo?.progress;
@@ -104,7 +104,7 @@ export function useImportProgress(
         }, 120);
 
         return () => window.clearInterval(interval);
-    }, [importStatus, progressInfo?.total, backendProgress, hasBackendProgress, speedPctPerSec]);
+    }, [importStatus, progressInfo?.total, backendProgress, hasBackendProgress, speedPctPerSec, computeInitialSpeedPerSec]);
 
     useEffect(() => {
         if (importStatus !== 'processing' && importStatus !== 'cancelling') return;

@@ -1,12 +1,12 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
+import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { useEffect, useRef, useState } from 'react';
-import { type BreadcrumbItem, PaginatedCollection } from '@/types';
+import { useRef, useState } from 'react';
+import { PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
+import { EditIcon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import tagsProducts from '@/routes/tags-products';
@@ -53,7 +53,9 @@ export default withAppLayout(
 
         const handleSearch = (s: string) => {
             setSearch(s);
-            clearTimeout(timerRef.current!);
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
             router.cancelAll();
             if (s.length < 2) {
                 return;
@@ -118,7 +120,7 @@ export default withAppLayout(
                         </Button>
                     </div> */}
                     <ButtonsActions
-                        add={() => {}}
+                        add={() => { }}
                     />
                 </StickyBar>
 

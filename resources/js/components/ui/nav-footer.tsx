@@ -10,8 +10,8 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { NavItemExtended, type NavItem } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from 'react';
+import { usePage } from '@inertiajs/react';
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
 export function NavFooter({
     items,
@@ -71,14 +71,19 @@ export function NavFooterExtended({
     menuButtonClassName?: string;
 }) {
     const page = usePage();
-    const { state, isOpenId } = useSidebar();
+    const { isOpenId } = useSidebar();
     const currentPath = page.props?.url ?? page.props?.current ?? '';
+
+    const getCandidateUrl = (href: NavItem['href'] | undefined): string => {
+        if (!href) return '';
+        if (typeof href === 'string') return href;
+        return typeof href.url === 'string' ? href.url : '';
+    };
 
     // initial open map based on current path (similar to NavMainExtended)
     const initialOpenMap = (items as NavItemExtended[]).reduce((acc: Record<string, boolean>, item) => {
-        const itemMatch = (href: any) => {
-            if (!href) return false;
-            const candidate = typeof href === 'string' ? href : href.url ?? '';
+        const itemMatch = (href: NavItem['href'] | undefined) => {
+            const candidate = getCandidateUrl(href);
             return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
         };
         acc[item.title] = itemMatch((item as NavItemExtended).href) || ((item as NavItemExtended).subItems || []).some((s) => itemMatch(s.href));
@@ -122,9 +127,8 @@ export function NavFooterExtended({
         // update open state when path changes
         const newMap = { ...openMap };
         (items as NavItemExtended[]).forEach((item) => {
-            const itemMatch = (href: any) => {
-                if (!href) return false;
-                const candidate = typeof href === 'string' ? href : href.url ?? '';
+            const itemMatch = (href: NavItem['href'] | undefined) => {
+                const candidate = getCandidateUrl(href);
                 return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
             };
             if (itemMatch((item as NavItemExtended).href) || ((item as NavItemExtended).subItems || []).some((s) => itemMatch(s.href))) {
@@ -144,13 +148,13 @@ export function NavFooterExtended({
         }
     }, [openMap]);
 
-    const isExternal = (href: any) => {
-        const url = typeof href === 'string' ? href : href?.url ?? '';
+    const isExternal = (href: NavItem['href'] | undefined) => {
+        const url = getCandidateUrl(href);
         return /^(https?:\/\/|mailto:|tel:)/.test(url);
     };
 
-    const renderLink = (href: any, children: any, itemTarget?: string) => {
-        const url = typeof href === 'string' ? href : href?.url ?? '';
+    const renderLink = (href: NavItem['href'] | undefined, children: ReactNode, itemTarget?: string) => {
+        const url = getCandidateUrl(href);
         const target = itemTarget ?? (isExternal(href) ? '_blank' : '_self');
         const rel = target === '_blank' ? 'noopener noreferrer' : undefined;
 
@@ -168,8 +172,6 @@ export function NavFooterExtended({
         // }
 
         return (
-            // external anchor
-            // eslint-disable-next-line jsx-a11y/anchor-has-content
             <a href={url} target={target} rel={rel}>
                 {children}
             </a>
@@ -208,8 +210,9 @@ export function NavFooterExtended({
                                         </SidebarMenuButton>
 
                                         <div
-                                            // @ts-ignore
-                                            ref={(el) => (subRefs.current[item.title] = el)}
+                                            ref={(el: HTMLDivElement | null) => {
+                                                subRefs.current[item.title] = el;
+                                            }}
                                             className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-in-out mt-2 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
                                             style={{ maxHeight: isOpen ? heights[item.title] ?? 400 : 0 }}
                                         >
@@ -235,7 +238,7 @@ export function NavFooterExtended({
                                     </>
                                 ) : (
                                     <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild className={menuButtonClassName}>
-                                        {renderLink(item.href ?? (item as NavItem).href, label, (item as any).target)}
+                                        {renderLink(item.href ?? (item as NavItem).href, label, item.target)}
                                     </SidebarMenuButton>
                                 )}
                             </SidebarMenuItem>

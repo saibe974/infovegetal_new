@@ -50,7 +50,7 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
 
     const name = typeof displayName === 'function'
         ? displayName(item)
-        : displayName || (item as any)?.name || '(sans nom)';
+        : displayName || item.name || '(sans nom)';
 
     const showChildren = typeof hasChildren === 'function'
         ? hasChildren(item)

@@ -2,9 +2,8 @@ import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EditIcon, TrashIcon, UserCheck } from 'lucide-react';
-import { type User, PaginatedCollection, SharedData } from '@/types';
+import { type User, SharedData } from '@/types';
 import { useI18n } from '@/lib/i18n';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { router } from '@inertiajs/react';
 
 interface UsersTableProps {
@@ -21,16 +20,9 @@ interface UsersTableProps {
 export default function UsersTable({ users, roles, auth, canEdit = false, canDelete = false, canPreview = false, canImpersonate = false, onImpersonate }: UsersTableProps) {
 
     const { t } = useI18n();
-
-    const handleRoleChange = (userId: number, roleName: string) => {
-        router.post(
-            `/settings/users/${userId}/role`,
-            { role: roleName },
-            {
-                preserveScroll: true,
-            }
-        );
-    };
+    void roles;
+    void auth;
+    void canPreview;
 
     const handleEdit = (userId: number) => {
         router.visit(`/admin/users/${userId}/edit`);

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { type CartItem } from '@/components/cart/cart.context';
 import { buildRollDistribution, type SupplierDistribution } from './product-roll';
-import { BE, DE, ES, FR, GB, IT, NL } from 'country-flag-icons/react/3x2';
 import { ShoppingCart } from 'lucide-react';
+import { CountryFlag } from '@/components/ui/country-flag';
 
 type ProductRollMiniProps = {
     items: CartItem[];
@@ -15,7 +15,7 @@ const clamp = (value: number, min = 0, max = 100): number => Math.min(max, Math.
 
 const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boolean }) => {
     const fillHeight = clamp(fill);
-    
+
     if (isFull) {
         return (
             <div className="relative h-6 w-6">
@@ -27,7 +27,7 @@ const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boo
     return (
         <div className="relative h-6 w-6">
             <ShoppingCart className="h-6 w-6 text-slate-300" strokeWidth={2} />
-            <div 
+            <div
                 className="absolute inset-0 overflow-hidden"
                 style={{ clipPath: `inset(${100 - fillHeight}% 0 0 0)` }}
             >
@@ -37,38 +37,10 @@ const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boo
     );
 };
 
-const formatCurrency = (value: number): string =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
-const getFlag = (country: string) => {
-    switch (country?.toLowerCase()) {
-        case 'fr':
-            return <FR title="France" className="w-4" />;
-        case 'be':
-            return <BE title="Belgium" className="w-4" />;
-        case 'nl':
-            return <NL title="Netherlands" className="w-4" />;
-        case 'de':
-            return <DE title="Germany" className="w-4" />;
-        case 'es':
-            return <ES title="Spain" className="w-4" />;
-        case 'it':
-            return <IT title="Italy" className="w-4" />;
-        case 'en':
-            return <GB title="United Kingdom" className="w-4" />;
-        default:
-            return (
-                <div className="h-4 w-4 rounded-full bg-slate-900 text-[8px] font-bold uppercase text-white flex items-center justify-center">
-                    {country ? country.slice(0, 2) : '??'}
-                </div>
-            );
-    }
-};
-
 export function ProductRollMini({ items, className, getSupplierPrice }: ProductRollMiniProps) {
     const distribution = useMemo(() => buildRollDistribution(items), [items]);
     const suppliers = Object.values(distribution.suppliers);
-    
+
 
     if (suppliers.length === 0) {
         return (
@@ -87,7 +59,7 @@ export function ProductRollMini({ items, className, getSupplierPrice }: ProductR
                 if (supplier.mod_liv !== 'roll') {
                     return (
                         <div key={supplier.supplierId} className="flex items-center gap-3 rounded-lg border px-3 py-2">
-                            {getFlag(supplier.country)}
+                            <CountryFlag countryCode={supplier.country} className="w-4" />
                             <div className="text-xs text-muted-foreground">devis</div>
                         </div>
                     );
@@ -98,7 +70,7 @@ export function ProductRollMini({ items, className, getSupplierPrice }: ProductR
 
                 return (
                     <div key={supplier.supplierId} className="flex items-center gap-3 px-0 py-2 border-b border-accent">
-                        {getFlag(supplier.country)}
+                        <CountryFlag countryCode={supplier.country} className="w-4" />
 
                         <div className="flex items-center gap-1">
                             {fullRolls > 0 && (

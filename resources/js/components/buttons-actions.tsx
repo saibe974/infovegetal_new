@@ -1,4 +1,4 @@
-import { CirclePlus, DownloadIcon, EyeIcon, Loader2Icon, PencilIcon, RefreshCw, RotateCcw, SaveIcon, TrashIcon, UploadIcon } from "lucide-react";
+import { CirclePlus, EyeIcon, Loader2Icon, PencilIcon, RefreshCw, RotateCcw, SaveIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { useI18n } from "@/lib/i18n";
 import { ReactNode } from "react";

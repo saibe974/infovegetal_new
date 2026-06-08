@@ -8,7 +8,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { getProductCartImage } from '@/components/products/product-cart-image';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatCurrency } from '@/lib/utils';
 
 type Props = Record<string, never>;
 
@@ -37,9 +38,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const formatCurrency = (value: number) =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
 const toText = (value: unknown): string => (value === undefined || value === null ? '' : String(value));
 
 export default withAppLayout<Props>(breadcrumbs, false, () => {
@@ -57,7 +55,6 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
     const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
     const [pdfResult, setPdfResult] = useState<{ url: string; filename: string; orderNumber: string | null } | null>(null);
-    const [orderConflict, setOrderConflict] = useState<{ orderNumber: string | null; resolve: (choice: 'append' | 'new') => void } | null>(null);
 
 
     const itemsPricing = useMemo(
@@ -68,17 +65,11 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const getGroupKey = (product: { db_products_id?: number | null; dbProduct?: { id?: number | null } | null }) =>
         Number(product.db_products_id ?? product.dbProduct?.id ?? 0);
 
-    const getGroupLabel = (product: { dbProduct?: { name?: string | null } | null; db_products_id?: number | null }) => {
+    const getGroupLabel = useCallback((product: { dbProduct?: { name?: string | null } | null; db_products_id?: number | null }) => {
         if (product.dbProduct?.name) return String(product.dbProduct.name);
         if (product.db_products_id) return `DB #${product.db_products_id}`;
         return t('Sans DB');
-    };
-
-    const toFileSlug = (value: string) =>
-        value
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/(^-|-$)/g, '') || 'panier';
+    }, [t]);
 
     const groupedItems = useMemo(() => {
         const groups = new Map<number, { id: number; label: string; items: typeof itemsPricing }>();
@@ -112,7 +103,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                 orderTotal,
             };
         });
-    }, [itemsPricing]);
+    }, [itemsPricing, getGroupLabel]);
 
     const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
     const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
@@ -188,95 +179,6 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
             setSaveMessage('Erreur lors de la mise a jour du panier');
         } finally {
             setIsRefreshingCart(false);
-        }
-    };
-
-    const handleGeneratePdf = async () => {
-        if (items.length === 0) {
-            setSaveMessage("Le panier est vide");
-            setTimeout(() => setSaveMessage(null), 3000);
-            return;
-        }
-
-        setIsSaving(true);
-        setIsPdfGenerating(true);
-        setPdfPhaseIndex(0);
-        setPdfCurrentGroup(null);
-        setSaveMessage(null);
-
-        try {
-            const csrfToken = (
-                document.querySelector(
-                    'meta[name="csrf-token"]'
-                ) as HTMLMetaElement
-            )?.content;
-
-            const basePayload = {
-                items: items.map((item) => ({
-                    id: item.product.id,
-                    quantity: item.quantity,
-                })),
-                shipping_total: deliveryTotal,
-            };
-
-            const placeOrder = async (choice?: 'append' | 'new') => {
-                return fetch('/cart/order', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken || '',
-                    },
-                    body: JSON.stringify({
-                        ...basePayload,
-                        ...(choice ? { choice } : {}),
-                    }),
-                });
-            };
-
-            let response = await placeOrder();
-
-            if (response.status === 409) {
-                const data = await response.json();
-                if (data?.requires_choice) {
-                    const orderNumber = data?.existing_order?.number ?? null;
-                    const choice = await new Promise<'append' | 'new'>((resolve) => {
-                        setOrderConflict({ orderNumber, resolve });
-                    });
-                    setOrderConflict(null);
-                    response = await placeOrder(choice);
-                }
-            }
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                setSaveMessage(data?.message || 'Erreur lors de la commande');
-                return;
-            }
-
-            const data = await response.json();
-            const pdfUrl = data?.pdf_download_url;
-            const orderNumber = data?.order_number;
-            if (pdfUrl) {
-                const link = document.createElement('a');
-                link.href = pdfUrl;
-                link.download = orderNumber ? `commande-${orderNumber}.pdf` : 'commande.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-
-            setSaveMessage(orderNumber
-                ? `Commande #${orderNumber} enregistree, PDF genere et emails envoyes`
-                : 'Commande enregistree, PDF genere et emails envoyes');
-            setTimeout(() => setSaveMessage(null), 3000);
-        } catch (error) {
-            console.error('Error placing order:', error);
-            setSaveMessage('Erreur lors de la commande');
-        } finally {
-            setIsSaving(false);
-            setIsPdfGenerating(false);
-            setPdfCurrentGroup(null);
-            setPdfPhaseIndex(0);
         }
     };
 
@@ -657,8 +559,8 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                                     </div>
                                                     <div className="space-y-1">
                                                         <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
-                                                        {toText((product as any).ref) ? (
-                                                            <p className="text-xs text-muted-foreground">Ref: {toText((product as any).ref)}</p>
+                                                        {toText(product.ref) ? (
+                                                            <p className="text-xs text-muted-foreground">Ref: {toText(product.ref)}</p>
                                                         ) : null}
                                                         <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
                                                         <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>

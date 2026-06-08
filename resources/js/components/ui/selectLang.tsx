@@ -1,10 +1,10 @@
 import { router, usePage } from "@inertiajs/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SelectWithItems } from "./select-with-items";
 import { SharedData } from "@/types";
 import { GB, FR, ES, DE, IT, NL } from 'country-flag-icons/react/3x2'
 
-const LANGS: { value: string; label: string; img: any }[] = [
+const LANGS: { value: string; label: string; img: ReactNode }[] = [
     { value: "en", label: "English", img: <GB title="United Kingdom" className="w-4" /> },
     { value: "fr", label: "Français", img: <FR title="France" className="w-4" /> },
     { value: "es", label: "Español", img: <ES title="Spain" className="w-4" /> },
@@ -22,14 +22,17 @@ export function SelectLang() {
         const stored = localStorage.getItem("locale");
         if (stored) return stored;
         // Ou utiliser la locale du serveur ou du système
-        const sys = (navigator.language || (navigator as any).userLanguage || "en").split("-")[0];
+        const userLanguage = 'userLanguage' in navigator ? String((navigator as Navigator & { userLanguage?: string }).userLanguage ?? '') : '';
+        const sys = (navigator.language || userLanguage || "en").split("-")[0];
         return (serverLocale as string) ?? sys ?? "en";
     });
 
     useEffect(() => {
         try {
             document.documentElement.lang = locale;
-        } catch (e) { }
+        } catch {
+            // no-op: ignore document language update errors
+        }
         // Sauvegarde côté client
         if (typeof window !== "undefined") {
             localStorage.setItem("locale", locale);

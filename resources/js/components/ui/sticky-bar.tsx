@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
 import BasicSticky from 'react-sticky-el';
-import { ViewModeToggle } from './view-mode-toggle';
 
 interface StickyBarProps {
     children: ReactNode;
@@ -58,7 +57,7 @@ export function StickyBar({
             window.removeEventListener('resize', update);
             if (mainRo) mainRo.disconnect();
         };
-    }, []);
+    }, [topOffsetElement]);
 
     // console.log(topOffset)
 

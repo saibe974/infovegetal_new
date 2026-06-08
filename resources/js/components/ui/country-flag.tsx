@@ -1,5 +1,6 @@
 import React, { ComponentType } from 'react';
 import * as Flags from 'country-flag-icons/react/3x2';
+import { cn } from '@/lib/utils';
 
 type CountryFlagProps = {
     countryCode: string | null | undefined;
@@ -7,8 +8,14 @@ type CountryFlagProps = {
     title?: string;
 };
 
+const CODE_ALIASES: Record<string, string> = {
+    EN: 'GB',
+    UK: 'GB',
+};
+
 export function CountryFlag({ countryCode, className = 'w-5', title }: CountryFlagProps) {
-    const code = (countryCode ?? '').trim().toUpperCase();
+    const rawCode = (countryCode ?? '').trim().toUpperCase();
+    const code = CODE_ALIASES[rawCode] ?? rawCode;
     const FlagComponent = code.length === 2
         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code]
         : undefined;
@@ -18,8 +25,8 @@ export function CountryFlag({ countryCode, className = 'w-5', title }: CountryFl
     }
 
     return (
-        <div className="h-4 w-4 rounded-full bg-slate-900 text-[8px] font-bold uppercase text-white flex items-center justify-center">
-            {code ? code.slice(0, 2) : '??'}
+        <div className={cn('rounded-full bg-slate-900 text-[8px] font-bold uppercase text-white flex items-center justify-center', className)}>
+            {rawCode ? rawCode.slice(0, 2) : '??'}
         </div>
     );
 }

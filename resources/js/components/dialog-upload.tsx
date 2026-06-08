@@ -29,9 +29,8 @@ type DialogUploadProps = {
     onImportQueued?: (id: string) => void;
     onImportError?: (error: unknown) => void;
     buttonLabel?: string;
-    buttonClassName?: string;
-    postTreatmentComponent?: React.ComponentType<any>;
-    postTreatmentProps?: Record<string, any>;
+    postTreatmentComponent?: React.ComponentType<Record<string, unknown>>;
+    postTreatmentProps?: Record<string, unknown>;
     disableProgressTracking?: boolean;
 
 };
@@ -61,6 +60,21 @@ type ImportProgressPayload = {
     has_more?: boolean;
 };
 
+type PondApi = {
+    setOptions?: (options: { chunkSize: number }) => void;
+};
+
+type PondRef = {
+    pond?: PondApi;
+    getFilePond?: () => PondApi | undefined;
+};
+
+type PondFile = {
+    file?: {
+        size?: number;
+    };
+};
+
 export function DialogUpload({
     title,
     description,
@@ -74,13 +88,12 @@ export function DialogUpload({
     onImportQueued,
     onImportError,
     buttonLabel,
-    buttonClassName,
     postTreatmentComponent,
     postTreatmentProps,
     disableProgressTracking = false,
 }: DialogUploadProps) {
     const [open, setOpen] = useState(false);
-    const [files, setFiles] = useState<any[]>([]);
+    const [files, setFiles] = useState<PondFile[]>([]);
     const [uploadComplete, setUploadComplete] = useState(false);
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
@@ -93,7 +106,7 @@ export function DialogUpload({
     const lastImportSettingsRef = useRef<
         { dbProductsId?: number; strategy?: string } | undefined
     >(undefined);
-    const pondRef = useRef<any>(null); // any pour accéder à setOptions sans friction TS
+    const pondRef = useRef<PondRef | null>(null);
     const progressPollRef = useRef<number | null>(null);
     const shouldPollRef = useRef<boolean>(false);
 
@@ -108,7 +121,6 @@ export function DialogUpload({
 
     const [displayProgress, setDisplayProgress] = useState<number>(0);
     const lastRealProgressRef = useRef<number>(0);
-    const [displayProcessed, setDisplayProcessed] = useState<number>(0);
     const lastRealProcessedRef = useRef<number>(0);
 
     const computeChunkSize = useCallback((size: number) => {
@@ -141,7 +153,6 @@ export function DialogUpload({
         shouldPollRef.current = false;
         setDisplayProgress(0);
         lastRealProgressRef.current = 0;
-        setDisplayProcessed(0);
         lastRealProcessedRef.current = 0;
     }, [stopProgressPolling]);
 
@@ -199,7 +210,6 @@ export function DialogUpload({
             setProgressInfo(null);
             setDisplayProgress(0);
             lastRealProgressRef.current = 0;
-            setDisplayProcessed(0);
             lastRealProcessedRef.current = 0;
 
             // 🔹 Activer le polling tout de suite
@@ -207,7 +217,7 @@ export function DialogUpload({
             setImportStatus('processing');
 
             try {
-                const body: any = {
+                const body: Record<string, unknown> = {
                     [importPayloadKey ?? 'id']: id,
                 };
 
@@ -739,24 +749,10 @@ export function DialogUpload({
 
         if (importStatus !== 'processing') {
             setDisplayProgress(lastRealProgressRef.current);
-            setDisplayProcessed(lastRealProcessedRef.current);
             return;
         }
 
         const id = window.setInterval(() => {
-            setDisplayProcessed((current) => {
-                const processedTarget = lastRealProcessedRef.current;
-                const totalLines = progressInfo?.total ?? 0;
-
-                if (totalLines === 0 || current >= processedTarget) {
-                    return current;
-                }
-
-                const increment = Math.max(1, Math.ceil((processedTarget - current) / 10));
-                const next = current + increment;
-                return next > processedTarget ? processedTarget : next;
-            });
-
             setDisplayProgress((current) => {
                 const totalLines = progressInfo?.total ?? 0;
                 const processedTarget = lastRealProcessedRef.current;
@@ -778,11 +774,11 @@ export function DialogUpload({
         return () => window.clearInterval(id);
     }, [disableProgressTracking, importStatus, progressInfo?.total]);
 
-    const handleServerResponse = (response: any) => {
+    const handleServerResponse = (response: unknown) => {
         const rawResponse =
             typeof response === 'string'
                 ? response
-                : response?.responseText ?? '';
+                : (response as { responseText?: string })?.responseText ?? '';
 
         if (!rawResponse) {
             return response;
@@ -815,11 +811,11 @@ export function DialogUpload({
         }
     };
 
-    const handleServerError = (response: any) => {
+    const handleServerError = (response: unknown) => {
         const rawResponse =
             typeof response === 'string'
                 ? response
-                : response?.responseText ?? '';
+                : (response as { responseText?: string })?.responseText ?? '';
         console.error('Upload error:', rawResponse || response);
         setImportStatus('error');
         setImportError('Échec du téléversement.');
@@ -870,7 +866,7 @@ export function DialogUpload({
                         <FilePond
                             ref={pondRef}
                             files={files}
-                            onupdatefiles={(nextFiles) => {
+                            onupdatefiles={(nextFiles: PondFile[]) => {
                                 setFiles(nextFiles);
                                 const fileSize = nextFiles?.[0]?.file?.size;
                                 if (typeof fileSize === 'number' && fileSize > 0) {
@@ -933,7 +929,7 @@ export function DialogUpload({
                                     handleRetryImport,
                                     uploadId,
                                     fileSize: files?.[0]?.file?.size ?? null,
-                                    onStartImport: (settings: any) => {
+                                    onStartImport: (settings: { dbProductsId?: number; strategy?: string }) => {
                                         // Déclencher l'import avec les paramètres choisis
                                         if (uploadId) {
                                             void startImport(uploadId, settings);

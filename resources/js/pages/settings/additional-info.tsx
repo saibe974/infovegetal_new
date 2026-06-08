@@ -75,14 +75,14 @@ export default function AdditionalInfo() {
         : '/settings/additional-info/meta';
 
     const { data, setData, patch, processing, errors } = useForm<AdditionalInfoPayload>({
-        alias: (targetUser as any)?.alias ?? '',
-        ref: (targetUser as any)?.ref ?? '',
-        phone: (targetUser as any)?.phone ?? '',
-        address_road: (targetUser as any)?.address_road ?? '',
-        address_zip: (targetUser as any)?.address_zip ?? '',
-        address_town: (targetUser as any)?.address_town ?? '',
-        active: Boolean((targetUser as any)?.active ?? true),
-        mailing: Boolean((targetUser as any)?.mailing ?? false),
+        alias: targetUser?.alias ?? '',
+        ref: targetUser?.ref ?? '',
+        phone: targetUser?.phone ?? '',
+        address_road: targetUser?.address_road ?? '',
+        address_zip: targetUser?.address_zip ?? '',
+        address_town: targetUser?.address_town ?? '',
+        active: Boolean(targetUser?.active ?? true),
+        mailing: Boolean(targetUser?.mailing ?? false),
     });
 
     const newMetaForm = useForm<MetaFormPayload>({
@@ -468,7 +468,7 @@ function DynamicValueInput({
     inputKind: string;
     fields: string[];
     data: MetaFormPayload;
-    setData: (key: keyof MetaFormPayload, value: any) => void;
+    setData: (key: keyof MetaFormPayload, value: unknown) => void;
 }) {
     const selectedPreview = useSelectedFilePreview(data.value_file);
     const persistedPreview = resolveImagePreview(data.value);
@@ -611,7 +611,7 @@ function resolveImagePreview(raw: string): string | null {
     return `/storage/${value}`;
 }
 
-function safeJson(value: string): Record<string, any> | null {
+function safeJson(value: string): Record<string, unknown> | null {
     try {
         const parsed = JSON.parse(value);
         return parsed && typeof parsed === 'object' ? parsed : null;

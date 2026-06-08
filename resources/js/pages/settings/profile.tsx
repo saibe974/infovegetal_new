@@ -31,11 +31,19 @@ export default function Profile({
     editingUser?: User;
 }) {
     const page = usePage<SharedData>();
-    const { auth, locale } = page.props as SharedData & { locale?: string };
-    const pageProps = page.props as any;
+    const pageProps = page.props as SharedData & {
+        locale?: string;
+        errors?: Record<string, string>;
+        userAbilities?: { move?: boolean };
+    };
+    const { auth } = pageProps;
     const errors = pageProps.errors ?? {};
     const { t } = useI18n();
     const targetUser = editingUser ?? auth.user;
+    const targetUserWithParent = (targetUser ?? {}) as User & {
+        parent_id?: number | null;
+        parent?: { name?: string | null } | null;
+    };
     const isSelf = !editingUser || editingUser.id === auth.user?.id;
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -47,7 +55,7 @@ export default function Profile({
 
     const effectiveUser = getEffectiveUser(auth);
     const isAdminUser = isAdmin(effectiveUser);
-    const userAbilities = (usePage().props as any).userAbilities ?? {};
+    const userAbilities = pageProps.userAbilities ?? {};
     const canManageParent = !!userAbilities.move;
     const isAdminEditContext = page.url.startsWith('/admin/users/') || isAdminUser;
     const formAction = isAdminEditContext
@@ -55,7 +63,7 @@ export default function Profile({
         : updateProfile.form();
 
     const isGroup = useMemo(
-        () => (targetUser?.roles ?? []).some((role: any) => role?.name === 'group'),
+        () => (targetUser?.roles ?? []).some((role) => role?.name === 'group'),
         [targetUser?.roles],
     );
 
@@ -64,8 +72,8 @@ export default function Profile({
     const [parentSearch, setParentSearch] = useState('');
     const [parentSearchItems, setParentSearchItems] = useState<{ id: number; name: string; email: string; depth: number }[]>([]);
     const [parentSearchLoading, setParentSearchLoading] = useState(false);
-    const initialParent = (targetUser as any)?.parent_id
-        ? { id: (targetUser as any).parent_id, name: (targetUser as any).parent?.name ?? `#${(targetUser as any).parent_id}` }
+    const initialParent = targetUserWithParent.parent_id
+        ? { id: targetUserWithParent.parent_id, name: targetUserWithParent.parent?.name ?? `#${targetUserWithParent.parent_id}` }
         : null;
     const [selectedParent, setSelectedParent] = useState<{ id: number; name: string } | null>(initialParent);
     const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,10 +92,10 @@ export default function Profile({
                 if (res.ok) {
                     const payload = await res.json();
                     setParentSearchItems(
-                        ((payload.items || []) as any[]).map((item) => ({
-                            id: item.id,
-                            name: item.name,
-                            email: item.email,
+                        ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
+                            id: Number(item.id),
+                            name: String(item.name ?? ''),
+                            email: String(item.email ?? ''),
                             depth: Number(item.depth ?? 0),
                         })),
                     );
@@ -106,7 +114,7 @@ export default function Profile({
                 <div className="space-y-6">
                     {/* Vérification d'email non vérifiée */}
                     {mustVerifyEmail &&
-                        (targetUser as any)?.email_verified_at === null && (
+                        targetUserWithParent.email_verified_at === null && (
                             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
                                 <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 flex-shrink-0" />
                                 <div className="flex-1">
@@ -146,7 +154,7 @@ export default function Profile({
                                 <Input
                                     id="name"
                                     className="mt-1 block w-full"
-                                    defaultValue={(targetUser as any)?.name || ''}
+                                    defaultValue={targetUserWithParent.name || ''}
                                     name="name"
                                     required
                                     autoComplete="name"
@@ -167,7 +175,7 @@ export default function Profile({
                                         id="email"
                                         type="email"
                                         className="mt-1 block w-full"
-                                        defaultValue={(targetUser as any)?.email || ''}
+                                        defaultValue={targetUserWithParent.email || ''}
                                         name="email"
                                         required
                                         autoComplete="username"

@@ -4,21 +4,13 @@ import { Link, usePage } from '@inertiajs/react';
 import { ArrowLeftCircle, MoveVertical, CircleSlash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
-import { useContext, useState } from 'react';
+import { useContext } from 'react';
 import { addCartonIcon, addEtageIcon, addRollIcon } from '@/lib/icon';
 import { Lens } from '@/components/ui/lens';
 import { useSidebar } from '@/components/ui/sidebar';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { type Product, SharedData } from '@/types';
 import { resolveProductPrices } from '@/lib/resolve-product-prices';
-
-const formatCurrency = (value: number): string =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
-const toNumber = (value: unknown): number | null => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : null;
-};
 
 type Props = {
     product: Product;
@@ -28,7 +20,6 @@ type Props = {
 export default function ProductDetails({ product, showBackLink = true }: Props) {
     const { t } = useI18n();
     const { addToCart } = useContext(CartContext);
-    const [quantity, setQuantity] = useState(1);
     const { toggleSidebar, isOpenId } = useSidebar();
 
     const { auth } = usePage<SharedData>().props;
@@ -36,11 +27,6 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const isAuthenticated = !!user;
 
     const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
-
-    const handleAddToCart = () => {
-        addToCart(product, quantity);
-        !isOpenId('right') && toggleSidebar('right');
-    };
 
     return (
         <div className="space-y-6">
@@ -209,7 +195,9 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                                 e.preventDefault();
                                                 e.stopPropagation();
                                                 addToCart(product, Number(product.cond) * Number(product.floor));
-                                                !isOpenId('right') && toggleSidebar('right');
+                                                if (!isOpenId('right')) {
+                                                    toggleSidebar('right');
+                                                }
                                             }}
                                             title={t('Add a floor')}
                                         >
@@ -233,7 +221,9 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                                 e.preventDefault();
                                                 e.stopPropagation();
                                                 addToCart(product, Number(product.cond) * Number(product.floor) * Number(product.roll));
-                                                !isOpenId('right') && toggleSidebar('right');
+                                                if (!isOpenId('right')) {
+                                                    toggleSidebar('right');
+                                                }
                                             }}
                                             title={t('Add a roll')}
                                         >

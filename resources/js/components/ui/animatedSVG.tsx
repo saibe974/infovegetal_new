@@ -31,7 +31,7 @@ export default function AnimatedSVG({ svg, duration = 3 }: AnimatedSVGProps) {
             let len = 0;
             try {
                 len = path.getTotalLength();
-            } catch (e) {
+            } catch {
                 len = 0;
             }
 

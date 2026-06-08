@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { type CartItem } from '@/components/cart/cart.context';
 import { type Product } from '@/types';
-import { BE, DE, ES, FR, GB, IT, NL } from 'country-flag-icons/react/3x2';
+import { CountryFlag } from '@/components/ui/country-flag';
 
 type BinpackItem = {
     x: number;
@@ -641,50 +641,6 @@ const getEtageFillScore = (etage: Etage): number => {
     return Math.max(0, Math.min(100, fill));
 };
 
-const sortEtagesMostFilledBottom = (etages: Etage[]): Etage[] => {
-    return [...etages].sort((a, b) => {
-        const fillDelta = getEtageFillScore(b) - getEtageFillScore(a);
-        if (Math.abs(fillDelta) > 0.0001) {
-            return fillDelta;
-        }
-
-        const yDelta = (b.y || 0) - (a.y || 0);
-        if (Math.abs(yDelta) > 0.0001) {
-            return yDelta;
-        }
-
-        return b.items.length - a.items.length;
-    });
-};
-
-const formatCurrency = (value: number): string =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-
-const getFlag = (country: string) => {
-    switch (country?.toLowerCase()) {
-        case 'fr':
-            return <FR title="France" className="w-6" />;
-        case 'be':
-            return <BE title="Belgium" className="w-6" />;
-        case 'nl':
-            return <NL title="Netherlands" className="w-6" />;
-        case 'de':
-            return <DE title="Germany" className="w-6" />;
-        case 'es':
-            return <ES title="Spain" className="w-6" />;
-        case 'it':
-            return <IT title="Italy" className="w-6" />;
-        case 'en':
-            return <GB title="United Kingdom" className="w-6" />;
-        default:
-            return (
-                <div className="h-6 w-6 rounded-full bg-slate-900 text-[10px] font-bold uppercase text-white flex items-center justify-center">
-                    {country ? country.slice(0, 2) : '??'}
-                </div>
-            );
-    }
-};
-
 export function ProductRoll({
     items,
     className,
@@ -751,8 +707,6 @@ export function ProductRoll({
                     ) : (
                         <div className="flex flex-wrap items-start justify-center gap-6">
                             {supplier.rolls.map((roll, rollIndex) => {
-                                const sortedEtages = sortEtagesMostFilledBottom(roll.etages);
-                                const totalY = sortedEtages.reduce((sum, etage) => sum + (etage.y || 0), 0) || sortedEtages.length;
                                 const rollWidth = Math.max(160, width);
                                 const rollHeight = Math.max(220, height);
                                 const rollPrice = getRollPrice
@@ -771,7 +725,7 @@ export function ProductRoll({
                                             style={{ width: rollWidth + 12, height: rollHeight + 12 }}
                                         >
                                             <div className="absolute left-[-20px] top-2 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
-                                                {getFlag(supplier.country)}
+                                                <CountryFlag countryCode={supplier.country} className="w-6" />
                                             </div>
 
                                             <div
@@ -804,8 +758,6 @@ export function ProductRoll({
                                                         return (b.y || 0) - (a.y || 0);
                                                     })
                                                     .map((etage, etageIndex) => {
-                                                        const heightRatio = totalY ? (etage.y || 0) / totalY : 1 / roll.etages.length;
-                                                        const etageHeight = Math.max(18, Math.floor(rollHeight * heightRatio));
                                                         const isFull = etage.perte <= 5;
                                                         return (
                                                             <div

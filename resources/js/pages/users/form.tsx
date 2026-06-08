@@ -77,12 +77,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, allRoles = [] }
                 if (res.ok) {
                     const payload = await res.json();
                     setParentSearchItems(
-                        ((payload.items || []) as any[]).map((item) => ({
+                        ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
                             ...item,
-                            parent_id: item.parent_id ?? null,
+                            parent_id: (item.parent_id as number | null | undefined) ?? null,
                             depth: Number(item.depth ?? 0),
                             has_children: Boolean(item.has_children),
-                        })),
+                        })) as TreeUser[],
                     );
                 }
             } finally {

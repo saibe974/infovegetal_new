@@ -18,7 +18,7 @@ import { ChevronDown, UserCheck } from 'lucide-react';
 export function NavUser() {
     const pageData = usePage<SharedData>().props;
     const auth = pageData.auth;
-    const users = (pageData.users as any[]) || [];
+    const users = (pageData.users as User[]) || [];
     const isMobile = useIsMobile();
 
     // L'utilisateur actuellement connecté (peut être impersoné)

@@ -19,7 +19,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type MissingImagesPageProps = Record<string, never>;
 
-export default withAppLayout<MissingImagesPageProps>(breadcrumbs, true, ({ }) => {
+export default withAppLayout<MissingImagesPageProps>(breadcrumbs, true, () => {
     const { t } = useI18n();
     const [libraryTheme, setLibraryTheme] = useState<'light' | 'dark'>('light');
 

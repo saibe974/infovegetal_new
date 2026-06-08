@@ -1,6 +1,4 @@
 import { useI18n } from "@/lib/i18n";
-import AppLogo from "./app-logo";
-import { NavFooter } from "../ui/nav-footer";
 import { AppLogoIconMini } from "./app-logo-icon";
 import { Button } from "../ui/button";
 import { Link } from "@inertiajs/react";

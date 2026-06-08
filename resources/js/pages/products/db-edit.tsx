@@ -39,7 +39,7 @@ type Props = {
 
 type KVPair = { key: string; value: string };
 
-const objectToKV = (obj: Record<string, any> | null | undefined): KVPair[] => {
+const objectToKV = (obj: Record<string, unknown> | null | undefined): KVPair[] => {
     if (!obj) return [];
     return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? '') }));
 };
@@ -59,12 +59,11 @@ interface KVEditorProps {
     keyPlaceholder?: string;
     valuePlaceholder?: string;
     error?: string;
-    valueMetaByValue?: Record<string, string>;
     unknownValueLabel?: string;
     valueOptions?: { value: string; label: string }[];
 }
 
-function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder = 'Valeur', error, valueMetaByValue, unknownValueLabel = 'Unknown', valueOptions }: KVEditorProps) {
+function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder = 'Valeur', error, unknownValueLabel = 'Unknown', valueOptions }: KVEditorProps) {
     const addRow = () => onChange([...pairs, { key: '', value: '' }]);
 
     const updateRow = (index: number, field: 'key' | 'value', val: string) => {

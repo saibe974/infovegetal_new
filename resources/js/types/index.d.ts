@@ -1,5 +1,6 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export interface PaginatedCollection<T> {
     data: T[];
@@ -40,8 +41,8 @@ export interface dbProduct {
     id: number | null;
     name: string;
     description: string | null;
-    champs: Record<string, any> | null;
-    categories: Record<string, any> | null;
+    champs: Record<string, unknown> | null;
+    categories: Record<string, unknown> | null;
     traitement: string | null;
     header_row_index?: number | null;
     source_delimiter?: string | null;
@@ -114,9 +115,7 @@ export interface Product {
     [key: string]: unknown; // This allows for additional properties...
 }
 
-export interface ProductDetailed extends Product {
-    // Add more detailed fields if necessary
-}
+export type ProductDetailed = Product;
 
 export interface BreadcrumbItem {
     title: string;
@@ -204,5 +203,5 @@ export interface RightSidebarProps {
     header?: ReactNode;
     children?: ReactNode;
     footer?: ReactNode;
-    [key: string]: any;
+    [key: string]: unknown;
 }

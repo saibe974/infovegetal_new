@@ -2,7 +2,6 @@
 // import { TopActions } from '@/components/top-actions';
 import { Button } from '@/components/ui/button';
 // import { Card, CardContent } from '@/components/ui/card';
-import Heading from '@/components/heading';
 import { FormField } from '@/components/ui/form-field';
 // import { ImageInput } from '@/components/ui/image-input';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import type { BreadcrumbItem, ProductDetailed } from '@/types';
-import { useForm, Head, Link } from '@inertiajs/react';
+import { useForm, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,8 +43,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const { t } = useI18n();
+    const initialTags = product.tags?.map((tagItem) => tagItem.name) ?? [];
     const [tag, setTag] = useState('')
-    const [tags, setTags] = useState((product as any).tags.map((t: any) => t.name) || [])
+    const [tags, setTags] = useState<string[]>(initialTags)
     const [previewImage, setPreviewImage] = useState(product.image_original ?? product.image_medium ?? product.img_link ?? '/images/placeholder.png');
     const [imgLinkRemoved, setImgLinkRemoved] = useState(!product.img_link);
     const [removeImgLinkProcessing, setRemoveImgLinkProcessing] = useState(false);
@@ -55,6 +55,11 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
     const writeTags = (t: string) => {
         setTag(t)
+        const nextTags = t
+            .split(/\s+/)
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+        setTags(nextTags);
     }
 
     const handleRemoveMissingImgLink = async () => {
@@ -125,7 +130,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         ref: String(product.ref || ''),
         ean13: String(product.ean13 || ''),
         description: product.description || '',
-        tags: (product as any).tags?.map((t: any) => t.name).join(',') || '',
+        tags: initialTags.join(','),
         pot: String(product.pot ?? ''),
         height: String(product.height || ''),
         cond: String(product.cond ?? ''),

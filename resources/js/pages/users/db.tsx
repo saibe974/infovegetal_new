@@ -1,5 +1,5 @@
-import { Head, Link, router, usePage, Form } from '@inertiajs/react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Head, router, usePage, Form } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,7 @@ import SearchSelect from '@/components/app/search-select';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
 
 type DbProductAttributes = {
     m: number;          // marge en %
@@ -97,15 +95,17 @@ type CarrierOption = {
     }>;
 };
 
+type DbPageProps = SharedData & {
+    user: User;
+    dbProducts: Array<{ id: number; name: string; description?: string }>;
+    eligibleUsers: Array<{ id: number; name: string; email: string }>;
+    carriers: CarrierOption[];
+    selectedDbId?: number[];
+    dbUserAttributes?: Record<number, Partial<DbProductAttributes>>;
+};
+
 export default function UserDbPage() {
-    const { auth, user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers } = usePage<SharedData & {
-        user: User;
-        dbProducts: Array<{ id: number; name: string; description?: string }>;
-        eligibleUsers: Array<{ id: number; name: string; email: string }>;
-        carriers: CarrierOption[];
-        selectedDbId?: number[];
-        dbUserAttributes?: Record<number, any>
-    }>().props as any;
+    const { user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers } = usePage<DbPageProps>().props;
     const carrierOptions: CarrierOption[] = Array.isArray(carriers) ? carriers : [];
     const eligibleUserOptions = useMemo(() => {
         const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
@@ -140,14 +140,14 @@ export default function UserDbPage() {
 
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<number[]>(Array.isArray(selectedDbId) ? selectedDbId : []);
-    const [processing, setProcessing] = useState(false);
+    const processing = false;
     const [savingDbId, setSavingDbId] = useState<number | null>(null);
     const [contactSearchByDbId, setContactSearchByDbId] = useState<Record<number, { com: string; fact: string }>>({});
 
     // Préparer la sélection initiale pour SearchSelect
     const initialSelection = useMemo(() => {
         return (Array.isArray(selectedDbId) ? selectedDbId : []).map((id: number) => {
-            const found = (dbProducts as any[]).find((d) => d.id === id);
+            const found = dbProducts.find((d) => d.id === id);
             return { value: found ? found.name : String(id), label: found ? found.name : String(id) };
         });
     }, [dbProducts, selectedDbId]);
@@ -172,7 +172,7 @@ export default function UserDbPage() {
         },
     ];
 
-    const updateAttribute = (dbId: number, key: keyof DbProductAttributes, value: any) => {
+    const updateAttribute = (dbId: number, key: keyof DbProductAttributes, value: unknown) => {
         const nextValue = key === 'p' ? normalizePriceMode(value) : value;
         setAttributesByDbId(prev => ({
             ...prev,
@@ -229,12 +229,12 @@ export default function UserDbPage() {
                                     onSubmit={(s) => {
                                         const names = s && s.trim() ? s.trim().split(/\s+/) : [];
                                         const ids = (names || []).map((name) => {
-                                            const found = (dbProducts as any[]).find((d) => d.name === name);
+                                            const found = dbProducts.find((d) => d.name === name);
                                             return found ? found.id : null;
                                         }).filter((v) => v !== null) as number[];
                                         setSelectedIds(ids);
                                     }}
-                                    propositions={((dbProducts as any[]) || []).map((d) => d.name)}
+                                    propositions={dbProducts.map((d) => d.name)}
                                     selection={initialSelection}
                                     loading={false}
                                     minQueryLength={0}
@@ -256,7 +256,7 @@ export default function UserDbPage() {
                     {selectedIds.length > 0 && (
                         <div className="mt-6 space-y-4">
                             {selectedIds.map((dbId) => {
-                                const db = (dbProducts as any[]).find((d) => d.id === dbId);
+                                const db = dbProducts.find((d) => d.id === dbId);
                                 const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
                                 const commercialOption = attrs.com ? eligibleUserOptionById.get(attrs.com) : undefined;
                                 const facturantOption = attrs.fact ? eligibleUserOptionById.get(attrs.fact) : undefined;

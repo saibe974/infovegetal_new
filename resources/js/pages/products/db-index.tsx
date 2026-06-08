@@ -1,12 +1,12 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
+import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { type BreadcrumbItem, PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, TrashIcon, PlusIcon } from 'lucide-react';
+import { EditIcon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import dbProducts from '@/routes/db-products';
@@ -30,8 +30,8 @@ type DbProduct = {
     id: number;
     name: string;
     description: string | null;
-    champs: Record<string, any> | null;
-    categories: Record<string, any> | null;
+    champs: Record<string, unknown> | null;
+    categories: Record<string, unknown> | null;
     traitement: string | null;
     created_at: string;
     updated_at: string;
@@ -52,7 +52,9 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
     const handleSearch = (s: string) => {
         setSearch(s);
-        clearTimeout(timerRef.current!);
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
         router.cancelAll();
         if (s.length < 2) {
             return;

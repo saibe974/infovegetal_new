@@ -1,9 +1,7 @@
-import AppLayout, { withAppLayout } from '@/layouts/app-layout';
-import { ReactNode, useRef, useState } from 'react';
-import { type BreadcrumbItem, Product, PaginatedCollection } from '@/types';
-import { InfiniteScroll, usePage, router, Form, Head, Link } from '@inertiajs/react';
+import { withAppLayout } from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { AppFooter } from '@/components/app/app-footer';
 import { ArrowLeftCircle } from 'lucide-react';
 import Heading from '@/components/heading';
 

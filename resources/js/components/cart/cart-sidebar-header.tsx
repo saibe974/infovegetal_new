@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useState } from "react";
-import { CheckCircleIcon, DownloadIcon, EyeIcon, PlusCircleIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
+import { CheckCircleIcon, DownloadIcon, EyeIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -107,65 +107,6 @@ export function CartSidebarHeader() {
         } catch (error) {
             console.error("Error saving cart:", error);
             setSaveMessage("Erreur lors de la sauvegarde");
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleGeneratePdf = async () => {
-        if (items.length === 0) {
-            setSaveMessage("Le panier est vide");
-            setTimeout(() => setSaveMessage(null), 3000);
-            return;
-        }
-
-        setIsSaving(true);
-        setSaveMessage(null);
-
-        try {
-            const csrfToken = (
-                document.querySelector(
-                    'meta[name="csrf-token"]'
-                ) as HTMLMetaElement
-            )?.content;
-
-            const response = await fetch("/cart/generate-pdf", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-Token": csrfToken || "",
-                },
-                body: JSON.stringify({
-                    items: items.map((item) => ({
-                        id: item.product.id,
-                        quantity: item.quantity,
-                    })),
-                }),
-            });
-
-            if (response.ok) {
-                // Créer un blob à partir de la réponse
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `panier-${new Date().toISOString().split('T')[0]}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-
-                setSaveMessage("PDF généré avec succès");
-                setTimeout(() => setSaveMessage(null), 3000);
-            } else {
-                const data = await response.json();
-                setSaveMessage(
-                    data.message || "Erreur lors de la génération du PDF"
-                );
-            }
-        } catch (error) {
-            console.error("Error generating PDF:", error);
-            setSaveMessage("Erreur lors de la génération du PDF");
         } finally {
             setIsSaving(false);
         }

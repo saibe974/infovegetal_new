@@ -39,7 +39,7 @@ export function ViewModeToggle({
             const views = JSON.parse(localStorage.getItem('views') || '{}');
             views[pageKey] = viewMode;
             localStorage.setItem('views', JSON.stringify(views));
-        } catch (e) {
+        } catch {
             // ignore (ex: stockage bloqué)
         }
     }, [viewMode, pageKey]);

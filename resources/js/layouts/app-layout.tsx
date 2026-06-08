@@ -16,8 +16,6 @@ interface AppLayoutProps {
 const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, ...props }: AppLayoutProps) => {
     const page = usePage<SharedData>();
 
-    const isHomePage = usePage().component === 'home';
-
     useEffect(() => {
         if (page.props.flash.success) {
             toast.success(page.props.flash.success);
@@ -40,7 +38,7 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
 
 export function withAppLayout<T>(
     breadcrumbs: BreadcrumbItem[] | (() => BreadcrumbItem[]),
-    hideFooterOnInfiniteScroll: boolean | ((props: any) => boolean) = false,
+    hideFooterOnInfiniteScroll: boolean | ((props: Record<string, unknown>) => boolean) = false,
     component: FC<T>
 ) {
 

@@ -9,6 +9,7 @@ import { leave as impersonateLeave, take as impersonateTake } from '@/actions/Ap
 import { router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 type CartStatus = 'processing' | 'processed';
 
@@ -26,9 +27,6 @@ type CartSummary = {
     user?: { id?: number; name: string; email: string };
     products?: CartProduct[];
 };
-
-const formatCurrency = (value: number) =>
-    value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 export function CartsList() {
     const { t } = useI18n();

@@ -1,10 +1,6 @@
 import { useI18n } from "@/lib/i18n";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { type Product } from '@/types';
-import { Link, router } from "@inertiajs/react";
-import { CameraIcon, Check, CircleCheckBig, CircleOff, CircleX, EditIcon, TrashIcon, X } from "lucide-react";
-import storage from "@/routes/storage";
+import { router } from "@inertiajs/react";
 import { ProductCard } from "./product-card";
 
 type Props = {

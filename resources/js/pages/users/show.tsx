@@ -1,15 +1,10 @@
 import { Button } from '@/components/ui/button';
-import Heading from '@/components/heading';
-import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
 import { withAppLayout } from '@/layouts/app-layout';
-import products from '@/routes/products';
-import type { BreadcrumbItem, ProductDetailed, SharedData, User } from '@/types';
-import { Form, Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, LinkIcon, SaveIcon, Mail, Calendar, Shield, Lock, EditIcon, TrashIcon } from 'lucide-react';
+import type { BreadcrumbItem, SharedData, User } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { ArrowLeftCircle, Mail, Shield, Lock, EditIcon, TrashIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import SearchSoham from '@/components/app/search-select';
-import { useState } from 'react';
+import { type MouseEvent } from 'react';
 import users from '@/routes/users';
 import { Badge } from '@/components/ui/badge';
 import { useI18n } from '@/lib/i18n';
@@ -44,7 +39,7 @@ const formatDate = (date: string | null) => {
 export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }) => {
     const { t } = useI18n();
 
-    const { auth, locale } = usePage<SharedData>().props;
+    const { auth } = usePage<SharedData>().props;
     const effectiveUser = getEffectiveUser(auth);
     const canEdit = userAbilities?.update ?? user.abilities?.update ?? (isAdmin(effectiveUser) || isDev(effectiveUser) || hasPermission(effectiveUser, 'edit users') || hasPermission(effectiveUser, 'manage users'));
     const canDelete = userAbilities?.delete ?? user.abilities?.delete ?? (isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete users') || hasPermission(effectiveUser, 'manage users'));
@@ -86,7 +81,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }
                             <Button
                                 size="icon"
                                 variant="outline"
-                                onClick={(e: React.MouseEvent) => {
+                                onClick={(e: MouseEvent) => {
                                     e.stopPropagation();
                                     router.visit(`/admin/users/${user.id}/edit`);
                                 }}
@@ -98,7 +93,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }
                             <Button
                                 size="icon"
                                 variant="destructive-outline"
-                                onClick={(e: React.MouseEvent) => {
+                                onClick={(e: MouseEvent) => {
                                     e.stopPropagation();
                                     handleDelete(user.id);
                                 }}
@@ -170,7 +165,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }
                     </h2>
                     <div className="flex flex-wrap gap-2">
                         {user.roles && user.roles.length > 0 ? (
-                            user.roles.map((role: any) => (
+                            user.roles.map((role: { id: number; name: string }) => (
                                 <Badge key={role.id} variant="secondary" className="bg-blue-100 text-blue-800">
                                     {role.name}
                                 </Badge>
@@ -189,7 +184,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, userAbilities }
                     </h2>
                     <div className="flex flex-wrap gap-2 max-h-96 overflow-y-auto">
                         {user.permissions && user.permissions.length > 0 ? (
-                            user.permissions.map((perm: any) => (
+                            user.permissions.map((perm: { id: number; name: string }) => (
                                 <Badge key={perm.id} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
                                     {perm.name}
                                 </Badge>

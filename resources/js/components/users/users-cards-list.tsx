@@ -1,6 +1,6 @@
 import React from "react";
 import { UserCard } from "@/components/users/user-card";
-import { type User, PaginatedCollection, SharedData } from "@/types";
+import { type User, SharedData } from "@/types";
 
 interface UsersCardsListProps {
     users: User[];
@@ -15,7 +15,6 @@ interface UsersCardsListProps {
     changeUserRole?: (userId: number, roleName: string) => void;
     impersonateUser?: (userId: number) => void;
     className?: string;
-    gridClassName?: string;
 }
 
 export default function UsersCardsList({
@@ -30,11 +29,10 @@ export default function UsersCardsList({
     deleteUser,
     changeUserRole,
     impersonateUser,
-    className = "",
-    gridClassName = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+    className = ""
 }: UsersCardsListProps) {
     return (
-        <div className='w-full'>
+        <div className={`w-full ${className}`}>
             {users.length > 0 ? (
                 <div className="flex gap-10 flex-wrap items-center justify-center max-w-full">
                     {users.map((user) => (

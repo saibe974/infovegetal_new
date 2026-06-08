@@ -2,14 +2,18 @@ import React, { useState } from 'react';
 import ReactJson from 'react18-json-view';
 
 interface AttributesEditorProps {
-    initialAttributes: Record<string, any>;
-    onChange?: (attributes: Record<string, any>) => void;
+    initialAttributes: Record<string, unknown>;
+    onChange?: (attributes: Record<string, unknown>) => void;
 }
+
+type JsonEditPayload = {
+    updated_src: Record<string, unknown>;
+};
 
 export default function AttributesEditor({ initialAttributes, onChange }: AttributesEditorProps) {
     const [attributes, setAttributes] = useState(initialAttributes || {});
 
-    const handleEdit = (edit: any) => {
+    const handleEdit = (edit: JsonEditPayload) => {
         setAttributes(edit.updated_src);
         onChange?.(edit.updated_src);
     };

@@ -12,7 +12,7 @@ import {
     CarouselPrevious,
 } from "@/components/ui/carousel"
 import { Button } from "@/components/ui/button"
-import { AlignRight, ArrowRight, ChevronRight } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 const images = [
     { src: "/img_carousel/pepin.jpg", alt: "Image 1" },
