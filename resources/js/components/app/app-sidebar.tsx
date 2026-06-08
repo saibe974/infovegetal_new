@@ -27,7 +27,7 @@ import carriers from '@/routes/carriers';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { canAccessUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission } from '@/lib/roles';
+import { canAccessUsers, getEffectiveUser, isDev, isAdmin, isClient, hasPermission, hasAnyPermission } from '@/lib/roles';
 
 import users from '@/routes/users';
 import legal from '@/routes/legal';
@@ -53,7 +53,13 @@ export function AppSidebar() {
     const canManageUsers = canAccessUsers(effectiveUser);
     const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
     const canManageCategories = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'products.categories.manage');
-    const canManageCarriers = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'manage carriers');
+    const canManageCarriers = isAdmin(effectiveUser) || hasAnyPermission(effectiveUser, [
+        'carriers.view',
+        'carriers.create',
+        'carriers.update',
+        'carriers.delete',
+        'manage carriers',
+    ]);
     const canManageMedia = isAdmin(effectiveUser);
 
     // derive active state from current url/path

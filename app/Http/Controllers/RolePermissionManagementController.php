@@ -56,6 +56,12 @@ class RolePermissionManagementController extends Controller
         'orders.export.branch',
         'orders.export.all',
 
+        // carriers
+        'carriers.view',
+        'carriers.create',
+        'carriers.update',
+        'carriers.delete',
+        
         // Security
         'security.catalog.view',
         'security.roles.manage',
