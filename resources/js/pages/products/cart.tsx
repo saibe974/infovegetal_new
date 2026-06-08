@@ -55,6 +55,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
     const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
     const [pdfResult, setPdfResult] = useState<{ url: string; filename: string; orderNumber: string | null } | null>(null);
+    const [orderConflict, setOrderConflict] = useState<{ orderNumber?: string | null; resolve: (action: 'new' | 'append') => void } | null>(null);
 
 
     const itemsPricing = useMemo(
