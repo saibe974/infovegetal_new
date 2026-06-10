@@ -57,11 +57,7 @@ export function ButtonsActions({
                 </Button>
             }
 
-            {onDelete &&
-                <Button onClick={onDelete} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
-                    <TrashIcon />
-                </Button>
-            }
+
 
             {onPreview &&
                 <Button onClick={onPreview} variant={'outline'} title={t('Preview')} disabled={saving} size={'icon'}>
@@ -100,6 +96,12 @@ export function ButtonsActions({
             {onAdd &&
                 <Button onClick={onAdd} title={t('Add')} disabled={saving} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
                     <CirclePlus />
+                </Button>
+            }
+
+            {onDelete &&
+                <Button onClick={onDelete} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
+                    <TrashIcon />
                 </Button>
             }
         </div>

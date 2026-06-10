@@ -184,21 +184,33 @@ class CartController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        // Créer ou récupérer le panier de l'utilisateur
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $cart = $user->cart()->firstOrCreate([]);
 
-        // Préparer les données pour synchroniser les produits
+        // Le panier sauvegardé est un brouillon courant distinct des commandes processées.
+        $cart = Cart::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['current', 'processing'])
+            ->latest('updated_at')
+            ->first();
+
+        if (!$cart) {
+            $cart = Cart::create([
+                'user_id' => $user->id,
+                'status' => 'current',
+            ]);
+        }
+
+        $cart->status = 'current';
+
         $syncData = [];
         foreach ($data['items'] as $item) {
             $syncData[$item['id']] = ['quantity' => $item['quantity']];
         }
 
-        // Synchroniser les produits du panier
         $cart->products()->sync($syncData);
+        $cart->save();
 
-        // Nettoyer la session du filtre panier
         $request->session()->forget('cart_filter_ids');
 
         return response()->json([
@@ -257,7 +269,7 @@ class CartController extends Controller
         }
 
         $data = $request->validate([
-            'status' => 'required|in:processing,processed',
+            'status' => 'required|in:current,processing,processed',
         ]);
 
         $cart->status = $data['status'];

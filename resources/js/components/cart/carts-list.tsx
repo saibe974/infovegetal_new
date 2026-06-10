@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
-type CartStatus = 'processing' | 'processed';
+type CartStatus = 'current' | 'processing' | 'processed';
 
 type CartProduct = Product & { pivot?: { quantity: number } };
 
@@ -276,6 +276,7 @@ export function CartsList() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="current">{t('En cours')}</SelectItem>
                                             <SelectItem value="processing">{t('En cours de traitement')}</SelectItem>
                                             <SelectItem value="processed">{t('Traite')}</SelectItem>
                                         </SelectContent>
