@@ -65,6 +65,16 @@ const hierarchicalUserPermissions = [
     'create guests',
     'link commercials clients',
     'link commercials suppliers',
+    'users.create.branch',
+    'users.create.all',
+    'users.update.branch',
+    'users.update.all',
+    'users.delete.branch',
+    'users.delete.all',
+    'users.assign_roles.branch',
+    'users.assign_roles.all',
+    'users.assign_permissions.branch',
+    'users.assign_permissions.all',
 ];
 
 export function canAccessUsers(user: User | null | undefined): boolean {

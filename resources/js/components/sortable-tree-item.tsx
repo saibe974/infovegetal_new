@@ -122,7 +122,7 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
 
             {/* Poignée de drag */}
             <div
-                {...listeners}
+                {...(listeners ?? {})}
                 {...attributes}
                 className="flex h-6 w-6 items-center justify-center text-muted-foreground cursor-grab flex-shrink-0"
                 aria-label="Drag"

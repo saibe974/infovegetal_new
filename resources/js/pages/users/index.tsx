@@ -82,8 +82,19 @@ export default withAppLayout(
         const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
 
         useEffect(() => {
-            setAllUsers(dedupeUsersById(collection?.data || []));
-        }, [collection]);
+            const nextUsers = dedupeUsersById(collection?.data || []);
+
+            setAllUsers((previousUsers) => {
+                if (
+                    previousUsers.length === nextUsers.length
+                    && previousUsers.every((user, index) => user.id === nextUsers[index]?.id)
+                ) {
+                    return previousUsers;
+                }
+
+                return nextUsers;
+            });
+        }, [collection?.data]);
 
         const { auth } = usePage<SharedData>().props;
         const effectiveUser = getEffectiveUser(auth);
@@ -205,12 +216,13 @@ export default withAppLayout(
         };
 
         const hasChanges = useMemo(() => !isTreeSearchMode && pending !== null, [pending, isTreeSearchMode]);
+        const emptyTreeItems = useMemo<TreeUser[]>(() => [], []);
 
         useEffect(() => {
             if (!isTreeSearchMode) {
-                setTreeSearchItems(null);
-                setTreeSearchExpandedIds([]);
-                setTreeSearchLoading(false);
+                setTreeSearchItems((previousItems) => (previousItems === null ? previousItems : null));
+                setTreeSearchExpandedIds((previousIds) => (previousIds.length === 0 ? previousIds : []));
+                setTreeSearchLoading((previousLoading) => (previousLoading ? false : previousLoading));
                 return;
             }
 
@@ -250,7 +262,7 @@ export default withAppLayout(
                         return;
                     }
                     console.error(error);
-                    toast.error(t('Error while loading tree search'));
+                    toast.error('Error while loading tree search');
                 })
                 .finally(() => {
                     if (!controller.signal.aborted) {
@@ -261,7 +273,7 @@ export default withAppLayout(
             return () => {
                 controller.abort();
             };
-        }, [isTreeSearchMode, treeSearchQuery, t]);
+        }, [isTreeSearchMode, treeSearchQuery]);
 
         const loadTreePage = async (
             parent: TreeUser | null,
@@ -403,8 +415,8 @@ export default withAppLayout(
                 props={props}
                 hasChildren={(item) => Boolean((item as User & { has_children?: boolean })?.has_children)}
                 nameHref={(item) => '/admin/users/' + item.id}
-                canEdit={canEdit}
-                canDelete={canDelete}
+                canEdit={canEdit && (props.item.id !== 1 || effectiveUser?.id === 1)}
+                canDelete={canDelete && props.item.id !== 1}
                 onEdit={(item) => handleEdit(item.id)}
                 onDelete={(item) => handleDelete(item.id)}
                 extraContent={(item) => (
@@ -517,7 +529,7 @@ export default withAppLayout(
                         )}
                         <div className="border rounded-md overflow-hidden">
                             <SortableTree
-                                items={isTreeSearchMode ? (treeSearchItems ?? []) : (pending ?? [])}
+                                items={isTreeSearchMode ? (treeSearchItems ?? emptyTreeItems) : (pending ?? emptyTreeItems)}
                                 idKey="id"
                                 parentKey="parent_id"
                                 depthKey="depth"

@@ -199,7 +199,7 @@ export function UserCard({
                                 <EditIcon size={16} />
                             </Button>
                         )}
-                        {canDelete && (
+                        {canDelete && user.id !== 1 && (
                             <Button
                                 size="icon"
                                 variant="destructive-outline"

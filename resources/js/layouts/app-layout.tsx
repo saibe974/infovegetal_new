@@ -36,9 +36,9 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
     );
 };
 
-export function withAppLayout<T>(
+export function withAppLayout<T extends Record<string, unknown>>(
     breadcrumbs: BreadcrumbItem[] | (() => BreadcrumbItem[]),
-    hideFooterOnInfiniteScroll: boolean | ((props: Record<string, unknown>) => boolean) = false,
+    hideFooterOnInfiniteScroll: boolean | ((props: T) => boolean) = false,
     component: FC<T>
 ) {
 
@@ -46,7 +46,7 @@ export function withAppLayout<T>(
     // @ts-expect-error layout exists for inertia
     component.layout = (page: ReactNode) => {
         const BreadcrumbWrapper = () => {
-            const pageProps = usePage().props;
+            const pageProps = usePage().props as T;
             const resolvedBreadcrumbs = typeof breadcrumbs === 'function'
                 ? breadcrumbs()
                 : breadcrumbs;

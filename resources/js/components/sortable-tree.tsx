@@ -36,8 +36,8 @@ export type RenderItemProps<T> = {
     isInsideTarget: boolean;
 
     setNodeRef: (el: HTMLElement | null) => void;
-    attributes: unknown;
-    listeners: unknown;
+    attributes: ReturnType<typeof useSortable>['attributes'];
+    listeners: ReturnType<typeof useSortable>['listeners'];
     toggleExpand: () => void;
 };
 
@@ -271,7 +271,14 @@ export default function SortableTree<T extends Record<string, unknown>>(props: S
             const incomingIds = new Set(incoming.map((x) => getField<T, Id>(x, idKey) as Id));
             const extras = prev.filter((x) => !incomingIds.has(getField<T, Id>(x, idKey) as Id));
             const merged = [...incoming, ...extras];
-            return Array.from(new Map(merged.map((c) => [getField(c, idKey) as Id, c])).values());
+            const next = Array.from(new Map(merged.map((c) => [getField(c, idKey) as Id, c])).values());
+
+            // Prevent render loops when parents pass a new array reference with unchanged content.
+            if (next.length === prev.length && next.every((item, index) => item === prev[index])) {
+                return prev;
+            }
+
+            return next;
         });
     }, [itemsProp, idKey]);
 
@@ -883,8 +890,8 @@ export default function SortableTree<T extends Record<string, unknown>>(props: S
                         insertLine: null,
                         isInsideTarget: false,
                         setNodeRef: () => { },
-                        attributes: {},
-                        listeners: {},
+                        attributes: {} as ReturnType<typeof useSortable>['attributes'],
+                        listeners: {} as ReturnType<typeof useSortable>['listeners'],
                         toggleExpand: () => { },
                     })
                 ) : null}

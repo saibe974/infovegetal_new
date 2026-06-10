@@ -148,7 +148,7 @@ export default function UsersTable({ users, roles, auth, canEdit = false, canDel
                                             <EditIcon size={16} />
                                         </Button>
                                     )}
-                                    {canDelete && (
+                                    {canDelete && user.id !== 1 && (
                                         <Button
                                             size="icon"
                                             variant="destructive-outline"

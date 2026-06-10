@@ -34,9 +34,10 @@ export default withAppLayout(
             { title: t('Categories'), href: categoryProducts.index().url },
         ];
     },
-    (props: Props) => {
-        const uniqueCount = Array.from(new Set(props.collection.data.map((c: ProductCategory) => c.id))).length;
-        return uniqueCount < props.collection.meta.total;
+    (props) => {
+        const pageProps = props as Props;
+        const uniqueCount = Array.from(new Set(pageProps.collection.data.map((c: ProductCategory) => c.id))).length;
+        return uniqueCount < pageProps.collection.meta.total;
     },
     ({ collection, q, children }: Props) => {
         const { t } = useI18n();
