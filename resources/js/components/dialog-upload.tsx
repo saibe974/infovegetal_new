@@ -16,7 +16,18 @@ import { FilePond } from 'react-filepond';
 import 'filepond/dist/filepond.min.css';
 import { Button } from './ui/button';
 
-type DialogUploadProps = {
+type PostTreatmentBaseProps = {
+    importStatus: ImportStatus;
+    importError: string | null;
+    progressInfo: ImportProgressPayload | null;
+    displayProgress: number;
+    handleRetryImport: () => void;
+    uploadId: string | null;
+    fileSize?: number | null;
+    onStartImport?: (settings?: { dbProductsId?: number; strategy?: string }) => void;
+};
+
+type DialogUploadProps<TPostTreatmentProps extends PostTreatmentBaseProps = PostTreatmentBaseProps> = {
     title: string;
     description?: string;
     uploadUrl: string;
@@ -29,8 +40,8 @@ type DialogUploadProps = {
     onImportQueued?: (id: string) => void;
     onImportError?: (error: unknown) => void;
     buttonLabel?: string;
-    postTreatmentComponent?: React.ComponentType<Record<string, unknown>>;
-    postTreatmentProps?: Record<string, unknown>;
+    postTreatmentComponent?: React.ComponentType<TPostTreatmentProps>;
+    postTreatmentProps?: Partial<TPostTreatmentProps>;
     disableProgressTracking?: boolean;
 
 };
@@ -75,7 +86,7 @@ type PondFile = {
     };
 };
 
-export function DialogUpload({
+export function DialogUpload<TPostTreatmentProps extends PostTreatmentBaseProps = PostTreatmentBaseProps>({
     title,
     description,
     uploadUrl,
@@ -91,7 +102,7 @@ export function DialogUpload({
     postTreatmentComponent,
     postTreatmentProps,
     disableProgressTracking = false,
-}: DialogUploadProps) {
+}: DialogUploadProps<TPostTreatmentProps>) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<PondFile[]>([]);
     const [uploadComplete, setUploadComplete] = useState(false);
@@ -864,8 +875,8 @@ export function DialogUpload({
                 <div className={hasLargePostTreatment ? 'min-h-0 flex-1 overflow-y-auto px-6 py-4' : 'space-y-3'}>
                     {!uploadComplete && importStatus !== 'processing' && importStatus !== 'cancelling' && (
                         <FilePond
-                            ref={pondRef}
-                            files={files}
+                            ref={pondRef as unknown as React.Ref<FilePond>}
+                            files={files as unknown as Array<string | Blob | File>}
                             onupdatefiles={(nextFiles: PondFile[]) => {
                                 setFiles(nextFiles);
                                 const fileSize = nextFiles?.[0]?.file?.size;
@@ -929,13 +940,13 @@ export function DialogUpload({
                                     handleRetryImport,
                                     uploadId,
                                     fileSize: files?.[0]?.file?.size ?? null,
-                                    onStartImport: (settings: { dbProductsId?: number; strategy?: string }) => {
+                                    onStartImport: (settings?: { dbProductsId?: number; strategy?: string }) => {
                                         // Déclencher l'import avec les paramètres choisis
                                         if (uploadId) {
                                             void startImport(uploadId, settings);
                                         }
                                     },
-                                })
+                                } as TPostTreatmentProps)
                             )}
                         </div>
                     )}

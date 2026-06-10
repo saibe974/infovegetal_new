@@ -13,15 +13,16 @@ type Props = {
     onStartImport?: (settings?: { strategy?: string }) => void;
 };
 
-export function UsersImportTreatment({
-    importStatus,
-    importError,
-    progressInfo,
-    displayProgress,
-    handleRetryImport,
-    uploadId,
-    onStartImport,
-}: Props) {
+export function UsersImportTreatment(inputProps: Record<string, unknown>) {
+    const {
+        importStatus,
+        importError,
+        progressInfo,
+        displayProgress,
+        handleRetryImport,
+        uploadId,
+        onStartImport,
+    } = inputProps as Props;
     void displayProgress;
     const [strategy, setStrategy] = useState<'basique' | 'old_DB'>('basique');
     const visualProgress = useImportProgress(importStatus, progressInfo);

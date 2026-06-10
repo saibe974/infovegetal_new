@@ -1,6 +1,6 @@
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, router, usePage, InfiniteScroll } from '@inertiajs/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -22,6 +22,8 @@ import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
+
+type UsersImportTreatmentProps = ComponentProps<typeof UsersImportTreatment>;
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -63,7 +65,7 @@ const dedupeUsersById = (users: User[]): User[] => {
 
 
 
-export default withAppLayout(
+export default withAppLayout<UsersPageProps>(
     breadcrumbs,
     true,
     ({ collection, roles, q, searchPropositions = [] }: UsersPageProps) => {
@@ -482,7 +484,9 @@ export default withAppLayout(
                                     importProcessChunkUrl={usersRoutes.import.process_chunk.url()}
                                     importCancelUrl={usersRoutes.import.cancel.url()}
                                     importProgressUrl={(id) => usersRoutes.import.progress.url({ id })}
-                                    postTreatmentComponent={UsersImportTreatment}
+                                    postTreatmentComponent={(props) => (
+                                        <UsersImportTreatment {...(props as unknown as UsersImportTreatmentProps)} />
+                                    )}
                                     successRedirectUrl={usersRoutes.index().url}
                                     buttonLabel=""
                                 />
