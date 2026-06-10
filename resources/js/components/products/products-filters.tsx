@@ -29,7 +29,9 @@ type ProductsFiltersProps = {
     pot?: string | null;
     height?: string | null;
     onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
+    onChange?: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
     closeFilters?: () => void;
+    autoApply?: boolean;
 };
 
 export function ProductsFilters({
@@ -44,7 +46,9 @@ export function ProductsFilters({
     pot,
     height,
     onApply,
+    onChange,
     closeFilters,
+    autoApply = true,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
     const { locale } = usePage<SharedData>().props;
@@ -87,6 +91,20 @@ export function ProductsFilters({
     }, [active, categoryId, country, pot, height]);
 
     useEffect(() => {
+        onChange?.({
+            active: localActive,
+            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
+            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
+            pot: localPot !== ALL_POTS ? localPot : null,
+            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+        });
+    }, [localActive, localCategory, localCountry, localPot, localHeight, onChange]);
+
+    useEffect(() => {
+        if (!autoApply) {
+            return;
+        }
+
         if (!didInitRef.current) {
             didInitRef.current = true;
             return;
@@ -105,7 +123,7 @@ export function ProductsFilters({
             pot: localPot !== ALL_POTS ? localPot : null,
             height: localHeight !== ALL_HEIGHTS ? localHeight : null,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, onApply]);
+    }, [localActive, localCategory, localCountry, localPot, localHeight, onApply, autoApply]);
 
     useEffect(() => {
         return () => {
