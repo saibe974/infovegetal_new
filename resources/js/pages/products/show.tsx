@@ -18,7 +18,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
     const { url } = usePage();
     const params = new URLSearchParams(url.split('?')[1] ?? '');
-    const showBackLink = params.get('from') === 'search';
+    // const showBackLink = params.get('from') === 'search';
+    const showBackLink = true;
 
     return (
         <>
