@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useState, useEffect, useRef } from '
 import { usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
 import { type SharedData } from '@/types';
+import { getAddQuantity, getUniteQuantity, normalizeQuantity } from './cart-quantity-rules';
 
 const getCsrfToken = (): string => {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -127,7 +128,6 @@ const serializeCart = (items: CartItem[]): string => {
 
     return JSON.stringify(compact);
 };
-
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const { auth, cart_refresh_token } = usePage<SharedData & { cart_refresh_token?: number | string | null }>().props;
@@ -309,15 +309,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const addToCart = (product: Product, quantity: number = 1) => {
         setItems((prev) => {
+            const unite = getUniteQuantity(product);
+            const quantityToAdd = getAddQuantity(product, quantity);
             const existing = prev.find((item) => item.product.id === product.id);
+
             if (existing) {
                 return prev.map((item) =>
                     item.product.id === product.id
-                        ? { ...item, product, quantity: item.quantity + quantity }
+                        ? { ...item, product, quantity: item.quantity + quantityToAdd }
                         : item
                 );
             }
-            return [...prev, { product, quantity }];
+
+            return [...prev, { product, quantity: Math.max(unite, quantityToAdd) }];
         });
     };
 
@@ -326,9 +330,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateQuantity = (productId: number, quantity: number) => {
-        setItems((prev) => prev.map((item) =>
-            item.product.id === productId ? { ...item, quantity: Math.max(1, quantity) } : item
-        ));
+        setItems((prev) => prev.flatMap((item) => {
+            if (item.product.id !== productId) {
+                return [item];
+            }
+
+            const nextQuantity = normalizeQuantity(item.product, quantity);
+            if (nextQuantity === null) {
+                return [];
+            }
+
+            return [{ ...item, quantity: nextQuantity }];
+        }));
     };
 
     const clearCart = () => setItems([]);

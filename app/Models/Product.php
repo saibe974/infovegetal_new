@@ -38,6 +38,7 @@ class Product extends Model implements HasMedia
         'cond',
         'floor',
         'roll',
+        'unite'
     ];
 
     protected $sortable = [
@@ -61,6 +62,7 @@ class Product extends Model implements HasMedia
         'cond',
         'floor',
         'roll',
+        'unite'
     ];
 
     protected $casts = [
@@ -74,6 +76,7 @@ class Product extends Model implements HasMedia
         'cond' => 'integer',
         'floor' => 'integer',
         'roll' => 'integer',
+        'unite' => 'integer',
         'created_at' => 'immutable_datetime',
         'updated_at' => 'immutable_datetime',
         'deleted_at' => 'immutable_datetime',

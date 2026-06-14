@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { getCartPricing } from './cart-pricing';
 import { getProductCartImage } from '@/components/products/product-cart-image';
+import { getCondQuantity, getQuantityStep, getUniteQuantity, isProductMultiple } from './cart-quantity-rules';
 import * as Flags from "country-flag-icons/react/3x2";
 
 export type CartItemProps = {
@@ -27,6 +28,12 @@ export function CartItem({ product, quantity }: CartItemProps) {
         ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
         : undefined;
     const productImage = getProductCartImage(product);
+
+    const unite = getUniteQuantity(product);
+    const decreaseStep = getQuantityStep(product, quantity);
+    const increaseStep = isProductMultiple(product)
+        ? unite
+        : (quantity >= unite ? getCondQuantity(product) : unite);
 
     return (
         <div className="group relative border-b pb-3 last:border-b-0">
@@ -79,8 +86,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                                 size="icon"
                                 className="size-5 hover:bg-background"
                                 aria-label="Diminuer la quantité"
-                                onClick={() => updateQuantity(product.id, quantity - 1)}
-                                disabled={quantity <= 1}
+                                onClick={() => updateQuantity(product.id, quantity - decreaseStep)}
                             >
                                 <Minus className="size-3" />
                             </Button>
@@ -89,10 +95,10 @@ export function CartItem({ product, quantity }: CartItemProps) {
                             </span> */}
                             <input
                                 type="text"
-                                min={1}
+                                min={unite}
                                 value={quantity}
                                 onChange={(e) => {
-                                    const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
+                                    const newQuantity = parseInt(e.target.value, 10);
                                     updateQuantity(product.id, newQuantity);
                                 }}
                                 className="w-[1.25rem] text-center text-xs font-medium bg-transparent outline-none"
@@ -102,7 +108,7 @@ export function CartItem({ product, quantity }: CartItemProps) {
                                 size="icon"
                                 className="size-5 hover:bg-background"
                                 aria-label="Augmenter la quantité"
-                                onClick={() => updateQuantity(product.id, quantity + 1)}
+                                onClick={() => updateQuantity(product.id, quantity + increaseStep)}
                             >
                                 <Plus className="size-3" />
                             </Button>

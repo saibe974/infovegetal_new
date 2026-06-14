@@ -7,7 +7,7 @@
 
 use Symfony\Component\String\Slugger\SluggerInterface;
 
-function importProducts_peplant($params = array(), $resolve)
+function importProducts_peplant(array $params, mixed $resolve)
 {
    $params = array_merge([
        'mapped' => [],
@@ -93,6 +93,10 @@ function importProducts_peplant($params = array(), $resolve)
     // Quantités cond/floor/roll depuis EMBALLAGE
     list($cond, $floor, $roll) = $parseEmballage($resolve($mapped, $defaultsMap, 'cond'));
 
+    // Unité: valeur explicite si fournie, sinon fallback sur cond.
+    $unite = $resolve($mapped, $defaultsMap, 'unite');
+    $unite = is_numeric($unite) ? (int) $unite : $cond;
+
     // Pot
     $potRaw = $resolve($mapped, $defaultsMap, 'pot');
     if ($potRaw !== null) {
@@ -143,6 +147,7 @@ function importProducts_peplant($params = array(), $resolve)
         'cond' => $cond,
         'floor' => $floor,
         'roll' => $roll,
+        'unite' => $unite,
     ];
     return $newRow;
 }

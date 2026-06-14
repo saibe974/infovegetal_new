@@ -3,6 +3,7 @@ import { Table, TableBody, TableHeader, TableHead, TableRow, TableCell } from '@
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { usePage } from '@inertiajs/react';
 import { Button } from "@/components/ui/button";
+import { Badge } from '@/components/ui/badge';
 import { CircleSlash2, EditIcon, MoveVertical, TrashIcon, Zap } from 'lucide-react';
 import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
@@ -141,6 +142,13 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             {isAuthenticated && (
                                 <>
                                     <TableCell className="text-end">
+                                        {item?.unite != null && item.unite > Number(item.cond) ? (
+                                            <div className="mb-2 flex justify-end">
+                                                <Badge variant="secondary">
+                                                    Mini : {String(item.unite)}
+                                                </Badge>
+                                            </div>
+                                        ) : null}
                                         <div className="flex gap-1">
                                             {price !== null && (
                                                 <button

@@ -66,7 +66,7 @@ class ProductImportService
             $dataFile = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $chunkIndex . '.csv';
 
             if (!is_file($dataFile)) {
-                Log::info("No data file for chunk $chunkIndex, nothing to process for ID: $id");
+                // Log::info("No data file for chunk $chunkIndex, nothing to process for ID: $id");
                 return;
             }
 
@@ -106,7 +106,7 @@ class ProductImportService
                     return;
                 }
 
-                Log::info("Import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
+                // Log::info("Import progress update for ID $id: processed=$processed, errors=$errors, total=$total, completed=$completed");
 
                 $this->updateImportState($id, [
                     'status' => 'processing',
@@ -305,6 +305,7 @@ class ProductImportService
                             'cond' => null,
                             'floor' => null,
                             'roll' => null,
+                            'unite' => null,
                         ];
                     endif;
 
@@ -353,7 +354,7 @@ class ProductImportService
             // Upsert par lots de 100 pour éviter les problèmes de contraintes
             if (!empty($upsertRows)) {
                 // Colonnes à mettre à jour selon la source (traitement)
-                $defaultUpdateColumns = ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id', 'ref', 'ean13', 'pot', 'height', 'price_floor', 'price_roll', 'price_promo', 'producer_id', 'tva_id', 'cond', 'floor', 'roll'];
+                $defaultUpdateColumns = ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id', 'ref', 'ean13', 'pot', 'height', 'price_floor', 'price_roll', 'price_promo', 'producer_id', 'tva_id', 'cond', 'floor', 'roll', 'unite'];
                 $updateColumns = $defaultUpdateColumns;
 
                 // Spécifique à infovegetal_old: n'update que category_products_id et img_link si le produit existe déjà
@@ -404,7 +405,7 @@ class ProductImportService
                 ]));
 
                 Cache::forget("import:$id:cancel");
-                Log::info("Import cancelled for ID $id");
+                // Log::info("Import cancelled for ID $id");
                 return;
             }
 
@@ -414,7 +415,7 @@ class ProductImportService
                     'status' => 'processing',
                     'progress' => (int) floor(((($processed + $errors)) / max(1, $total)) * 100),
                 ]));
-                Log::info("Import chunk completed for ID $id: processed=$processed, errors=$errors, next_offset=" . $finalState['next_offset']);
+                // Log::info("Import chunk completed for ID $id: processed=$processed, errors=$errors, next_offset=" . $finalState['next_offset']);
             } else {
                 $this->updateImportState($id, array_merge($finalState, [
                     'status' => 'done',
@@ -432,7 +433,7 @@ class ProductImportService
 
                 Cache::forget("import:$id:cancel");
 
-                Log::info("Import completed for ID $id: processed=$processed, errors=$errors");
+                // Log::info("Import completed for ID $id: processed=$processed, errors=$errors");
             }
         } catch (\Throwable $e) {
             Log::error('Import process failed: ' . $e->getMessage());
@@ -477,7 +478,7 @@ class ProductImportService
 
         $openWriter = function () use (&$writer, $tempDir, &$chunkIndex, $headers) {
             $path = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $chunkIndex . '.csv';
-            Log::info("[Import][Split] Creating temp chunk file: {$path}");
+                // Log::info("[Import][Split] Creating temp chunk file: {$path}");
             $writer = Writer::from($path, 'w+');
             $writer->setDelimiter(';');
             $writer->insertOne($headers);
@@ -489,7 +490,7 @@ class ProductImportService
             ? (int) $state['db_products_id']
             : null;
 
-        Log::info("[Import][Split][$id] db_products_id from cache: $dbProductsId");
+        // Log::info("[Import][Split][$id] db_products_id from cache: $dbProductsId");
 
         $defaultsMap = null;
         $traitement = null;
@@ -499,7 +500,7 @@ class ProductImportService
                 $dbp = \App\Models\DbProducts::find($dbProductsId);
                 if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
                     $defaultsMap = $dbp->champs;
-                    Log::info("[Import][Split][$id] Loaded defaultsMap", ['map' => $defaultsMap]);
+                    // Log::info("[Import][Split][$id] Loaded defaultsMap", ['map' => $defaultsMap]);
                 }
                 if ($dbp && !empty($dbp->traitement)) {
                     $traitement = $dbp->traitement;
@@ -538,7 +539,7 @@ class ProductImportService
             }
 
             if (!$this->rowHasContent($mapped)) {
-                Log::info("[Import][Split][$id] Line $lineCount: empty row, skipped");
+                // Log::info("[Import][Split][$id] Line $lineCount: empty row, skipped");
                 continue;
             }
 
@@ -574,15 +575,15 @@ class ProductImportService
             }
 
             if ($lineCount <= 3) {
-                Log::info("[Import][Split][$id] Line $lineCount: sku resolved", [
-                    'sku_source' => $skuSource,
-                    'sku' => $sku,
-                    'mapped_keys' => array_keys($mapped)
-                ]);
+                // Log::info("[Import][Split][$id] Line $lineCount: sku resolved", [
+                //     'sku_source' => $skuSource,
+                //     'sku' => $sku,
+                //     'mapped_keys' => array_keys($mapped)
+                // ]);
             }
 
             if ($sku === '') {
-                Log::info("[Import][Split][$id] Line $lineCount: empty SKU, skipped");
+                // Log::info("[Import][Split][$id] Line $lineCount: empty SKU, skipped");
                 continue;
             }
 
@@ -603,7 +604,7 @@ class ProductImportService
             $total++;
         }
 
-        Log::info("Split CSV for ID $id: total=$total, chunks=" . ($chunkIndex + ($rowsInChunk > 0 ? 1 : 0)));
+        // Log::info("Split CSV for ID $id: total=$total, chunks=" . ($chunkIndex + ($rowsInChunk > 0 ? 1 : 0)));
         
         // Mettre à jour l'état global (total lignes et nombre de chunks)
         $this->updateImportState($id, [
@@ -708,7 +709,7 @@ class ProductImportService
         return false;
     }
 
-    private function writeReportLine($handle, int $line, string $message, array $rawRow, array $mapped): void
+    private function writeReportLine(mixed $handle, int $line, string $message, array $rawRow, array $mapped): void
     {
         if (!$handle) {
             return;

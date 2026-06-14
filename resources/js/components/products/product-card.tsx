@@ -2,6 +2,7 @@ import React, { useContext } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Zap } from "lucide-react";
 import { type Product, SharedData } from "@/types";
@@ -224,164 +225,94 @@ export function ProductCard({
                 </CardContent>
 
                 {isAuthenticated && (
-                    <CardFooter className="flex flex-col lg:flex-row p-0 gap-2 w-full">
-                        {price !== null && (
-                            <button
-                                className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                    "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
-                                    "dark:text-black",
-                                )}
-                                onClick={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleAddToCart(product.id, Number(product.cond))
-                                }}
-                                title={t('Add a tray')}
-                            >
-
-                                <div className="flex items-center gap-1">
-                                    <span className="w-5 h-5">
-                                        <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                    </span>
-                                    <span className="font-semibold">{formatCurrency(price)}</span>
-                                </div>
-                                <span className="text-xs font-light">X {String(product.cond)}</span>
-                            </button>
-                        )}
-                        {priceFloor !== null ? (
-                            <button
-                                className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                    "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
-                                    "dark:text-black",
-                                )}
-                                onClick={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
-                                }}
-                                title={t('Add a floor')}
-                            >
-
-                                <div className="flex items-center gap-1">
-                                    <span className="w-5 h-5">
-                                        <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                    </span>
-                                    <span className="font-semibold">{formatCurrency(priceFloor)}</span>
-                                </div>
-                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
-                            </button>
+                    <>
+                        {product?.unite != null && product.unite > Number(product.cond) ? (
+                            <Badge variant="secondary" className="self-start">
+                                Mini : {String(product.unite)}
+                            </Badge>
                         ) : null}
-                        {priceRoll !== null ? (
-                            <button
-                                className={cn(
-                                    "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                    "bg-brand-main hover:bg-brand-main-hover text-white",
-                                    "dark:text-black",
-                                )}
-                                onClick={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
-                                }}
-                                title={t('Add a roll')}
-                            >
-                                <div className="flex items-center gap-1">
-                                    <span className="w-5 h-5">
-                                        <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                    </span>
-                                    <span
-                                        className={cn(
-                                            "font-semibold",
-                                            product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
-                                        )}
-                                    >
-                                        {pricePromo > 0 ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
-                                    </span>
-                                </div>
+                        <CardFooter className="flex flex-col lg:flex-row p-0 gap-2 w-full">
+                            {price !== null && (
+                                <button
+                                    className={cn(
+                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
+                                        "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
+                                        "dark:text-black",
+                                    )}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleAddToCart(product.id, Number(product.cond))
+                                    }}
+                                    title={t('Add a tray')}
+                                >
 
-                                <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-                            </button>
-                        ) : null}
-                    </CardFooter>
+                                    <div className="flex items-center gap-1">
+                                        <span className="w-5 h-5">
+                                            <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
+                                        </span>
+                                        <span className="font-semibold">{formatCurrency(price)}</span>
+                                    </div>
+                                    <span className="text-xs font-light">X {String(product.cond)}</span>
+                                </button>
+                            )}
+                            {priceFloor !== null ? (
+                                <button
+                                    className={cn(
+                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
+                                        "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
+                                        "dark:text-black",
+                                    )}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
+                                    }}
+                                    title={t('Add a floor')}
+                                >
 
-                    // <CardFooter className="flex flex-col p-0 gap-2 w-full flex-1">
-                    //     {product?.price && (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-[#3b6cc9] hover:bg-[#3b6cc9]/90 text-white",
-                    //                 "dark:bg-[#00b07d] dark:hover:bg-[#00b07d]/90 dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, Number(product.cond) || 1)
-                    //             }}
-                    //             title={t('Add a tray')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                    //             </span>
-                    //             <span className="font-semibold">{product.price} €</span>
-                    //             <span className="text-xs font-light">X {String(product.cond)}</span>
-                    //         </button>
-                    //     )}
-                    //     {product?.price_floor ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-[#84439f] hover:bg-[#84439f]/90 text-white",
-                    //                 "dark:bg-[#5cce55] dark:hover:bg-[#5cce55]/90 dark:text-black",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
-                    //             }}
-                    //             title={t('Add a floor')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                    //             </span>
-                    //             <span className="font-semibold">{String(product.price_floor)} €</span>
+                                    <div className="flex items-center gap-1">
+                                        <span className="w-5 h-5">
+                                            <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
+                                        </span>
+                                        <span className="font-semibold">{formatCurrency(priceFloor)}</span>
+                                    </div>
+                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
+                                </button>
+                            ) : null}
+                            {priceRoll !== null ? (
+                                <button
+                                    className={cn(
+                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
+                                        "bg-brand-main hover:bg-brand-main-hover text-white",
+                                        "dark:text-black",
+                                    )}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
+                                    }}
+                                    title={t('Add a roll')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        <span className="w-5 h-5">
+                                            <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                "font-semibold",
+                                                product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
+                                            )}
+                                        >
+                                            {pricePromo > 0 ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
+                                        </span>
+                                    </div>
 
-                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
-                    //         </button>
-                    //     ) : <div className="h-10" />}
-                    //     {product?.price_roll ? (
-                    //         <button
-                    //             className={cn(
-                    //                 "w-full h-10 gap-2 flex items-center justify-center rounded-md",
-                    //                 "bg-main-purple hover:bg-main-purple-hover text-white",
-                    //                 "dark:bg-main-green dark:text-black dark:hover:bg-main-green-hover",
-                    //             )}
-                    //             onClick={(e: React.MouseEvent) => {
-                    //                 e.preventDefault();
-                    //                 e.stopPropagation();
-                    //                 handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
-                    //             }}
-                    //             title={t('Add a roll')}
-                    //         >
-                    //             <span className="w-6 h-6">
-                    //                 <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                    //             </span>
-
-                    //             {product?.price_promo ? (
-                    //                 <>
-                    //                     <span className="font-semibold line-through opacity-75 text-xs">{String(product.price_roll)} €</span>
-                    //                     <span className="font-bold text-red-300 dark:text-red-600">{String(product.price_promo)} €</span>
-                    //                 </>
-                    //             ) : (
-                    //                 <span className="font-semibold">{String(product.price_roll)} €</span>
-                    //             )}
-
-                    //             <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-
-                    //         </button>
-                    //     ) : <div className="h-10" />}
-                    // </CardFooter>
+                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
+                                </button>
+                            ) : null}
+                        </CardFooter>
+                    </>
                 )}
             </Card>
         </Link>

@@ -95,9 +95,11 @@ export interface Product {
     price_promo?: number | null;
     producer_id?: number | null;
     tva_id?: number | null;
-    cond?: number | null;
+    cond?: number | 1;
     floor?: number | null;
     roll?: number | null;
+    unite?: number | null;
+    multiple?: boolean | number | string | null;
     category?: ProductCategory | null;
     dbProduct?: dbProduct | null;
     db_user_attributes?: Record<string, unknown> | null;

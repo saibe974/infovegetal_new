@@ -151,6 +151,7 @@ class ProductResource extends JsonResource
             'cond' => $this->cond,
             'floor' => $this->floor,
             'roll' => $this->roll,
+            'unite' => $this->unite,
             'category' => $this->whenLoaded('category', fn () => $this->category),
             'producer' => $this->whenLoaded('producer', fn () => $this->producer),
             'dbProduct' => DbProductsResource::make($this->whenLoaded('dbProduct')),

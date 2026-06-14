@@ -192,6 +192,10 @@ function importProducts_ddk($params = array(), $resolve)
     $activeVal = $resolve($mapped, $defaultsMap, 'active');
     $active = isset($activeVal) ? (int) $activeVal : 1;
 
+    // Unité: valeur explicite si fournie, sinon fallback sur cond.
+    $unite = $resolve($mapped, $defaultsMap, 'unite');
+    $unite = is_numeric($unite) ? (int) $unite : $cond;
+
     // Résoudre la catégorie via slug dans defaultsMapCategories
     $catVal = $resolve($mapped, $defaultsMap, 'category_products_name');
     $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger();
@@ -240,6 +244,7 @@ function importProducts_ddk($params = array(), $resolve)
         'cond' => $cond,
         'floor' => $floor,
         'roll' => $roll,
+        'unite' => $unite,
     ];
 
     return $newRow;

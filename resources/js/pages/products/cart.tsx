@@ -17,6 +17,7 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { ProductRoll } from '@/components/products/product-roll';
 import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
+import { getQuantityStep, getUniteQuantity } from '@/components/cart/cart-quantity-rules';
 import { getProductCartImage } from '@/components/products/product-cart-image';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils';
@@ -111,7 +112,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
     const orderTotal = itemsTotal + deliveryTotal;
 
     const handleQuantityChange = (productId: number, next: number) => {
-        updateQuantity(productId, Math.max(1, next || 1));
+        updateQuantity(productId, next);
     };
 
     const handleSaveCart = async () => {
@@ -536,6 +537,8 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                     {group.items.map(({ product, quantity, pricing }) => {
                                         const unitPrice = pricing.unitPrice;
                                         const lineTotal = pricing.lineTotal;
+                                        const unite = getUniteQuantity(product);
+                                        const step = getQuantityStep(product, quantity);
 
                                         return (
                                             <div
@@ -575,14 +578,13 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                                             size="icon"
                                                             className="h-8 w-8"
                                                             aria-label={t('Diminuer la quantité')}
-                                                            onClick={() => handleQuantityChange(product.id, quantity - 1)}
-                                                            disabled={quantity <= 1}
+                                                            onClick={() => handleQuantityChange(product.id, quantity - step)}
                                                         >
                                                             <Minus className="h-4 w-4" />
                                                         </Button>
                                                         <Input
                                                             type="text"
-                                                            min={1}
+                                                            min={unite}
                                                             value={quantity}
                                                             onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
                                                             className="w-16 h-8 text-center border-0"
@@ -592,7 +594,7 @@ export default withAppLayout<Props>(breadcrumbs, false, () => {
                                                             size="icon"
                                                             className="h-8 w-8"
                                                             aria-label={t('Augmenter la quantité')}
-                                                            onClick={() => handleQuantityChange(product.id, quantity + 1)}
+                                                            onClick={() => handleQuantityChange(product.id, quantity + step)}
                                                         >
                                                             <Plus className="h-4 w-4" />
                                                         </Button>
