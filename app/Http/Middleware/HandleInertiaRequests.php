@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Cart;
 use App\Models\User;
 use App\Services\UserManagementAuthorizationService;
 // use Illuminate\Foundation\Inspiring;
@@ -107,6 +108,15 @@ class HandleInertiaRequests extends Middleware
                 ->get(['id', 'name', 'email']);
         }
 
+        $activeCart = null;
+        if ($user) {
+            $activeCart = Cart::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'current')
+                ->latest('updated_at')
+                ->first();
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -120,6 +130,7 @@ class HandleInertiaRequests extends Middleware
                 'impersonator' => $impersonatorArray,
                 'impersonation_strict_mode' => $impersonationStrictMode,
             ],
+            'cart' => $activeCart ? $activeCart->only(['id', 'status']) : null,
             'cart_refresh_token' => $user ? Cache::get('cart:refresh:' . $user->id) : null,
             'users' => $users,
             'flash' => [

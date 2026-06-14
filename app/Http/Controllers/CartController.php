@@ -190,7 +190,7 @@ class CartController extends Controller
         // Le panier sauvegardé est un brouillon courant distinct des commandes processées.
         $cart = Cart::query()
             ->where('user_id', $user->id)
-            ->whereIn('status', ['current', 'processing'])
+            ->where('status', 'current')
             ->latest('updated_at')
             ->first();
 
@@ -271,6 +271,14 @@ class CartController extends Controller
         $data = $request->validate([
             'status' => 'required|in:current,processing,processed',
         ]);
+
+        if ($data['status'] === 'current') {
+            Cart::query()
+                ->where('user_id', $cart->user_id)
+                ->where('id', '!=', $cart->id)
+                ->where('status', 'current')
+                ->update(['status' => 'processed']);
+        }
 
         $cart->status = $data['status'];
         $cart->save();

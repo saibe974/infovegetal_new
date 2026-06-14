@@ -11,9 +11,16 @@ interface AppLayoutProps {
     children: ReactNode;
     breadcrumbs?: BreadcrumbItem[];
     hideFooterOnInfiniteScroll?: boolean;
+    showRightSidebar?: boolean;
 }
 
-const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, ...props }: AppLayoutProps) => {
+const AppLayout = ({
+    children,
+    breadcrumbs,
+    hideFooterOnInfiniteScroll = false,
+    showRightSidebar = true,
+    ...props
+}: AppLayoutProps) => {
     const page = usePage<SharedData>();
 
     useEffect(() => {
@@ -27,7 +34,7 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
     }, [page.props]);
 
     return (
-        <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
+        <AppLayoutTemplate breadcrumbs={breadcrumbs} showRightSidebar={showRightSidebar} {...props}>
             {children}
             <AppFooter hideOnInfiniteScroll={hideFooterOnInfiniteScroll} />
 
@@ -39,7 +46,8 @@ const AppLayout = ({ children, breadcrumbs, hideFooterOnInfiniteScroll = false, 
 export function withAppLayout<T>(
     breadcrumbs: BreadcrumbItem[] | (() => BreadcrumbItem[]),
     hideFooterOnInfiniteScroll: boolean | ((props: T) => boolean) = false,
-    component: FC<T>
+    component: FC<T>,
+    layoutOptions: Pick<AppLayoutProps, 'showRightSidebar'> = {}
 ) {
 
 
@@ -55,7 +63,11 @@ export function withAppLayout<T>(
                 ? hideFooterOnInfiniteScroll(pageProps)
                 : hideFooterOnInfiniteScroll;
 
-            return <AppLayout breadcrumbs={resolvedBreadcrumbs} hideFooterOnInfiniteScroll={resolvedHideFooter}>
+            return <AppLayout
+                breadcrumbs={resolvedBreadcrumbs}
+                hideFooterOnInfiniteScroll={resolvedHideFooter}
+                {...layoutOptions}
+            >
                 <div className={`p-2 lg:p-4`}>
                     {page}
                 </div>

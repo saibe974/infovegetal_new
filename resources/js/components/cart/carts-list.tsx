@@ -30,7 +30,8 @@ type CartSummary = {
 
 export function CartsList() {
     const { t } = useI18n();
-    const { carts, auth } = usePage<SharedData & { carts: CartSummary[] }>().props;
+    const { carts, auth, cart } = usePage<SharedData & { carts: CartSummary[] }>().props;
+    const openedCartId = cart?.id ?? null;
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
     const [impersonatingCartId, setImpersonatingCartId] = useState<number | null>(null);
@@ -60,6 +61,25 @@ export function CartsList() {
         }));
 
         localStorage.setItem(getCartStorageKey(userId), JSON.stringify(items));
+    };
+
+    const markCartAsCurrent = async (cartId: number) => {
+        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content;
+
+        const response = await fetch(`/cart/${cartId}/status`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ status: 'current' }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Unable to activate cart for edition');
+        }
     };
 
     const switchImpersonationToUser = async (targetUserId: number) => {
@@ -110,6 +130,7 @@ export function CartsList() {
             writeCartToLocalStorage(cart, userId);
 
             await switchImpersonationToUser(userId);
+            await markCartAsCurrent(cart.id);
 
             router.visit('/cart/checkout');
         } catch {
@@ -259,8 +280,15 @@ export function CartsList() {
                             </tr>
                         )}
                         {rows.map((cart) => (
-                            <tr key={cart.id} className="hover:bg-muted/30">
-                                <td className="px-4 py-3">#{cart.id}</td>
+                            <tr
+                                key={cart.id}
+                                className={
+                                    cart.id === openedCartId
+                                        ? 'bg-brand-main/15 hover:bg-brand-main/20'
+                                        : 'hover:bg-muted/30'
+                                }
+                            >
+                                <td className={`px-4 py-3 ${cart.id === openedCartId ? 'font-semibold text-brand-main' : ''}`}>#{cart.id}</td>
                                 <td className="px-4 py-3">
                                     <div className="font-medium">{cart.user?.name ?? t('Inconnu')}</div>
                                     <div className="text-xs text-muted-foreground">{cart.user?.email ?? ''}</div>

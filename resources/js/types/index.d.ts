@@ -154,6 +154,7 @@ export interface SharedData {
     quote: { message: string; author: string };
     auth: Auth;
     csrf_token?: string;
+    cart?: { id: number; status?: string | null } | null;
     cart_refresh_token?: number | string | null;
     users?: User[];
     sidebarOpen: boolean;

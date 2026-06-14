@@ -11,7 +11,8 @@ import { type PropsWithChildren } from 'react';
 export default function AppSidebarLayout({
     children,
     breadcrumbs = [],
-}: PropsWithChildren<{ breadcrumbs?: BreadcrumbItem[] }>) {
+    showRightSidebar = true,
+}: PropsWithChildren<{ breadcrumbs?: BreadcrumbItem[]; showRightSidebar?: boolean }>) {
     return (
         <CartProvider>
             <AppShell variant="sidebar">
@@ -23,12 +24,14 @@ export default function AppSidebarLayout({
                     {children}
                 </AppContent>
 
-                <RightSidebar
-                    id='right'
-                    variant='inset'
-                    header={<CartSidebarHeader />}
-                >
-                </RightSidebar>
+                {showRightSidebar && (
+                    <RightSidebar
+                        id='right'
+                        variant='inset'
+                        header={<CartSidebarHeader />}
+                    >
+                    </RightSidebar>
+                )}
 
             </AppShell>
         </CartProvider>

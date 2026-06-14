@@ -45,12 +45,11 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $baseQuery = Product::query();
-
         // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
         if ($request->get('cart') === '1') {
             $cartIds = $request->session()->get('cart_filter_ids', []);
             if (!empty($cartIds) && is_array($cartIds)) {
-                $baseQuery->whereIn('id', $cartIds);
+                $baseQuery->whereIn('products.id', $cartIds);
             }
         }
 
@@ -129,9 +128,13 @@ class ProductController extends Controller
         $country = $request->filled('country') ? trim((string) $request->input('country')) : null;
         $pot = $request->filled('pot') ? trim((string) $request->input('pot')) : null;
         $height = $request->filled('height') ? trim((string) $request->input('height')) : null;
+        $categoryBranchIds = $categoryId
+            ? CategoryProducts::descendantsAndSelf($categoryId)->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : [];
 
         $filters = [
             'category' => $categoryId,
+            'category_branch_ids' => $categoryBranchIds,
             'country' => $country,
             'pot' => $pot,
             'height' => $height,
@@ -139,7 +142,7 @@ class ProductController extends Controller
 
         $applyFilters = function ($q, array $filters, array $skip = []) {
             if (!in_array('category', $skip, true) && $filters['category']) {
-                $q->where('category_products_id', $filters['category']);
+                $q->whereIn('category_products_id', $filters['category_branch_ids']);
             }
 
             if (!in_array('country', $skip, true) && $filters['country']) {
@@ -156,7 +159,7 @@ class ProductController extends Controller
                 $q->where('height', $filters['height']);
             }
         };
-
+        
         $optionsBaseQuery = clone $baseQuery;
         $applySearch($optionsBaseQuery, $search);
 

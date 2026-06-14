@@ -81,6 +81,7 @@ export function AppSidebarHeader({
     const [searchPropositionsState, setSearchPropositions] = useState<Array<string | SearchOption>>([]);
 
     const isHomePage = page.component === 'home';
+    const isCartCheckoutPage = page.url.split('?')[0] === '/cart/checkout';
 
     const { items } = useContext(CartContext);
 
@@ -329,9 +330,21 @@ export function AppSidebarHeader({
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
+
                         <div>
                             <div className="w-full flex items-center justify-between gap-4 relative">
-                                <SidebarTrigger className="" targetId='right' icon={ShoppingCart} />
+                                {isCartCheckoutPage ? (
+                                    <button
+                                        type="button"
+                                        aria-disabled="true"
+                                        tabIndex={-1}
+                                        className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground/60 cursor-default"
+                                    >
+                                        <ShoppingCart className="size-5" />
+                                    </button>
+                                ) : (
+                                    <SidebarTrigger className="" targetId='right' icon={ShoppingCart} />
+                                )}
                                 <Badge
                                     // variant={"destructive"}
                                     className={cn(
@@ -344,6 +357,7 @@ export function AppSidebarHeader({
                                 </Badge>
                             </div>
                         </div>
+
 
                         <div className='lg:hidden'>
                             <DropdownMenu>

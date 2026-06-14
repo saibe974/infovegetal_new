@@ -179,9 +179,14 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         return params;
     };
 
-    const applyFilters = (next: FiltersState) => {
-        setFiltersState(next);
-        router.get(window.location.pathname, buildQueryParams(next), {
+    const applyFilters = (next: FiltersState & CartFilter) => {
+        const mergedFilters = {
+            ...next,
+            cart: Object.prototype.hasOwnProperty.call(next, 'cart') ? next.cart : filtersState.cart,
+        };
+
+        setFiltersState(mergedFilters);
+        router.get(window.location.pathname, buildQueryParams(mergedFilters), {
             preserveState: false,
             replace: true,
             preserveScroll: false,

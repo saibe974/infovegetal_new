@@ -19,15 +19,19 @@ import { Button } from "../ui/button";
 import HeadingSmall from "../heading-small";
 import { ProductRollMini } from "@/components/products/product-roll-mini";
 import { calculateCartShipping } from "./cart-shipping";
+import { Badge } from "../ui/badge";
+
+const validateCartButtonClassName = "bg-brand-main text-black hover:bg-brand-main-hover disabled:opacity-50";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
 
     const { toggleSidebar } = useSidebar();
 
-    const { auth } = usePage<SharedData>().props;
+    const { auth, cart } = usePage<SharedData>().props;
     const user = auth?.user;
     const isAuthenticated = !!user;
+    const cartId = cart?.id;
 
     const { items, clearCart } = useContext(CartContext);
     const [isSaving, setIsSaving] = useState(false);
@@ -99,6 +103,7 @@ export function CartSidebarHeader() {
             if (response.ok) {
                 setSaveMessage("Panier enregistré avec succès");
                 setTimeout(() => setSaveMessage(null), 3000);
+                router.reload({ only: ["cart", "cart_refresh_token"] });
             } else {
                 setSaveMessage(
                     data.message || "Erreur lors de la sauvegarde"
@@ -107,6 +112,54 @@ export function CartSidebarHeader() {
         } catch (error) {
             console.error("Error saving cart:", error);
             setSaveMessage("Erreur lors de la sauvegarde");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleCreateNewCart = async () => {
+        if (!cartId) {
+            return;
+        }
+
+        const confirmed = window.confirm(
+            t("Voulez-vous vider le panier actif et en preparer un nouveau sans identifiant ?")
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setIsSaving(true);
+        setSaveMessage(null);
+
+        try {
+            const csrfToken = (
+                document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement
+            )?.content;
+
+            const response = await fetch(`/cart/${cartId}/status`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-Token": csrfToken || "",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: JSON.stringify({ status: "processed" }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                setSaveMessage(data?.message || t("Erreur lors de la preparation du nouveau panier"));
+                return;
+            }
+
+            clearCart();
+            setSaveMessage(t("Panier actif vide. Enregistrez pour creer un nouvel identifiant."));
+            router.reload({ only: ["cart", "cart_refresh_token"] });
+        } catch (error) {
+            console.error("Error creating new cart:", error);
+            setSaveMessage(t("Erreur lors de la preparation du nouveau panier"));
         } finally {
             setIsSaving(false);
         }
@@ -158,7 +211,7 @@ export function CartSidebarHeader() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
 
-                            <SidebarMenuItem className="w-fit">
+                            {/* <SidebarMenuItem className="w-fit">
                                 <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
                                     <button
                                         type="button"
@@ -167,7 +220,7 @@ export function CartSidebarHeader() {
                                         <DownloadIcon className="size-5" />
                                     </button>
                                 </SidebarMenuButton>
-                            </SidebarMenuItem>
+                            </SidebarMenuItem> */}
 
                             <SidebarMenuItem className="w-fit">
                                 <SidebarMenuButton asChild title={t("Voir le panier")}>
@@ -194,15 +247,27 @@ export function CartSidebarHeader() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
 
+                            {cartId ? (
+                                <button
+                                    type="button"
+                                    className="rounded"
+                                    onClick={handleCreateNewCart}
+                                    title={t("Creer un nouveau panier")}
+                                    disabled={isSaving}
+                                >
+                                    <Badge variant="secondary">#{cartId}</Badge>
+                                </button>
+                            ) : null}
+
                             <SidebarMenuItem className="w-fit">
                                 <SidebarMenuButton asChild title={t("Valider le panier")}>
                                     <button
                                         type="button"
-                                        className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                                        className={`p-2 rounded ${validateCartButtonClassName}`}
                                         onClick={() => router.visit('/cart/checkout')}
                                         disabled={isSaving}
                                     >
-                                        <CheckCircleIcon className="size-5 text-green-600" />
+                                        <CheckCircleIcon className="size-6" />
                                     </button>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -257,11 +322,8 @@ export function CartSidebarHeader() {
                     {items.length > 0 && (
                         <SidebarFooter className="pb-6">
                             <Button
-                                onClick={() => {
-                                    router.visit('/cart/checkout');
-                                    toggleSidebar('right');
-                                }}
-                                className="bg-brand-main hover:bg-brand-main-hover"
+                                onClick={() => router.visit('/cart/checkout')}
+                                className={validateCartButtonClassName}
                             >
                                 {t('Valider le panier')}
                             </Button>
