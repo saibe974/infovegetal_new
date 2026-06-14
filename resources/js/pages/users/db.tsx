@@ -98,27 +98,38 @@ type CarrierOption = {
 type DbPageProps = SharedData & {
     user: User;
     dbProducts: Array<{ id: number; name: string; description?: string }>;
-    eligibleUsers: Array<{ id: number; name: string; email: string; can_sell_db_ids?: number[] }>;
+    eligibleUsers: Array<{ id: number; name: string; email: string }>;
+    billableEligibleUsers: Array<{ id: number; name: string; email: string; can_sell_db_ids?: number[] }>;
     carriers: CarrierOption[];
     selectedDbId?: number[];
     dbUserAttributes?: Record<number, Partial<DbProductAttributes>>;
 };
 
 export default function UserDbPage() {
-    const { user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers } = usePage<DbPageProps>().props;
+    const { user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers, billableEligibleUsers } = usePage<DbPageProps>().props;
     const carrierOptions: CarrierOption[] = Array.isArray(carriers) ? carriers : [];
-    const eligibleUserOptions = useMemo(() => {
+    const commercialUserOptions = useMemo(() => {
         const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
         return list.map((user) => ({
             value: String(user.id),
             label: `${user.name} (${user.email})`,
         }));
     }, [eligibleUsers]);
-    const eligibleUserOptionById = useMemo(() => {
-        return new Map(eligibleUserOptions.map((option) => [Number(option.value), option]));
-    }, [eligibleUserOptions]);
-    const eligibleUserOptionsByDbId = useMemo(() => {
-        const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
+    const billableUserOptions = useMemo(() => {
+        const list = Array.isArray(billableEligibleUsers) ? billableEligibleUsers : [];
+        return list.map((user) => ({
+            value: String(user.id),
+            label: `${user.name} (${user.email})`,
+        }));
+    }, [billableEligibleUsers]);
+    const commercialUserOptionById = useMemo(() => {
+        return new Map(commercialUserOptions.map((option) => [Number(option.value), option]));
+    }, [commercialUserOptions]);
+    const billableUserOptionById = useMemo(() => {
+        return new Map(billableUserOptions.map((option) => [Number(option.value), option]));
+    }, [billableUserOptions]);
+    const billableUserOptionsByDbId = useMemo(() => {
+        const list = Array.isArray(billableEligibleUsers) ? billableEligibleUsers : [];
         const byDbId = new Map<number, Array<{ value: string; label: string }>>();
 
         for (const user of list) {
@@ -132,7 +143,7 @@ export default function UserDbPage() {
         }
 
         return byDbId;
-    }, [eligibleUsers]);
+    }, [billableEligibleUsers]);
 
     const { t } = useI18n();
     const targetUser: User = propsUser;
@@ -274,11 +285,11 @@ export default function UserDbPage() {
                             {selectedIds.map((dbId) => {
                                 const db = dbProducts.find((d) => d.id === dbId);
                                 const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
-                                const commercialOption = attrs.com ? eligibleUserOptionById.get(attrs.com) : undefined;
-                                const facturantOption = attrs.fact ? eligibleUserOptionById.get(attrs.fact) : undefined;
+                                const commercialOption = attrs.com ? commercialUserOptionById.get(attrs.com) : undefined;
+                                const facturantOption = attrs.fact ? billableUserOptionById.get(attrs.fact) : undefined;
                                 const commercialSelection = commercialOption ? [commercialOption] : [];
                                 const facturantSelection = facturantOption ? [facturantOption] : [];
-                                const dbEligibleUserOptions = eligibleUserOptionsByDbId.get(dbId) ?? [];
+                                const dbBillableUserOptions = billableUserOptionsByDbId.get(dbId) ?? [];
 
                                 return (
                                     <Card key={dbId}>
@@ -315,7 +326,7 @@ export default function UserDbPage() {
                                                                 updateAttribute(dbId, 'fact', Number.isFinite(nextId) ? nextId : null);
                                                                 updateContactSearch(dbId, 'fact', '');
                                                             }}
-                                                            propositions={dbEligibleUserOptions}
+                                                            propositions={dbBillableUserOptions}
                                                             selection={facturantSelection}
                                                             loading={false}
                                                             minQueryLength={0}
@@ -333,7 +344,7 @@ export default function UserDbPage() {
                                                                 updateAttribute(dbId, 'com', Number.isFinite(nextId) ? nextId : null);
                                                                 updateContactSearch(dbId, 'com', '');
                                                             }}
-                                                            propositions={dbEligibleUserOptions}
+                                                            propositions={commercialUserOptions}
                                                             selection={commercialSelection}
                                                             loading={false}
                                                             minQueryLength={0}

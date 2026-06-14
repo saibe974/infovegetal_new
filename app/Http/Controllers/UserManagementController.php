@@ -1011,16 +1011,32 @@ class UserManagementController extends Controller
                 ->orderBy('db_products.name')
                 ->get()
             : DbProducts::orderBy('name')->get(['id', 'name']);
+
         $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
             ->orderBy('name');
 
-        if ($hasCanSellColumn) {
-            $eligibleUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_products_users.can_sell', true));
-        }
-
         $this->authorization()->scopeManageableUsers($request->user(), $eligibleUsersQuery);
         $eligibleUsers = $eligibleUsersQuery
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $eligibleUser) => [
+                'id' => (int) $eligibleUser->id,
+                'name' => (string) $eligibleUser->name,
+                'email' => (string) $eligibleUser->email,
+            ])
+            ->values()
+            ->all();
+
+        $billableUsersQuery = User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
+            ->orderBy('name');
+
+        if ($hasCanSellColumn) {
+            $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_products_users.can_sell', true));
+        }
+
+        $this->authorization()->scopeManageableUsers($request->user(), $billableUsersQuery);
+        $billableEligibleUsers = $billableUsersQuery
             ->with(['dbProducts' => function ($query) use ($hasCanSellColumn) {
                 $query->select('db_products.id');
                 if ($hasCanSellColumn) {
@@ -1028,12 +1044,12 @@ class UserManagementController extends Controller
                 }
             }])
             ->get(['id', 'name', 'email'])
-            ->map(function (User $eligibleUser) {
+            ->map(function (User $billableUser) {
                 return [
-                    'id' => (int) $eligibleUser->id,
-                    'name' => (string) $eligibleUser->name,
-                    'email' => (string) $eligibleUser->email,
-                    'can_sell_db_ids' => $eligibleUser->dbProducts->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                    'id' => (int) $billableUser->id,
+                    'name' => (string) $billableUser->name,
+                    'email' => (string) $billableUser->email,
+                    'can_sell_db_ids' => $billableUser->dbProducts->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                 ];
             })
             ->values()
@@ -1070,6 +1086,7 @@ class UserManagementController extends Controller
             'userAbilities' => $this->userAbilities($request, $user),
             'dbProducts' => $dbProducts,
             'eligibleUsers' => $eligibleUsers,
+            'billableEligibleUsers' => $billableEligibleUsers,
             'carriers' => $carriers,
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,
