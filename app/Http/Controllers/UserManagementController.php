@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate as FacadesGate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -813,6 +814,9 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
+        $isSelfManagement = (int) $request->user()->id === (int) $user->id;
+        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+
         $request->validate([
             'db_ids' => ['nullable', 'array'],
             'db_ids.*' => ['integer', 'exists:db_products,id'],
@@ -820,7 +824,7 @@ class UserManagementController extends Controller
             'merge' => ['nullable', 'boolean'],
         ]);
 
-        $dbIds = $request->input('db_ids', []);
+        $dbIds = array_map('intval', (array) $request->input('db_ids', []));
         $attributes = $request->input('attributes', []);
         $merge = $request->boolean('merge');
 
@@ -834,7 +838,12 @@ class UserManagementController extends Controller
             return $value;
         };
 
-        $current = $user->dbProducts()
+        $currentQuery = $user->dbProducts();
+        if ($isSelfManagement && $hasCanSellColumn) {
+            $currentQuery->where('db_products_users.can_sell', true);
+        }
+
+        $current = $currentQuery
             ->get()
             ->mapWithKeys(function ($dbProduct) use ($normalize) {
                 $attrs = [];
@@ -849,11 +858,19 @@ class UserManagementController extends Controller
             })
             ->toArray();
 
+        if ($isSelfManagement) {
+            $currentDbIds = array_keys($current);
+            $unauthorizedIds = array_diff($dbIds, $currentDbIds);
+            if (!empty($unauthorizedIds)) {
+                abort(403, 'Unauthorized');
+            }
+        }
+
         // On prépare le tableau pour sync : [db_product_id => ['attributes' => ...], ...]
         $syncData = [];
         $next = [];
 
-        if ($merge) {
+        if ($merge || $isSelfManagement) {
             $next = $current;
             foreach ($current as $dbId => $attrs) {
                 $syncData[$dbId] = [
@@ -984,20 +1001,54 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $dbProducts = DbProducts::orderBy('name')->get(['id', 'name']);
+        $isSelfManagement = (int) $request->user()->id === (int) $user->id;
+        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+
+        $dbProducts = $isSelfManagement
+            ? $user->dbProducts()
+                ->when($hasCanSellColumn, fn ($q) => $q->where('db_products_users.can_sell', true))
+                ->select('db_products.id', 'db_products.name')
+                ->orderBy('db_products.name')
+                ->get()
+            : DbProducts::orderBy('name')->get(['id', 'name']);
         $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
             ->orderBy('name');
+
+        if ($hasCanSellColumn) {
+            $eligibleUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_products_users.can_sell', true));
+        }
+
         $this->authorization()->scopeManageableUsers($request->user(), $eligibleUsersQuery);
-        $eligibleUsers = $eligibleUsersQuery->get(['id', 'name', 'email']);
+        $eligibleUsers = $eligibleUsersQuery
+            ->with(['dbProducts' => function ($query) use ($hasCanSellColumn) {
+                $query->select('db_products.id');
+                if ($hasCanSellColumn) {
+                    $query->where('db_products_users.can_sell', true);
+                }
+            }])
+            ->get(['id', 'name', 'email'])
+            ->map(function (User $eligibleUser) {
+                return [
+                    'id' => (int) $eligibleUser->id,
+                    'name' => (string) $eligibleUser->name,
+                    'email' => (string) $eligibleUser->email,
+                    'can_sell_db_ids' => $eligibleUser->dbProducts->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
         $carriers = \App\Models\Carrier::query()
             ->with(['zones:id,carrier_id,name'])
             ->orderBy('name')
             ->get(['id', 'name', 'country']);
 
         // On charge les pivots pour récupérer les attributs
-        $userWithPivots = $user->load(['dbProducts' => function ($q) {
+        $userWithPivots = $user->load(['dbProducts' => function ($q) use ($isSelfManagement, $hasCanSellColumn) {
             $q->select('db_products.id');
+            if ($isSelfManagement && $hasCanSellColumn) {
+                $q->where('db_products_users.can_sell', true);
+            }
         }]);
         $selected = $userWithPivots->dbProducts->pluck('id')->toArray();
 

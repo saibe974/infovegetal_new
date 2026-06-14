@@ -98,7 +98,7 @@ type CarrierOption = {
 type DbPageProps = SharedData & {
     user: User;
     dbProducts: Array<{ id: number; name: string; description?: string }>;
-    eligibleUsers: Array<{ id: number; name: string; email: string }>;
+    eligibleUsers: Array<{ id: number; name: string; email: string; can_sell_db_ids?: number[] }>;
     carriers: CarrierOption[];
     selectedDbId?: number[];
     dbUserAttributes?: Record<number, Partial<DbProductAttributes>>;
@@ -117,6 +117,22 @@ export default function UserDbPage() {
     const eligibleUserOptionById = useMemo(() => {
         return new Map(eligibleUserOptions.map((option) => [Number(option.value), option]));
     }, [eligibleUserOptions]);
+    const eligibleUserOptionsByDbId = useMemo(() => {
+        const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
+        const byDbId = new Map<number, Array<{ value: string; label: string }>>();
+
+        for (const user of list) {
+            const option = { value: String(user.id), label: `${user.name} (${user.email})` };
+            for (const dbId of user.can_sell_db_ids ?? []) {
+                if (!byDbId.has(dbId)) {
+                    byDbId.set(dbId, []);
+                }
+                byDbId.get(dbId)?.push(option);
+            }
+        }
+
+        return byDbId;
+    }, [eligibleUsers]);
 
     const { t } = useI18n();
     const targetUser: User = propsUser;
@@ -262,6 +278,7 @@ export default function UserDbPage() {
                                 const facturantOption = attrs.fact ? eligibleUserOptionById.get(attrs.fact) : undefined;
                                 const commercialSelection = commercialOption ? [commercialOption] : [];
                                 const facturantSelection = facturantOption ? [facturantOption] : [];
+                                const dbEligibleUserOptions = eligibleUserOptionsByDbId.get(dbId) ?? [];
 
                                 return (
                                     <Card key={dbId}>
@@ -298,7 +315,7 @@ export default function UserDbPage() {
                                                                 updateAttribute(dbId, 'fact', Number.isFinite(nextId) ? nextId : null);
                                                                 updateContactSearch(dbId, 'fact', '');
                                                             }}
-                                                            propositions={eligibleUserOptions}
+                                                            propositions={dbEligibleUserOptions}
                                                             selection={facturantSelection}
                                                             loading={false}
                                                             minQueryLength={0}
@@ -316,7 +333,7 @@ export default function UserDbPage() {
                                                                 updateAttribute(dbId, 'com', Number.isFinite(nextId) ? nextId : null);
                                                                 updateContactSearch(dbId, 'com', '');
                                                             }}
-                                                            propositions={eligibleUserOptions}
+                                                            propositions={dbEligibleUserOptions}
                                                             selection={commercialSelection}
                                                             loading={false}
                                                             minQueryLength={0}

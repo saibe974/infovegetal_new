@@ -132,12 +132,14 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions, o
     };
 
     const createPermission = () => {
-        if (!newPermissionName) {
+        const normalized = newPermissionName.trim().toLowerCase();
+
+        if (!normalized) {
             return;
         }
 
         router.post('/admin/users/roles-permissions/permissions', {
-            name: newPermissionName,
+            name: normalized,
         }, {
             preserveScroll: true,
             onSuccess: () => setNewPermissionName(''),

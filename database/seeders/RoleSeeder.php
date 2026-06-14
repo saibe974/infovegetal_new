@@ -71,6 +71,8 @@ class RoleSeeder extends Seeder
             'users.assign_permissions.all',
             'users.impersonate.branch',
             'users.impersonate.all',
+            'users.db_products.manage.his',
+            'users.db_products.manage.all',
         ];
 
         foreach ($permissions as $permission) {
@@ -127,6 +129,7 @@ class RoleSeeder extends Seeder
             'users.delete.branch',
             'users.assign_roles.branch',
             'users.assign_permissions.branch',
+            'users.db_products.manage.his',
         ]);
 
         // Fournisseur peut travailler avec produits et ses commerciaux
@@ -156,6 +159,7 @@ class RoleSeeder extends Seeder
             'users.delete.branch',
             'users.assign_roles.branch',
             'users.assign_permissions.branch',
+            'users.db_products.manage.his',
         ]);
 
 

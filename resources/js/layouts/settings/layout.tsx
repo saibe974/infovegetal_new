@@ -100,11 +100,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }
     const currentPath = window.location.pathname;
 
-    // Ajout de lien si l'utilisateur est admin
-    if (!isSelf && userAbilities.manage_db) {
+    // Ajout de lien base de donnees quand l'utilisateur y a acces
+    if (userAbilities.manage_db) {
         sidebarNavItems.push({
             title: 'Database access',
-            href: editingUser ? `/admin/users/${editingUser.id}/db` : '#',
+            href: `/admin/users/${userId}/db`,
             icon: null,
         });
 

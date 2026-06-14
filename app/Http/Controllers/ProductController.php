@@ -10,11 +10,13 @@ use App\Models\Carrier;
 use App\Models\Product;
 use App\Services\ProductImportService;
 use App\Services\ProductMediaService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
@@ -356,6 +358,8 @@ class ProductController extends Controller
             : ((isset($state['db_products_id']) && is_numeric($state['db_products_id']) && (int) $state['db_products_id'] > 0)
                 ? (int) $state['db_products_id']
                 : null);
+
+        $this->authorizeImportDb($request, $dbProductsId);
         
         if (!$state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
@@ -415,6 +419,8 @@ class ProductController extends Controller
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
+        $this->authorizeImportDb($request, isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
+
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
@@ -448,6 +454,10 @@ class ProductController extends Controller
     {
         $progress = Cache::get("import:$id");
 
+        if ($progress) {
+            $this->authorizeImportDb(request(), isset($progress['db_products_id']) ? (int) $progress['db_products_id'] : null);
+        }
+
         if (!$progress) {
             return response()->json(['status' => 'waiting', 'progress' => 0]);
         }
@@ -470,6 +480,11 @@ class ProductController extends Controller
      */
     public function importReport(string $id)
     {
+        $state = Cache::get("import:$id");
+        if ($state) {
+            $this->authorizeImportDb(request(), isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
+        }
+
         $reportPath = 'imports/reports/' . $id . '.csv';
         if (!Storage::exists($reportPath)) {
             return response()->json(['message' => 'Rapport introuvable'], 404);
@@ -502,8 +517,10 @@ class ProductController extends Controller
             'id' => ['required', 'string'],
         ]);
         $id = $data['id'];
-        Cache::put("import:$id:cancel", true, now()->addHour());
         $state = Cache::get("import:$id", []);
+        $this->authorizeImportDb($request, isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
+
+        Cache::put("import:$id:cancel", true, now()->addHour());
         Cache::put("import:$id", array_merge($state, [ 'status' => 'cancelling' ]), now()->addHour());
         return response()->json(['status' => 'cancelling']);
     }
@@ -667,13 +684,48 @@ class ProductController extends Controller
         }
     }
 
+    private function authorizeImportDb(Request $request, ?int $dbProductsId): void
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            abort(403, 'Unauthorized');
+        }
+
+        $canManageAll = $user->hasRole('admin')
+            || $user->hasRole('dev')
+            || $user->hasPermissionTo('users.db_products.manage.all');
+
+        if ($canManageAll) {
+            return;
+        }
+
+        if (!$user->hasPermissionTo('users.db_products.manage.his')) {
+            abort(403, 'Unauthorized');
+        }
+
+        if (!$dbProductsId || $dbProductsId <= 0) {
+            abort(403, 'Unauthorized');
+        }
+
+        $relation = $user->dbProducts()->where('db_products.id', $dbProductsId);
+
+        if (Schema::hasColumn('db_products_users', 'can_sell')) {
+            $relation->where('db_products_users.can_sell', true);
+        }
+
+        if (!$relation->exists()) {
+            abort(403, 'Unauthorized');
+        }
+    }
+
 
 
     
     /**
      * Génère les propositions triées selon la logique de recherche.
      */
-    public static function getSearchPropositions($query, ?string $search)
+    public static function getSearchPropositions(Builder $query, ?string $search)
     {
         if (empty($search)) {
             return [];

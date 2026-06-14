@@ -28,6 +28,9 @@ class DbProductsResource extends JsonResource
             'country' => $this->country,
             'mod_liv' => $this->mod_liv,
             'mini' => $this->mini,
+            'billable_user_ids' => $this->relationLoaded('users')
+                ? $this->users->pluck('id')->map(fn ($id) => (int) $id)->values()->all()
+                : [],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

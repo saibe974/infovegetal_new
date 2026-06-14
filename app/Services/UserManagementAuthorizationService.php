@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -416,19 +417,31 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if (!$this->canManageTarget($actor, $target, allowSelf: false)) {
+        $canManageAll = $this->isGlobalManager($actor) || $this->hasPermission($actor, 'users.db_products.manage.all');
+        $canManageHis = $canManageAll || $this->hasPermission($actor, 'users.db_products.manage.his');
+
+        if (!$canManageHis) {
             return false;
         }
 
-        if ($this->isGlobalManager($actor)) {
-            return true;
+        if ($canManageAll) {
+            if ($actor->isSameAs($target)) {
+                return true;
+            }
+
+            return $this->canManageTarget($actor, $target, allowSelf: false);
         }
 
-        if (!$this->hasOwnClientManagementCapability($actor)) {
-            return false;
+        if ($actor->isSameAs($target)) {
+            $query = $target->dbProducts();
+            if (Schema::hasColumn('db_products_users', 'can_sell')) {
+                $query->where('db_products_users.can_sell', true);
+            }
+
+            return $query->exists();
         }
 
-        return $this->userHasRole($target, 'client');
+        return false;
     }
 
     /**

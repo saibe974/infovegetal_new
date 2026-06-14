@@ -9,12 +9,13 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchSelect from '@/components/app/search-select';
 import ProductImportConfigPanel from '@/components/products/import-config-panel';
 import { useI18n } from '@/lib/i18n';
 import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
 import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
-import { FormEvent, useCallback, useMemo } from 'react';
+import { FormEvent, useCallback, useMemo, useState } from 'react';
 import type { dbProduct } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -35,6 +36,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 type Props = {
     dbProduct: dbProduct;
     categoryOptions: { id: number; name: string }[];
+    eligibleUsers: { id: number; name: string; email: string }[];
 };
 
 type KVPair = { key: string; value: string };
@@ -137,18 +139,21 @@ function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder =
     );
 }
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOptions }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOptions, eligibleUsers }) => {
     const { t } = useI18n();
     const isCreate = dbProduct.id == null;
-    const categoriesById = useMemo<Record<string, string>>(
-        () => Object.fromEntries(categoryOptions.map((category) => [String(category.id), category.name])),
-        [categoryOptions],
-    );
     const categoryValueOptions = useMemo(
         () => categoryOptions.map((category) => ({ value: String(category.id), label: `${category.id} - ${category.name}` })),
         [categoryOptions],
     );
-
+    const [billableUsersSearch, setBillableUsersSearch] = useState('');
+    const eligibleUserOptions = useMemo(
+        () => (Array.isArray(eligibleUsers) ? eligibleUsers : []).map((user) => ({
+            value: String(user.id),
+            label: `${user.name} (${user.email})`,
+        })),
+        [eligibleUsers],
+    );
     const { data, setData, post, put, processing, errors, transform } = useForm({
         name: dbProduct.name ?? '',
         description: dbProduct.description ?? '',
@@ -158,7 +163,15 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
         country: dbProduct.country ?? '',
         mod_liv: dbProduct.mod_liv ?? '',
         mini: dbProduct.mini !== null && dbProduct.mini !== undefined ? String(dbProduct.mini) : '',
+        billable_user_ids: dbProduct.billable_user_ids ?? [],
     });
+
+    const billableSelection = useMemo(
+        () => (data.billable_user_ids ?? [])
+            .map((id) => eligibleUserOptions.find((option) => Number(option.value) === Number(id)))
+            .filter((option): option is { value: string; label: string } => !!option),
+        [data.billable_user_ids, eligibleUserOptions],
+    );
 
     const errorBag = errors as Record<string, string>;
 
@@ -244,6 +257,26 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                 onChange={(e) => setData('traitement', e.target.value)}
                             />
                             <InputError message={errors.traitement} />
+                        </FormField>
+
+                        <FormField label={t('Billing users')}>
+                            <SearchSelect
+                                value={billableUsersSearch}
+                                onChange={setBillableUsersSearch}
+                                onSubmit={(value) => {
+                                    const ids = value
+                                        .split(/\s+/)
+                                        .map((token) => Number(token))
+                                        .filter((id) => Number.isInteger(id) && id > 0);
+                                    setData('billable_user_ids', Array.from(new Set(ids)));
+                                    setBillableUsersSearch('');
+                                }}
+                                propositions={eligibleUserOptions}
+                                selection={billableSelection}
+                                loading={false}
+                                minQueryLength={0}
+                            />
+                            <InputError message={errorBag['billable_user_ids']} />
                         </FormField>
 
                         {isCreate ? (
@@ -336,7 +369,6 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                             keyPlaceholder={t('Supplier slug')}
                             valuePlaceholder={t('Category ID')}
                             error={errorBag['categories']}
-                            valueMetaByValue={categoriesById}
                             unknownValueLabel={t('Unknown category')}
                             valueOptions={categoryValueOptions}
                         />

@@ -58,7 +58,7 @@ export default function PermissionsChecklistCard({
             return officialPermissionSet.has(permissionName);
         }
 
-        return /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$/.test(permissionName);
+        return /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(permissionName);
     };
 
     return (
@@ -67,40 +67,54 @@ export default function PermissionsChecklistCard({
 
             {createPermission && (
                 <>
-                    <div className='flex gap-2'>
+                    <div className='flex flex-col gap-2'>
                         {createPermission.optionsByDomain.length > 0 ? (
-                            <Select value={createPermission.value} onValueChange={createPermission.onChange}>
-                                <SelectTrigger className='w-full'>
-                                    <SelectValue placeholder={createPermission.placeholder} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {createPermission.optionsByDomain.map(([domain, items]) => (
-                                        <SelectGroup key={domain}>
-                                            <SelectLabel>{domain}</SelectLabel>
-                                            {items.map((item) => (
-                                                <SelectItem key={item.value} value={item.value}>
-                                                    {item.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
+                                <Select value={createPermission.value} onValueChange={createPermission.onChange}>
+                                    <SelectTrigger className='w-full'>
+                                        <SelectValue placeholder={createPermission.placeholder} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {createPermission.optionsByDomain.map(([domain, items]) => (
+                                            <SelectGroup key={domain}>
+                                                <SelectLabel>{domain}</SelectLabel>
+                                                {items.map((item) => (
+                                                    <SelectItem key={item.value} value={item.value}>
+                                                        {item.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Input
+                                    value={createPermission.value}
+                                    onChange={(e) => createPermission.onChange(e.target.value)}
+                                    placeholder={translate('Or type a custom permission')}
+                                    className='w-full'
+                                />
+                            </div>
                         ) : (
-                            <Input
-                                value={createPermission.value}
-                                onChange={(e) => createPermission.onChange(e.target.value)}
-                                placeholder={createPermission.placeholder}
-                                className='w-full'
-                            />
+                            <div className='flex gap-2'>
+                                <Input
+                                    value={createPermission.value}
+                                    onChange={(e) => createPermission.onChange(e.target.value)}
+                                    placeholder={createPermission.placeholder}
+                                    className='w-full'
+                                />
+                            </div>
                         )}
-                        <Button
-                            type='button'
-                            onClick={createPermission.onCreate}
-                            disabled={createPermission.disabled || !createPermission.value}
-                        >
-                            {createPermission.addLabel}
-                        </Button>
+
+                        <div>
+                            <Button
+                                type='button'
+                                onClick={createPermission.onCreate}
+                                disabled={createPermission.disabled || !createPermission.value.trim()}
+                            >
+                                {createPermission.addLabel}
+                            </Button>
+                        </div>
                     </div>
 
                     {createPermission.helpText && (

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class DbProducts extends Model
 {
@@ -44,8 +45,14 @@ class DbProducts extends Model
      */
     public function users()
     {
-        return $this->belongsToMany(\App\Models\User::class, 'db_products_users', 'db_product_id', 'user_id')
+        $relation = $this->belongsToMany(\App\Models\User::class, 'db_products_users', 'db_product_id', 'user_id')
             ->withTimestamps()->withPivot('attributes');
+
+        if (Schema::hasColumn('db_products_users', 'can_sell')) {
+            $relation->withPivot('can_sell');
+        }
+
+        return $relation;
     }
 
     

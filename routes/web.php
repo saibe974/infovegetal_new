@@ -127,7 +127,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // API routes accessibles depuis l'admin (JSON)
     Route::prefix('api')
         ->name('api.')
-        ->middleware(['role_or_impersonator:admin'])
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his'])
         ->group(function () {
             Route::get('/db-products', [\App\Http\Controllers\Api\DbProductsController::class, 'index'])
                 ->name('db-products.index');
@@ -143,12 +143,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{product}', [\App\Http\Controllers\ProductController::class, 'destroy'])->name('destroy');
 
         // CSV import/export endpoints
-        Route::post('/import/process', [\App\Http\Controllers\ProductController::class, 'importProcess'])->name('import.process');
-        Route::post('/import/process-chunk', [\App\Http\Controllers\ProductController::class, 'importProcessChunk'])->name('import.process_chunk');
-        Route::post('/import/cancel', [\App\Http\Controllers\ProductController::class, 'importCancel'])->name('import.cancel');
-        Route::get('/import/progress/{id}', [\App\Http\Controllers\ProductController::class, 'importProgress'])->name('import.progress');
-        Route::get('/import/report/{id}', [\App\Http\Controllers\ProductController::class, 'importReport'])->name('import.report');
         Route::get('/export', [\App\Http\Controllers\ProductController::class, 'export'])->name('export');
+    });
+
+    // Product import endpoints: admin ou permissions users.db_products.manage.*
+    Route::prefix('admin/products/import')->name('products.admin.import.')->middleware([
+        'role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his'
+    ])->group(function () {
+        Route::post('/process', [\App\Http\Controllers\ProductController::class, 'importProcess'])->name('process');
+        Route::post('/process-chunk', [\App\Http\Controllers\ProductController::class, 'importProcessChunk'])->name('process_chunk');
+        Route::post('/cancel', [\App\Http\Controllers\ProductController::class, 'importCancel'])->name('cancel');
+        Route::get('/progress/{id}', [\App\Http\Controllers\ProductController::class, 'importProgress'])->name('progress');
+        Route::get('/report/{id}', [\App\Http\Controllers\ProductController::class, 'importReport'])->name('report');
     });
 
     
@@ -163,11 +169,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     
     Route::post('db-products/analyze-sample', [\App\Http\Controllers\DbProductsController::class, 'analyzeSample'])
         ->name('db-products.analyze-sample')
-        ->middleware(['role_or_impersonator:admin']);
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::put('db-products/{db_product}/import-config', [\App\Http\Controllers\DbProductsController::class, 'updateImportConfig'])
         ->name('db-products.import-config')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::get('db-products', [\App\Http\Controllers\DbProductsController::class, 'index'])
+        ->name('db-products.index')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::get('db-products/{db_product}/edit', [\App\Http\Controllers\DbProductsController::class, 'edit'])
+        ->name('db-products.edit')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::put('db-products/{db_product}', [\App\Http\Controllers\DbProductsController::class, 'update'])
+        ->name('db-products.update')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)
+        ->except(['index', 'edit', 'update'])
         ->middleware(['role_or_impersonator:admin']);
-    Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)->middleware(['role_or_impersonator:admin']);
     Route::resource('tags-products', \App\Http\Controllers\TagController::class)->middleware(['role_or_impersonator:admin']);
     Route::post('carriers/{carrier}/zones/import', [CarrierController::class, 'importZones'])
         ->whereNumber('carrier')

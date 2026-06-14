@@ -17,6 +17,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Services\UserManagementAuthorizationService;
+use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable implements HasMedia
 {
@@ -96,12 +97,18 @@ class User extends Authenticatable implements HasMedia
      */
     public function dbProducts(): BelongsToMany
     {
-        return $this->belongsToMany(
+        $relation = $this->belongsToMany(
             \App\Models\DbProducts::class,
             'db_products_users',
             'user_id',
             'db_product_id',
         )->withTimestamps()->withPivot('attributes');
+
+        if (Schema::hasColumn('db_products_users', 'can_sell')) {
+            $relation->withPivot('can_sell');
+        }
+
+        return $relation;
     }
 
     /**

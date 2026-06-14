@@ -41,11 +41,11 @@ class ImpersonationController extends Controller
             // Par defaut, on reste en mode gestion (droits admin conserves).
             $request->session()->put(self::STRICT_MODE_SESSION_KEY, false);
 
-            Log::info('users.impersonation.started', [
-                'actor_id' => $request->user()->authorizationActor()->id,
-                'effective_user_id' => $request->user()->id,
-                'target_id' => $target->id,
-            ]);
+            // Log::info('users.impersonation.started', [
+            //     'actor_id' => $request->user()->authorizationActor()->id,
+            //     'effective_user_id' => $request->user()->id,
+            //     'target_id' => $target->id,
+            // ]);
 
             $takeRedirect = $this->manager->getTakeRedirectTo();
             if ($takeRedirect !== 'back') {
@@ -68,10 +68,10 @@ class ImpersonationController extends Controller
         $this->manager->leave();
         $request->session()->forget(self::STRICT_MODE_SESSION_KEY);
 
-        Log::info('users.impersonation.ended', [
-            'actor_id' => $actor->id,
-            'effective_user_id' => $effectiveUser->id,
-        ]);
+        // Log::info('users.impersonation.ended', [
+        //     'actor_id' => $actor->id,
+        //     'effective_user_id' => $effectiveUser->id,
+        // ]);
 
         $leaveRedirect = $this->manager->getLeaveRedirectTo();
         if ($leaveRedirect !== 'back') {
@@ -94,11 +94,11 @@ class ImpersonationController extends Controller
         $strict = (bool) $validated['strict'];
         $request->session()->put(self::STRICT_MODE_SESSION_KEY, $strict);
 
-        Log::info('users.impersonation.mode.changed', [
-            'actor_id' => $request->user()->authorizationActor()->id,
-            'effective_user_id' => $request->user()->id,
-            'strict' => $strict,
-        ]);
+        // Log::info('users.impersonation.mode.changed', [
+        //     'actor_id' => $request->user()->authorizationActor()->id,
+        //     'effective_user_id' => $request->user()->id,
+        //     'strict' => $strict,
+        // ]);
 
         return redirect()->back();
     }

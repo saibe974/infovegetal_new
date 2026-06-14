@@ -49,6 +49,7 @@ export function AppSidebar() {
         'manage carriers',
     ]);
     const canManageMedia = isAdmin(effectiveUser);
+    const canManageDbProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'users.db_products.manage.all') || hasPermission(effectiveUser, 'users.db_products.manage.his');
 
     const title: string = '';
     let mainNavItems: NavItemExtended[] = [];
@@ -112,12 +113,16 @@ export function AppSidebar() {
                 href: tagsProducts.index(),
                 icon: TagIcon,
             });
+        }
+
+        if (canManageDbProducts && productsMenu?.subItems) {
             productsMenu.subItems.push({
                 title: t('Database'),
                 href: dbProducts.index().url,
                 icon: ServerIcon,
             });
         }
+
 
         if (canManageMedia && productsMenu?.subItems) {
             productsMenu.subItems.push({

@@ -35,6 +35,9 @@ class RolePermissionManagementController extends Controller
         'users.assign_permissions.all',
         'users.impersonate.branch',
         'users.impersonate.all',
+        'users.assign_permissions.branch',
+        'users.db_products.manage.his',
+        'users.db_products.manage.all',
 
         // Products
         'products.view',
@@ -125,7 +128,7 @@ class RolePermissionManagementController extends Controller
                 'required',
                 'string',
                 'max:255',
-                'regex:/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$/',
+                'regex:/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/',
                 Rule::unique('permissions', 'name'),
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $slug = (string) $value;

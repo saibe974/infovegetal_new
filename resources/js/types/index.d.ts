@@ -49,6 +49,7 @@ export interface dbProduct {
     country?: string | null;
     mod_liv?: string | null;
     mini?: number | null;
+    billable_user_ids?: number[];
     created_at: string | null;
     updated_at: string | null;
 }
