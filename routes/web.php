@@ -108,10 +108,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $cart->computed_total = round($itemsTotal + $shippingTotal, 2);
 
             $orderNumber = str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT);
-            $date = optional($cart->created_at)->format('Y-m-d')
-                ?: optional($cart->updated_at)->format('Y-m-d')
-                ?: now()->format('Y-m-d');
-            $cart->pdf_filename = $orderNumber . '-' . $date . '.pdf';
+            $date = optional($cart->created_at)->format('Y_m_d')
+                ?: optional($cart->updated_at)->format('Y_m_d')
+                ?: now()->format('Y_m_d');
+            $cart->pdf_filename = $orderNumber . '_' . $date . '.pdf';
 
             return $cart;
         });
@@ -224,6 +224,7 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::get('admin/users/export', [UserManagementController::class, 'export'])->name('users.export');
     Route::get('admin/users/roles-permissions', [RolePermissionManagementController::class, 'index'])->name('users.roles_permissions.index');
     Route::post('admin/users/roles-permissions/roles', [RolePermissionManagementController::class, 'storeRole'])->name('users.roles_permissions.roles.store');
+    Route::get('admin/users/roles-permissions/roles/{role}', [RolePermissionManagementController::class, 'redirectRoleToIndex'])->whereNumber('role')->name('users.roles_permissions.roles.redirect');
     Route::put('admin/users/roles-permissions/roles/{role}', [RolePermissionManagementController::class, 'updateRolePermissions'])->whereNumber('role')->name('users.roles_permissions.roles.update');
     Route::delete('admin/users/roles-permissions/roles/{role}', [RolePermissionManagementController::class, 'destroyRole'])->whereNumber('role')->name('users.roles_permissions.roles.destroy');
     Route::post('admin/users/roles-permissions/permissions', [RolePermissionManagementController::class, 'storePermission'])->name('users.roles_permissions.permissions.store');

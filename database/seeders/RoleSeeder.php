@@ -71,6 +71,7 @@ class RoleSeeder extends Seeder
             'users.assign_permissions.all',
             'users.impersonate.branch',
             'users.impersonate.all',
+            'users.db_products.access',
             'users.db_products.manage.his',
             'users.db_products.manage.all',
         ];

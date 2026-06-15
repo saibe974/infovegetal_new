@@ -814,8 +814,12 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
+        $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
         $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+        $canManageAllDb = $actor
+            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+        $allowedDbIds = $this->selectableDbProductIds($request->user(), $user);
 
         $request->validate([
             'db_ids' => ['nullable', 'array'],
@@ -838,12 +842,7 @@ class UserManagementController extends Controller
             return $value;
         };
 
-        $currentQuery = $user->dbProducts();
-        if ($isSelfManagement && $hasCanSellColumn) {
-            $currentQuery->where('db_products_users.can_sell', true);
-        }
-
-        $current = $currentQuery
+        $allCurrent = $user->dbProducts()
             ->get()
             ->mapWithKeys(function ($dbProduct) use ($normalize) {
                 $attrs = [];
@@ -858,9 +857,27 @@ class UserManagementController extends Controller
             })
             ->toArray();
 
-        if ($isSelfManagement) {
-            $currentDbIds = array_keys($current);
-            $unauthorizedIds = array_diff($dbIds, $currentDbIds);
+        $editableCurrent = $allCurrent;
+        if ($isSelfManagement && $hasCanSellColumn) {
+            $editableCurrent = $user->dbProducts()
+                ->where('db_products_users.can_sell', true)
+                ->get()
+                ->mapWithKeys(function ($dbProduct) use ($normalize) {
+                    $attrs = [];
+                    $pivot = $dbProduct->pivot;
+                    if ($pivot && $pivot->attributes) {
+                        $decoded = json_decode($pivot->attributes, true);
+                        if (is_array($decoded)) {
+                            $attrs = $normalize($decoded);
+                        }
+                    }
+                    return [(int) $dbProduct->id => $attrs];
+                })
+                ->toArray();
+        }
+
+        if (!$canManageAllDb) {
+            $unauthorizedIds = array_diff($dbIds, $allowedDbIds);
             if (!empty($unauthorizedIds)) {
                 abort(403, 'Unauthorized');
             }
@@ -871,8 +888,8 @@ class UserManagementController extends Controller
         $next = [];
 
         if ($merge || $isSelfManagement) {
-            $next = $current;
-            foreach ($current as $dbId => $attrs) {
+            $next = $allCurrent;
+            foreach ($allCurrent as $dbId => $attrs) {
                 $syncData[$dbId] = [
                     'attributes' => json_encode($attrs),
                 ];
@@ -898,7 +915,7 @@ class UserManagementController extends Controller
 
         $user->dbProducts()->sync($syncData);
 
-        $currentIds = array_keys($current);
+        $currentIds = array_keys($allCurrent);
         $nextIds = array_keys($next);
         sort($currentIds);
         sort($nextIds);
@@ -906,7 +923,7 @@ class UserManagementController extends Controller
 
         if (!$hasChanges) {
             foreach ($nextIds as $dbId) {
-                $currentJson = json_encode($current[$dbId] ?? []);
+                $currentJson = json_encode($allCurrent[$dbId] ?? []);
                 $nextJson = json_encode($next[$dbId] ?? []);
                 if ($currentJson !== $nextJson) {
                     $hasChanges = true;
@@ -1001,16 +1018,16 @@ class UserManagementController extends Controller
             abort(403, 'Unauthorized');
         }
 
+        $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
         $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
 
-        $dbProducts = $isSelfManagement
-            ? $user->dbProducts()
-                ->when($hasCanSellColumn, fn ($q) => $q->where('db_products_users.can_sell', true))
-                ->select('db_products.id', 'db_products.name')
-                ->orderBy('db_products.name')
-                ->get()
-            : DbProducts::orderBy('name')->get(['id', 'name']);
+        $canManageAllDb = $actor
+            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+
+        $dbProducts = $canManageAllDb
+            ? DbProducts::orderBy('name')->get(['id', 'name'])
+            : $this->selectableDbProducts($actor, $user);
 
         $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
@@ -1035,7 +1052,6 @@ class UserManagementController extends Controller
             $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_products_users.can_sell', true));
         }
 
-        $this->authorization()->scopeManageableUsers($request->user(), $billableUsersQuery);
         $billableEligibleUsers = $billableUsersQuery
             ->with(['dbProducts' => function ($query) use ($hasCanSellColumn) {
                 $query->select('db_products.id');
@@ -1060,11 +1076,8 @@ class UserManagementController extends Controller
             ->get(['id', 'name', 'country']);
 
         // On charge les pivots pour récupérer les attributs
-        $userWithPivots = $user->load(['dbProducts' => function ($q) use ($isSelfManagement, $hasCanSellColumn) {
+        $userWithPivots = $user->load(['dbProducts' => function ($q) {
             $q->select('db_products.id');
-            if ($isSelfManagement && $hasCanSellColumn) {
-                $q->where('db_products_users.can_sell', true);
-            }
         }]);
         $selected = $userWithPivots->dbProducts->pluck('id')->toArray();
 
@@ -1296,6 +1309,38 @@ class UserManagementController extends Controller
         $current = Cache::get("import:$id", []);
         $merged = array_merge($current, $state);
         Cache::put("import:$id", $merged, now()->addHour());
+    }
+
+    private function selectableDbProducts(User $actor, User $target)
+    {
+        $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
+
+        if (!$sourceUser) {
+            return collect();
+        }
+
+        return $sourceUser->dbProducts()
+            ->select('db_products.id', 'db_products.name')
+            ->orderBy('db_products.name')
+            ->get();
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function selectableDbProductIds(User $actor, User $target): array
+    {
+        $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
+
+        if (!$sourceUser) {
+            return [];
+        }
+
+        return $sourceUser->dbProducts()
+            ->pluck('db_products.id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function authorization(): UserManagementAuthorizationService

@@ -419,8 +419,9 @@ class UserManagementAuthorizationService
 
         $canManageAll = $this->isGlobalManager($actor) || $this->hasPermission($actor, 'users.db_products.manage.all');
         $canManageHis = $canManageAll || $this->hasPermission($actor, 'users.db_products.manage.his');
+        $canAccessDatabase = $canManageHis || $this->hasPermission($actor, 'users.db_products.access');
 
-        if (!$canManageHis) {
+        if (!$canAccessDatabase) {
             return false;
         }
 
@@ -433,15 +434,10 @@ class UserManagementAuthorizationService
         }
 
         if ($actor->isSameAs($target)) {
-            $query = $target->dbProducts();
-            if (Schema::hasColumn('db_products_users', 'can_sell')) {
-                $query->where('db_products_users.can_sell', true);
-            }
-
-            return $query->exists();
+            return true;
         }
 
-        return false;
+        return $this->canManageTarget($actor, $target, allowSelf: false);
     }
 
     /**

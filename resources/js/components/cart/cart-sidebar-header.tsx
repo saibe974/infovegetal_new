@@ -1,5 +1,5 @@
-import React, { useContext, useMemo, useState } from "react";
-import { CheckCircleIcon, DownloadIcon, EyeIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
+import React, { useContext, useEffect, useMemo } from "react";
+import { CheckCircleIcon, EyeIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -10,6 +10,7 @@ import {
     useSidebar,
 } from "../ui/sidebar";
 import { CartContext } from "./cart.context";
+import { useCartOrder } from "./cart-order.context";
 import { router, usePage } from "@inertiajs/react";
 import { CartItem } from "./cart-item";
 import { getCartPricing } from "./cart-pricing";
@@ -34,8 +35,7 @@ export function CartSidebarHeader() {
     const cartId = cart?.id;
 
     const { items, clearCart } = useContext(CartContext);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveMessage, setSaveMessage] = useState<string | null>(null);
+    const { isSaving, saveMessage, handleSaveCart, handleGenerateTcpdf } = useCartOrder();
 
     const total = items.reduce((sum, item) => {
         const pricing = getCartPricing(item.product, item.quantity);
@@ -65,56 +65,6 @@ export function CartSidebarHeader() {
         params.set("cart", "1");
 
         return `/products?${params.toString()}`;
-    };
-
-    const handleSaveCart = async () => {
-        if (items.length === 0) {
-            setSaveMessage("Le panier est vide");
-            setTimeout(() => setSaveMessage(null), 3000);
-            return;
-        }
-
-        setIsSaving(true);
-        setSaveMessage(null);
-
-        try {
-            const csrfToken = (
-                document.querySelector(
-                    'meta[name="csrf-token"]'
-                ) as HTMLMetaElement
-            )?.content;
-
-            const response = await fetch("/cart/save", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-Token": csrfToken || "",
-                },
-                body: JSON.stringify({
-                    items: items.map((item) => ({
-                        id: item.product.id,
-                        quantity: item.quantity,
-                    })),
-                }),
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setSaveMessage("Panier enregistré avec succès");
-                setTimeout(() => setSaveMessage(null), 3000);
-                router.reload({ only: ["cart", "cart_refresh_token"] });
-            } else {
-                setSaveMessage(
-                    data.message || "Erreur lors de la sauvegarde"
-                );
-            }
-        } catch (error) {
-            console.error("Error saving cart:", error);
-            setSaveMessage("Erreur lors de la sauvegarde");
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     const handleCreateNewCart = async () => {

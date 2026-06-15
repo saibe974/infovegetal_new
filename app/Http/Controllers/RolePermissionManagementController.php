@@ -36,6 +36,7 @@ class RolePermissionManagementController extends Controller
         'users.impersonate.branch',
         'users.impersonate.all',
         'users.assign_permissions.branch',
+        'users.db_products.access',
         'users.db_products.manage.his',
         'users.db_products.manage.all',
 
@@ -110,7 +111,7 @@ class RolePermissionManagementController extends Controller
             'guard_name' => 'web',
         ]);
 
-        return back()->with('success', 'Role created successfully');
+        return to_route('users.roles_permissions.index')->with('success', 'Role created successfully');
     }
 
     /**
@@ -144,7 +145,7 @@ class RolePermissionManagementController extends Controller
             'guard_name' => 'web',
         ]);
 
-        return back()->with('success', 'Permission created successfully');
+        return to_route('users.roles_permissions.index')->with('success', 'Permission created successfully');
     }
 
     /**
@@ -166,7 +167,19 @@ class RolePermissionManagementController extends Controller
 
         $role->syncPermissions($permissionNames);
 
-        return back()->with('success', 'Role permissions updated successfully');
+        return redirect()
+            ->route('users.roles_permissions.index', ['role' => $role->id])
+            ->with('success', 'Role permissions updated successfully');
+    }
+
+    /**
+     * Redirect legacy GET URL to index with selected role query.
+     */
+    public function redirectRoleToIndex(Request $request, Role $role): RedirectResponse
+    {
+        $this->ensureAdmin($request);
+
+        return redirect()->route('users.roles_permissions.index', ['role' => $role->id]);
     }
 
     /**
@@ -182,7 +195,7 @@ class RolePermissionManagementController extends Controller
 
         $role->delete();
 
-        return back()->with('success', 'Role deleted successfully');
+        return to_route('users.roles_permissions.index')->with('success', 'Role deleted successfully');
     }
 
     /**
@@ -194,7 +207,7 @@ class RolePermissionManagementController extends Controller
 
         $permission->delete();
 
-        return back()->with('success', 'Permission deleted successfully');
+        return to_route('users.roles_permissions.index')->with('success', 'Permission deleted successfully');
     }
 
     private function ensureAdmin(Request $request): void

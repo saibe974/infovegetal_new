@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -19,19 +19,11 @@ import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { getQuantityStep, getUniteQuantity } from '@/components/cart/cart-quantity-rules';
 import { getProductCartImage } from '@/components/products/product-cart-image';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils';
+import { useCartOrder } from '@/components/cart/cart-order.context';
 import { SharedData } from '@/types';
 
 type Props = Record<string, never>;
-
-const pdfGenerationPhases = [
-    'Verification des produits et des quantites',
-    'Recherche des images locales disponibles',
-    'Telechargement des images manquantes si necessaire',
-    'Generation des vignettes et conversions',
-    'Composition et export du PDF',
-];
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -55,14 +47,14 @@ export default withAppLayout<Props>(
 
         const [deliveryDate, setDeliveryDate] = useState('');
 
-        const [isSaving, setIsSaving] = useState(false);
         const [isRefreshingCart, setIsRefreshingCart] = useState(false);
-        const [saveMessage, setSaveMessage] = useState<string | null>(null);
-        const [isPdfGenerating, setIsPdfGenerating] = useState(false);
-        const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
-        const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
-        const [pdfResult, setPdfResult] = useState<{ url: string; filename: string; orderNumber: string | null } | null>(null);
-        const [orderConflict, setOrderConflict] = useState<{ orderNumber?: string | null; resolve: (action: 'new' | 'append') => void } | null>(null);
+        const {
+            isSaving,
+            saveMessage,
+            handleSaveCart,
+            handleGenerateTcpdf,
+        } = useCartOrder();
+        const [pageMessage, setPageMessage] = useState<string | null>(null);
 
 
         const itemsPricing = useMemo(
@@ -121,179 +113,23 @@ export default withAppLayout<Props>(
             updateQuantity(productId, next);
         };
 
-        const handleSaveCart = async () => {
-            if (items.length === 0) {
-                setSaveMessage("Le panier est vide");
-                setTimeout(() => setSaveMessage(null), 3000);
-                return;
-            }
-
-            setIsSaving(true);
-            setSaveMessage(null);
-
-            try {
-                const csrfToken = (
-                    document.querySelector(
-                        'meta[name="csrf-token"]'
-                    ) as HTMLMetaElement
-                )?.content;
-
-                const response = await fetch("/cart/save", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": csrfToken || "",
-                    },
-                    body: JSON.stringify({
-                        items: items.map((item) => ({
-                            id: item.product.id,
-                            quantity: item.quantity,
-                        })),
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    setSaveMessage("Panier enregistré avec succès");
-                    setTimeout(() => setSaveMessage(null), 3000);
-                    router.reload({ only: ['cart', 'cart_refresh_token'] });
-                } else {
-                    setSaveMessage(
-                        data.message || "Erreur lors de la sauvegarde"
-                    );
-                }
-            } catch (error) {
-                console.error("Error saving cart:", error);
-                setSaveMessage("Erreur lors de la sauvegarde");
-            } finally {
-                setIsSaving(false);
-            }
-        };
-
         const handleRefreshCart = async () => {
             if (items.length === 0 || isRefreshingCart) {
                 return;
             }
 
             setIsRefreshingCart(true);
-            setSaveMessage(null);
 
             try {
                 await refreshCart();
-                setSaveMessage('Panier mis a jour selon les acces DB utilisateur');
-                setTimeout(() => setSaveMessage(null), 3000);
+                setPageMessage('Panier mis a jour selon les acces DB utilisateur');
+                setTimeout(() => setPageMessage(null), 3000);
             } catch (error) {
                 console.error('Error refreshing cart:', error);
-                setSaveMessage('Erreur lors de la mise a jour du panier');
+                setPageMessage('Erreur lors de la mise a jour du panier');
             } finally {
                 setIsRefreshingCart(false);
             }
-        };
-
-        const handleGenerateTcpdf = async () => {
-            if (items.length === 0) {
-                setSaveMessage('Le panier est vide');
-                setTimeout(() => setSaveMessage(null), 3000);
-                return;
-            }
-
-            setIsSaving(true);
-            setIsPdfGenerating(true);
-            setPdfPhaseIndex(0);
-            setPdfCurrentGroup(null);
-            if (pdfResult?.url) {
-                window.URL.revokeObjectURL(pdfResult.url);
-            }
-            setPdfResult(null);
-            setSaveMessage(null);
-
-            try {
-                const csrfToken = (
-                    document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement
-                )?.content;
-
-                const response = await fetch('/cart/generate-pdf-tcpdf', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken || '',
-                    },
-                    body: JSON.stringify({
-                        items: itemsPricing.map((item) => ({
-                            id: item.product.id,
-                            quantity: item.quantity,
-                            unit_price: item.pricing.unitPrice,
-                            line_total: item.pricing.lineTotal,
-                        })),
-                        shipping_total: deliveryTotal,
-                    }),
-                });
-
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    setSaveMessage(data?.message || 'Erreur lors de la generation TCPDF');
-                    return;
-                }
-
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const contentDisposition = response.headers.get('content-disposition') || '';
-                const filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
-                const extractedFilename = filenameMatch
-                    ? decodeURIComponent(filenameMatch[1] || filenameMatch[2] || '')
-                    : `panier-${new Date().toISOString().split('T')[0]}.pdf`;
-                const orderMatch = extractedFilename.match(/^(\d{5})-/);
-
-                setPdfResult({
-                    url,
-                    filename: extractedFilename,
-                    orderNumber: orderMatch ? orderMatch[1] : null,
-                });
-
-                setSaveMessage('Commande enregistree et PDF genere avec succes');
-                setTimeout(() => setSaveMessage(null), 3000);
-            } catch (error) {
-                console.error('Error generating TCPDF:', error);
-                setSaveMessage('Erreur lors de la generation TCPDF');
-            } finally {
-                setIsSaving(false);
-                setIsPdfGenerating(false);
-            }
-        };
-
-        const closePdfModal = () => {
-            if (isPdfGenerating) {
-                return;
-            }
-
-            if (pdfResult?.url) {
-                window.URL.revokeObjectURL(pdfResult.url);
-            }
-
-            setPdfResult(null);
-            setPdfCurrentGroup(null);
-            setPdfPhaseIndex(0);
-        };
-
-        const handleDownloadGeneratedPdf = () => {
-            if (!pdfResult) {
-                return;
-            }
-
-            const link = document.createElement('a');
-            link.href = pdfResult.url;
-            link.download = pdfResult.filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
-
-        const handleClearCartFromModal = () => {
-            clearCart();
-            closePdfModal();
-            setSaveMessage('Panier vide');
-            setTimeout(() => setSaveMessage(null), 3000);
         };
 
         const handleCreateNewCart = async () => {
@@ -309,8 +145,7 @@ export default withAppLayout<Props>(
                 return;
             }
 
-            setIsSaving(true);
-            setSaveMessage(null);
+            setPageMessage(null);
 
             try {
                 const csrfToken = (
@@ -329,36 +164,21 @@ export default withAppLayout<Props>(
 
                 if (!response.ok) {
                     const data = await response.json().catch(() => ({}));
-                    setSaveMessage(data?.message || t('Erreur lors de la preparation du nouveau panier'));
+                    setPageMessage(data?.message || t('Erreur lors de la preparation du nouveau panier'));
                     return;
                 }
 
                 clearCart();
-                setSaveMessage(t('Panier actif vide. Enregistrez pour creer un nouvel identifiant.'));
+                setPageMessage(t('Panier actif vide. Enregistrez pour creer un nouvel identifiant.'));
                 router.reload({ only: ['cart', 'cart_refresh_token'] });
             } catch (error) {
                 console.error('Error creating new cart:', error);
-                setSaveMessage(t('Erreur lors de la preparation du nouveau panier'));
+                setPageMessage(t('Erreur lors de la preparation du nouveau panier'));
             } finally {
-                setIsSaving(false);
             }
         };
 
         const [topOffset, setTopOffset] = useState<number>(0);
-
-        useEffect(() => {
-            if (!isPdfGenerating) {
-                return;
-            }
-
-            const timer = window.setInterval(() => {
-                setPdfPhaseIndex((current) => (current + 1) % pdfGenerationPhases.length);
-            }, 1600);
-
-            return () => {
-                window.clearInterval(timer);
-            };
-        }, [isPdfGenerating]);
 
         useEffect(() => {
             const getHeight = () => {
@@ -407,123 +227,6 @@ export default withAppLayout<Props>(
         return (
             <div className="">
                 <Head title={t('Cart')} />
-                <Dialog open={orderConflict !== null} onOpenChange={() => undefined}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>Commande en cours</DialogTitle>
-                            <DialogDescription>
-                                {orderConflict?.orderNumber
-                                    ? `La commande #${orderConflict.orderNumber} est deja en cours de traitement.`
-                                    : 'Une commande est deja en cours de traitement.'}
-                                {' '}Souhaitez-vous y ajouter les articles du panier, ou creer une nouvelle commande ?
-                            </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter className="flex-col gap-2 sm:flex-row">
-                            <Button variant="outline" onClick={() => orderConflict?.resolve('new')}>
-                                Nouvelle commande
-                            </Button>
-                            <Button onClick={() => orderConflict?.resolve('append')}>
-                                Ajouter a la commande en cours
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-                <Dialog open={isPdfGenerating || pdfResult !== null} onOpenChange={(open) => !open && closePdfModal()}>
-                    <DialogContent className="sm:max-w-lg" showCloseButton={false}>
-                        <DialogHeader>
-                            {isPdfGenerating ? (
-                                <>
-                                    <DialogTitle className="flex items-center gap-3 text-xl">
-                                        <Loader2 className="h-5 w-5 animate-spin text-brand-main" />
-                                        Generation du PDF en cours
-                                    </DialogTitle>
-                                    <DialogDescription className="text-sm leading-6">
-                                        Le document peut prendre un peu de temps. Le serveur verifie les produits, telecharge les images manquantes, prepare les conversions, puis genere le PDF final.
-                                    </DialogDescription>
-                                </>
-                            ) : (
-                                <>
-                                    <DialogTitle className="text-xl">Commande terminee</DialogTitle>
-                                    <DialogDescription className="text-sm leading-6">
-                                        {pdfResult?.orderNumber
-                                            ? `La commande #${pdfResult.orderNumber} est prete. Choisissez l'action a effectuer.`
-                                            : 'Le PDF est pret. Choisissez l\'action a effectuer.'}
-                                    </DialogDescription>
-                                </>
-                            )}
-                        </DialogHeader>
-
-                        {isPdfGenerating ? (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-brand-main/20 bg-brand-main/5 p-4">
-                                    <div className="text-sm font-medium text-foreground">
-                                        {pdfCurrentGroup
-                                            ? `Fournisseur ${pdfCurrentGroup.index}/${pdfCurrentGroup.total} : ${pdfCurrentGroup.label}`
-                                            : 'Preparation de la generation'}
-                                    </div>
-                                    <div className="mt-1 text-sm text-muted-foreground">
-                                        Etape en cours : {pdfGenerationPhases[pdfPhaseIndex]}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 rounded-xl border p-4">
-                                    {pdfGenerationPhases.map((phase, index) => {
-                                        const isActive = index === pdfPhaseIndex;
-                                        const isPassed = index < pdfPhaseIndex;
-
-                                        return (
-                                            <div
-                                                key={phase}
-                                                className={cn(
-                                                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                                                    isActive && 'bg-brand-main/10 text-foreground',
-                                                    isPassed && 'text-muted-foreground',
-                                                    !isActive && !isPassed && 'text-muted-foreground/80',
-                                                )}
-                                            >
-                                                <span
-                                                    className={cn(
-                                                        'inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold',
-                                                        isActive && 'border-brand-main text-brand-main',
-                                                        isPassed && 'border-green-600 text-green-600',
-                                                        !isActive && !isPassed && 'border-muted-foreground/30 text-muted-foreground',
-                                                    )}
-                                                >
-                                                    {isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : index + 1}
-                                                </span>
-                                                <span>{phase}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <p className="text-xs text-muted-foreground">
-                                    Veuillez patienter jusqu'a la fin de la generation.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-green-300/60 bg-green-50 p-4 text-sm text-green-800">
-                                    PDF genere avec succes.
-                                    {pdfResult ? (
-                                        <span className="mt-1 block text-xs text-green-700">Fichier: {pdfResult.filename}</span>
-                                    ) : null}
-                                </div>
-                                <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-                                    <Button variant="outline" onClick={closePdfModal}>
-                                        Fermer
-                                    </Button>
-                                    <Button variant="destructive" onClick={handleClearCartFromModal}>
-                                        Vider le panier
-                                    </Button>
-                                    <Button onClick={handleDownloadGeneratedPdf}>
-                                        Telecharger le PDF
-                                    </Button>
-                                </DialogFooter>
-                            </div>
-                        )}
-                    </DialogContent>
-                </Dialog>
                 <StickyBar
                     zIndex={20}
                     borderBottom={false}
@@ -724,10 +427,24 @@ export default withAppLayout<Props>(
                                     <div
                                         className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
                                             ? " text-destructive border border-destructive"
+                                            : " text-green-600 border border-green-600"}`}
+                                    >
+                                        {saveMessage}
+                                    </div>
+                                )}
+                                {pageMessage && (
+                                    <div
+                                        className={`mt-2 text-sm p-2 rounded ${pageMessage.includes("Erreur")
+                                            ? " text-destructive border border-destructive"
                                             : " text-green-600 border border-green-600"
                                             }`}
                                     >
                                         {saveMessage}
+                                    </div>
+                                )}
+                                {pageMessage && (
+                                    <div className={`mt-2 text-sm p-2 rounded ${pageMessage.includes("Erreur") ? " text-destructive border border-destructive" : " text-green-600 border border-green-600"}`}>
+                                        {pageMessage}
                                     </div>
                                 )}
                             </CardHeader>

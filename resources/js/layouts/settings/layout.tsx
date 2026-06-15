@@ -11,7 +11,7 @@ import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
-import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
 import { ArrowLeftCircle, Menu } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -23,6 +23,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
     const effectiveUser = getEffectiveUser(auth);
+    const isStrictImpersonation = Boolean(auth?.impersonation_strict_mode);
+    const privilegedUser = isStrictImpersonation ? effectiveUser : (auth?.impersonator ?? effectiveUser);
     const userAbilities = (pageProps.userAbilities as { manage_db?: boolean } | undefined) ?? {};
     useIsMobile();
 
@@ -33,6 +35,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     const userId = editingUser ? editingUser.id : auth.user!.id;
     const isSelf = !editingUser || editingUser.id === auth.user!.id;
+    const isImpersonating = Boolean(auth?.impersonate_from || auth?.impersonator);
 
     const sidebarNavItems: NavItem[] = [
         {
@@ -42,7 +45,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         },
     ];
 
-    const canManageOtherUserSections = isAdmin(effectiveUser);
+    const isDirectParentOfEditingUser = Boolean(
+        editingUser && auth.user && editingUser.parent_id === auth.user.id,
+    );
+    const canManageChildSections = isAdmin(privilegedUser) || isDev(privilegedUser) || isDirectParentOfEditingUser;
+    const canManageSensitiveChildSections = isAdmin(privilegedUser) || isDev(privilegedUser);
 
     if (isSelf) {
         sidebarNavItems.push(
@@ -68,26 +75,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             }
         );
 
-    } else if (canManageOtherUserSections) {
+    } else if (canManageChildSections) {
         sidebarNavItems.push(
-            {
-                title: 'Password',
-                href: editAdminPassword(userId),
-                icon: null,
-            },
             {
                 title: 'Permissions',
                 href: `/admin/users/${userId}/permissions`,
-                icon: null,
-            },
-            {
-                title: 'Two-Factor Auth',
-                href: showAdminTwoFactor(userId),
-                icon: null,
-            },
-            {
-                title: 'Appearance',
-                href: editAdminAppearance(userId),
                 icon: null,
             },
             {
@@ -97,11 +89,30 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             }
         );
 
+        if (canManageSensitiveChildSections) {
+            sidebarNavItems.push(
+                {
+                    title: 'Two-Factor Auth',
+                    href: showAdminTwoFactor(userId),
+                    icon: null,
+                },
+                {
+                    title: 'Appearance',
+                    href: editAdminAppearance(userId),
+                    icon: null,
+                }
+            );
+        }
+
     }
     const currentPath = window.location.pathname;
 
     // Ajout de lien base de donnees quand l'utilisateur y a acces
-    if (userAbilities.manage_db) {
+    const isPrivilegedAdminDev = isAdmin(privilegedUser) || isDev(privilegedUser);
+    const canAccessDatabaseSection = ((isImpersonating || (hasPermission(privilegedUser, 'users.db_products.access') && !isSelf)) || isPrivilegedAdminDev);
+
+    //  if (userAbilities.manage_db && canAccessDatabaseSection) {
+    if (canAccessDatabaseSection) {
         sidebarNavItems.push({
             title: 'Database access',
             href: `/admin/users/${userId}/db`,

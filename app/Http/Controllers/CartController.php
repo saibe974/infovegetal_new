@@ -57,7 +57,7 @@ class CartController extends Controller
                 'requires_choice' => true,
                 'existing_order' => [
                     'id' => $existingProcessing->id,
-                    'number' => str_pad((string) $existingProcessing->id, 4, '0', STR_PAD_LEFT),
+                    'number' => $this->formatOrderNumber((int) $existingProcessing->id),
                 ],
                 'message' => 'Une commande est deja en cours de traitement. Choisissez ajouter ou nouvelle commande.',
             ], 409);
@@ -112,9 +112,8 @@ class CartController extends Controller
         $cart->shipping_total = round($shippingTotal, 2);
         $cart->save();
 
-        $orderNumber = str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT);
-        $orderDate = now()->format('Y-m-d');
-        $pdfFilename = $orderNumber . '-' . $orderDate . '.pdf';
+        $orderNumber = $this->formatOrderNumber((int) $cart->id);
+        $pdfFilename = $this->buildOrderPdfFilename((int) $cart->id);
         $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $pdfFilename);
 
         Pdf::view('pdf.cart', array_merge($pdfPayload, [
@@ -176,12 +175,15 @@ class CartController extends Controller
         return response()->json(['message' => 'Produit retiré du panier']);
     }
 
-    public function save(Request $request)
+    public function save(Request $request, CartTcpdfService $cartTcpdfService)
     {
         $data = $request->validate([
             'items' => 'required|array',
             'items.*.id' => 'required|integer|min:1',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.line_total' => 'nullable|numeric|min:0',
+            'shipping_total' => 'nullable|numeric|min:0',
         ]);
 
         /** @var \App\Models\User $user */
@@ -209,13 +211,27 @@ class CartController extends Controller
         }
 
         $cart->products()->sync($syncData);
-        $cart->save();
+        $cart->touch();
+
+        $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+        $result = $this->generateAndStorePdfForCart(
+            $cart,
+            $data['items'],
+            $user,
+            $shippingTotal,
+            $cartTcpdfService,
+            false,
+        );
 
         $request->session()->forget('cart_filter_ids');
 
         return response()->json([
             'status' => 'ok',
-            'message' => __('Panier enregistré avec succès'),
+            'order_id' => $result['order_id'],
+            'order_number' => $result['order_number'],
+            'pdf_filename' => $result['pdf_filename'],
+            'pdf_download_url' => $result['pdf_download_url'],
+            'message' => __('Panier enregistré avec succès, PDF généré'),
         ]);
     }
 
@@ -450,57 +466,18 @@ class CartController extends Controller
         $cart->products()->sync($syncData);
         $cart->touch();
 
-        $payload = $this->buildPdfPayload($data['items'], $user, $shippingTotal, true);
-        $orderNumber = str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT);
-        $payload['order_number'] = $orderNumber;
-
-        $cart->items_total = round((float) ($payload['items_total'] ?? 0), 2);
-        $cart->shipping_total = round($shippingTotal, 2);
-        $cart->save();
-
-        $orderDate = now()->format('Y-m-d');
-        $filename = $orderNumber . '-' . $orderDate . '.pdf';
-
-        $pdfBinary = $cartTcpdfService->render($payload);
-
-        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $filename);
-        Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
-
-        $user->files()->create([
-            'file_name' => $filename,
-            'file_path' => $pdfRelativePath,
-            'file_size' => strlen($pdfBinary),
-        ]);
-
-        try {
-            $user->addMediaFromString($pdfBinary)
-                ->usingName(pathinfo($filename, PATHINFO_FILENAME))
-                ->usingFileName($filename)
-                ->withCustomProperties([
-                    'source' => 'cart-tcpdf',
-                    'shipping_total' => $shippingTotal,
-                ])
-                ->toMediaCollection('user_meta_files');
-        } catch (\Throwable $e) {
-            Log::warning('Failed to store TCPDF in media library', [
-                'user_id' => $user->id,
-                'filename' => $filename,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        $this->sendOrderPdfMails(
-            $payload['mail_recipients'] ?? collect([$user]),
-            $pdfRelativePath,
-            $orderNumber,
+        $result = $this->generateAndStorePdfForCart(
+            $cart,
+            $data['items'],
             $user,
-            'public',
-            $filename,
+            $shippingTotal,
+            $cartTcpdfService,
+            true,
         );
 
-        return response($pdfBinary, 200, [
+        return response($result['pdf_binary'], 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="' . $result['pdf_filename'] . '"',
         ]);
     }
 
@@ -626,7 +603,6 @@ class CartController extends Controller
             ->values();
 
         $itemsTotal = $items->sum(fn ($item) => $item['line_total']);
-        $total = $itemsTotal + $shippingTotal;
         $rollDistribution = app(PdfRollDistributionService::class)->build($items);
 
         $dbProductIds = $items
@@ -637,6 +613,7 @@ class CartController extends Controller
 
         $facturantIds = [];
         $commercialIds = [];
+        $pivotsByDbProductId = [];
         foreach ($dbProductIds as $dbProductId) {
             $pivot = DB::table('db_products_users')
                 ->where('user_id', $user->id)
@@ -652,6 +629,8 @@ class CartController extends Controller
                 continue;
             }
 
+            $pivotsByDbProductId[(int) $dbProductId] = $attrs;
+
             if (!empty($attrs['fact'])) {
                 $facturantIds[] = (int) $attrs['fact'];
             }
@@ -660,6 +639,9 @@ class CartController extends Controller
                 $commercialIds[] = (int) $attrs['com'];
             }
         }
+
+        $backendShipping = $this->computeShippingFromRollDistribution($rollDistribution, $pivotsByDbProductId);
+        $effectiveShipping = $backendShipping > 0.0 ? $backendShipping : $shippingTotal;
 
         $facturantUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($facturantIds)))->get();
         $commercialUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($commercialIds)))->get();
@@ -671,10 +653,12 @@ class CartController extends Controller
             ->unique(fn ($u) => strtolower((string) $u->email))
             ->values();
 
+        $total = $itemsTotal + $effectiveShipping;
+
         return [
             'items' => $items,
             'items_total' => $itemsTotal,
-            'shipping_total' => $shippingTotal,
+            'shipping_total' => $effectiveShipping,
             'total' => $total,
             'roll_distribution' => $rollDistribution,
             'user' => $user,
@@ -695,7 +679,7 @@ class CartController extends Controller
     {
         $sent = 0;
         $pdfAbsolutePath = Storage::disk($disk)->path($pdfRelativePath);
-        $attachmentFilename = $attachmentName ?: "commande-{$orderNumber}.pdf";
+        $attachmentFilename = $attachmentName ?: $this->buildOrderPdfFilename((int) $orderNumber);
 
         foreach ($recipients as $recipient) {
             try {
@@ -724,4 +708,276 @@ class CartController extends Controller
 
         return $sent;
     }
+
+    private function generateAndStorePdfForCart(
+        Cart $cart,
+        array $itemsInput,
+        \App\Models\User $user,
+        float $shippingTotal,
+        CartTcpdfService $cartTcpdfService,
+        bool $sendEmails,
+    ): array {
+        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, true);
+        $orderNumber = $this->formatOrderNumber((int) $cart->id);
+        $payload['order_number'] = $orderNumber;
+
+        $cart->items_total = round((float) ($payload['items_total'] ?? 0), 2);
+        $cart->shipping_total = round((float) ($payload['shipping_total'] ?? 0), 2);
+        $cart->save();
+
+        $filename = $this->buildOrderPdfFilename((int) $cart->id);
+        $pdfBinary = $cartTcpdfService->render($payload);
+
+        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $filename);
+        Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
+
+        $user->files()->create([
+            'file_name' => $filename,
+            'file_path' => $pdfRelativePath,
+            'file_size' => strlen($pdfBinary),
+        ]);
+
+        try {
+            $user->addMediaFromString($pdfBinary)
+                ->usingName(pathinfo($filename, PATHINFO_FILENAME))
+                ->usingFileName($filename)
+                ->withCustomProperties([
+                    'source' => 'cart-tcpdf',
+                    'shipping_total' => $shippingTotal,
+                ])
+                ->toMediaCollection('user_meta_files');
+        } catch (\Throwable $e) {
+            Log::warning('Failed to store TCPDF in media library', [
+                'user_id' => $user->id,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $mailCount = 0;
+        if ($sendEmails) {
+            $mailCount = $this->sendOrderPdfMails(
+                $payload['mail_recipients'] ?? collect([$user]),
+                $pdfRelativePath,
+                $orderNumber,
+                $user,
+                'public',
+                $filename,
+            );
+        }
+
+        return [
+            'order_id' => $cart->id,
+            'order_number' => $orderNumber,
+            'pdf_filename' => $filename,
+            'pdf_relative_path' => $pdfRelativePath,
+            'pdf_download_url' => asset('storage/' . $pdfRelativePath),
+            'items_total' => $cart->items_total,
+            'shipping_total' => $cart->shipping_total,
+            'mail_recipients_count' => $mailCount,
+            'pdf_binary' => $pdfBinary,
+        ];
+    }
+
+    private function computeShippingFromRollDistribution(array $rollDistribution, array $pivotsByDbProductId): float
+    {
+        $suppliers = $rollDistribution['suppliers'] ?? [];
+        if (empty($suppliers) || empty($pivotsByDbProductId)) {
+            return 0.0;
+        }
+
+        // Batch-fetch carriers and zones needed
+        $carrierIds = [];
+        $zoneIds = [];
+        foreach ($suppliers as $supplier) {
+            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
+            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
+            if (!$attrs) {
+                continue;
+            }
+            $carrierId = (int) ($attrs['t'] ?? 0);
+            $zoneId = (int) ($attrs['z'] ?? 0);
+            if ($carrierId > 0) {
+                $carrierIds[] = $carrierId;
+            }
+            if ($zoneId > 0) {
+                $zoneIds[] = $zoneId;
+            }
+        }
+
+        $carriers = empty($carrierIds)
+            ? collect()
+            : \App\Models\Carrier::whereIn('id', array_unique($carrierIds))->get()->keyBy('id');
+        $zones = empty($zoneIds)
+            ? collect()
+            : \App\Models\CarrierZone::whereIn('id', array_unique($zoneIds))->get()->keyBy('id');
+
+        $totalShipping = 0.0;
+
+        foreach ($suppliers as $supplier) {
+            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
+            $modLiv = (string) ($supplier['mod_liv'] ?? '');
+            $rolls = is_array($supplier['rolls'] ?? null) ? $supplier['rolls'] : [];
+
+            if ($modLiv !== 'roll' || empty($rolls)) {
+                continue;
+            }
+
+            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
+            if (!$attrs) {
+                continue;
+            }
+
+            $carrierId = (int) ($attrs['t'] ?? 0);
+            $zoneId = (int) ($attrs['z'] ?? 0);
+            $priceMode = (int) $this->tariffToFloat($attrs['p'] ?? 0);
+            $rollCount = count($rolls);
+
+            if ($carrierId > 0 && $zoneId > 0) {
+                $carrier = $carriers->get($carrierId);
+                $zone = $zones->get($zoneId);
+
+                if ($carrier && $zone) {
+                    $tariffs = is_array($zone->tariffs) ? $zone->tariffs : [];
+                    $baseTariffPerRoll = $this->pickZoneTariff($rollCount, $tariffs);
+                    $baseTotal = $baseTariffPerRoll * $rollCount;
+
+                    if ($priceMode === 1 && $rollCount > 0) {
+                        $adjustedTotal = 0.0;
+                        foreach ($rolls as $roll) {
+                            $coef = $this->tariffToFloat($roll['coef'] ?? 0);
+                            $ratioToPay = 1.0 - $this->tariffToFillRatio($coef);
+                            $adjustedTotal += $baseTariffPerRoll * $ratioToPay;
+                        }
+                    } else {
+                        $adjustedTotal = $baseTariffPerRoll * $rollCount;
+                    }
+
+                    $mini = $this->tariffToFloat($tariffs['mini'] ?? 0);
+                    if ($mini > 0 && $baseTotal < $mini) {
+                        $adjustedTotal = max($adjustedTotal, $mini);
+                    }
+
+                    $taxgoRate = max(0.0, $this->tariffToFloat($carrier->taxgo ?? 0));
+                    $totalShipping += round($adjustedTotal * (1.0 + $taxgoRate / 100.0) * 100) / 100;
+                    continue;
+                }
+            }
+
+            // Fallback: roll_price from attributes
+            $rollPrice = $this->tariffToFloat($attrs['l'] ?? 0);
+            if ($rollPrice <= 0) {
+                continue;
+            }
+
+            if ($priceMode === 0) {
+                $totalShipping += round($rollPrice * $rollCount * 100) / 100;
+            } elseif ($priceMode === 1) {
+                $supplierShipping = 0.0;
+                foreach ($rolls as $roll) {
+                    $coef = $this->tariffToFloat($roll['coef'] ?? 0);
+                    $ratioToPay = 1.0 - $this->tariffToFillRatio($coef);
+                    $supplierShipping += $rollPrice * $ratioToPay;
+                }
+                $totalShipping += round($supplierShipping * 100) / 100;
+            }
+        }
+
+        return round($totalShipping * 100) / 100;
+    }
+
+    private function pickZoneTariff(int $rollCount, array $tariffs): float
+    {
+        if ($rollCount <= 0) {
+            return 0.0;
+        }
+
+        $entries = [];
+        foreach ($tariffs as $key => $value) {
+            if ((string) $key === 'mini') {
+                continue;
+            }
+            $range = $this->parseTariffRange((string) $key);
+            if ($range === null) {
+                continue;
+            }
+            $numValue = $this->tariffToFloat($value);
+            if (!is_finite($numValue) || $numValue <= 0 || $range['min'] <= 0) {
+                continue;
+            }
+            $entries[] = ['min' => $range['min'], 'max' => $range['max'], 'value' => $numValue];
+        }
+
+        usort($entries, fn ($a, $b) => $a['min'] !== $b['min']
+            ? $a['min'] <=> $b['min']
+            : ($a['max'] ?? PHP_INT_MAX) <=> ($b['max'] ?? PHP_INT_MAX));
+
+        if (empty($entries)) {
+            return 0.0;
+        }
+
+        $eligible = array_values(array_filter($entries,
+            fn ($e) => $rollCount >= $e['min'] && ($e['max'] === null || $rollCount <= $e['max'])));
+
+        if (!empty($eligible)) {
+            return array_reduce($eligible, fn ($best, $e) => $e['min'] >= $best['min'] ? $e : $best, $eligible[0])['value'];
+        }
+
+        $lowerOrEqual = array_values(array_filter($entries, fn ($e) => $rollCount >= $e['min']));
+
+        return !empty($lowerOrEqual) ? end($lowerOrEqual)['value'] : 0.0;
+    }
+
+    private function parseTariffRange(string $key): ?array
+    {
+        $normalized = trim((string) preg_replace('/^roll:/', '', trim($key)));
+        if ($normalized === '') {
+            return null;
+        }
+        preg_match_all('/\d+(?:[.,]\d+)?/', $normalized, $matches);
+        $parts = $matches[0] ?? [];
+        if (empty($parts)) {
+            return null;
+        }
+        $toVal = fn (string $v) => (float) str_replace(',', '.', $v);
+        $min = $toVal($parts[0]);
+        if (!is_finite($min)) {
+            return null;
+        }
+        $max = isset($parts[1]) ? (is_finite($toVal($parts[1])) ? $toVal($parts[1]) : null) : null;
+
+        return ['min' => $min, 'max' => $max];
+    }
+
+    private function tariffToFloat(mixed $value): float
+    {
+        if (is_float($value)) {
+            return is_finite($value) ? $value : 0.0;
+        }
+        if (is_int($value)) {
+            return (float) $value;
+        }
+        if (is_string($value)) {
+            $parsed = (float) str_replace(',', '.', trim($value));
+            return is_finite($parsed) ? $parsed : 0.0;
+        }
+        return 0.0;
+    }
+
+    private function tariffToFillRatio(float $coef): float
+    {
+        $normalized = $coef > 1.0 ? $coef / 100.0 : $coef;
+        return max(0.0, min(1.0, $normalized));
+    }
+
+    private function formatOrderNumber(int $cartId): string
+    {
+        return str_pad((string) $cartId, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function buildOrderPdfFilename(int $cartId): string
+    {
+        return $this->formatOrderNumber($cartId) . '_' . now()->format('Y_m_d') . '.pdf';
+    }
+
 }
