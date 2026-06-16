@@ -1,5 +1,5 @@
-import React, { useContext, useEffect, useMemo } from "react";
-import { CheckCircleIcon, EyeIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
+import React, { useContext, useMemo, useState } from "react";
+import { CheckCircleIcon, EyeIcon, Flower2Icon, FlowerIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -36,6 +36,10 @@ export function CartSidebarHeader() {
 
     const { items, clearCart } = useContext(CartContext);
     const { isSaving, saveMessage, handleSaveCart, handleGenerateTcpdf } = useCartOrder();
+    const [isPreparingNewCart, setIsPreparingNewCart] = useState(false);
+    const [newCartMessage, setNewCartMessage] = useState<string | null>(null);
+    const isBusy = isSaving || isPreparingNewCart;
+    const feedbackMessage = newCartMessage ?? saveMessage;
 
     const total = items.reduce((sum, item) => {
         const pricing = getCartPricing(item.product, item.quantity);
@@ -80,8 +84,8 @@ export function CartSidebarHeader() {
             return;
         }
 
-        setIsSaving(true);
-        setSaveMessage(null);
+        setIsPreparingNewCart(true);
+        setNewCartMessage(null);
 
         try {
             const csrfToken = (
@@ -100,18 +104,18 @@ export function CartSidebarHeader() {
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
-                setSaveMessage(data?.message || t("Erreur lors de la preparation du nouveau panier"));
+                setNewCartMessage(data?.message || t("Erreur lors de la preparation du nouveau panier"));
                 return;
             }
 
             clearCart();
-            setSaveMessage(t("Panier actif vide. Enregistrez pour creer un nouvel identifiant."));
+            setNewCartMessage(t("Panier actif vide. Enregistrez pour creer un nouvel identifiant."));
             router.reload({ only: ["cart", "cart_refresh_token"] });
         } catch (error) {
             console.error("Error creating new cart:", error);
-            setSaveMessage(t("Erreur lors de la preparation du nouveau panier"));
+            setNewCartMessage(t("Erreur lors de la preparation du nouveau panier"));
         } finally {
-            setIsSaving(false);
+            setIsPreparingNewCart(false);
         }
     };
 
@@ -190,7 +194,7 @@ export function CartSidebarHeader() {
                                         type="button"
                                         className="p-2 rounded hover:bg-muted disabled:opacity-50"
                                         onClick={handleSaveCart}
-                                        disabled={isSaving}
+                                        disabled={isBusy}
                                     >
                                         <SaveIcon className="size-5 text-primary" />
                                     </button>
@@ -203,7 +207,7 @@ export function CartSidebarHeader() {
                                     className="rounded"
                                     onClick={handleCreateNewCart}
                                     title={t("Creer un nouveau panier")}
-                                    disabled={isSaving}
+                                    disabled={isBusy}
                                 >
                                     <Badge variant="secondary">#{cartId}</Badge>
                                 </button>
@@ -215,7 +219,7 @@ export function CartSidebarHeader() {
                                         type="button"
                                         className={`p-2 rounded ${validateCartButtonClassName}`}
                                         onClick={() => router.visit('/cart/checkout')}
-                                        disabled={isSaving}
+                                        disabled={isBusy}
                                     >
                                         <CheckCircleIcon className="size-6" />
                                     </button>
@@ -225,17 +229,18 @@ export function CartSidebarHeader() {
 
 
                         <div className="flex-shrink-0">
+                            <div className="my-1 text-sm flex gap-2 items-center"><Flower2Icon size={20} /> : {total.toFixed(2)} €</div>
                             <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
                             <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
 
-                            {saveMessage && (
+                            {feedbackMessage && (
                                 <div
-                                    className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
+                                    className={`mt-2 text-sm p-2 rounded ${feedbackMessage.includes("Erreur")
                                         ? " text-destructive border border-destructive"
                                         : " text-green-600 border border-green-600"
                                         }`}
                                 >
-                                    {saveMessage}
+                                    {feedbackMessage}
                                 </div>
                             )}
                         </div>

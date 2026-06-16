@@ -71,9 +71,12 @@ export function CartItem({ product, quantity }: CartItemProps) {
 
                 {/* Infos produit */}
                 <div className="flex-1 min-w-0 pr-6">
-                    <h4 className="font-medium text-sm leading-tight line-clamp-2 mb-1">
+                    <h4 className="font-medium text-sm leading-tight line-clamp-2">
                         {product.name}
                     </h4>
+                    <div className="text-xs text-muted-foreground mb-2">
+                        {product.ref}
+                    </div>
                     <div className="text-xs text-muted-foreground mb-2">
                         {pricing.unitPrice.toFixed(2)} €
                     </div>

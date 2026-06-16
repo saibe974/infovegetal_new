@@ -170,6 +170,18 @@ export default function UserDbPage() {
     const processing = false;
     const [savingDbId, setSavingDbId] = useState<number | null>(null);
     const [contactSearchByDbId, setContactSearchByDbId] = useState<Record<number, { com: string; fact: string }>>({});
+    const [deliveryInputByDbId, setDeliveryInputByDbId] = useState<Record<number, string>>(() => {
+        const initial: Record<number, string> = {};
+
+        if (dbUserAttributes && typeof dbUserAttributes === 'object') {
+            Object.entries(dbUserAttributes).forEach(([dbId, attrs]) => {
+                const rawValue = (attrs as Partial<DbProductAttributes> | undefined)?.l;
+                initial[Number(dbId)] = rawValue === null || rawValue === undefined || rawValue === 0 ? '' : String(rawValue);
+            });
+        }
+
+        return initial;
+    });
 
     // Préparer la sélection initiale pour SearchSelect
     const initialSelection = useMemo(() => {
@@ -210,6 +222,21 @@ export default function UserDbPage() {
         }));
     };
 
+    const parseDeliveryValue = (value: string): number => {
+        const normalized = value.trim().replace(',', '.');
+        if (normalized === '') {
+            return 0;
+        }
+
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const commitDeliveryValue = (dbId: number) => {
+        const rawValue = deliveryInputByDbId[dbId] ?? '';
+        updateAttribute(dbId, 'l', parseDeliveryValue(rawValue));
+    };
+
     const updateContactSearch = (dbId: number, key: 'com' | 'fact', value: string) => {
         setContactSearchByDbId((prev) => ({
             ...prev,
@@ -222,7 +249,10 @@ export default function UserDbPage() {
     };
 
     const handleSaveDb = (dbId: number) => {
-        const attrs = attributesByDbId[dbId] ?? DEFAULT_ATTRIBUTES;
+        const attrs = {
+            ...(attributesByDbId[dbId] ?? DEFAULT_ATTRIBUTES),
+            l: parseDeliveryValue(deliveryInputByDbId[dbId] ?? ''),
+        };
 
         router.post(
             `/admin/users/${targetUser.id}/db`,
@@ -539,10 +569,15 @@ export default function UserDbPage() {
                                                     <FormField label={t('Delivery (€)')} htmlFor={`l-${dbId}`}>
                                                         <Input
                                                             id={`l-${dbId}`}
-                                                            type="number"
+                                                            type="text"
+                                                            inputMode="decimal"
                                                             step="0.01"
-                                                            value={attrs.l}
-                                                            onChange={(e) => updateAttribute(dbId, 'l', parseFloat(e.target.value) || 0)}
+                                                            value={deliveryInputByDbId[dbId] ?? (attrs.l ? String(attrs.l) : '')}
+                                                            onChange={(e) => setDeliveryInputByDbId((prev) => ({
+                                                                ...prev,
+                                                                [dbId]: e.target.value,
+                                                            }))}
+                                                            onBlur={() => commitDeliveryValue(dbId)}
                                                         />
                                                     </FormField>
 

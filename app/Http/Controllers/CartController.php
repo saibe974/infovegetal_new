@@ -110,7 +110,7 @@ class CartController extends Controller
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
-        $cart->shipping_total = round($shippingTotal, 2);
+        $cart->shipping_total = round((float) ($pdfPayload['shipping_total'] ?? $shippingTotal), 2);
         $cart->save();
 
         $orderNumber = $this->formatOrderNumber((int) $cart->id);

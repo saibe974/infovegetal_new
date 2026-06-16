@@ -302,7 +302,18 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
         };
     };
 
-    const rolls = useMemo(() => getUniqueRolls(data.zones), [data.zones]);
+    const rollsRef = useRef<string[]>([]);
+    const rolls = useMemo(() => {
+        const next = getUniqueRolls(data.zones);
+        if (
+            next.length === rollsRef.current.length &&
+            next.every((r, i) => r === rollsRef.current[i])
+        ) {
+            return rollsRef.current;
+        }
+        rollsRef.current = next;
+        return next;
+    }, [data.zones]);
     const zoneRows = useMemo<ZoneRow[]>(
         () => data.zones.map((zone, index) => ({ ...zone, __index: index })),
         [data.zones],
