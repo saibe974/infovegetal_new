@@ -641,6 +641,28 @@ const getEtageFillScore = (etage: Etage): number => {
     return Math.max(0, Math.min(100, fill));
 };
 
+const getRollFillRatio = (roll: Roll): number => {
+    const coef = Number.isFinite(roll.coef) ? roll.coef : 0;
+    const normalized = coef > 1 ? coef / 100 : coef;
+    return Math.max(0, Math.min(1, normalized));
+};
+
+const distributeSupplierPriceByFill = (supplierPrice: number, rolls: Roll[]): number[] => {
+    if (rolls.length === 0) {
+        return [];
+    }
+
+    const weights = rolls.map((roll) => 1 - getRollFillRatio(roll));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+
+    if (totalWeight <= 0) {
+        const fallback = supplierPrice / rolls.length;
+        return rolls.map(() => Math.round(fallback * 100) / 100);
+    }
+
+    return weights.map((weight) => Math.round((supplierPrice * weight / totalWeight) * 100) / 100);
+};
+
 export function ProductRoll({
     items,
     className,
@@ -706,102 +728,109 @@ export function ProductRoll({
                         </div>
                     ) : (
                         <div className="flex flex-wrap items-start justify-center gap-6">
-                            {supplier.rolls.map((roll, rollIndex) => {
-                                const rollWidth = Math.max(160, width);
-                                const rollHeight = Math.max(220, height);
-                                const rollPrice = getRollPrice
-                                    ? getRollPrice(supplier, roll, rollIndex)
-                                    : getSupplierPrice
-                                        ? getSupplierPrice(supplier)
-                                        : null;
-                                const rollBg = '';
-                                const rollBorder = 'border-[#ac9c9c]';
-                                return (
-                                    <div key={`${supplier.supplierId}-${rollIndex}`} className="m-5">
+                            {(() => {
+                                const supplierPrice = getSupplierPrice ? getSupplierPrice(supplier) : null;
+                                const fallbackRollPrices = supplierPrice !== null
+                                    ? distributeSupplierPriceByFill(supplierPrice, supplier.rolls)
+                                    : null;
 
-
-                                        <div
-                                            className={cn('relative', 'border-2 border-t-0 p-1', 'rounded-b-md', rollBorder, rollBg)}
-                                            style={{ width: rollWidth + 12, height: rollHeight + 12 }}
-                                        >
-                                            <div className="absolute left-[-20px] top-2 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
-                                                <CountryFlag countryCode={supplier.country} className="w-6" />
-                                            </div>
-
-                                            <div
-                                                className={cn(
-                                                    'absolute right-[-14px] top-2 w-9 border border-slate-900 bg-white text-[11px] font-semibold text-center shadow-sm',
-                                                    'bg-transparent'
-                                                )}
-                                            >
-                                                <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
-                                                    {roll.coef}%
-                                                </span>
-                                            </div>
-
-                                            <div className="absolute left-1/2 -translate-x-1/2 -top-[20px] flex items-center gap-2 text-[11px]">
-                                                <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
-                                                    {rollPrice !== null ? formatCurrency(rollPrice) : 'devis'}
-                                                </span>
-
-                                            </div>
+                                return supplier.rolls.map((roll, rollIndex) => {
+                                    const rollWidth = Math.max(160, width);
+                                    const rollHeight = Math.max(220, height);
+                                    const rollPrice = getRollPrice
+                                        ? getRollPrice(supplier, roll, rollIndex)
+                                        : fallbackRollPrices
+                                            ? fallbackRollPrices[rollIndex] ?? null
+                                            : null;
+                                    const rollBg = '';
+                                    const rollBorder = 'border-[#ac9c9c]';
+                                    return (
+                                        <div key={`${supplier.supplierId}-${rollIndex}`} className="m-5">
 
 
                                             <div
-                                                className={cn('flex h-full w-full flex-col-reverse justify-start gap-0 bg-transparent p-0', 'rounded-b-sm')}
-                                                style={{ width: rollWidth, height: rollHeight }}
+                                                className={cn('relative', 'border-2 border-t-0 p-1', 'rounded-b-md', rollBorder, rollBg)}
+                                                style={{ width: rollWidth + 12, height: rollHeight + 12 }}
                                             >
-                                                {[...roll.etages]
-                                                    .sort((a, b) => {
-                                                        const fillDelta = getEtageFillScore(b) - getEtageFillScore(a);
-                                                        if (Math.abs(fillDelta) > 0.0001) return fillDelta;
-                                                        return (b.y || 0) - (a.y || 0);
-                                                    })
-                                                    .map((etage, etageIndex) => {
-                                                        const isFull = etage.perte <= 5;
-                                                        return (
-                                                            <div
-                                                                key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}`}
-                                                                className={cn(
-                                                                    'flex items-end border-b border-slate-900',
-                                                                    isFull ? 'justify-between' : 'flex-wrap'
-                                                                )}
-                                                                style={{ marginTop: '2px' }}
-                                                            >
-                                                                {etage.items.map((productId, cartonIndex) => {
-                                                                    const product = productMap.get(productId);
-                                                                    const floor = Math.max(1, Math.floor(toNumber(product?.floor ?? 1)));
-                                                                    const rollCount = Math.max(1, Math.floor(toNumber(product?.roll ?? roll.nbetages)));
-                                                                    const cartonHeight = Math.max(12, Math.floor(rollHeight / rollCount));
-                                                                    const widthPx = Math.max(10, Math.floor((rollWidth - Math.floor(floor / 5)) * 100 / floor) / 100);
-                                                                    return (
-                                                                        <div
-                                                                            key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}-carton-${cartonIndex}`}
-                                                                            className={cn(
-                                                                                'flex items-center justify-center bg-slate-300 border border-slate-400',
-                                                                                isFull ? 'mr-0' : 'mr-px'
-                                                                            )}
-                                                                            style={{
-                                                                                width: widthPx,
-                                                                                height: cartonHeight,
-                                                                                backgroundColor: getColorForId(productId),
-                                                                            }}
-                                                                            title={product ? product.name : `Product ${productId}`}
-                                                                        />
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                <div className="absolute left-[-20px] top-2 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
+                                                    <CountryFlag countryCode={supplier.country} className="w-6" />
+                                                </div>
+
+                                                <div
+                                                    className={cn(
+                                                        'absolute right-[-14px] top-2 w-9 border border-slate-900 bg-white text-[11px] font-semibold text-center shadow-sm',
+                                                        'bg-transparent'
+                                                    )}
+                                                >
+                                                    <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
+                                                        {roll.coef}%
+                                                    </span>
+                                                </div>
+
+                                                <div className="absolute left-1/2 -translate-x-1/2 -top-[20px] flex items-center gap-2 text-[11px]">
+                                                    <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
+                                                        {rollPrice !== null ? formatCurrency(rollPrice) : 'devis'}
+                                                    </span>
+
+                                                </div>
+
+
+                                                <div
+                                                    className={cn('flex h-full w-full flex-col-reverse justify-start gap-0 bg-transparent p-0', 'rounded-b-sm')}
+                                                    style={{ width: rollWidth, height: rollHeight }}
+                                                >
+                                                    {[...roll.etages]
+                                                        .sort((a, b) => {
+                                                            const fillDelta = getEtageFillScore(b) - getEtageFillScore(a);
+                                                            if (Math.abs(fillDelta) > 0.0001) return fillDelta;
+                                                            return (b.y || 0) - (a.y || 0);
+                                                        })
+                                                        .map((etage, etageIndex) => {
+                                                            const isFull = etage.perte <= 5;
+                                                            return (
+                                                                <div
+                                                                    key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}`}
+                                                                    className={cn(
+                                                                        'flex items-end border-b border-slate-900',
+                                                                        isFull ? 'justify-between' : 'flex-wrap'
+                                                                    )}
+                                                                    style={{ marginTop: '2px' }}
+                                                                >
+                                                                    {etage.items.map((productId, cartonIndex) => {
+                                                                        const product = productMap.get(productId);
+                                                                        const floor = Math.max(1, Math.floor(toNumber(product?.floor ?? 1)));
+                                                                        const rollCount = Math.max(1, Math.floor(toNumber(product?.roll ?? roll.nbetages)));
+                                                                        const cartonHeight = Math.max(12, Math.floor(rollHeight / rollCount));
+                                                                        const widthPx = Math.max(10, Math.floor((rollWidth - Math.floor(floor / 5)) * 100 / floor) / 100);
+                                                                        return (
+                                                                            <div
+                                                                                key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}-carton-${cartonIndex}`}
+                                                                                className={cn(
+                                                                                    'flex items-center justify-center bg-slate-300 border border-slate-400',
+                                                                                    isFull ? 'mr-0' : 'mr-px'
+                                                                                )}
+                                                                                style={{
+                                                                                    width: widthPx,
+                                                                                    height: cartonHeight,
+                                                                                    backgroundColor: getColorForId(productId),
+                                                                                }}
+                                                                                title={product ? product.name : `Product ${productId}`}
+                                                                            />
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                </div>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between text-slate-400" style={{ width: rollWidth + 12 }}>
+                                                <span className="text-lg">⏻</span>
+                                                <span className="text-lg">⏻</span>
                                             </div>
                                         </div>
-                                        <div className="mt-1 flex items-center justify-between text-slate-400" style={{ width: rollWidth + 12 }}>
-                                            <span className="text-lg">⏻</span>
-                                            <span className="text-lg">⏻</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                });
+                            })()}
                         </div>
                     )}
                 </section>

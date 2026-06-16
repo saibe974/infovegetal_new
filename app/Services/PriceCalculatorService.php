@@ -241,11 +241,17 @@ class PriceCalculatorService
 
             $raw = strtolower(trim((string) $value));
 
-            if ($raw === 'price_depart') {
+            if ($raw === 'price_depart' || $raw === 'depart' || $raw === 'departure') {
                 return 0;
             }
 
-            if ($raw === 'price_render') {
+            if (
+                $raw === 'price_render'
+                || $raw === 'price_rendu'
+                || $raw === 'render'
+                || $raw === 'rendered'
+                || $raw === 'rendu'
+            ) {
                 return 1;
             }
 

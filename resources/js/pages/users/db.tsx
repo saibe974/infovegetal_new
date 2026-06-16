@@ -38,11 +38,11 @@ const normalizePriceMode = (value: unknown): string => {
 
     const raw = String(value).trim().toLowerCase();
 
-    if (raw === 'price_depart') {
+    if (raw === 'price_depart' || raw === 'depart' || raw === 'departure') {
         return 'price_depart';
     }
 
-    if (raw === 'price_render') {
+    if (raw === 'price_render' || raw === 'price_rendu' || raw === 'render' || raw === 'rendered' || raw === 'rendu') {
         return 'price_render';
     }
 

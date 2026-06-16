@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\Product;
+use App\Support\RenderedTransportCalculator;
 use App\Services\PdfRollDistributionService;
 use App\Services\CartTcpdfService;
 use App\Services\PriceCalculatorService;
@@ -830,7 +831,7 @@ class CartController extends Controller
 
             $carrierId = (int) ($attrs['t'] ?? 0);
             $zoneId = (int) ($attrs['z'] ?? 0);
-            $priceMode = (int) $this->tariffToFloat($attrs['p'] ?? 0);
+            $priceMode = $this->normalizeShippingPriceMode($attrs['p'] ?? 0);
             $rollCount = count($rolls);
 
             if ($carrierId > 0 && $zoneId > 0) {
@@ -841,21 +842,24 @@ class CartController extends Controller
                     $tariffs = is_array($zone->tariffs) ? $zone->tariffs : [];
                     $baseTariffPerRoll = $this->pickZoneTariff($rollCount, $tariffs);
                     $baseTotal = $baseTariffPerRoll * $rollCount;
+                    $carrierMinimum = max(0.0, $this->tariffToFloat($tariffs['mini'] ?? 0));
 
                     if ($priceMode === 1 && $rollCount > 0) {
-                        $adjustedTotal = 0.0;
+                        $fillRates = [];
                         foreach ($rolls as $roll) {
                             $coef = $this->tariffToFloat($roll['coef'] ?? 0);
-                            $ratioToPay = 1.0 - $this->tariffToFillRatio($coef);
-                            $adjustedTotal += $baseTariffPerRoll * $ratioToPay;
+                            $fillRates[] = $this->tariffToFillRatio($coef);
                         }
-                    } else {
-                        $adjustedTotal = $baseTariffPerRoll * $rollCount;
-                    }
 
-                    $mini = $this->tariffToFloat($tariffs['mini'] ?? 0);
-                    if ($mini > 0 && $baseTotal < $mini) {
-                        $adjustedTotal = max($adjustedTotal, $mini);
+                        $adjustedTotal = RenderedTransportCalculator::calculateRenderedTransportCost(
+                            $fillRates,
+                            $baseTariffPerRoll,
+                            $carrierMinimum,
+                        );
+                    } else {
+                        $adjustedTotal = $carrierMinimum > 0.0 && $baseTotal < $carrierMinimum
+                            ? $carrierMinimum
+                            : $baseTotal;
                     }
 
                     $taxgoRate = max(0.0, $this->tariffToFloat($carrier->taxgo ?? 0));
@@ -968,6 +972,20 @@ class CartController extends Controller
     {
         $normalized = $coef > 1.0 ? $coef / 100.0 : $coef;
         return max(0.0, min(1.0, $normalized));
+    }
+
+    private function normalizeShippingPriceMode(mixed $value): int
+    {
+        if (is_int($value) || is_float($value)) {
+            return ((int) $value) === 1 ? 1 : 0;
+        }
+
+        $raw = strtolower(trim((string) $value));
+        if ($raw === '1' || $raw === 'price_render') {
+            return 1;
+        }
+
+        return 0;
     }
 
     private function formatOrderNumber(int $cartId): string
