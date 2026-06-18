@@ -1,5 +1,5 @@
 import { withAppLayout } from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,10 @@ import ProductImportConfigPanel from '@/components/products/import-config-panel'
 import { useI18n } from '@/lib/i18n';
 import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
-import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
+import { ArrowLeftCircle, CirclePlusIcon, InfoIcon, PlusIcon, RowsIcon, SaveIcon, ShellIcon, TrashIcon } from 'lucide-react';
 import { FormEvent, useCallback, useMemo, useState } from 'react';
-import type { dbProduct } from '@/types';
+import type { SharedData, dbProduct } from '@/types';
+import { getEffectiveUser, isAdmin, isDev, hasPermission } from '@/lib/roles';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -40,6 +41,7 @@ type Props = {
 };
 
 type KVPair = { key: string; value: string };
+type EditTab = 'info' | 'billing' | 'mapping';
 
 const objectToKV = (obj: Record<string, unknown> | null | undefined): KVPair[] => {
     if (!obj) return [];
@@ -141,12 +143,18 @@ function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder =
 
 export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOptions, eligibleUsers }) => {
     const { t } = useI18n();
+
+    const { auth, locale } = usePage<SharedData>().props;
+    const effectiveUser = getEffectiveUser(auth);
+    // const canEdit = isDev(effectiveUser);// || hasPermission(effectiveUser, 'products.db_products');
+
     const isCreate = dbProduct.id == null;
     const categoryValueOptions = useMemo(
         () => categoryOptions.map((category) => ({ value: String(category.id), label: `${category.id} - ${category.name}` })),
         [categoryOptions],
     );
     const [billableUsersSearch, setBillableUsersSearch] = useState('');
+    const [activeTab, setActiveTab] = useState<EditTab>('info');
     const eligibleUserOptions = useMemo(
         () => (Array.isArray(eligibleUsers) ? eligibleUsers : []).map((user) => ({
             value: String(user.id),
@@ -207,174 +215,292 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
         <>
             <Head title={isCreate ? t('Add Database') : `${t('Edit')} — ${dbProduct.name}`} />
 
-            <form onSubmit={handleSubmit}>
-                <StickyBar className="mb-4">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href={dbProducts.index().url}>
-                            <ArrowLeftCircle size={16} className="mr-2" />
-                            {t('Back')}
-                        </Link>
-                    </Button>
-
-                    <div className="ml-auto flex items-center gap-2">
-                        <Button type="submit" size="sm" disabled={processing}>
-                            <SaveIcon size={16} className="mr-2" />
-                            {isCreate ? t('Create') : t('Save')}
+            <div className='space-y-6'>
+                <form onSubmit={handleSubmit}>
+                    <StickyBar className="mb-4">
+                        <Button asChild variant="ghost">
+                            <Link href={dbProducts.index().url}>
+                                <ArrowLeftCircle size={32} className="mr-2" />
+                                {dbProduct.name}
+                            </Link>
                         </Button>
-                    </div>
-                </StickyBar>
 
-                <div className="space-y-6 max-w-4xl mx-auto px-4">
+                        <div className="ml-auto flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant={activeTab === 'info' ? 'default' : 'outline'}
+                                onClick={() => setActiveTab('info')}
+                            >
+                                <InfoIcon size={32} className="mr-2" />
+                                {t('Info')}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={activeTab === 'billing' ? 'default' : 'outline'}
+                                onClick={() => setActiveTab('billing')}
+                            >
+                                <ShellIcon size={32} className="mr-2" />
+                                {t('Billing')}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={activeTab === 'mapping' ? 'default' : 'outline'}
+                                onClick={() => setActiveTab('mapping')}
+                            >
+                                <RowsIcon size={32} className="mr-2" />
+                                {t('Mapping')}
+                            </Button>
+                            <Button type="submit" disabled={processing}>
+                                <SaveIcon size={32} className="mr-2" />
+                                {isCreate ? t('Create') : t('Save')}
+                            </Button>
+                        </div>
+                    </StickyBar>
 
-                    {/* Infos générales */}
-                    <Card className="p-6 space-y-4">
-                        <h2 className="text-base font-semibold">{t('General information')}</h2>
-                        <Separator />
+                    <div className="space-y-6 w-full">
 
-                        <FormField label={t('Name')} htmlFor="db-name">
-                            <Input
-                                id="db-name"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                            />
-                            <InputError message={errors.name} />
-                        </FormField>
+                        {/* Infos générales */}
+                        {activeTab === 'info' && (
+                            <Card className="p-6 space-y-4">
+                                {/* <h2 className="text-base font-semibold">{t('General information')}</h2>
+                        <Separator /> */}
 
-                        <FormField label={t('Description')} htmlFor="db-description">
-                            <Input
-                                id="db-description"
-                                value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                            />
-                            <InputError message={errors.description} />
-                        </FormField>
+                                <FormField label={t('Name')} htmlFor="db-name">
+                                    <Input
+                                        id="db-name"
+                                        value={data.name}
+                                        onChange={(e) => setData('name', e.target.value)}
+                                    />
+                                    <InputError message={errors.name} />
+                                </FormField>
 
-                        <FormField label={t('Treatment file')} htmlFor="db-traitement">
-                            <Input
-                                id="db-traitement"
-                                placeholder="peplant"
-                                value={data.traitement}
-                                onChange={(e) => setData('traitement', e.target.value)}
-                            />
-                            <InputError message={errors.traitement} />
-                        </FormField>
+                                <FormField label={t('Description')} htmlFor="db-description">
+                                    <Input
+                                        id="db-description"
+                                        value={data.description}
+                                        onChange={(e) => setData('description', e.target.value)}
+                                    />
+                                    <InputError message={errors.description} />
+                                </FormField>
 
-                        <FormField label={t('Billing users')}>
-                            <SearchSelect
-                                value={billableUsersSearch}
-                                onChange={setBillableUsersSearch}
-                                onSubmit={(value) => {
-                                    const ids = value
-                                        .split(/\s+/)
-                                        .map((token) => Number(token))
-                                        .filter((id) => Number.isInteger(id) && id > 0);
-                                    setData('billable_user_ids', Array.from(new Set(ids)));
-                                    setBillableUsersSearch('');
-                                }}
-                                propositions={eligibleUserOptions}
-                                selection={billableSelection}
-                                loading={false}
-                                minQueryLength={0}
-                            />
-                            <InputError message={errorBag['billable_user_ids']} />
-                        </FormField>
+                                {isDev(effectiveUser) && (
+                                    <FormField label={t('Treatment file')} htmlFor="db-traitement">
+                                        <Input
+                                            id="db-traitement"
+                                            placeholder="peplant"
+                                            value={data.traitement}
+                                            onChange={(e) => setData('traitement', e.target.value)}
+                                        />
+                                        <InputError message={errors.traitement} />
+                                    </FormField>
+                                )}
 
-                        {isCreate ? (
-                            <div className="rounded border p-4 space-y-3">
-                                <div>
-                                    <h3 className="text-sm font-semibold">{t('Supplier import format')}</h3>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t('Create the supplier first, then upload a sample file to configure its import format.')}
-                                    </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FormField label={t('Country')} htmlFor="db-country">
+                                        <Input
+                                            id="db-country"
+                                            maxLength={2}
+                                            placeholder="fr"
+                                            value={data.country}
+                                            onChange={(e) => setData('country', e.target.value.toLowerCase())}
+                                        />
+                                        <InputError message={errors.country} />
+                                    </FormField>
+
+                                    <FormField label={t('Delivery mode')} htmlFor="db-mod-liv">
+                                        <Input
+                                            id="db-mod-liv"
+                                            value={data.mod_liv}
+                                            onChange={(e) => setData('mod_liv', e.target.value)}
+                                        />
+                                        <InputError message={errorBag['mod_liv']} />
+                                    </FormField>
+
+                                    <FormField label={t('Minimum rolls')} htmlFor="db-mini">
+                                        <Input
+                                            id="db-mini"
+                                            type="number"
+                                            min={0}
+                                            value={data.mini}
+                                            onChange={(e) => setData('mini', e.target.value)}
+                                        />
+                                        <InputError message={errors.mini} />
+                                    </FormField>
                                 </div>
 
-                                <Button type="button" variant="outline" className="w-full" disabled>
-                                    {t('Upload sample file')}
-                                </Button>
-                            </div>
-                        ) : (
-                            <ProductImportConfigPanel
-                                dbProductId={dbProduct.id as number}
-                                headerRowIndex={dbProduct.header_row_index}
-                                sourceDelimiter={dbProduct.source_delimiter}
-                            />
+                            </Card>
                         )}
-                    </Card>
 
-                    {/* Livraison */}
-                    <Card className="p-6 space-y-4">
-                        <h2 className="text-base font-semibold">{t('Shipping')}</h2>
-                        <Separator />
+                        {/* Billing */}
+                        {activeTab === 'billing' && (
+                            <div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
+                                <Card className="p-6 space-y-4">
+                                    <FormField label={t('Billing users')}>
+                                        <SearchSelect
+                                            value={billableUsersSearch}
+                                            onChange={setBillableUsersSearch}
+                                            onSubmit={(value) => {
+                                                const ids = value
+                                                    .split(/\s+/)
+                                                    .map((token) => Number(token))
+                                                    .filter((id) => Number.isInteger(id) && id > 0);
+                                                setData('billable_user_ids', Array.from(new Set(ids)));
+                                                setBillableUsersSearch('');
+                                            }}
+                                            propositions={eligibleUserOptions}
+                                            selection={billableSelection}
+                                            loading={false}
+                                            minQueryLength={0}
+                                        />
+                                        <InputError message={errorBag['billable_user_ids']} />
+                                    </FormField>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FormField label={t('Country')} htmlFor="db-country">
-                                <Input
-                                    id="db-country"
-                                    maxLength={2}
-                                    placeholder="fr"
-                                    value={data.country}
-                                    onChange={(e) => setData('country', e.target.value.toLowerCase())}
+
+                                </Card>
+
+                                <Card className='p-6 xl:col-span-2 space-y-4'>
+                                    <FormField label={t('Default marges')}>
+                                        <Button title={t('Add')} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
+                                            <CirclePlusIcon />
+                                        </Button>
+                                        {/* Section Marges */}
+                                        <div className="space-y-6 ">
+                                            <h3 className="text-md font-semibold">{t('Margin')}</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <FormField label={t('General margin (%)')}>
+                                                    <Input
+                                                        // id={`m-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.m}
+                                                    // onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+
+                                                <FormField label={t('Minimum margin per roll (€)')}>
+                                                    <Input
+                                                        // id={`mm-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.mm}
+                                                    // onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+
+                                                <FormField label={t('Ponderation coefficient (%)')}>
+                                                    <Input
+                                                        // id={`pd-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.pd}
+                                                    // onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+
+                                                {/* </div> */}
+                                                {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
+                                                <FormField label={t('Margin per carton (%)')}>
+                                                    <Input
+                                                        // id={`mc-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.mc}
+                                                    // onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+
+                                                <FormField label={t('Margin per level (%)')}>
+                                                    <Input
+                                                        // id={`me-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.me}
+                                                    // onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+
+                                                <FormField label={t('Margin per roll (%)')}>
+                                                    <Input
+                                                        // id={`mr-${dbId}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                    // value={attrs.mr}
+                                                    // onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
+                                                    />
+                                                </FormField>
+                                            </div>
+
+                                        </div>
+                                    </FormField>
+                                </Card>
+                            </div>
+                        )}
+
+                        {/* mapping Champs */}
+                        {activeTab === 'mapping' && (
+                            <Card className="p-6 space-y-4">
+
+                                <h2 className="text-base font-semibold">{t('Column mapping (champs)')}</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {t('Map CSV column headers to internal product fields.')}
+                                </p>
+
+                                {isCreate ? (
+                                    <div className="rounded border p-4 space-y-3">
+                                        <div>
+                                            <h3 className="text-sm font-semibold">{t('Supplier import format')}</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                {t('Create the supplier first, then upload a sample file to configure its import format.')}
+                                            </p>
+                                        </div>
+
+                                        <Button type="button" variant="outline" className="w-full" disabled>
+                                            {t('Upload sample file')}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <ProductImportConfigPanel
+                                        dbProductId={dbProduct.id as number}
+                                        headerRowIndex={dbProduct.header_row_index}
+                                        sourceDelimiter={dbProduct.source_delimiter}
+                                    />
+                                )}
+
+
+
+                                <Separator />
+                                <KVEditor
+                                    pairs={data.champs}
+                                    onChange={updateChamps}
+                                    keyPlaceholder={t('CSV column')}
+                                    valuePlaceholder={t('Product field')}
+                                    error={errorBag['champs']}
                                 />
-                                <InputError message={errors.country} />
-                            </FormField>
+                            </Card>
+                        )}
 
-                            <FormField label={t('Delivery mode')} htmlFor="db-mod-liv">
-                                <Input
-                                    id="db-mod-liv"
-                                    value={data.mod_liv}
-                                    onChange={(e) => setData('mod_liv', e.target.value)}
+                        {/* mapping Categories */}
+                        {activeTab === 'mapping' && (
+                            <Card className="p-6 space-y-4">
+                                <h2 className="text-base font-semibold">{t('Category mapping (categories)')}</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {t('Map category slugs from the supplier to internal category IDs.')}
+                                </p>
+                                <Separator />
+                                <KVEditor
+                                    pairs={data.categories}
+                                    onChange={updateCategories}
+                                    keyPlaceholder={t('Supplier slug')}
+                                    valuePlaceholder={t('Category ID')}
+                                    error={errorBag['categories']}
+                                    unknownValueLabel={t('Unknown category')}
+                                    valueOptions={categoryValueOptions}
                                 />
-                                <InputError message={errorBag['mod_liv']} />
-                            </FormField>
-
-                            <FormField label={t('Minimum rolls')} htmlFor="db-mini">
-                                <Input
-                                    id="db-mini"
-                                    type="number"
-                                    min={0}
-                                    value={data.mini}
-                                    onChange={(e) => setData('mini', e.target.value)}
-                                />
-                                <InputError message={errors.mini} />
-                            </FormField>
-                        </div>
-                    </Card>
-
-                    {/* Champs */}
-                    <Card className="p-6 space-y-4">
-                        <h2 className="text-base font-semibold">{t('Column mapping (champs)')}</h2>
-                        <p className="text-sm text-muted-foreground">
-                            {t('Map CSV column headers to internal product fields.')}
-                        </p>
-                        <Separator />
-                        <KVEditor
-                            pairs={data.champs}
-                            onChange={updateChamps}
-                            keyPlaceholder={t('CSV column')}
-                            valuePlaceholder={t('Product field')}
-                            error={errorBag['champs']}
-                        />
-                    </Card>
-
-                    {/* Categories */}
-                    <Card className="p-6 space-y-4">
-                        <h2 className="text-base font-semibold">{t('Category mapping (categories)')}</h2>
-                        <p className="text-sm text-muted-foreground">
-                            {t('Map category slugs from the supplier to internal category IDs.')}
-                        </p>
-                        <Separator />
-                        <KVEditor
-                            pairs={data.categories}
-                            onChange={updateCategories}
-                            keyPlaceholder={t('Supplier slug')}
-                            valuePlaceholder={t('Category ID')}
-                            error={errorBag['categories']}
-                            unknownValueLabel={t('Unknown category')}
-                            valueOptions={categoryValueOptions}
-                        />
-                    </Card>
-                </div>
-            </form>
+                            </Card>
+                        )}
+                    </div>
+                </form >
+            </div >
         </>
     );
 });

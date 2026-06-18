@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import { ArrowRightCircleIcon } from 'lucide-react';
 
 type DbProductAttributes = {
     m: number;          // marge en %
@@ -272,355 +274,367 @@ export default function UserDbPage() {
     };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        < AppLayout breadcrumbs={breadcrumbs} >
+
             <Head title={t('User database association')} />
 
             <SettingsLayout>
-                <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
-                    <Card className="p-6">
-                        <div className="flex flex-col gap-6">
-                            <FormField label={t('Select DB product')}>
-                                <SearchSelect
-                                    value={search}
-                                    onChange={(v) => setSearch(v)}
-                                    onSubmit={(s) => {
-                                        const names = s && s.trim() ? s.trim().split(/\s+/) : [];
-                                        const ids = (names || []).map((name) => {
-                                            const found = dbProducts.find((d) => d.name === name);
-                                            return found ? found.id : null;
-                                        }).filter((v) => v !== null) as number[];
-                                        setSelectedIds(ids);
-                                    }}
-                                    propositions={dbProducts.map((d) => d.name)}
-                                    selection={initialSelection}
-                                    loading={false}
-                                    minQueryLength={0}
-                                />
+                <div className=''>
+                    <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
+                        {/* <StickyBar className="mb-4">
 
-                                {/* Hidden inputs for selected ids */}
-                                {(selectedIds || []).map((id) => (
-                                    <input key={id} type="hidden" name="db_ids[]" value={id} />
-                                ))}
-                            </FormField>
+                        </StickyBar> */}
+
+                        <div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
+                            <Card className="p-6 space-y-4">
+                                <div className="flex flex-col gap-6">
+                                    <FormField label={t('Select DB product')}>
+                                        <SearchSelect
+                                            value={search}
+                                            onChange={(v) => setSearch(v)}
+                                            onSubmit={(s) => {
+                                                const names = s && s.trim() ? s.trim().split(/\s+/) : [];
+                                                const ids = (names || []).map((name) => {
+                                                    const found = dbProducts.find((d) => d.name === name);
+                                                    return found ? found.id : null;
+                                                }).filter((v) => v !== null) as number[];
+                                                setSelectedIds(ids);
+                                            }}
+                                            propositions={dbProducts.map((d) => d.name)}
+                                            selection={initialSelection}
+                                            loading={false}
+                                            minQueryLength={0}
+                                        />
+
+                                        {/* Hidden inputs for selected ids */}
+                                        {(selectedIds || []).map((id) => (
+                                            <input key={id} type="hidden" name="db_ids[]" value={id} />
+                                        ))}
+                                    </FormField>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    <Button disabled={processing} type="submit">{t('Save')}</Button>
+                                </div>
+                            </Card>
+
+                            <Card className='p-6 xl:col-span-2 space-y-4'>
+                                {/* Formulaires d'attributs pour chaque DB sélectionné */}
+                                {selectedIds.length > 0 && (
+                                    <div className="mt-6 space-y-4">
+                                        {selectedIds.map((dbId) => {
+                                            const db = dbProducts.find((d) => d.id === dbId);
+                                            const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
+                                            const commercialOption = attrs.com ? commercialUserOptionById.get(attrs.com) : undefined;
+                                            const facturantOption = attrs.fact ? billableUserOptionById.get(attrs.fact) : undefined;
+                                            const commercialSelection = commercialOption ? [commercialOption] : [];
+                                            const facturantSelection = facturantOption ? [facturantOption] : [];
+                                            const dbBillableUserOptions = billableUserOptionsByDbId.get(dbId) ?? [];
+
+                                            return (
+                                                <Card key={dbId}>
+                                                    <CardHeader>
+                                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                                            <div>
+                                                                <CardTitle className='text-lg'>{db ? db.name : `DB #${dbId}`}</CardTitle>
+                                                                {db?.description && (
+                                                                    <CardDescription>{db.description}</CardDescription>
+                                                                )}
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                onClick={() => handleSaveDb(dbId)}
+                                                                disabled={savingDbId === dbId}
+                                                            >
+                                                                {savingDbId === dbId ? t('Saving...') : t('Save')}
+                                                            </Button>
+                                                        </div>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-6">
+                                                        {/* Section Contacts */}
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <FormField label="Facturant" htmlFor={`fact-${dbId}`}>
+                                                                    <SearchSelect
+                                                                        value={contactSearchByDbId[dbId]?.fact ?? ''}
+                                                                        onChange={(value) => updateContactSearch(dbId, 'fact', value)}
+                                                                        onSubmit={(value) => {
+                                                                            const tokens = value.trim().split(/\s+/).filter(Boolean);
+                                                                            const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
+                                                                            const nextId = nextValue ? Number(nextValue) : null;
+                                                                            updateAttribute(dbId, 'fact', Number.isFinite(nextId) ? nextId : null);
+                                                                            updateContactSearch(dbId, 'fact', '');
+                                                                        }}
+                                                                        propositions={dbBillableUserOptions}
+                                                                        selection={facturantSelection}
+                                                                        loading={false}
+                                                                        minQueryLength={0}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label="Commercial" htmlFor={`com-${dbId}`}>
+                                                                    <SearchSelect
+                                                                        value={contactSearchByDbId[dbId]?.com ?? ''}
+                                                                        onChange={(value) => updateContactSearch(dbId, 'com', value)}
+                                                                        onSubmit={(value) => {
+                                                                            const tokens = value.trim().split(/\s+/).filter(Boolean);
+                                                                            const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
+                                                                            const nextId = nextValue ? Number(nextValue) : null;
+                                                                            updateAttribute(dbId, 'com', Number.isFinite(nextId) ? nextId : null);
+                                                                            updateContactSearch(dbId, 'com', '');
+                                                                        }}
+                                                                        propositions={commercialUserOptions}
+                                                                        selection={commercialSelection}
+                                                                        loading={false}
+                                                                        minQueryLength={0}
+                                                                    />
+                                                                </FormField>
+                                                            </div>
+                                                        </div>
+
+                                                        <Separator />
+
+                                                        {/* Section Marges */}
+                                                        <div className="space-y-6 ">
+                                                            <h3 className="text-md font-semibold">{t('Margin')}</h3>
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                                <FormField label={t('Margin category')} htmlFor={`c-${dbId}`}>
+                                                                    <Input
+                                                                        id={`c-${dbId}`}
+                                                                        type="text"
+                                                                        value={attrs.c}
+                                                                        onChange={(e) => updateAttribute(dbId, 'c', e.target.value)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('General margin (%)')} htmlFor={`m-${dbId}`}>
+                                                                    <Input
+                                                                        id={`m-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.m}
+                                                                        onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('Minimum margin per roll (€)')} htmlFor={`mm-${dbId}`}>
+                                                                    <Input
+                                                                        id={`mm-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.mm}
+                                                                        onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+                                                                {/* </div> */}
+                                                                {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
+                                                                <FormField label={t('Margin per carton (%)')} htmlFor={`mc-${dbId}`}>
+                                                                    <Input
+                                                                        id={`mc-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.mc}
+                                                                        onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('Margin per level (%)')} htmlFor={`me-${dbId}`}>
+                                                                    <Input
+                                                                        id={`me-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.me}
+                                                                        onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('Margin per roll (%)')} htmlFor={`mr-${dbId}`}>
+                                                                    <Input
+                                                                        id={`mr-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.mr}
+                                                                        onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+                                                            </div>
+
+                                                        </div>
+
+                                                        <Separator />
+
+                                                        {/* Section Prix et Pondération */}
+                                                        <div className="space-y-6">
+                                                            <h3 className="text-md font-semibold">{t('Price and Weighting')}</h3>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <FormField label={t('Price mode')} htmlFor={`p-${dbId}`}>
+                                                                    <Select
+                                                                        value={normalizePriceMode(attrs.p)}
+                                                                        onValueChange={(value) => updateAttribute(dbId, 'p', value)}
+                                                                    >
+                                                                        <SelectTrigger id={`p-${dbId}`}>
+                                                                            <SelectValue />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
+                                                                            <SelectItem value="price_depart">{t('Departure price')}</SelectItem>
+                                                                            <SelectItem value="price_render">{t('Rendered price')}</SelectItem>
+                                                                            <SelectItem value="price">{t('Base price')}</SelectItem>
+                                                                            <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
+                                                                            <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
+                                                                            <SelectItem value="price_promo">{t('Promo price')}</SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </FormField>
+
+                                                                <FormField label={t('Ponderation coefficient (%)')} htmlFor={`pd-${dbId}`}>
+                                                                    <Input
+                                                                        id={`pd-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.pd}
+                                                                        onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+
+                                                            </div>
+                                                        </div>
+
+                                                        <Separator />
+
+                                                        {/* Section Livraison et TVA */}
+                                                        <div className="space-y-6">
+                                                            <h3 className="text-md font-semibold">{t('Delivery and VAT')}</h3>
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                                                                <FormField label={t('Higher roll')} htmlFor={`h-${dbId}`} >
+                                                                    <Input
+                                                                        id={`h-${dbId}`}
+                                                                        type="checkbox"
+                                                                        // step="0.01"
+                                                                        checked={attrs.h === 1}
+                                                                        // defaultChecked={attrs.h === 1}
+                                                                        value={attrs.h}
+                                                                        onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                    {/* <Checkbox id={`h-${dbId}`} checked={attrs.h === 1} onCheckedChange={(checked) => updateAttribute(dbId, 'h', checked ? 1 : 0)} /> */}
+
+                                                                </FormField>
+
+                                                                <FormField label={t('Carrier')} htmlFor={`t-${dbId}`}>
+                                                                    <Select
+                                                                        value={attrs.t !== null ? String(attrs.t) : 'none'}
+                                                                        onValueChange={(value) => {
+                                                                            const carrierId = value === 'none' ? null : Number(value);
+                                                                            const selectedCarrier = carrierOptions.find((c) => c.id === carrierId);
+                                                                            const selectedZones = selectedCarrier?.zones ?? [];
+
+                                                                            updateAttribute(dbId, 't', carrierId);
+                                                                            updateAttribute(
+                                                                                dbId,
+                                                                                'z',
+                                                                                carrierId && selectedZones.some((zone) => zone.id === attrs.z)
+                                                                                    ? attrs.z
+                                                                                    : null,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <SelectTrigger id={`t-${dbId}`}>
+                                                                            <SelectValue placeholder="Sélectionner un transporteur" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                                            {carrierOptions.map((carrier) => (
+                                                                                <SelectItem key={carrier.id} value={String(carrier.id)}>
+                                                                                    {carrier.name}{carrier.country ? ` (${carrier.country})` : ''}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </FormField>
+
+                                                                <FormField label={t('Zone')} htmlFor={`z-${dbId}`}>
+                                                                    <Select
+                                                                        value={attrs.z !== null ? String(attrs.z) : 'none'}
+                                                                        onValueChange={(value) => updateAttribute(dbId, 'z', value === 'none' ? null : Number(value))}
+                                                                        disabled={!attrs.t}
+                                                                    >
+                                                                        <SelectTrigger id={`z-${dbId}`}>
+                                                                            <SelectValue placeholder={t('Select a zone')} />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                                            {(carrierOptions.find((c) => c.id === attrs.t)?.zones ?? []).map((zone) => (
+                                                                                <SelectItem key={zone.id} value={String(zone.id)}>
+                                                                                    {zone.name}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                </FormField>
+
+                                                                <FormField label={t('Delivery (€)')} htmlFor={`l-${dbId}`}>
+                                                                    <Input
+                                                                        id={`l-${dbId}`}
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        step="0.01"
+                                                                        value={deliveryInputByDbId[dbId] ?? (attrs.l ? String(attrs.l) : '')}
+                                                                        onChange={(e) => setDeliveryInputByDbId((prev) => ({
+                                                                            ...prev,
+                                                                            [dbId]: e.target.value,
+                                                                        }))}
+                                                                        onBlur={() => commitDeliveryValue(dbId)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('Product VAT (%)')} htmlFor={`tvap-${dbId}`}>
+                                                                    <Input
+                                                                        id={`tvap-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.tvap}
+                                                                        onChange={(e) => updateAttribute(dbId, 'tvap', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </FormField>
+
+                                                                <FormField label={t('Transport VAT (%)')} htmlFor={`tvat-${dbId}`}>
+                                                                    <Input
+                                                                        id={`tvat-${dbId}`}
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        value={attrs.tvat ?? ''}
+                                                                        onChange={(e) => updateAttribute(dbId, 'tvat', e.target.value ? parseFloat(e.target.value) : null)}
+                                                                    />
+                                                                </FormField>
+                                                            </div>
+                                                        </div>
+
+                                                        <Separator />
+
+
+
+                                                        {/* Champ caché pour envoyer le JSON au backend */}
+                                                        <input
+                                                            type="hidden"
+                                                            name={`attributes[${dbId}]`}
+                                                            value={JSON.stringify(attrs)}
+                                                        />
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </Card>
                         </div>
+                    </Form>
 
-                        <div className="flex items-center gap-4">
-                            <Button disabled={processing} type="submit">{t('Save')}</Button>
-                        </div>
-                    </Card>
-
-                    {/* Formulaires d'attributs pour chaque DB sélectionné */}
-                    {selectedIds.length > 0 && (
-                        <div className="mt-6 space-y-4">
-                            {selectedIds.map((dbId) => {
-                                const db = dbProducts.find((d) => d.id === dbId);
-                                const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
-                                const commercialOption = attrs.com ? commercialUserOptionById.get(attrs.com) : undefined;
-                                const facturantOption = attrs.fact ? billableUserOptionById.get(attrs.fact) : undefined;
-                                const commercialSelection = commercialOption ? [commercialOption] : [];
-                                const facturantSelection = facturantOption ? [facturantOption] : [];
-                                const dbBillableUserOptions = billableUserOptionsByDbId.get(dbId) ?? [];
-
-                                return (
-                                    <Card key={dbId}>
-                                        <CardHeader>
-                                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                                <div>
-                                                    <CardTitle className='text-lg'>{db ? db.name : `DB #${dbId}`}</CardTitle>
-                                                    {db?.description && (
-                                                        <CardDescription>{db.description}</CardDescription>
-                                                    )}
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    onClick={() => handleSaveDb(dbId)}
-                                                    disabled={savingDbId === dbId}
-                                                >
-                                                    {savingDbId === dbId ? t('Saving...') : t('Save')}
-                                                </Button>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-6">
-                                            {/* Section Contacts */}
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <FormField label="Facturant" htmlFor={`fact-${dbId}`}>
-                                                        <SearchSelect
-                                                            value={contactSearchByDbId[dbId]?.fact ?? ''}
-                                                            onChange={(value) => updateContactSearch(dbId, 'fact', value)}
-                                                            onSubmit={(value) => {
-                                                                const tokens = value.trim().split(/\s+/).filter(Boolean);
-                                                                const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
-                                                                const nextId = nextValue ? Number(nextValue) : null;
-                                                                updateAttribute(dbId, 'fact', Number.isFinite(nextId) ? nextId : null);
-                                                                updateContactSearch(dbId, 'fact', '');
-                                                            }}
-                                                            propositions={dbBillableUserOptions}
-                                                            selection={facturantSelection}
-                                                            loading={false}
-                                                            minQueryLength={0}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label="Commercial" htmlFor={`com-${dbId}`}>
-                                                        <SearchSelect
-                                                            value={contactSearchByDbId[dbId]?.com ?? ''}
-                                                            onChange={(value) => updateContactSearch(dbId, 'com', value)}
-                                                            onSubmit={(value) => {
-                                                                const tokens = value.trim().split(/\s+/).filter(Boolean);
-                                                                const nextValue = tokens.length > 0 ? tokens[tokens.length - 1] : '';
-                                                                const nextId = nextValue ? Number(nextValue) : null;
-                                                                updateAttribute(dbId, 'com', Number.isFinite(nextId) ? nextId : null);
-                                                                updateContactSearch(dbId, 'com', '');
-                                                            }}
-                                                            propositions={commercialUserOptions}
-                                                            selection={commercialSelection}
-                                                            loading={false}
-                                                            minQueryLength={0}
-                                                        />
-                                                    </FormField>
-                                                </div>
-                                            </div>
-
-                                            <Separator />
-
-                                            {/* Section Marges */}
-                                            <div className="space-y-6 ">
-                                                <h3 className="text-md font-semibold">{t('Margin')}</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <FormField label={t('Margin category')} htmlFor={`c-${dbId}`}>
-                                                        <Input
-                                                            id={`c-${dbId}`}
-                                                            type="text"
-                                                            value={attrs.c}
-                                                            onChange={(e) => updateAttribute(dbId, 'c', e.target.value)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('General margin (%)')} htmlFor={`m-${dbId}`}>
-                                                        <Input
-                                                            id={`m-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.m}
-                                                            onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('Minimum margin per roll (€)')} htmlFor={`mm-${dbId}`}>
-                                                        <Input
-                                                            id={`mm-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.mm}
-                                                            onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    {/* </div> */}
-                                                    {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
-                                                    <FormField label={t('Margin per carton (%)')} htmlFor={`mc-${dbId}`}>
-                                                        <Input
-                                                            id={`mc-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.mc}
-                                                            onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('Margin per level (%)')} htmlFor={`me-${dbId}`}>
-                                                        <Input
-                                                            id={`me-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.me}
-                                                            onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('Margin per roll (%)')} htmlFor={`mr-${dbId}`}>
-                                                        <Input
-                                                            id={`mr-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.mr}
-                                                            onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-                                                </div>
-
-                                            </div>
-
-                                            <Separator />
-
-                                            {/* Section Prix et Pondération */}
-                                            <div className="space-y-6">
-                                                <h3 className="text-md font-semibold">{t('Price and Weighting')}</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <FormField label={t('Price mode')} htmlFor={`p-${dbId}`}>
-                                                        <Select
-                                                            value={normalizePriceMode(attrs.p)}
-                                                            onValueChange={(value) => updateAttribute(dbId, 'p', value)}
-                                                        >
-                                                            <SelectTrigger id={`p-${dbId}`}>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
-                                                                <SelectItem value="price_depart">{t('Departure price')}</SelectItem>
-                                                                <SelectItem value="price_render">{t('Rendered price')}</SelectItem>
-                                                                <SelectItem value="price">{t('Base price')}</SelectItem>
-                                                                <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
-                                                                <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
-                                                                <SelectItem value="price_promo">{t('Promo price')}</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormField>
-
-                                                    <FormField label={t('Ponderation coefficient (%)')} htmlFor={`pd-${dbId}`}>
-                                                        <Input
-                                                            id={`pd-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.pd}
-                                                            onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-
-                                                </div>
-                                            </div>
-
-                                            <Separator />
-
-                                            {/* Section Livraison et TVA */}
-                                            <div className="space-y-6">
-                                                <h3 className="text-md font-semibold">{t('Delivery and VAT')}</h3>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                                                    <FormField label={t('Higher roll')} htmlFor={`h-${dbId}`} >
-                                                        <Input
-                                                            id={`h-${dbId}`}
-                                                            type="checkbox"
-                                                            // step="0.01"
-                                                            checked={attrs.h === 1}
-                                                            // defaultChecked={attrs.h === 1}
-                                                            value={attrs.h}
-                                                            onChange={(e) => updateAttribute(dbId, 'h', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                        {/* <Checkbox id={`h-${dbId}`} checked={attrs.h === 1} onCheckedChange={(checked) => updateAttribute(dbId, 'h', checked ? 1 : 0)} /> */}
-
-                                                    </FormField>
-
-                                                    <FormField label={t('Carrier')} htmlFor={`t-${dbId}`}>
-                                                        <Select
-                                                            value={attrs.t !== null ? String(attrs.t) : 'none'}
-                                                            onValueChange={(value) => {
-                                                                const carrierId = value === 'none' ? null : Number(value);
-                                                                const selectedCarrier = carrierOptions.find((c) => c.id === carrierId);
-                                                                const selectedZones = selectedCarrier?.zones ?? [];
-
-                                                                updateAttribute(dbId, 't', carrierId);
-                                                                updateAttribute(
-                                                                    dbId,
-                                                                    'z',
-                                                                    carrierId && selectedZones.some((zone) => zone.id === attrs.z)
-                                                                        ? attrs.z
-                                                                        : null,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <SelectTrigger id={`t-${dbId}`}>
-                                                                <SelectValue placeholder="Sélectionner un transporteur" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">{t('None')}</SelectItem>
-                                                                {carrierOptions.map((carrier) => (
-                                                                    <SelectItem key={carrier.id} value={String(carrier.id)}>
-                                                                        {carrier.name}{carrier.country ? ` (${carrier.country})` : ''}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormField>
-
-                                                    <FormField label={t('Zone')} htmlFor={`z-${dbId}`}>
-                                                        <Select
-                                                            value={attrs.z !== null ? String(attrs.z) : 'none'}
-                                                            onValueChange={(value) => updateAttribute(dbId, 'z', value === 'none' ? null : Number(value))}
-                                                            disabled={!attrs.t}
-                                                        >
-                                                            <SelectTrigger id={`z-${dbId}`}>
-                                                                <SelectValue placeholder={t('Select a zone')} />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">{t('None')}</SelectItem>
-                                                                {(carrierOptions.find((c) => c.id === attrs.t)?.zones ?? []).map((zone) => (
-                                                                    <SelectItem key={zone.id} value={String(zone.id)}>
-                                                                        {zone.name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </FormField>
-
-                                                    <FormField label={t('Delivery (€)')} htmlFor={`l-${dbId}`}>
-                                                        <Input
-                                                            id={`l-${dbId}`}
-                                                            type="text"
-                                                            inputMode="decimal"
-                                                            step="0.01"
-                                                            value={deliveryInputByDbId[dbId] ?? (attrs.l ? String(attrs.l) : '')}
-                                                            onChange={(e) => setDeliveryInputByDbId((prev) => ({
-                                                                ...prev,
-                                                                [dbId]: e.target.value,
-                                                            }))}
-                                                            onBlur={() => commitDeliveryValue(dbId)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('Product VAT (%)')} htmlFor={`tvap-${dbId}`}>
-                                                        <Input
-                                                            id={`tvap-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.tvap}
-                                                            onChange={(e) => updateAttribute(dbId, 'tvap', parseFloat(e.target.value) || 0)}
-                                                        />
-                                                    </FormField>
-
-                                                    <FormField label={t('Transport VAT (%)')} htmlFor={`tvat-${dbId}`}>
-                                                        <Input
-                                                            id={`tvat-${dbId}`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={attrs.tvat ?? ''}
-                                                            onChange={(e) => updateAttribute(dbId, 'tvat', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                    </FormField>
-                                                </div>
-                                            </div>
-
-                                            <Separator />
-
-
-
-                                            {/* Champ caché pour envoyer le JSON au backend */}
-                                            <input
-                                                type="hidden"
-                                                name={`attributes[${dbId}]`}
-                                                value={JSON.stringify(attrs)}
-                                            />
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    )}
-                </Form>
+                </div>
             </SettingsLayout>
-        </AppLayout>
+        </AppLayout >
     );
 }
