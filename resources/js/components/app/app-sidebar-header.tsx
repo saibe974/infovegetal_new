@@ -82,6 +82,7 @@ export function AppSidebarHeader({
 
     const isHomePage = page.component === 'home';
     const isCartCheckoutPage = page.url.split('?')[0] === '/cart/checkout';
+    const isRightSidebarOpen = isOpenId('right');
 
     const { items } = useContext(CartContext);
 
@@ -338,12 +339,16 @@ export function AppSidebarHeader({
                                         type="button"
                                         aria-disabled="true"
                                         tabIndex={-1}
-                                        className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground/60 cursor-default"
+                                        className="flex items-center justify-center rounded-md p-1.5 bg-accent text-accent-foreground cursor-default"
                                     >
                                         <ShoppingCart className="size-5" />
                                     </button>
                                 ) : (
-                                    <SidebarTrigger className="" targetId='right' icon={ShoppingCart} />
+                                    <SidebarTrigger
+                                        className={cn(isRightSidebarOpen && 'bg-accent text-accent-foreground')}
+                                        targetId='right'
+                                        icon={ShoppingCart}
+                                    />
                                 )}
                                 <Badge
                                     // variant={"destructive"}

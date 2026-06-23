@@ -11,7 +11,7 @@ import {
 } from "../ui/sidebar";
 import { CartContext } from "./cart.context";
 import { useCartOrder } from "./cart-order.context";
-import { router, usePage } from "@inertiajs/react";
+import { router, usePage, Link } from "@inertiajs/react";
 import { CartItem } from "./cart-item";
 import { getCartPricing } from "./cart-pricing";
 import { useI18n } from "@/lib/i18n";
@@ -152,20 +152,22 @@ export function CartSidebarHeader() {
             ) : (
                 <>
                     <SidebarHeader>
-                        <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
-                            <SidebarMenuItem className="w-fit">
-                                <SidebarMenuButton asChild title={t("Vider le panier")}>
-                                    <button
-                                        type="button"
-                                        className="p-2 rounded hover:bg-muted"
-                                        onClick={clearCart}
-                                    >
-                                        <Trash2Icon className="size-5 text-destructive" />
-                                    </button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                        {items.length > 0 && (
+                            <>
+                                <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
+                                    <SidebarMenuItem className="w-fit">
+                                        <SidebarMenuButton asChild title={t("Vider le panier")}>
+                                            <button
+                                                type="button"
+                                                className="p-2 rounded hover:bg-muted"
+                                                onClick={clearCart}
+                                            >
+                                                <Trash2Icon className="size-5 text-destructive" />
+                                            </button>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
 
-                            {/* <SidebarMenuItem className="w-fit">
+                                    {/* <SidebarMenuItem className="w-fit">
                                 <SidebarMenuButton asChild title={t("Insérer dans le panier")}>
                                     <button
                                         type="button"
@@ -176,91 +178,101 @@ export function CartSidebarHeader() {
                                 </SidebarMenuButton>
                             </SidebarMenuItem> */}
 
-                            <SidebarMenuItem className="w-fit">
-                                <SidebarMenuButton asChild title={t("Voir le panier")}>
-                                    <button
-                                        type="button"
-                                        className="p-2 rounded hover:bg-muted"
-                                        onClick={() => router.visit(getFiltersUrl())}
-                                    >
-                                        <EyeIcon className="size-5" />
-                                    </button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                                    <SidebarMenuItem className="w-fit">
+                                        <SidebarMenuButton asChild title={t("Voir le panier")}>
+                                            <button
+                                                type="button"
+                                                className="p-2 rounded hover:bg-muted"
+                                                onClick={() => router.visit(getFiltersUrl())}
+                                            >
+                                                <EyeIcon className="size-5" />
+                                            </button>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
 
-                            <SidebarMenuItem className="w-fit">
-                                <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
-                                    <button
-                                        type="button"
-                                        className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                                        onClick={handleSaveCart}
-                                        disabled={isBusy}
-                                    >
-                                        <SaveIcon className="size-5 text-primary" />
-                                    </button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
+                                    <SidebarMenuItem className="w-fit">
+                                        <SidebarMenuButton asChild title={t("Sauvegarder le panier")}>
+                                            <button
+                                                type="button"
+                                                className="p-2 rounded hover:bg-muted disabled:opacity-50"
+                                                onClick={handleSaveCart}
+                                                disabled={isBusy}
+                                            >
+                                                <SaveIcon className="size-5 text-primary" />
+                                            </button>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
 
-                            {cartId ? (
-                                <button
-                                    type="button"
-                                    className="rounded"
-                                    onClick={handleCreateNewCart}
-                                    title={t("Creer un nouveau panier")}
-                                    disabled={isBusy}
-                                >
-                                    <Badge variant="secondary">#{cartId}</Badge>
-                                </button>
-                            ) : null}
+                                    {cartId ? (
+                                        <button
+                                            type="button"
+                                            className="rounded"
+                                            onClick={handleCreateNewCart}
+                                            title={t("Creer un nouveau panier")}
+                                            disabled={isBusy}
+                                        >
+                                            <Badge variant="secondary">#{cartId}</Badge>
+                                        </button>
+                                    ) : null}
 
-                            <SidebarMenuItem className="w-fit">
-                                <SidebarMenuButton asChild title={t("Valider le panier")}>
-                                    <button
-                                        type="button"
-                                        className={`p-2 rounded ${validateCartButtonClassName}`}
-                                        onClick={() => router.visit('/cart/checkout')}
-                                        disabled={isBusy}
-                                    >
-                                        <CheckCircleIcon className="size-6" />
-                                    </button>
-                                </SidebarMenuButton>
-                            </SidebarMenuItem>
-                        </SidebarMenu>
+                                    <SidebarMenuItem className="w-fit">
+                                        <SidebarMenuButton asChild title={t("Valider le panier")}>
+                                            <button
+                                                type="button"
+                                                className={`p-2 rounded ${validateCartButtonClassName}`}
+                                                onClick={() => router.visit('/cart/checkout')}
+                                                disabled={isBusy}
+                                            >
+                                                <CheckCircleIcon className="size-6" />
+                                            </button>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                </SidebarMenu>
 
 
-                        <div className="flex-shrink-0">
-                            <div className="my-1 text-sm flex gap-2 items-center"><Flower2Icon size={20} /> : {total.toFixed(2)} €</div>
-                            <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
-                            <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
+                                <div className="flex-shrink-0">
+                                    <div className="my-1 text-sm flex gap-2 items-center"><Flower2Icon size={20} /> : {total.toFixed(2)} €</div>
+                                    <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
+                                    <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
 
-                            {feedbackMessage && (
-                                <div
-                                    className={`mt-2 text-sm p-2 rounded ${feedbackMessage.includes("Erreur")
-                                        ? " text-destructive border border-destructive"
-                                        : " text-green-600 border border-green-600"
-                                        }`}
-                                >
-                                    {feedbackMessage}
+                                    {feedbackMessage && (
+                                        <div
+                                            className={`mt-2 text-sm p-2 rounded ${feedbackMessage.includes("Erreur")
+                                                ? " text-destructive border border-destructive"
+                                                : " text-green-600 border border-green-600"
+                                                }`}
+                                        >
+                                            {feedbackMessage}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        {items.length > 0 && (
-                            <div className="mt-4">
-                                <ProductRollMini
-                                    items={items}
-                                    getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
-                                />
-                            </div>
+                                {items.length > 0 && (
+                                    <div className="mt-4">
+                                        <ProductRollMini
+                                            items={items}
+                                            getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                                        />
+                                    </div>
+                                )}
+                            </>
                         )}
                     </SidebarHeader>
 
+
                     <SidebarContent className="flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
-                        <div className="my-2 ">
+                        <div className="my-2 flex flex-col gap-2 items-center justify-center">
                             {items.length === 0 && (
-                                <div className="text-center text-muted-foreground text-sm py-8">
-                                    {t("Panier vide")}
-                                </div>
+                                <>
+                                    <div className="text-center text-muted-foreground text-sm py-8">
+                                        {t("Panier vide")}
+                                    </div>
+                                    <Link href='/products'>
+                                        <Button className='w-40 underline bg-brand-main hover:bg-brand-main-hover  transition-all duration-75'>
+                                            {t('Voir le catalogue')}
+                                        </Button>
+                                    </Link>
+                                </>
                             )}
 
                             {items.map((item) => (

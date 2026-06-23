@@ -66,7 +66,7 @@ export default withAppLayout(breadcrumbs, false, ({ collection, }: Props) => {
                 <ProductsCarousel products={popularProducts} />
             </div>
 
-            <ServicesSection active={true} />
+            <ServicesSection />
 
         </div>
     );

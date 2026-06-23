@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import { Button } from '@/components/ui/button';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchSelect from '@/components/app/search-select';
@@ -15,7 +15,7 @@ import { useI18n } from '@/lib/i18n';
 import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
 import { ArrowLeftCircle, CirclePlusIcon, InfoIcon, PlusIcon, RowsIcon, SaveIcon, ShellIcon, TrashIcon } from 'lucide-react';
-import { FormEvent, useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import type { SharedData, dbProduct } from '@/types';
 import { getEffectiveUser, isAdmin, isDev, hasPermission } from '@/lib/roles';
 
@@ -155,12 +155,20 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
     );
     const [billableUsersSearch, setBillableUsersSearch] = useState('');
     const [activeTab, setActiveTab] = useState<EditTab>('info');
+    const [activeBillableUserId, setActiveBillableUserId] = useState<number | null>(() => {
+        const ids = Array.isArray(dbProduct.billable_user_ids) ? dbProduct.billable_user_ids : [];
+        return ids.length > 0 ? Number(ids[0]) : null;
+    });
     const eligibleUserOptions = useMemo(
         () => (Array.isArray(eligibleUsers) ? eligibleUsers : []).map((user) => ({
             value: String(user.id),
             label: `${user.name} (${user.email})`,
         })),
         [eligibleUsers],
+    );
+    const eligibleUserOptionById = useMemo(
+        () => new Map(eligibleUserOptions.map((option) => [Number(option.value), option])),
+        [eligibleUserOptions],
     );
     const { data, setData, post, put, processing, errors, transform } = useForm({
         name: dbProduct.name ?? '',
@@ -174,12 +182,18 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
         billable_user_ids: dbProduct.billable_user_ids ?? [],
     });
 
-    const billableSelection = useMemo(
-        () => (data.billable_user_ids ?? [])
-            .map((id) => eligibleUserOptions.find((option) => Number(option.value) === Number(id)))
-            .filter((option): option is { value: string; label: string } => !!option),
-        [data.billable_user_ids, eligibleUserOptions],
-    );
+    const availableEligibleUserOptions = useMemo(() => {
+        const selected = new Set((data.billable_user_ids ?? []).map((id) => Number(id)));
+        return eligibleUserOptions.filter((option) => !selected.has(Number(option.value)));
+    }, [data.billable_user_ids, eligibleUserOptions]);
+
+    const activeBillableUser = useMemo(() => {
+        if (activeBillableUserId === null) {
+            return null;
+        }
+
+        return eligibleUserOptionById.get(activeBillableUserId) ?? null;
+    }, [activeBillableUserId, eligibleUserOptionById]);
 
     const errorBag = errors as Record<string, string>;
 
@@ -210,6 +224,19 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
         (pairs: KVPair[]) => setData('categories', pairs),
         [setData],
     );
+
+    useEffect(() => {
+        const ids = (data.billable_user_ids ?? []).map((id) => Number(id));
+
+        if (ids.length === 0) {
+            setActiveBillableUserId(null);
+            return;
+        }
+
+        if (activeBillableUserId === null || !ids.includes(activeBillableUserId)) {
+            setActiveBillableUserId(ids[0]);
+        }
+    }, [activeBillableUserId, data.billable_user_ids]);
 
     return (
         <>
@@ -360,94 +387,150 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                                 .split(/\s+/)
                                                 .map((token) => Number(token))
                                                 .filter((id) => Number.isInteger(id) && id > 0);
-                                            setData('billable_user_ids', Array.from(new Set(ids)));
+
+                                            if (ids.length === 0) {
+                                                return;
+                                            }
+
+                                            setData('billable_user_ids', Array.from(new Set([
+                                                ...(data.billable_user_ids ?? []).map((id) => Number(id)),
+                                                ...ids,
+                                            ])));
                                             setBillableUsersSearch('');
                                         }}
-                                        propositions={eligibleUserOptions}
-                                        selection={billableSelection}
+                                        propositions={availableEligibleUserOptions}
+                                        selection={[]}
                                         loading={false}
                                         minQueryLength={0}
                                     />
                                     <InputError message={errorBag['billable_user_ids']} />
                                 </FormField>
 
+                                <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                                    {(data.billable_user_ids ?? []).map((id) => {
+                                        const userId = Number(id);
+                                        const option = eligibleUserOptionById.get(userId);
+
+                                        if (!option) {
+                                            return null;
+                                        }
+
+                                        return (
+                                            <div key={userId} className="flex items-center justify-between gap-2">
+                                                <button
+                                                    type="button"
+                                                    className={`text-left rounded-md px-3 py-2 w-full border ${activeBillableUserId === userId ? 'bg-muted border-primary' : 'border-border'}`}
+                                                    onClick={() => setActiveBillableUserId(userId)}
+                                                >
+                                                    <span className="font-medium">{option.label}</span>
+                                                </button>
+
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive-outline"
+                                                    size="icon"
+                                                    onClick={() => setData('billable_user_ids', (data.billable_user_ids ?? []).filter((currentId) => Number(currentId) !== userId))}
+                                                    aria-label={t('Delete')}
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
 
                             </Card>
 
                             <Card className='p-6 xl:col-span-2 space-y-4'>
-                                <FormField label={t('Default marges')}>
-                                    <Button title={t('Add')} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
-                                        <CirclePlusIcon />
-                                    </Button>
-                                    {/* Section Marges */}
-                                    <div className="space-y-6 ">
-                                        <h3 className="text-md font-semibold">{t('Margin')}</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <FormField label={t('General margin (%)')}>
-                                                <Input
-                                                    // id={`m-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.m}
-                                                // onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
+                                {activeBillableUser ? (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className='text-lg'>
+                                                {t('Billing user')}: {activeBillableUser.label}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <FormField label={t('Default marges')}>
+                                                <Button title={t('Add')} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
+                                                    <CirclePlusIcon />
+                                                </Button>
+                                                {/* Section Marges */}
+                                                <div className="space-y-6 ">
+                                                    <h3 className="text-md font-semibold">{t('Margin')}</h3>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        <FormField label={t('General margin (%)')}>
+                                                            <Input
+                                                                // id={`m-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.m}
+                                                            // onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
 
-                                            <FormField label={t('Minimum margin per roll (€)')}>
-                                                <Input
-                                                    // id={`mm-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.mm}
-                                                // onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
+                                                        <FormField label={t('Minimum margin per roll (€)')}>
+                                                            <Input
+                                                                // id={`mm-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.mm}
+                                                            // onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
 
-                                            <FormField label={t('Ponderation coefficient (%)')}>
-                                                <Input
-                                                    // id={`pd-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.pd}
-                                                // onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
+                                                        <FormField label={t('Ponderation coefficient (%)')}>
+                                                            <Input
+                                                                // id={`pd-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.pd}
+                                                            // onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
 
-                                            {/* </div> */}
-                                            {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
-                                            <FormField label={t('Margin per carton (%)')}>
-                                                <Input
-                                                    // id={`mc-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.mc}
-                                                // onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
+                                                        {/* </div> */}
+                                                        {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
+                                                        <FormField label={t('Margin per carton (%)')}>
+                                                            <Input
+                                                                // id={`mc-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.mc}
+                                                            // onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
 
-                                            <FormField label={t('Margin per level (%)')}>
-                                                <Input
-                                                    // id={`me-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.me}
-                                                // onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
+                                                        <FormField label={t('Margin per level (%)')}>
+                                                            <Input
+                                                                // id={`me-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.me}
+                                                            // onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
 
-                                            <FormField label={t('Margin per roll (%)')}>
-                                                <Input
-                                                    // id={`mr-${dbId}`}
-                                                    type="number"
-                                                    step="0.01"
-                                                // value={attrs.mr}
-                                                // onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </FormField>
-                                        </div>
+                                                        <FormField label={t('Margin per roll (%)')}>
+                                                            <Input
+                                                                // id={`mr-${dbId}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                            // value={attrs.mr}
+                                                            // onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
+                                                            />
+                                                        </FormField>
+                                                    </div>
 
+                                                </div>
+                                            </FormField>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <div className='text-sm text-muted-foreground'>
+                                        {t('Select a billing user from the list.')}
                                     </div>
-                                </FormField>
+                                )}
                             </Card>
                         </div>
                     )}
