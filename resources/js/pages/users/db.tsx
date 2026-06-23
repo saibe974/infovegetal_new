@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { ArrowRightCircleIcon } from 'lucide-react';
+import { ArrowRightCircleIcon, TrashIcon } from 'lucide-react';
 
 type DbProductAttributes = {
     m: number;          // marge en %
@@ -109,6 +109,16 @@ type DbPageProps = SharedData & {
 
 export default function UserDbPage() {
     const { user: propsUser, dbProducts, carriers, selectedDbId, dbUserAttributes, eligibleUsers, billableEligibleUsers } = usePage<DbPageProps>().props;
+    const dbProductOptions = useMemo(
+        () => dbProducts.map((db) => ({ value: String(db.id), label: db.name })),
+        [dbProducts],
+    );
+    const dbProductById = useMemo(() => {
+        return new Map(dbProducts.map((db) => [db.id, db]));
+    }, [dbProducts]);
+    const dbIdByName = useMemo(() => {
+        return new Map(dbProducts.map((db) => [db.name, db.id]));
+    }, [dbProducts]);
     const carrierOptions: CarrierOption[] = Array.isArray(carriers) ? carriers : [];
     const commercialUserOptions = useMemo(() => {
         const list = Array.isArray(eligibleUsers) ? eligibleUsers : [];
@@ -168,7 +178,9 @@ export default function UserDbPage() {
     });
 
     const [search, setSearch] = useState('');
+    const [dbSelectResetToken, setDbSelectResetToken] = useState(0);
     const [selectedIds, setSelectedIds] = useState<number[]>(Array.isArray(selectedDbId) ? selectedDbId : []);
+    const [activeDbId, setActiveDbId] = useState<number | null>(() => (Array.isArray(selectedDbId) && selectedDbId.length > 0 ? selectedDbId[0] : null));
     const processing = false;
     const [savingDbId, setSavingDbId] = useState<number | null>(null);
     const [contactSearchByDbId, setContactSearchByDbId] = useState<Record<number, { com: string; fact: string }>>({});
@@ -185,13 +197,13 @@ export default function UserDbPage() {
         return initial;
     });
 
-    // Préparer la sélection initiale pour SearchSelect
-    const initialSelection = useMemo(() => {
-        return (Array.isArray(selectedDbId) ? selectedDbId : []).map((id: number) => {
-            const found = dbProducts.find((d) => d.id === id);
-            return { value: found ? found.name : String(id), label: found ? found.name : String(id) };
+    const availableDbProductOptions = useMemo(() => {
+        const selected = new Set(selectedIds);
+        return dbProductOptions.filter((option) => {
+            const id = Number(option.value);
+            return !selected.has(id);
         });
-    }, [dbProducts, selectedDbId]);
+    }, [dbProductOptions, selectedIds]);
 
     // Initialiser les attributs pour les nouvelles sélections
     useEffect(() => {
@@ -205,6 +217,17 @@ export default function UserDbPage() {
             return updated;
         });
     }, [selectedIds]);
+
+    useEffect(() => {
+        if (selectedIds.length === 0) {
+            setActiveDbId(null);
+            return;
+        }
+
+        if (activeDbId === null || !selectedIds.includes(activeDbId)) {
+            setActiveDbId(selectedIds[0]);
+        }
+    }, [activeDbId, selectedIds]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -250,7 +273,35 @@ export default function UserDbPage() {
         }));
     };
 
+    const handleDbSelectionSubmit = (value: string) => {
+        const tokens = value.trim().split(/\s+/).filter(Boolean);
+        const ids = tokens
+            .map((token) => {
+                const asNumber = Number(token);
+                if (Number.isFinite(asNumber)) {
+                    return asNumber;
+                }
+
+                return dbIdByName.get(token) ?? null;
+            })
+            .filter((id): id is number => id !== null && dbProductById.has(id));
+
+        if (ids.length === 0) {
+            return;
+        }
+
+        setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+        setSearch('');
+    };
+
+    const removeDbFromSelection = (dbId: number) => {
+        setSelectedIds((prev) => prev.filter((id) => id !== dbId));
+    };
+
     const handleSaveDb = (dbId: number) => {
+        setSearch('');
+        setDbSelectResetToken((prev) => prev + 1);
+
         const attrs = {
             ...(attributesByDbId[dbId] ?? DEFAULT_ATTRIBUTES),
             l: parseDeliveryValue(deliveryInputByDbId[dbId] ?? ''),
@@ -280,37 +331,68 @@ export default function UserDbPage() {
 
             <SettingsLayout>
                 <div className=''>
-                    <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
-                        {/* <StickyBar className="mb-4">
-
-                        </StickyBar> */}
+                    <Form
+                        method="post"
+                        action={`/admin/users/${targetUser.id}/db`}
+                        className="space-y-4"
+                        onSubmit={() => {
+                            setSearch('');
+                            setDbSelectResetToken((prev) => prev + 1);
+                        }}
+                    >
 
                         <div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
+
                             <Card className="p-6 space-y-4">
                                 <div className="flex flex-col gap-6">
                                     <FormField label={t('Select DB product')}>
                                         <SearchSelect
+                                            key={`db-select-${dbSelectResetToken}`}
                                             value={search}
                                             onChange={(v) => setSearch(v)}
-                                            onSubmit={(s) => {
-                                                const names = s && s.trim() ? s.trim().split(/\s+/) : [];
-                                                const ids = (names || []).map((name) => {
-                                                    const found = dbProducts.find((d) => d.name === name);
-                                                    return found ? found.id : null;
-                                                }).filter((v) => v !== null) as number[];
-                                                setSelectedIds(ids);
-                                            }}
-                                            propositions={dbProducts.map((d) => d.name)}
-                                            selection={initialSelection}
+                                            onSubmit={handleDbSelectionSubmit}
+                                            propositions={availableDbProductOptions}
+                                            selection={[]}
                                             loading={false}
                                             minQueryLength={0}
                                         />
-
-                                        {/* Hidden inputs for selected ids */}
-                                        {(selectedIds || []).map((id) => (
-                                            <input key={id} type="hidden" name="db_ids[]" value={id} />
-                                        ))}
                                     </FormField>
+
+                                    <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                                        {selectedIds.map((dbId) => {
+                                            const db = dbProductById.get(dbId);
+                                            if (!db) {
+                                                return null;
+                                            }
+
+                                            return (
+                                                <div key={dbId} className="flex items-center justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        className={`text-left rounded-md px-3 py-2 w-full border ${activeDbId === dbId ? 'bg-muted border-primary' : 'border-border'}`}
+                                                        onClick={() => setActiveDbId(dbId)}
+                                                    >
+                                                        <span className="font-medium">{db.name}</span>
+                                                    </button>
+
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive-outline"
+                                                        size="icon"
+                                                        onClick={() => removeDbFromSelection(dbId)}
+                                                        aria-label={t('Delete')}
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Hidden inputs for selected ids */}
+                                    {(selectedIds || []).map((id) => (
+                                        <input key={id} type="hidden" name="db_ids[]" value={id} />
+                                    ))}
                                 </div>
 
                                 <div className="flex items-center gap-4">
@@ -321,9 +403,10 @@ export default function UserDbPage() {
                             <Card className='p-6 xl:col-span-2 space-y-4'>
                                 {/* Formulaires d'attributs pour chaque DB sélectionné */}
                                 {selectedIds.length > 0 && (
-                                    <div className="mt-6 space-y-4">
-                                        {selectedIds.map((dbId) => {
-                                            const db = dbProducts.find((d) => d.id === dbId);
+                                    <div>
+                                        {activeDbId !== null && (() => {
+                                            const dbId = activeDbId;
+                                            const db = dbProductById.get(dbId);
                                             const attrs = attributesByDbId[dbId] || DEFAULT_ATTRIBUTES;
                                             const commercialOption = attrs.com ? commercialUserOptionById.get(attrs.com) : undefined;
                                             const facturantOption = attrs.fact ? billableUserOptionById.get(attrs.fact) : undefined;
@@ -333,6 +416,7 @@ export default function UserDbPage() {
 
                                             return (
                                                 <Card key={dbId}>
+
                                                     <CardHeader>
                                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                                             <div>
@@ -351,7 +435,10 @@ export default function UserDbPage() {
                                                             </Button>
                                                         </div>
                                                     </CardHeader>
-                                                    <CardContent className="space-y-6">
+
+                                                    <Separator className="my-1" />
+
+                                                    <CardContent className="">
                                                         {/* Section Contacts */}
                                                         <div className="space-y-4">
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -393,7 +480,7 @@ export default function UserDbPage() {
                                                             </div>
                                                         </div>
 
-                                                        <Separator />
+                                                        <Separator className="my-1" />
 
                                                         {/* Section Marges */}
                                                         <div className="space-y-6 ">
@@ -463,7 +550,7 @@ export default function UserDbPage() {
 
                                                         </div>
 
-                                                        <Separator />
+                                                        <Separator className="my-1" />
 
                                                         {/* Section Prix et Pondération */}
                                                         <div className="space-y-6">
@@ -503,7 +590,7 @@ export default function UserDbPage() {
                                                             </div>
                                                         </div>
 
-                                                        <Separator />
+                                                        <Separator className="my-1" />
 
                                                         {/* Section Livraison et TVA */}
                                                         <div className="space-y-6">
@@ -626,7 +713,18 @@ export default function UserDbPage() {
                                                     </CardContent>
                                                 </Card>
                                             );
-                                        })}
+                                        })()}
+
+                                        {selectedIds
+                                            .filter((id) => id !== activeDbId)
+                                            .map((id) => (
+                                                <input
+                                                    key={`attrs-${id}`}
+                                                    type="hidden"
+                                                    name={`attributes[${id}]`}
+                                                    value={JSON.stringify(attributesByDbId[id] ?? DEFAULT_ATTRIBUTES)}
+                                                />
+                                            ))}
                                     </div>
                                 )}
                             </Card>
