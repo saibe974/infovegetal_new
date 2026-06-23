@@ -12,7 +12,7 @@ import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
-import { ArrowLeftCircle, Menu } from 'lucide-react';
+import { ArrowLeftCircle, InfoIcon, Menu, ServerIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -41,7 +41,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         {
             title: 'Profile',
             href: isSelf ? editProfile() : editAdminUser(userId),
-            icon: null,
+            icon: InfoIcon,
         },
     ];
 
@@ -116,7 +116,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         sidebarNavItems.push({
             title: 'Database access',
             href: `/admin/users/${userId}/db`,
-            icon: null,
+            icon: ServerIcon,
         });
 
         // sidebarNavItems.push({
@@ -126,13 +126,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         // });
     }
 
+
     return (
         <div className="p-2 lg:p-4 space-y-6">
             {/* Header */}
-            <StickyBar
-                className='mb-4 w-full'
-                borderBottom={false}
-            >
+            <StickyBar className='mb-4 w-full'>
                 <div className='flex w-full items-center justify-between'>
                     <div className="flex items-center gap-4 ">
                         <Link href="#"
@@ -144,7 +142,13 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                         <div className='flex flex-col'>
                             <h1 className='text-3xl font-bold capitalize'>{editingUser ? editingUser.name : 'Settings'}</h1>
                             <p className="text-gray-500">
-                                {editingUser ? `Manage settings for ${editingUser.name}` : 'Manage your profile and account settings'}
+                                {currentPath === `/admin/users/${userId}/db` ? `Manage database access` :
+                                    currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :
+                                        currentPath === `/admin/users/${userId}/additional-info` ? `Manage additional user information` :
+                                            currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
+                                                currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
+                                                    currentPath === `/admin/users/${userId}/edit` ? `Edit user information` :
+                                                        ``}
                             </p>
                         </div>
                     </div>
@@ -219,7 +223,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 </div>
             )} */}
 
-            <div className="flex-1 w-full max-w-[1200px] mx-auto">
+            <div>
                 {children}
             </div>
         </div>

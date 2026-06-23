@@ -35,7 +35,7 @@ export default function Password() {
             <Head title={t('Password settings')} />
 
             <SettingsLayout>
-                <Card className="p-6">
+                <Card className="flex-1 w-full max-w-[600px] mx-auto p-6 space-y-4">
                     {/* <HeadingSmall
                         title={t('Update password')}
                         description={t('Ensure your account is using a long, random password to stay secure')}

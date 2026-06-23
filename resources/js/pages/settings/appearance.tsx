@@ -32,7 +32,7 @@ export default function Appearance() {
             <Head title={t('Appearance settings')} />
 
             <SettingsLayout>
-                <Card className="p-6">
+                <Card className="flex-1 w-full max-w-[600px] mx-auto p-6 space-y-4">
                     <HeadingSmall
                         title={t('Appearance settings')}
                         description={t("Update your account's appearance settings")}

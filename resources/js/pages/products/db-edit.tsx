@@ -217,13 +217,27 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
 
             <div className='space-y-6'>
                 <form onSubmit={handleSubmit}>
-                    <StickyBar className="mb-4">
-                        <Button asChild variant="ghost">
-                            <Link href={dbProducts.index().url}>
-                                <ArrowLeftCircle size={32} className="mr-2" />
-                                {dbProduct.name}
+                    <StickyBar className="mb-4 w-full">
+
+                        <div className="flex items-center gap-4 ">
+                            <Link href="#"
+                                onClick={(e) => { e.preventDefault(); window.history.back(); }}
+                                className='hover:text-gray-500 transition-colors duration-200'
+                            >
+                                <ArrowLeftCircle size={35} />
                             </Link>
-                        </Button>
+                            <div className='flex flex-col'>
+                                <h1 className='text-3xl font-bold capitalize'>{dbProduct.name}</h1>
+                                <p className="text-gray-500">
+                                    {isCreate ? `Add a new database` :
+                                        activeTab === 'info' ? `Edit general information` :
+                                            activeTab === 'billing' ? `Manage billing settings` :
+                                                activeTab === 'mapping' ? `Configure column and category mapping` :
+                                                    ''}
+                                </p>
+                            </div>
+                        </div>
+
 
                         <div className="ml-auto flex items-center gap-2">
                             <Button
@@ -257,10 +271,11 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                         </div>
                     </StickyBar>
 
-                    <div className="space-y-6 w-full">
+                    {/* Infos générales */}
+                    {activeTab === 'info' && (
+                        <div className="flex-1 w-full max-w-[1200px] mx-auto">
 
-                        {/* Infos générales */}
-                        {activeTab === 'info' && (
+
                             <Card className="p-6 space-y-4">
                                 {/* <h2 className="text-base font-semibold">{t('General information')}</h2>
                         <Separator /> */}
@@ -329,115 +344,117 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                 </div>
 
                             </Card>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Billing */}
-                        {activeTab === 'billing' && (
-                            <div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
-                                <Card className="p-6 space-y-4">
-                                    <FormField label={t('Billing users')}>
-                                        <SearchSelect
-                                            value={billableUsersSearch}
-                                            onChange={setBillableUsersSearch}
-                                            onSubmit={(value) => {
-                                                const ids = value
-                                                    .split(/\s+/)
-                                                    .map((token) => Number(token))
-                                                    .filter((id) => Number.isInteger(id) && id > 0);
-                                                setData('billable_user_ids', Array.from(new Set(ids)));
-                                                setBillableUsersSearch('');
-                                            }}
-                                            propositions={eligibleUserOptions}
-                                            selection={billableSelection}
-                                            loading={false}
-                                            minQueryLength={0}
-                                        />
-                                        <InputError message={errorBag['billable_user_ids']} />
-                                    </FormField>
+                    {/* Billing */}
+                    {activeTab === 'billing' && (
+                        <div className='grid grid-cols-1 xl:grid-cols-3 gap-6'>
+                            <Card className="p-6 space-y-4">
+                                <FormField label={t('Billing users')}>
+                                    <SearchSelect
+                                        value={billableUsersSearch}
+                                        onChange={setBillableUsersSearch}
+                                        onSubmit={(value) => {
+                                            const ids = value
+                                                .split(/\s+/)
+                                                .map((token) => Number(token))
+                                                .filter((id) => Number.isInteger(id) && id > 0);
+                                            setData('billable_user_ids', Array.from(new Set(ids)));
+                                            setBillableUsersSearch('');
+                                        }}
+                                        propositions={eligibleUserOptions}
+                                        selection={billableSelection}
+                                        loading={false}
+                                        minQueryLength={0}
+                                    />
+                                    <InputError message={errorBag['billable_user_ids']} />
+                                </FormField>
 
 
-                                </Card>
+                            </Card>
 
-                                <Card className='p-6 xl:col-span-2 space-y-4'>
-                                    <FormField label={t('Default marges')}>
-                                        <Button title={t('Add')} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
-                                            <CirclePlusIcon />
-                                        </Button>
-                                        {/* Section Marges */}
-                                        <div className="space-y-6 ">
-                                            <h3 className="text-md font-semibold">{t('Margin')}</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <FormField label={t('General margin (%)')}>
-                                                    <Input
-                                                        // id={`m-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.m}
-                                                    // onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
+                            <Card className='p-6 xl:col-span-2 space-y-4'>
+                                <FormField label={t('Default marges')}>
+                                    <Button title={t('Add')} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
+                                        <CirclePlusIcon />
+                                    </Button>
+                                    {/* Section Marges */}
+                                    <div className="space-y-6 ">
+                                        <h3 className="text-md font-semibold">{t('Margin')}</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <FormField label={t('General margin (%)')}>
+                                                <Input
+                                                    // id={`m-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.m}
+                                                // onChange={(e) => updateAttribute(dbId, 'm', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
 
-                                                <FormField label={t('Minimum margin per roll (€)')}>
-                                                    <Input
-                                                        // id={`mm-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.mm}
-                                                    // onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
+                                            <FormField label={t('Minimum margin per roll (€)')}>
+                                                <Input
+                                                    // id={`mm-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.mm}
+                                                // onChange={(e) => updateAttribute(dbId, 'mm', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
 
-                                                <FormField label={t('Ponderation coefficient (%)')}>
-                                                    <Input
-                                                        // id={`pd-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.pd}
-                                                    // onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
+                                            <FormField label={t('Ponderation coefficient (%)')}>
+                                                <Input
+                                                    // id={`pd-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.pd}
+                                                // onChange={(e) => updateAttribute(dbId, 'pd', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
 
-                                                {/* </div> */}
-                                                {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
-                                                <FormField label={t('Margin per carton (%)')}>
-                                                    <Input
-                                                        // id={`mc-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.mc}
-                                                    // onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
+                                            {/* </div> */}
+                                            {/* <div className='grid grid-cols-1 md:grid-cols-3 gap-4 w-full'> */}
+                                            <FormField label={t('Margin per carton (%)')}>
+                                                <Input
+                                                    // id={`mc-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.mc}
+                                                // onChange={(e) => updateAttribute(dbId, 'mc', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
 
-                                                <FormField label={t('Margin per level (%)')}>
-                                                    <Input
-                                                        // id={`me-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.me}
-                                                    // onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
+                                            <FormField label={t('Margin per level (%)')}>
+                                                <Input
+                                                    // id={`me-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.me}
+                                                // onChange={(e) => updateAttribute(dbId, 'me', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
 
-                                                <FormField label={t('Margin per roll (%)')}>
-                                                    <Input
-                                                        // id={`mr-${dbId}`}
-                                                        type="number"
-                                                        step="0.01"
-                                                    // value={attrs.mr}
-                                                    // onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
-                                                    />
-                                                </FormField>
-                                            </div>
-
+                                            <FormField label={t('Margin per roll (%)')}>
+                                                <Input
+                                                    // id={`mr-${dbId}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                // value={attrs.mr}
+                                                // onChange={(e) => updateAttribute(dbId, 'mr', parseFloat(e.target.value) || 0)}
+                                                />
+                                            </FormField>
                                         </div>
-                                    </FormField>
-                                </Card>
-                            </div>
-                        )}
 
-                        {/* mapping Champs */}
-                        {activeTab === 'mapping' && (
+                                    </div>
+                                </FormField>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* mapping Champs */}
+                    {activeTab === 'mapping' && (
+                        <div className="flex-1 w-full max-w-[1200px] mx-auto space-y-6">
                             <Card className="p-6 space-y-4">
 
                                 <h2 className="text-base font-semibold">{t('Column mapping (champs)')}</h2>
@@ -477,10 +494,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                     error={errorBag['champs']}
                                 />
                             </Card>
-                        )}
 
-                        {/* mapping Categories */}
-                        {activeTab === 'mapping' && (
                             <Card className="p-6 space-y-4">
                                 <h2 className="text-base font-semibold">{t('Category mapping (categories)')}</h2>
                                 <p className="text-sm text-muted-foreground">
@@ -497,8 +511,9 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOp
                                     valueOptions={categoryValueOptions}
                                 />
                             </Card>
-                        )}
-                    </div>
+                        </div>
+                    )}
+
                 </form >
             </div >
         </>
