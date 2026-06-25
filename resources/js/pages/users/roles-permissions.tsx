@@ -56,7 +56,7 @@ function getInitialRoleId(roles: RoleItem[]): number | null {
     return roles[0]?.id ?? null;
 }
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ roles, permissions, officialPermissionNames }) => {
+export default withAppLayout<Props>(breadcrumbs, true, ({ roles, permissions, officialPermissionNames }) => {
     const { t } = useI18n();
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(() => getInitialRoleId(roles));
     const [newRoleName, setNewRoleName] = useState('');

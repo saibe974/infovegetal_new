@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { ArrowRightCircleIcon, TrashIcon } from 'lucide-react';
+import { ArrowRightCircleIcon, TrashIcon, ServerIcon } from 'lucide-react';
 
 type DbProductAttributes = {
     m: number;          // marge en %
@@ -345,7 +345,7 @@ export default function UserDbPage() {
 
                             <Card className="p-6 space-y-4">
                                 <div className="flex flex-col gap-6">
-                                    <FormField label={t('Select DB product')}>
+                                    <FormField label={<><ServerIcon className='inline mx-2' /> {t('Select DB product')}</>}>
                                         <SearchSelect
                                             key={`db-select-${dbSelectResetToken}`}
                                             value={search}

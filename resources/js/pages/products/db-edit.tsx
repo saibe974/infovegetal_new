@@ -141,7 +141,7 @@ function KVEditor({ pairs, onChange, keyPlaceholder = 'Clé', valuePlaceholder =
     );
 }
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ dbProduct, categoryOptions, eligibleUsers }) => {
+export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, categoryOptions, eligibleUsers }) => {
     const { t } = useI18n();
 
     const { auth, locale } = usePage<SharedData>().props;

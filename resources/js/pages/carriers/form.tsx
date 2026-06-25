@@ -159,7 +159,7 @@ const parseDays = (days: string[] | number | string | null | undefined): string[
     return [];
 };
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ carrier }) => {
+export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
     const { t } = useI18n();
     const isNew = !carrier || !carrier.id;
     const { data, setData, post, put, processing, errors, transform } = useForm({

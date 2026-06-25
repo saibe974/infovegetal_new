@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Role;
 
 class RolePermissionManagementController extends Controller
@@ -59,6 +60,7 @@ class RolePermissionManagementController extends Controller
         'orders.cancel.all',
         'orders.export.branch',
         'orders.export.all',
+        'orders.invoice',
 
         // carriers
         'carriers.view',
@@ -160,12 +162,16 @@ class RolePermissionManagementController extends Controller
             'permissions.*' => ['integer', 'exists:permissions,id'],
         ]);
 
-        $permissionNames = Permission::query()
-            ->whereIn('id', array_map('intval', $validated['permissions'] ?? []))
-            ->pluck('name')
-            ->all();
+        $permissionIds = array_map('intval', $validated['permissions'] ?? []);
 
-        $role->syncPermissions($permissionNames);
+        $permissions = Permission::query()
+            ->whereIn('id', $permissionIds)
+            ->get();
+
+        // Keep Spatie registrar cache in sync with DB before resolving permissions.
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $role->syncPermissions($permissions);
 
         return redirect()
             ->route('users.roles_permissions.index', ['role' => $role->id])

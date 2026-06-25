@@ -12,7 +12,7 @@ import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
-import { ArrowLeftCircle, InfoIcon, Menu, ServerIcon } from 'lucide-react';
+import { ArrowLeftCircle, InfoIcon, Menu, ServerIcon, UserIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -132,6 +132,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             {/* Header */}
             <StickyBar className='mb-4 w-full'>
                 <div className='flex w-full items-center justify-between'>
+
                     <div className="flex items-center gap-4 ">
                         <Link href="#"
                             onClick={(e) => { e.preventDefault(); window.history.back(); }}
@@ -140,7 +141,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                             <ArrowLeftCircle size={35} />
                         </Link>
                         <div className='flex flex-col'>
-                            <h1 className='text-3xl font-bold capitalize'>{editingUser ? editingUser.name : 'Settings'}</h1>
+                            <h1 className='text-3xl font-bold capitalize'><UserIcon className='inline mx-2' />{editingUser ? editingUser.name : 'Settings'}</h1>
                             <p className="text-gray-500">
                                 {currentPath === `/admin/users/${userId}/db` ? `Manage database access` :
                                     currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :

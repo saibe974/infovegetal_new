@@ -4,7 +4,7 @@ import type { PropsWithChildren } from 'react';
 
 type Props = PropsWithChildren<{
     htmlFor?: string;
-    label: string;
+    label: React.ReactNode;
     error?: string;
     help?: string;
 }>;
