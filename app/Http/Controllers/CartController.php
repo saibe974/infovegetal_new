@@ -145,7 +145,96 @@ class CartController extends Controller
 
     public function checkout()
     {
-        return Inertia::render('products/cart') ;
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $rows = DB::table('db_products_users')
+            ->where('user_id', $user->id)
+            ->whereNotNull('attributes')
+            ->get(['db_product_id', 'attributes']);
+
+        $contactIds = [];
+        $contactIdsByDbProductId = [];
+
+        foreach ($rows as $row) {
+            $dbProductId = (int) ($row->db_product_id ?? 0);
+            if ($dbProductId <= 0) {
+                continue;
+            }
+
+            $attrs = is_array($row->attributes)
+                ? $row->attributes
+                : json_decode((string) $row->attributes, true);
+
+            if (!is_array($attrs)) {
+                continue;
+            }
+
+            $factId = !empty($attrs['fact']) ? (int) $attrs['fact'] : null;
+            $comId = !empty($attrs['com']) ? (int) $attrs['com'] : null;
+
+            $contactIdsByDbProductId[$dbProductId] = [
+                'fact' => $factId,
+                'com' => $comId,
+            ];
+
+            if ($factId) {
+                $contactIds[] = $factId;
+            }
+
+            if ($comId) {
+                $contactIds[] = $comId;
+            }
+        }
+
+        $usersById = \App\Models\User::query()
+            ->whereIn('id', array_values(array_unique($contactIds)))
+            ->get(['id', 'name', 'email'])
+            ->keyBy('id');
+
+        $dbProductCountries = DB::table('db_products')
+            ->whereIn('id', array_keys($contactIdsByDbProductId))
+            ->pluck('country', 'id')
+            ->mapWithKeys(fn ($country, $id) => [(string) $id => (string) ($country ?? '')])
+            ->toArray();
+
+        $cartContacts = [];
+        foreach ($contactIdsByDbProductId as $dbProductId => $ids) {
+            $fact = null;
+            $com = null;
+
+            if (!empty($ids['fact'])) {
+                $factUser = $usersById->get((int) $ids['fact']);
+                if ($factUser) {
+                    $fact = [
+                        'id' => (int) $factUser->id,
+                        'name' => (string) $factUser->name,
+                        'email' => (string) ($factUser->email ?? ''),
+                    ];
+                }
+            }
+
+            if (!empty($ids['com'])) {
+                $comUser = $usersById->get((int) $ids['com']);
+                if ($comUser) {
+                    $com = [
+                        'id' => (int) $comUser->id,
+                        'name' => (string) $comUser->name,
+                        'email' => (string) ($comUser->email ?? ''),
+                    ];
+                }
+            }
+
+            $cartContacts[(string) $dbProductId] = [
+                'fact' => $fact,
+                'com' => $com,
+            ];
+        }
+
+        return Inertia::render('products/cart', [
+            'cart_contacts' => $cartContacts,
+            'cart_db_countries' => $dbProductCountries,
+        ]);
     }
 
     public function addProduct(Request $request)

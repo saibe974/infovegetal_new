@@ -701,15 +701,18 @@ export function ProductRoll({
             {suppliers.map((supplier) => (
                 <section key={supplier.supplierId} className="space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
+
+                        {/* <div>
                             <div className="text-lg font-semibold text-foreground">
+                                <CountryFlag countryCode={supplier.country} className="inline-block w-6" />
                                 {supplier.name || `Supplier ${supplier.supplierId}`}
                             </div>
                             <div className="text-xs uppercase tracking-wide text-muted-foreground">
                                 {supplier.country ? supplier.country : 'unknown'} · {supplier.mod_liv || 'roll'}
                                 {supplier.mini > 0 ? ` · min ${supplier.mini}` : ''}
                             </div>
-                        </div>
+                        </div> */}
+
                         <div className="flex items-center gap-4 text-sm">
                             <div>
                                 <div className="text-xs text-muted-foreground">Rolls</div>
@@ -823,7 +826,7 @@ export function ProductRoll({
                                                         })}
                                                 </div>
                                             </div>
-                                            <div className="mt-1 flex items-center justify-between text-slate-400" style={{ width: rollWidth + 12 }}>
+                                            <div className="flex items-center justify-between text-slate-400" style={{ width: rollWidth + 12 }}>
                                                 <span className="text-lg">⏻</span>
                                                 <span className="text-lg">⏻</span>
                                             </div>

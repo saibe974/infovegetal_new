@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeftCircle, Flower2Icon, FlowerIcon, Minus, Plus, Trash2, TruckIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -22,6 +22,8 @@ import { getProductCartImage } from '@/components/products/product-cart-image';
 import { formatCurrency } from '@/lib/utils';
 import { useCartOrder } from '@/components/cart/cart-order.context';
 import { SharedData } from '@/types';
+import { Separator } from '@/components/ui/separator';
+import CountryFlag from '@/components/ui/country-flag';
 
 type Props = Record<string, never>;
 
@@ -39,7 +41,13 @@ export default withAppLayout<Props>(
     false,
     () => {
         const { t } = useI18n();
-        const { cart } = usePage<SharedData>().props;
+        const { cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {} } = usePage<SharedData & {
+            cart_contacts?: Record<string, {
+                fact?: { id: number; name: string; email: string } | null;
+                com?: { id: number; name: string; email: string } | null;
+            }>;
+            cart_db_countries?: Record<string, string | null>;
+        }>().props;
         const cartId = cart?.id;
         const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
@@ -47,7 +55,7 @@ export default withAppLayout<Props>(
 
         const [deliveryDate, setDeliveryDate] = useState('');
 
-        const [isRefreshingCart, setIsRefreshingCart] = useState(false);
+        // const [isRefreshingCart, setIsRefreshingCart] = useState(false);
         const {
             isSaving,
             saveMessage,
@@ -92,6 +100,10 @@ export default withAppLayout<Props>(
                 const itemsTotal = group.items.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
                 const deliveryTotal = shippingSummary.total;
                 const orderTotal = itemsTotal + deliveryTotal;
+                const country = String(cartDbCountries[String(group.id)] ?? '').trim().toUpperCase();
+                const contacts = cartContacts[String(group.id)] ?? null;
+                const facturant = contacts?.fact ?? null;
+                const commercial = contacts?.com ?? null;
 
                 return {
                     ...group,
@@ -101,9 +113,12 @@ export default withAppLayout<Props>(
                     transportContext: transport,
                     deliveryTotal,
                     orderTotal,
+                    country,
+                    facturant,
+                    commercial,
                 };
             });
-        }, [itemsPricing, getGroupLabel]);
+        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries]);
 
         const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
         const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
@@ -113,24 +128,24 @@ export default withAppLayout<Props>(
             updateQuantity(productId, next);
         };
 
-        const handleRefreshCart = async () => {
-            if (items.length === 0 || isRefreshingCart) {
-                return;
-            }
+        // const handleRefreshCart = async () => {
+        //     if (items.length === 0 || isRefreshingCart) {
+        //         return;
+        //     }
 
-            setIsRefreshingCart(true);
+        //     setIsRefreshingCart(true);
 
-            try {
-                await refreshCart();
-                setPageMessage('Panier mis a jour selon les acces DB utilisateur');
-                setTimeout(() => setPageMessage(null), 3000);
-            } catch (error) {
-                console.error('Error refreshing cart:', error);
-                setPageMessage('Erreur lors de la mise a jour du panier');
-            } finally {
-                setIsRefreshingCart(false);
-            }
-        };
+        //     try {
+        //         await refreshCart();
+        //         setPageMessage('Panier mis a jour selon les acces DB utilisateur');
+        //         setTimeout(() => setPageMessage(null), 3000);
+        //     } catch (error) {
+        //         console.error('Error refreshing cart:', error);
+        //         setPageMessage('Erreur lors de la mise a jour du panier');
+        //     } finally {
+        //         setIsRefreshingCart(false);
+        //     }
+        // };
 
         const handleCreateNewCart = async () => {
             if (!cartId) {
@@ -247,34 +262,26 @@ export default withAppLayout<Props>(
                             <h1 className="text-3xl font-bold">
                                 {t('Panier')}
                                 {cartId ? (
-                                    <button
-                                        type="button"
-                                        className="rounded"
-                                        onClick={handleCreateNewCart}
-                                        title={t('Creer un nouveau panier')}
-                                        disabled={isSaving}
-                                    >
-                                        <Badge variant="secondary" style={{ fontSize: '2rem' }}>#{cartId}</Badge>
-                                    </button>
+                                    <>
+                                        &nbsp;<button
+                                            type="button"
+                                            className="rounded"
+                                            onClick={handleCreateNewCart}
+                                            title={t('Creer un nouveau panier')}
+                                            disabled={isSaving}
+                                        >
+                                            <Badge variant="secondary" style={{ fontSize: '2rem' }}>#{cartId}</Badge>
+                                        </button></>
                                 ) : null}
                             </h1>
                         </div>
 
                         {items.length > 0 && (
-                            // <div className='space-x-2'>
-
-                            //     <Button variant="default" onClick={handleSaveCart} className="" size="sm" disabled={isSaving}>
-                            //         {t('Save')} <SaveIcon className="h-4 w-4" />
-                            //     </Button>
-                            //     <Button variant="ghost" onClick={clearCart} className="text-destructive" size="sm" disabled={isSaving}>
-                            //         {t('Clear')}<Trash2 className="h-4 w-4" />
-                            //     </Button>
-                            // </div>
                             <ButtonsActions
-                                refresh={handleRefreshCart}
+                                // refresh={handleRefreshCart}
                                 save={handleSaveCart}
                                 delete={clearCart}
-                                refreshing={isRefreshingCart}
+                                // refreshing={isRefreshingCart}
                                 saving={isSaving}
                             />
                         )}
@@ -297,117 +304,149 @@ export default withAppLayout<Props>(
                         )}
 
                         {groupedItems.map((group) => (
-                            <div key={group.id} className="space-y-6">
+                            <div key={group.id}>
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>
-                                            {t('Produits')} - {group.label} ({group.items.length})
+                                            {<CountryFlag countryCode={group.country} className="inline-block w-6" />}
+                                            &nbsp;<Flower2Icon className='inline size-4' /> {formatCurrency(group.itemsTotal)}
+                                            &nbsp;-&nbsp;{<TruckIcon className='inline size-4' />} {group.items.length} Rolls
+                                            &nbsp;:&nbsp;{formatCurrency(group.deliveryTotal)}
+                                            &nbsp;-&nbsp;Total : {formatCurrency(group.orderTotal)}
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {group.items.map(({ product, quantity, pricing }) => {
-                                            const unitPrice = pricing.unitPrice;
-                                            const lineTotal = pricing.lineTotal;
-                                            const unite = getUniteQuantity(product);
-                                            const step = getQuantityStep(product, quantity);
 
-                                            return (
-                                                <div
-                                                    key={product.id}
-                                                    className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
-                                                >
-                                                    <div className="flex items-center gap-4 md:w-1/2">
-                                                        <div className="h-20 w-20 rounded relative shrink-0">
-                                                            <img
-                                                                src={getProductCartImage(product)}
-                                                                alt={product.name}
-                                                                className="h-full w-full object-cover"
-                                                            />
-                                                            <Badge
-                                                                className={cn(
-                                                                    "absolute -top-1 -right-1 text-xs rounded-full",
-                                                                    quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
-                                                                )}
-                                                            >
-                                                                {quantity}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-sm font-semibold leading-tight line-clamp-2 capitalize">{product.name}</p>
-                                                            {toText(product.ref) ? (
-                                                                <p className="text-xs text-muted-foreground">Ref: {toText(product.ref)}</p>
-                                                            ) : null}
-                                                            <p className="text-xs text-muted-foreground">{t('Prix unitaire')}</p>
-                                                            <p className="text-base font-semibold">{formatCurrency(unitPrice)}</p>
-                                                        </div>
-                                                    </div>
+                                    <CardContent className="space-y-6">
+                                        {/* Produits */}
+                                        <div className="space-y-4">
+                                            {group.items.map(({ product, quantity, pricing }) => {
+                                                const unitPrice = pricing.unitPrice;
+                                                const lineTotal = pricing.lineTotal;
+                                                const unite = getUniteQuantity(product);
+                                                const step = getQuantityStep(product, quantity);
 
-                                                    <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
-                                                        <div className="flex items-center gap-3 bg-muted rounded-lg p-2">
+                                                return (
+                                                    <div
+                                                        key={product.id}
+                                                        className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
+                                                    >
+                                                        <div className="flex items-center gap-4 md:w-1/2">
+                                                            <div className="relative h-20 w-20 shrink-0 rounded">
+                                                                <img
+                                                                    src={getProductCartImage(product)}
+                                                                    alt={product.name}
+                                                                    className="h-full w-full object-cover"
+                                                                />
+                                                                <Badge
+                                                                    className={cn(
+                                                                        "absolute -top-1 -right-1 rounded-full text-xs",
+                                                                        quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                                    )}
+                                                                >
+                                                                    {quantity}
+                                                                </Badge>
+                                                            </div>
+
+                                                            <div className="space-y-1">
+                                                                <p className="line-clamp-2 text-sm font-semibold leading-tight capitalize">
+                                                                    {product.name}
+                                                                </p>
+
+                                                                {toText(product.ref) ? (
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Ref: {toText(product.ref)}
+                                                                    </p>
+                                                                ) : null}
+
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {product.description}
+                                                                </p>
+
+                                                                <p className="text-base font-semibold">
+                                                                    {formatCurrency(unitPrice)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
+                                                            <div className="flex items-center gap-3 rounded-lg bg-muted p-2">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8"
+                                                                    onClick={() =>
+                                                                        handleQuantityChange(product.id, quantity - step)
+                                                                    }
+                                                                >
+                                                                    <Minus className="h-4 w-4" />
+                                                                </Button>
+
+                                                                <Input
+                                                                    type="text"
+                                                                    min={unite}
+                                                                    value={quantity}
+                                                                    onChange={(e) =>
+                                                                        handleQuantityChange(
+                                                                            product.id,
+                                                                            parseInt(e.target.value, 10)
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-16 border-0 text-center"
+                                                                />
+
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8"
+                                                                    onClick={() =>
+                                                                        handleQuantityChange(product.id, quantity + step)
+                                                                    }
+                                                                >
+                                                                    <Plus className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+
+                                                            <div className="text-right">
+                                                                <p className="text-lg font-semibold">
+                                                                    {formatCurrency(lineTotal)}
+                                                                </p>
+                                                            </div>
+
                                                             <Button
                                                                 variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8"
-                                                                aria-label={t('Diminuer la quantité')}
-                                                                onClick={() => handleQuantityChange(product.id, quantity - step)}
+                                                                className="text-destructive"
+                                                                onClick={() => removeFromCart(product.id)}
                                                             >
-                                                                <Minus className="h-4 w-4" />
-                                                            </Button>
-                                                            <Input
-                                                                type="text"
-                                                                min={unite}
-                                                                value={quantity}
-                                                                onChange={(e) => handleQuantityChange(product.id, parseInt(e.target.value, 10))}
-                                                                className="w-16 h-8 text-center border-0"
-                                                            />
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8"
-                                                                aria-label={t('Augmenter la quantité')}
-                                                                onClick={() => handleQuantityChange(product.id, quantity + step)}
-                                                            >
-                                                                <Plus className="h-4 w-4" />
+                                                                <Trash2 className="mr-2 h-4 w-4" />
                                                             </Button>
                                                         </div>
-
-                                                        <div className="text-right">
-                                                            <p className="text-xs text-muted-foreground">{t('Total ligne')}</p>
-                                                            <p className="text-lg font-semibold">{formatCurrency(lineTotal)}</p>
-                                                        </div>
-
-                                                        <Button
-                                                            variant="ghost"
-                                                            className="text-destructive"
-                                                            onClick={() => removeFromCart(product.id)}
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                        </Button>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </CardContent>
-                                </Card>
-
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>{t('Rolls')}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ProductRoll
-                                            items={group.cartItems}
-                                            getSupplierPrice={(supplier) => group.shipping.bySupplier[supplier.supplierId] ?? 0}
-                                            getRollPrice={(supplier, roll, rollIndex) => {
-                                                const prices = getSupplierRollPrices(
-                                                    supplier,
-                                                    group.transportContext.attrsBySupplier[supplier.supplierId],
-                                                    group.transportContext.transportBySupplier[supplier.supplierId],
                                                 );
+                                            })}
+                                        </div>
 
-                                                return prices ? prices[rollIndex] ?? null : null;
-                                            }}
-                                        />
+                                        {/* Séparateur */}
+                                        <Separator />
+
+                                        {/* Rolls */}
+                                        <div className="space-y-4">
+
+                                            <ProductRoll
+                                                items={group.cartItems}
+                                                getSupplierPrice={(supplier) =>
+                                                    group.shipping.bySupplier[supplier.supplierId] ?? 0
+                                                }
+                                                getRollPrice={(supplier, roll, rollIndex) => {
+                                                    const prices = getSupplierRollPrices(
+                                                        supplier,
+                                                        group.transportContext.attrsBySupplier[supplier.supplierId],
+                                                        group.transportContext.transportBySupplier[supplier.supplierId],
+                                                    );
+
+                                                    return prices ? prices[rollIndex] ?? null : null;
+                                                }}
+                                            />
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -451,8 +490,11 @@ export default withAppLayout<Props>(
                             <CardContent className="space-y-4">
                                 <div className="space-y-3">
                                     {groupedItems.map((group) => (
-                                        <div key={group.id} className="rounded-md border px-3 py-2">
-                                            <div className="text-xs text-muted-foreground">{group.label}</div>
+                                        <div key={group.id} className="relative rounded-md border px-3 py-2">
+                                            <div className="absolute -top-1 -left-2 shadow-sm">
+                                                <CountryFlag countryCode={group.country} className="w-4" />
+                                                {/* {isAdminUser && group.label ? ` ${group.label}` : ''} */}
+                                            </div>
                                             <div className="flex items-center justify-between text-sm">
                                                 <span>{t('Total produits')}</span>
                                                 <span className="font-semibold">{formatCurrency(group.itemsTotal)}</span>
@@ -464,6 +506,30 @@ export default withAppLayout<Props>(
                                             <div className="flex items-center justify-between text-sm font-semibold">
                                                 <span>{t('Total')}</span>
                                                 <span>{formatCurrency(group.orderTotal)}</span>
+                                            </div>
+                                            <Separator className="my-2" />
+                                            <div className="flex flex-col text-sm font-semibold">
+                                                <span>{t('Facturant')} : </span>
+                                                <span className="text-right">
+                                                    {group.facturant?.email ? (
+                                                        <a
+                                                            href={`mailto:${group.facturant.email}`}
+                                                            className="text-primary hover:underline"
+                                                        >
+                                                            {group.facturant.email}
+                                                        </a>
+                                                    ) : '-'}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col text-sm font-semibold">
+                                                <span>{t('Commercial')} : </span>
+                                                <span className="text-right">
+                                                    {group.commercial?.email ? (
+                                                        <a href={`mailto:${group.commercial.email}`} className="text-primary hover:underline">
+                                                            {group.commercial.email}
+                                                        </a>
+                                                    ) : '-'}
+                                                </span>
                                             </div>
                                         </div>
                                     ))}
