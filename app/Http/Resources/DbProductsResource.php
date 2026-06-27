@@ -15,6 +15,14 @@ class DbProductsResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $actor = $request->user();
+        $canManageAll = $actor
+            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+        $canManageFromPivot = $this->relationLoaded('users')
+            ? $this->users->contains(fn ($user) => (bool) ($user->pivot?->can_manage ?? false))
+            : false;
+        $canManage = (bool) ($canManageAll || $canManageFromPivot);
+
         $billingUsers = [];
 
         if ($this->relationLoaded('billingRules')) {
@@ -53,7 +61,7 @@ class DbProductsResource extends JsonResource
                         'id' => (int) $billingUser->id,
                         'name' => (string) $billingUser->name,
                         'email' => (string) ($billingUser->email ?? ''),
-                        'defaults' => $rule->defaults,
+                        'defaults' => $this->normalizeBillingDefaults($rule->defaults),
                         'sellers' => $sellers,
                     ];
                 })
@@ -85,8 +93,63 @@ class DbProductsResource extends JsonResource
                     ->values()
                     ->all()
                 : [],
+            'manageable_user_ids' => $this->relationLoaded('users')
+                ? $this->users
+                    ->filter(fn ($user) => (bool) ($user->pivot?->can_manage ?? false))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all()
+                : [],
+            'abilities' => [
+                'update' => $canManage,
+                'manage' => $canManage,
+                'delete' => $canManage,
+                'billing' => $canManage,
+            ],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+        ];
+    }
+
+    private function normalizeBillingDefaults(mixed $defaults): array
+    {
+        if (!is_array($defaults)) {
+            return [
+                'profiles' => [],
+                'default_profile_id' => null,
+            ];
+        }
+
+        $profiles = $defaults['profiles'] ?? null;
+        if (is_array($profiles)) {
+            return [
+                'profiles' => collect($profiles)
+                    ->filter(fn ($profile) => is_array($profile))
+                    ->map(function ($profile) {
+                        return [
+                            'id' => (string) ($profile['id'] ?? 'standard'),
+                            'name' => (string) ($profile['name'] ?? 'Standard'),
+                            'conditions' => is_array($profile['conditions'] ?? null) ? $profile['conditions'] : [],
+                        ];
+                    })
+                    ->values()
+                    ->all(),
+                'default_profile_id' => isset($defaults['default_profile_id'])
+                    ? (string) $defaults['default_profile_id']
+                    : null,
+            ];
+        }
+
+        return [
+            'profiles' => [
+                [
+                    'id' => 'standard',
+                    'name' => 'Standard',
+                    'conditions' => $defaults,
+                ],
+            ],
+            'default_profile_id' => 'standard',
         ];
     }
 }

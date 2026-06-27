@@ -26,17 +26,36 @@ class DbProductsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $hasCanAccessColumn = Schema::hasColumn('db_product_user', 'can_access');
         $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
+        $hasCanManageColumn = Schema::hasColumn('db_product_user', 'can_manage');
         $search = $request->get('q');
-        $query = DbProducts::query()->orderFromRequest($request);
+        $query = DbProducts::query()
+            ->with([
+                'users' => fn ($usersQuery) => $usersQuery
+                    ->select('users.id')
+                    ->when($user, fn ($q) => $q->where('users.id', (int) $user->id)),
+            ])
+            ->orderFromRequest($request);
 
-        $canManageAll = $user
-            && ($user->hasRole('admin') || $user->hasRole('dev') || $user->hasPermissionTo('users.db_products.manage.all'));
+        $canManageAll = $this->canManageAll($user);
 
         if ($user && !$canManageAll) {
-            $query->whereHas('users', function ($q) use ($user, $hasCanSellColumn) {
+            $query->whereHas('users', function ($q) use ($user, $hasCanAccessColumn, $hasCanSellColumn, $hasCanManageColumn) {
                 $q->where('users.id', (int) $user->id)
-                    ->when($hasCanSellColumn, fn ($qq) => $qq->where('db_product_user.can_sell', true));
+                    ->where(function ($scope) use ($hasCanAccessColumn, $hasCanSellColumn, $hasCanManageColumn) {
+                        if ($hasCanAccessColumn) {
+                            $scope->orWhere('db_product_user.can_access', true);
+                        }
+
+                        if ($hasCanSellColumn) {
+                            $scope->orWhere('db_product_user.can_sell', true);
+                        }
+
+                        if ($hasCanManageColumn) {
+                            $scope->orWhere('db_product_user.can_manage', true);
+                        }
+                    });
             });
         }
 
@@ -71,14 +90,10 @@ class DbProductsController extends Controller
                 'country' => null,
                 'mod_liv' => null,
                 'mini' => null,
-                'billing_users' => [],
-                'billable_user_ids' => [],
                 'created_at' => null,
                 'updated_at' => null,
             ],
             'categoryOptions' => $this->categoryOptions(),
-            'eligibleUsers' => $this->eligibleUsers($request),
-            'carriers' => $this->carrierOptions(),
         ]);
     }
 
@@ -89,16 +104,7 @@ class DbProductsController extends Controller
     {
         $validated = $this->validatePayload($request);
 
-        $billableUserIds = $validated['billable_user_ids'] ?? [];
-        $billingUsers = $validated['billing_users'] ?? [];
-        unset($validated['billable_user_ids']);
-        unset($validated['billing_users']);
-
         $dbProduct = DbProducts::create($validated);
-
-        $this->syncBillableUsers($dbProduct, $billableUserIds);
-        $this->syncDbProductBillingRules($dbProduct, $billingUsers);
-
 
         return redirect()->route('db-products.index')->with('success', __('Database created.'));
     }
@@ -118,11 +124,25 @@ class DbProductsController extends Controller
     {
         $this->ensureCanManageDbProduct($request, $db_product);
 
-        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
         $db_product->load([
-            'users' => fn ($query) => $query
-                ->select('users.id')
-                ->when($hasCanSellColumn, fn ($q) => $q->where('db_product_user.can_sell', true)),
+            'users' => fn ($query) => $query->select('users.id')->where('users.id', (int) $request->user()->id),
+        ]);
+
+        return Inertia::render('products/db-edit', [
+            'dbProduct' => DbProductsResource::make($db_product)->resolve(),
+            'categoryOptions' => $this->categoryOptions(),
+        ]);
+    }
+
+    public function billing(Request $request, DbProducts $db_product)
+    {
+        $this->ensureCanManageDbProduct($request, $db_product);
+
+        $user = $request->user();
+        $canManageAll = $this->canManageAll($user);
+
+        $db_product->load([
+            'users' => fn ($query) => $query->select('users.id')->where('users.id', (int) $request->user()->id),
             'billingRules' => fn ($query) => $query
                 ->where('active', true)
                 ->with([
@@ -136,10 +156,34 @@ class DbProductsController extends Controller
                 ]),
         ]);
 
-        return Inertia::render('products/db-edit', [
+        if ($user && !$canManageAll) {
+            $filteredRules = $db_product->billingRules
+                ->filter(function (DbProductBillingUser $rule) use ($user) {
+                    $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
+
+                    if (!$billingUser) {
+                        return false;
+                    }
+
+                    if ((int) $billingUser->id === (int) $user->id) {
+                        return true;
+                    }
+
+                    if (!$billingUser->relationLoaded('sellers')) {
+                        return false;
+                    }
+
+                    return $billingUser->sellers->contains(fn (User $seller) => (int) $seller->id === (int) $user->id);
+                })
+                ->values();
+
+            $db_product->setRelation('billingRules', $filteredRules);
+        }
+
+        return Inertia::render('products/db-billing', [
             'dbProduct' => DbProductsResource::make($db_product)->resolve(),
-            'categoryOptions' => $this->categoryOptions(),
-            'eligibleUsers' => $this->eligibleUsers($request),
+            'eligibleBillingUsers' => $this->eligibleBillingUsers($request),
+            'eligibleSellerUsers' => $this->eligibleSellerUsers($request),
             'carriers' => $this->carrierOptions(),
         ]);
     }
@@ -153,23 +197,37 @@ class DbProductsController extends Controller
 
         $validated = $this->validatePayload($request, $db_product);
 
-        $billableUserIds = $validated['billable_user_ids'] ?? [];
-        $billingUsers = $validated['billing_users'] ?? [];
-        unset($validated['billable_user_ids']);
-        unset($validated['billing_users']);
-
         $db_product->update($validated);
+
+        return redirect()->route('db-products.index')->with('success', __('Database updated.'));
+    }
+
+    public function updateBilling(Request $request, DbProducts $db_product)
+    {
+        $this->ensureCanManageDbProduct($request, $db_product);
+
+        $validated = $this->validateBillingPayload($request);
+        $billingUsers = $validated['billing_users'] ?? [];
+
+        $billableUserIds = collect($billingUsers)
+            ->map(fn ($rule) => (int) ($rule['billing_user_id'] ?? 0))
+            ->filter(fn ($id) => $id > 0)
+            ->values()
+            ->all();
+
         $this->syncBillableUsers($db_product, $billableUserIds);
         $this->syncDbProductBillingRules($db_product, $billingUsers);
 
-        return redirect()->route('db-products.index')->with('success', __('Database updated.'));
+        return redirect()->route('db-products.billing', $db_product)->with('success', __('Billing rules updated.'));
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(DbProducts $db_product)
+    public function destroy(Request $request, DbProducts $db_product)
     {
+        $this->ensureCanManageDbProduct($request, $db_product);
+
         $db_product->delete();
 
         return redirect()->route('db-products.index')->with('success', __('Database deleted.'));
@@ -320,8 +378,12 @@ class DbProductsController extends Controller
             'country' => ['nullable', 'string', 'size:2'],
             'mod_liv' => ['nullable', 'string', 'max:100'],
             'mini' => ['nullable', 'integer', 'min:0'],
-            'billable_user_ids' => ['nullable', 'array'],
-            'billable_user_ids.*' => ['integer', 'exists:users,id'],
+        ]);
+    }
+
+    private function validateBillingPayload(Request $request): array
+    {
+        return $request->validate([
             'billing_users' => ['nullable', 'array'],
             'billing_users.*.billing_user_id' => ['required', 'integer', 'exists:users,id'],
             'billing_users.*.defaults' => ['nullable', 'array'],
@@ -345,7 +407,7 @@ class DbProductsController extends Controller
             ->all();
     }
 
-    private function eligibleUsers(Request $request): array
+    private function eligibleBillingUsers(Request $request): array
     {
         $query = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
@@ -363,6 +425,11 @@ class DbProductsController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    private function eligibleSellerUsers(Request $request): array
+    {
+        return $this->eligibleBillingUsers($request);
     }
 
     private function carrierOptions(): array
@@ -405,6 +472,7 @@ class DbProductsController extends Controller
                     'can_buy' => false,
                     'can_invoice' => true,
                     'can_sell' => true,
+                    'can_manage' => false,
                 ];
             }
             $dbProduct->users()->syncWithoutDetaching($attachPayload);
@@ -543,9 +611,7 @@ class DbProductsController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $canManageAll = $user->hasRole('admin')
-            || $user->hasRole('dev')
-            || $user->hasPermissionTo('users.db_products.manage.all');
+        $canManageAll = $this->canManageAll($user);
 
         if ($canManageAll) {
             return;
@@ -555,14 +621,30 @@ class DbProductsController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $relation = $user->dbProducts()->where('db_products.id', (int) $dbProduct->id);
-
-        if (Schema::hasColumn('db_product_user', 'can_sell')) {
-            $relation->where('db_product_user.can_sell', true);
-        }
-
-        if (!$relation->exists()) {
+        if (!$this->canManageDbProduct($user, $dbProduct)) {
             abort(403, 'Unauthorized');
         }
+    }
+
+    private function canManageAll(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $user->hasRole('admin')
+            || $user->hasRole('dev')
+            || $user->hasPermissionTo('users.db_products.manage.all');
+    }
+
+    private function canManageDbProduct(User $user, DbProducts $dbProduct): bool
+    {
+        $relation = $user->dbProducts()->where('db_products.id', (int) $dbProduct->id);
+
+        if (Schema::hasColumn('db_product_user', 'can_manage')) {
+            $relation->where('db_product_user.can_manage', true);
+        }
+
+        return $relation->exists();
     }
 }

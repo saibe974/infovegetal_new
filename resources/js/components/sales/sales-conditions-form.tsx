@@ -104,6 +104,9 @@ export default function SalesConditionsForm({ value, onChange, carriers, mode }:
                 <FormField label={t('Margin per roll (%)')}>
                     <Input type="number" step="0.01" value={String(merged.mr ?? 0)} onChange={(e) => update('mr', toNumber(e.target.value))} />
                 </FormField>
+                <FormField label={t('Product VAT (%)')}>
+                    <Input type="number" step="0.01" value={String(merged.tvap ?? 0)} onChange={(e) => update('tvap', toNumber(e.target.value))} />
+                </FormField>
             </div>
 
             {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -180,9 +183,7 @@ export default function SalesConditionsForm({ value, onChange, carriers, mode }:
                 <FormField label={t('Delivery (€)')}>
                     <Input type="number" step="0.01" value={String(merged.l ?? 0)} onChange={(e) => update('l', toNumber(e.target.value))} />
                 </FormField>
-                <FormField label={t('Product VAT (%)')}>
-                    <Input type="number" step="0.01" value={String(merged.tvap ?? 0)} onChange={(e) => update('tvap', toNumber(e.target.value))} />
-                </FormField>
+                
                 <FormField label={t('Transport VAT (%)')}>
                     <Input
                         type="number"

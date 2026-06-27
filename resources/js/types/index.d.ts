@@ -51,8 +51,25 @@ export interface dbProduct {
     mini?: number | null;
     billable_user_ids?: number[];
     billing_users?: BillingUserRule[];
+    abilities?: {
+        update?: boolean;
+        manage?: boolean;
+        delete?: boolean;
+        billing?: boolean;
+    };
     created_at: string | null;
     updated_at: string | null;
+}
+
+export interface SalesConditionProfile {
+    id: string;
+    name: string;
+    conditions: SalesConditions;
+}
+
+export interface BillingDefaults {
+    profiles: SalesConditionProfile[];
+    default_profile_id?: string | null;
 }
 
 export interface SalesConditions {
@@ -84,14 +101,14 @@ export interface BillingUserRule {
     id: number;
     name: string;
     email: string;
-    defaults?: SalesConditions;
+    defaults?: BillingDefaults | SalesConditions;
     sellers: SellerUserRule[];
 }
 
 export interface DbProductBillingUser {
     db_product_id: number;
     billing_user_id: number;
-    defaults?: SalesConditions;
+    defaults?: BillingDefaults | SalesConditions;
     active?: boolean;
 }
 

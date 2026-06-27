@@ -179,8 +179,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('db-products/{db_product}/edit', [\App\Http\Controllers\DbProductsController::class, 'edit'])
         ->name('db-products.edit')
         ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::get('db-products/{db_product}/billing', [\App\Http\Controllers\DbProductsController::class, 'billing'])
+        ->name('db-products.billing')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::put('db-products/{db_product}', [\App\Http\Controllers\DbProductsController::class, 'update'])
         ->name('db-products.update')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::put('db-products/{db_product}/billing', [\App\Http\Controllers\DbProductsController::class, 'updateBilling'])
+        ->name('db-products.update-billing')
         ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::resource('db-products', \App\Http\Controllers\DbProductsController::class)
         ->except(['index', 'edit', 'update'])

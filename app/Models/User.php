@@ -103,7 +103,7 @@ class User extends Authenticatable implements HasMedia
             'db_product_id',
         )
             ->withTimestamps()
-            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'attributes']);
+            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'can_manage', 'attributes']);
     }
 
     /**

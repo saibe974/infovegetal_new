@@ -6,7 +6,7 @@ import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@
 import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, ShellIcon, TrashIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import SearchSelect from '@/components/app/search-select';
 import dbProducts from '@/routes/db-products';
@@ -33,6 +33,12 @@ type DbProduct = {
     champs: Record<string, unknown> | null;
     categories: Record<string, unknown> | null;
     traitement: string | null;
+    abilities?: {
+        update?: boolean;
+        manage?: boolean;
+        delete?: boolean;
+        billing?: boolean;
+    };
     created_at: string;
     updated_at: string;
 };
@@ -155,20 +161,33 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                             buttonLabel=''
                                         />
 
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={dbProducts.edit(item.id).url}>
-                                                <EditIcon size={16} />
-                                            </Link>
-                                        </Button>
-                                        <Button asChild size="icon" variant="destructive-outline">
-                                            <Link
-                                                href={dbProducts.destroy(item.id).url}
-                                                method="delete"
-                                                onBefore={() => confirm(t('Are you sure you want to delete this database?'))}
-                                            >
-                                                <TrashIcon size={16} />
-                                            </Link>
-                                        </Button>
+                                        {item.abilities?.update ? (
+                                            <Button asChild size="icon" variant="outline">
+                                                <Link href={dbProducts.edit(item.id).url}>
+                                                    <EditIcon size={16} />
+                                                </Link>
+                                            </Button>
+                                        ) : null}
+
+                                        {item.abilities?.billing ? (
+                                            <Button asChild size="icon" variant="outline">
+                                                <Link href={dbProducts.billing(item.id).url}>
+                                                    <ShellIcon size={16} />
+                                                </Link>
+                                            </Button>
+                                        ) : null}
+
+                                        {item.abilities?.delete ? (
+                                            <Button asChild size="icon" variant="destructive-outline">
+                                                <Link
+                                                    href={dbProducts.destroy(item.id).url}
+                                                    method="delete"
+                                                    onBefore={() => confirm(t('Are you sure you want to delete this database?'))}
+                                                >
+                                                    <TrashIcon size={16} />
+                                                </Link>
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 </TableCell>
                             </TableRow>

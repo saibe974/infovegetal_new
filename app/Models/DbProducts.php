@@ -48,7 +48,7 @@ class DbProducts extends Model
     {
         return $this->belongsToMany(\App\Models\User::class, 'db_product_user', 'db_product_id', 'user_id')
             ->withTimestamps()
-            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'attributes']);
+            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'can_manage', 'attributes']);
     }
 
     /**
