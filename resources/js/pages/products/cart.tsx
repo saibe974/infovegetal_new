@@ -309,8 +309,8 @@ export default withAppLayout<Props>(
                                     <CardHeader>
                                         <CardTitle>
                                             {<CountryFlag countryCode={group.country} className="inline-block w-6" />}
-                                            &nbsp;<Flower2Icon className='inline size-4' /> {formatCurrency(group.itemsTotal)}
-                                            &nbsp;-&nbsp;{<TruckIcon className='inline size-4' />} {group.items.length} Rolls
+                                            &nbsp;<Flower2Icon className='inline size-4' />  {group.items.length} : {formatCurrency(group.itemsTotal)}
+                                            &nbsp;-&nbsp;{<TruckIcon className='inline size-4' />}
                                             &nbsp;:&nbsp;{formatCurrency(group.deliveryTotal)}
                                             &nbsp;-&nbsp;Total : {formatCurrency(group.orderTotal)}
                                         </CardTitle>

@@ -17,7 +17,6 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Services\UserManagementAuthorizationService;
-use Illuminate\Support\Facades\Schema;
 
 class User extends Authenticatable implements HasMedia
 {
@@ -93,22 +92,71 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
-     * Many-to-many relation to DbProducts via pivot `db_products_users`.
+     * Many-to-many relation to DbProducts via pivot `db_product_user`.
      */
     public function dbProducts(): BelongsToMany
     {
-        $relation = $this->belongsToMany(
+        return $this->belongsToMany(
             \App\Models\DbProducts::class,
-            'db_products_users',
+            'db_product_user',
             'user_id',
             'db_product_id',
-        )->withTimestamps()->withPivot('attributes');
+        )
+            ->withTimestamps()
+            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'attributes']);
+    }
 
-        if (Schema::hasColumn('db_products_users', 'can_sell')) {
-            $relation->withPivot('can_sell');
-        }
+    /**
+     * DB products where the user is configured as billing user.
+     */
+    public function billingDbProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\DbProducts::class,
+            'db_product_billing_user',
+            'billing_user_id',
+            'db_product_id',
+        )
+            ->withTimestamps()
+            ->withPivot(['defaults', 'active']);
+    }
 
-        return $relation;
+    /**
+     * Sellers linked to this billing user.
+     */
+    public function sellers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'billing_user_seller_user',
+            'billing_user_id',
+            'seller_user_id',
+        )
+            ->withTimestamps()
+            ->withPivot(['active', 'conditions_override']);
+    }
+
+    /**
+     * Billing users linked to this seller.
+     */
+    public function billingUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            self::class,
+            'billing_user_seller_user',
+            'seller_user_id',
+            'billing_user_id',
+        )
+            ->withTimestamps()
+            ->withPivot(['active', 'conditions_override']);
+    }
+
+    /**
+     * Final client conditions entries.
+     */
+    public function clientSalesConditions(): HasMany
+    {
+        return $this->hasMany(ClientSalesCondition::class, 'client_user_id');
     }
 
     /**

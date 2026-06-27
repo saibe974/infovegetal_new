@@ -148,7 +148,7 @@ class CartController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $rows = DB::table('db_products_users')
+        $rows = DB::table('db_product_user')
             ->where('user_id', $user->id)
             ->whereNotNull('attributes')
             ->get(['db_product_id', 'attributes']);
@@ -467,12 +467,12 @@ class CartController extends Controller
         $total = $itemsTotal + $shippingTotal;
         $rollDistribution = app(PdfRollDistributionService::class)->build($items);
 
-        // Récupérer le facturant et le commercial via le pivot db_products_users
+        // Récupérer le facturant et le commercial via le pivot db_product_user
         $facturant = null;
         $commercial = null;
         $dbProductId = isset($data['group_key']) ? (int) $data['group_key'] : 0;
         if ($dbProductId > 0) {
-            $pivot = DB::table('db_products_users')
+            $pivot = DB::table('db_product_user')
                 ->where('user_id', $user->id)
                 ->where('db_product_id', $dbProductId)
                 ->value('attributes');
@@ -705,7 +705,7 @@ class CartController extends Controller
         $commercialIds = [];
         $pivotsByDbProductId = [];
         foreach ($dbProductIds as $dbProductId) {
-            $pivot = DB::table('db_products_users')
+            $pivot = DB::table('db_product_user')
                 ->where('user_id', $user->id)
                 ->where('db_product_id', $dbProductId)
                 ->value('attributes');
@@ -759,7 +759,7 @@ class CartController extends Controller
     }
 
     private function sendOrderPdfMails(
-        $recipients,
+        iterable $recipients,
         string $pdfRelativePath,
         string $orderNumber,
         \App\Models\User $client,

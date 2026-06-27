@@ -666,7 +666,7 @@ class UserImportService
 
                         if (!$user) {
                             if ($emailKey === $targetEmail) {
-                                Log::info('[User Import][SYNC][target-user] User introuvable pour sync db_products_users', [
+                                Log::info('[User Import][SYNC][target-user] User introuvable pour sync db_product_user', [
                                     'email' => $email,
                                     'email_key' => $emailKey,
                                     'db_products_sync' => $links,
@@ -676,7 +676,7 @@ class UserImportService
                         }
 
                         if ($emailKey === $targetEmail) {
-                            Log::info('[User Import][SYNC][target-user] Preparation sync db_products_users', [
+                            Log::info('[User Import][SYNC][target-user] Preparation sync db_product_user', [
                                 'email' => $email,
                                 'email_key' => $emailKey,
                                 'user_id' => (int) $user->id,
@@ -689,6 +689,10 @@ class UserImportService
                                 'user_id' => (int) $user->id,
                                 'db_product_id' => (int) $link['db_product_id'],
                                 'attributes' => $link['attributes'],
+                                'can_access' => true,
+                                'can_buy' => false,
+                                'can_invoice' => false,
+                                'can_sell' => false,
                                 'created_at' => $now,
                                 'updated_at' => $now,
                             ];
@@ -696,14 +700,14 @@ class UserImportService
                     }
 
                     if (!empty($pivotRows)) {
-                        DB::table('db_products_users')->upsert(
+                        DB::table('db_product_user')->upsert(
                             $pivotRows,
                             ['user_id', 'db_product_id'],
-                            ['attributes', 'updated_at']
+                            ['attributes', 'can_access', 'can_buy', 'can_invoice', 'can_sell', 'updated_at']
                         );
 
                         if (isset($dbProductsByEmail[$targetEmail])) {
-                            Log::info('[User Import][SYNC][target-user] Upsert db_products_users execute', [
+                            Log::info('[User Import][SYNC][target-user] Upsert db_product_user execute', [
                                 'email' => $targetEmail,
                                 'rows_count' => count($dbProductsByEmail[$targetEmail]),
                             ]);
@@ -826,7 +830,7 @@ class UserImportService
     /**
      * Écrire une ligne d'erreur dans le rapport.
      */
-    private function writeReportLine($handle, int $line, string $error, array $row, array $mapped): void
+    private function writeReportLine(mixed $handle, int $line, string $error, array $row, array $mapped): void
     {
         if ($handle) {
             $email = $mapped['email'] ?? $row['email'] ?? '';
@@ -839,7 +843,7 @@ class UserImportService
     /**
      * Préparer le sync des db_products depuis la colonne expediteurs (JSON).
      */
-    private function buildDbProductsSyncFromExpediteurs($raw): array
+    private function buildDbProductsSyncFromExpediteurs(array|string|null $raw): array
     {
         if ($raw === null || $raw === '') {
             return [];
@@ -938,7 +942,7 @@ class UserImportService
     /**
      * Mapper les ids legacy d'expediteurs vers db_products.
      */
-    private function mapLegacyDbProductId($sourceId): ?int
+    private function mapLegacyDbProductId(int|string|null $sourceId): ?int
     {
         if ($sourceId === null) {
             return null;

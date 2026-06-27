@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Users\UserStoreRequest;
 use App\Http\Requests\Users\UserUpdateRequest;
+use App\Http\Resources\DbProductsResource;
 use App\Http\Resources\UserResource;
 use App\Models\Cart;
+use App\Models\ClientSalesCondition;
 use App\Models\User;
 use App\Services\PriceCalculatorService;
 use App\Services\UserManagementAuthorizationService;
@@ -29,6 +31,7 @@ use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\DbProducts;
+use App\Models\DbProductBillingUser;
 use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
 use Illuminate\Validation\ValidationException;
 
@@ -816,7 +819,7 @@ class UserManagementController extends Controller
 
         $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
-        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
         $canManageAllDb = $actor
             && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
         $allowedDbIds = $this->selectableDbProductIds($request->user(), $user);
@@ -826,33 +829,23 @@ class UserManagementController extends Controller
             'db_ids.*' => ['integer', 'exists:db_products,id'],
             'attributes' => ['nullable', 'array'],
             'merge' => ['nullable', 'boolean'],
+            'sales_conditions' => ['nullable', 'array'],
+            'sales_conditions.*.db_product_id' => ['required', 'integer', 'exists:db_products,id'],
+            'sales_conditions.*.billing_user_id' => ['required', 'integer', 'exists:users,id'],
+            'sales_conditions.*.seller_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sales_conditions.*.conditions_override' => ['nullable', 'array'],
         ]);
 
         $dbIds = array_map('intval', (array) $request->input('db_ids', []));
         $attributes = $request->input('attributes', []);
         $merge = $request->boolean('merge');
 
-        $normalize = function (array $value) use (&$normalize): array {
-            foreach ($value as $key => $item) {
-                if (is_array($item)) {
-                    $value[$key] = $normalize($item);
-                }
-            }
-            ksort($value);
-            return $value;
-        };
-
         $allCurrent = $user->dbProducts()
             ->get()
-            ->mapWithKeys(function ($dbProduct) use ($normalize) {
-                $attrs = [];
-                $pivot = $dbProduct->pivot;
-                if ($pivot && $pivot->attributes) {
-                    $decoded = json_decode($pivot->attributes, true);
-                    if (is_array($decoded)) {
-                        $attrs = $normalize($decoded);
-                    }
-                }
+            ->mapWithKeys(function ($dbProduct) {
+                $attrs = $this->normalizeSalesConditions(
+                    $this->decodeJsonPivotAttributes($dbProduct->pivot?->attributes)
+                );
                 return [(int) $dbProduct->id => $attrs];
             })
             ->toArray();
@@ -860,17 +853,12 @@ class UserManagementController extends Controller
         $editableCurrent = $allCurrent;
         if ($isSelfManagement && $hasCanSellColumn) {
             $editableCurrent = $user->dbProducts()
-                ->where('db_products_users.can_sell', true)
+                ->where('db_product_user.can_sell', true)
                 ->get()
-                ->mapWithKeys(function ($dbProduct) use ($normalize) {
-                    $attrs = [];
-                    $pivot = $dbProduct->pivot;
-                    if ($pivot && $pivot->attributes) {
-                        $decoded = json_decode($pivot->attributes, true);
-                        if (is_array($decoded)) {
-                            $attrs = $normalize($decoded);
-                        }
-                    }
+                ->mapWithKeys(function ($dbProduct) {
+                    $attrs = $this->normalizeSalesConditions(
+                        $this->decodeJsonPivotAttributes($dbProduct->pivot?->attributes)
+                    );
                     return [(int) $dbProduct->id => $attrs];
                 })
                 ->toArray();
@@ -897,6 +885,10 @@ class UserManagementController extends Controller
         }
 
         foreach ($dbIds as $dbId) {
+            if (!array_key_exists($dbId, $attributes) && array_key_exists((int) $dbId, $next)) {
+                continue;
+            }
+
             $attr = $attributes[$dbId] ?? [];
             // Si c'est une string JSON (cas rare), on la décode
             if (is_string($attr)) {
@@ -906,14 +898,29 @@ class UserManagementController extends Controller
             if (!is_array($attr)) {
                 $attr = [];
             }
-            $normalizedAttr = $normalize($attr);
+            $normalizedAttr = $this->normalizeSalesConditions($attr);
             $next[(int) $dbId] = $normalizedAttr;
             $syncData[$dbId] = [
+                'can_access' => true,
                 'attributes' => json_encode($normalizedAttr),
             ];
         }
 
+        foreach (array_keys($syncData) as $dbId) {
+            if (!isset($syncData[$dbId]['can_sell'])) {
+                $syncData[$dbId]['can_sell'] = true;
+            }
+            if (!isset($syncData[$dbId]['can_invoice'])) {
+                $syncData[$dbId]['can_invoice'] = true;
+            }
+            if (!isset($syncData[$dbId]['can_buy'])) {
+                $syncData[$dbId]['can_buy'] = false;
+            }
+        }
+
         $user->dbProducts()->sync($syncData);
+
+        $salesChanged = $this->syncClientSalesConditions($user, (array) $request->input('sales_conditions', []));
 
         $currentIds = array_keys($allCurrent);
         $nextIds = array_keys($next);
@@ -932,12 +939,16 @@ class UserManagementController extends Controller
             }
         }
 
+        if ($salesChanged) {
+            $hasChanges = true;
+        }
+
         if ($hasChanges) {
             $this->recalculateActiveCartTotals($user);
             Cache::put('cart:refresh:' . $user->id, now()->getTimestamp(), now()->addHour());
         }
 
-        return back()->with('success', 'User DB association and attributes updated successfully');
+        return back()->with('success', 'User DB association and sales conditions updated successfully');
     }
 
     private function recalculateActiveCartTotals(User $user): void
@@ -1020,14 +1031,30 @@ class UserManagementController extends Controller
 
         $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
-        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
 
         $canManageAllDb = $actor
             && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
 
-        $dbProducts = $canManageAllDb
-            ? DbProducts::orderBy('name')->get(['id', 'name'])
+        $dbProductsQuery = $canManageAllDb
+            ? DbProducts::query()->orderBy('name')
             : $this->selectableDbProducts($actor, $user);
+
+        $dbProducts = $dbProductsQuery
+            ->with([
+                'billingRules' => fn ($query) => $query
+                    ->where('active', true)
+                    ->with([
+                        'billingUser' => fn ($billingQuery) => $billingQuery
+                            ->select('users.id', 'users.name', 'users.email')
+                            ->with([
+                                'sellers' => fn ($sellersQuery) => $sellersQuery
+                                    ->select('users.id', 'users.name', 'users.email')
+                                    ->wherePivot('active', true),
+                            ]),
+                    ]),
+            ])
+            ->get(['id', 'name', 'description']);
 
         $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
@@ -1049,14 +1076,14 @@ class UserManagementController extends Controller
             ->orderBy('name');
 
         if ($hasCanSellColumn) {
-            $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_products_users.can_sell', true));
+            $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_product_user.can_sell', true));
         }
 
         $billableEligibleUsers = $billableUsersQuery
             ->with(['dbProducts' => function ($query) use ($hasCanSellColumn) {
                 $query->select('db_products.id');
                 if ($hasCanSellColumn) {
-                    $query->where('db_products_users.can_sell', true);
+                    $query->where('db_product_user.can_sell', true);
                 }
             }])
             ->get(['id', 'name', 'email'])
@@ -1084,25 +1111,32 @@ class UserManagementController extends Controller
         // On prépare les attributs par db_product_id
         $dbUserAttributes = [];
         foreach ($userWithPivots->dbProducts as $dbProduct) {
-            $pivot = $dbProduct->pivot;
-            $attrs = [];
-            if ($pivot && $pivot->attributes) {
-                $decoded = json_decode($pivot->attributes, true);
-                if (is_array($decoded)) $attrs = $decoded;
-            }
-            $dbUserAttributes[$dbProduct->id] = $attrs;
+            $dbUserAttributes[$dbProduct->id] = $this->decodeJsonPivotAttributes($dbProduct->pivot?->attributes);
         }
+
+        $salesConditions = $user->clientSalesConditions()
+            ->where('active', true)
+            ->get(['db_product_id', 'billing_user_id', 'seller_user_id', 'conditions_override'])
+            ->map(fn (ClientSalesCondition $condition) => [
+                'db_product_id' => (int) $condition->db_product_id,
+                'billing_user_id' => (int) $condition->billing_user_id,
+                'seller_user_id' => $condition->seller_user_id !== null ? (int) $condition->seller_user_id : null,
+                'conditions_override' => $condition->conditions_override ?? [],
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('users/db', [
             'user' => $user->load(['roles', 'permissions']),
             'editingUser' => $user,
             'userAbilities' => $this->userAbilities($request, $user),
-            'dbProducts' => $dbProducts,
+            'dbProducts' => DbProductsResource::collection($dbProducts)->resolve(),
             'eligibleUsers' => $eligibleUsers,
             'billableEligibleUsers' => $billableEligibleUsers,
             'carriers' => $carriers,
             'selectedDbId' => $selected,
             'dbUserAttributes' => $dbUserAttributes,
+            'salesConditions' => $salesConditions,
         ]);
     }
 
@@ -1316,13 +1350,12 @@ class UserManagementController extends Controller
         $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
 
         if (!$sourceUser) {
-            return collect();
+            return DbProducts::query()->whereRaw('1 = 0');
         }
 
         return $sourceUser->dbProducts()
-            ->select('db_products.id', 'db_products.name')
-            ->orderBy('db_products.name')
-            ->get();
+            ->select('db_products.id', 'db_products.name', 'db_products.description')
+            ->orderBy('db_products.name');
     }
 
     /**
@@ -1346,6 +1379,135 @@ class UserManagementController extends Controller
     private function authorization(): UserManagementAuthorizationService
     {
         return app(UserManagementAuthorizationService::class);
+    }
+
+    private function normalizeSalesConditions(?array $value): array
+    {
+        if (!$value) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $normalized[$key] = $this->normalizeSalesConditions($item);
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        ksort($normalized);
+
+        return $normalized;
+    }
+
+    private function decodeJsonPivotAttributes(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
+    }
+
+    private function syncClientSalesConditions(User $user, array $salesConditions): bool
+    {
+        $rows = collect($salesConditions)
+            ->filter(fn ($row) => is_array($row) && !empty($row['db_product_id']) && !empty($row['billing_user_id']))
+            ->map(function (array $row) {
+                return [
+                    'client_user_id' => (int) ($row['client_user_id'] ?? 0),
+                    'db_product_id' => (int) $row['db_product_id'],
+                    'billing_user_id' => (int) $row['billing_user_id'],
+                    'seller_user_id' => isset($row['seller_user_id']) && $row['seller_user_id'] !== null
+                        ? (int) $row['seller_user_id']
+                        : null,
+                    'conditions_override' => $this->normalizeSalesConditions($row['conditions_override'] ?? []),
+                ];
+            })
+            ->values();
+
+        $current = $user->clientSalesConditions()
+            ->where('active', true)
+            ->get(['db_product_id', 'billing_user_id', 'seller_user_id', 'conditions_override'])
+            ->map(fn (ClientSalesCondition $row) => [
+                'db_product_id' => (int) $row->db_product_id,
+                'billing_user_id' => (int) $row->billing_user_id,
+                'seller_user_id' => $row->seller_user_id !== null ? (int) $row->seller_user_id : null,
+                'conditions_override' => $this->normalizeSalesConditions($row->conditions_override ?? []),
+            ])
+            ->sortBy(fn (array $row) => implode(':', [
+                $row['db_product_id'],
+                $row['billing_user_id'],
+                $row['seller_user_id'] ?? 'null',
+                json_encode($row['conditions_override']),
+            ]))
+            ->values()
+            ->all();
+
+        $next = $rows
+            ->map(fn (array $row) => [
+                'db_product_id' => (int) $row['db_product_id'],
+                'billing_user_id' => (int) $row['billing_user_id'],
+                'seller_user_id' => $row['seller_user_id'] !== null ? (int) $row['seller_user_id'] : null,
+                'conditions_override' => $row['conditions_override'],
+            ])
+            ->sortBy(fn (array $row) => implode(':', [
+                $row['db_product_id'],
+                $row['billing_user_id'],
+                $row['seller_user_id'] ?? 'null',
+                json_encode($row['conditions_override']),
+            ]))
+            ->values()
+            ->all();
+
+        $changed = json_encode($current) !== json_encode($next);
+
+        $activeMap = [];
+        foreach ($rows as $row) {
+            $key = implode(':', [
+                $row['db_product_id'],
+                $row['billing_user_id'],
+                $row['seller_user_id'] ?? 'null',
+            ]);
+            $activeMap[$key] = $row;
+
+            ClientSalesCondition::query()->updateOrCreate(
+                [
+                    'client_user_id' => (int) $user->id,
+                    'db_product_id' => (int) $row['db_product_id'],
+                    'billing_user_id' => (int) $row['billing_user_id'],
+                    'seller_user_id' => $row['seller_user_id'],
+                ],
+                [
+                    'conditions_override' => $row['conditions_override'],
+                    'active' => true,
+                ]
+            );
+        }
+
+        $user->clientSalesConditions()
+            ->where('active', true)
+            ->get()
+            ->each(function (ClientSalesCondition $condition) use ($activeMap): void {
+                $key = implode(':', [
+                    (int) $condition->db_product_id,
+                    (int) $condition->billing_user_id,
+                    $condition->seller_user_id !== null ? (int) $condition->seller_user_id : 'null',
+                ]);
+
+                if (!isset($activeMap[$key])) {
+                    $condition->update(['active' => false]);
+                }
+            });
+
+        return $changed;
     }
 
     private function assignableRolesQuery(Request $request, ?User $target = null)

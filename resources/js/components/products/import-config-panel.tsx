@@ -11,27 +11,9 @@ type Props = {
     sourceDelimiter?: string | null;
 };
 
-type PondApi = {
-    setOptions?: (options: { chunkSize: number }) => void;
-    browse?: () => void;
-};
-
-type PondRef = {
-    pond?: PondApi;
-    getFilePond?: () => PondApi | undefined;
-    browse?: () => void;
-};
-
-type PondFile = {
-    file?: {
-        size?: number;
-    };
-};
-
 export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDelimiter }: Props) {
     const { t } = useI18n();
-    const pondRef = useRef<PondRef | null>(null);
-    const [files, setFiles] = useState<PondFile[]>([]);
+    const pondRef = useRef<any>(null);
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -99,10 +81,8 @@ export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDe
             <div className="space-y-3">
                 <FilePond
                     ref={pondRef}
-                    files={files}
-                    onupdatefiles={(nextFiles: PondFile[]) => {
-                        setFiles(nextFiles);
-                        const fileSize = nextFiles?.[0]?.file?.size;
+                    onupdatefiles={(nextFiles) => {
+                        const fileSize = (nextFiles?.[0] as { file?: { size?: number } } | undefined)?.file?.size;
                         if (typeof fileSize === 'number' && fileSize > 0) {
                             const chunkSize = computeChunkSize(fileSize);
                             const pond = pondRef.current?.pond ?? pondRef.current?.getFilePond?.();

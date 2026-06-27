@@ -39,7 +39,7 @@ Route::middleware(['auth'])->get('/api/auth/products/{product}', function (Reque
     $dbProductId = (int) ($product->db_products_id ?? 0);
 
     if ($user && $dbProductId > 0) {
-        $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
+        $dbProduct = $user->dbProducts()->where('db_products.id', $dbProductId)->first();
         $pivotAttributes = $dbProduct?->pivot?->attributes;
 
         if ($pivotAttributes) {

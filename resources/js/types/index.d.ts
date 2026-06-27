@@ -50,8 +50,57 @@ export interface dbProduct {
     mod_liv?: string | null;
     mini?: number | null;
     billable_user_ids?: number[];
+    billing_users?: BillingUserRule[];
     created_at: string | null;
     updated_at: string | null;
+}
+
+export interface SalesConditions {
+    m?: number;
+    mm?: number;
+    pd?: number;
+    h?: number;
+    l?: number;
+    c?: string;
+    mc?: number;
+    me?: number;
+    mr?: number;
+    tvap?: number;
+    tvat?: number | null;
+    t?: number | null;
+    z?: number | null;
+    p?: string;
+    [key: string]: string | number | boolean | null | undefined;
+}
+
+export interface SellerUserRule {
+    id: number;
+    name: string;
+    email: string;
+    conditions_override?: SalesConditions;
+}
+
+export interface BillingUserRule {
+    id: number;
+    name: string;
+    email: string;
+    defaults?: SalesConditions;
+    sellers: SellerUserRule[];
+}
+
+export interface DbProductBillingUser {
+    db_product_id: number;
+    billing_user_id: number;
+    defaults?: SalesConditions;
+    active?: boolean;
+}
+
+export interface ClientSalesCondition {
+    db_product_id: number;
+    billing_user_id: number;
+    seller_user_id?: number | null;
+    conditions_override?: SalesConditions;
+    active?: boolean;
 }
 
 export interface CarrierZone {

@@ -6,16 +6,13 @@ interface AttributesEditorProps {
     onChange?: (attributes: Record<string, unknown>) => void;
 }
 
-type JsonEditPayload = {
-    updated_src: Record<string, unknown>;
-};
-
 export default function AttributesEditor({ initialAttributes, onChange }: AttributesEditorProps) {
     const [attributes, setAttributes] = useState(initialAttributes || {});
 
-    const handleEdit = (edit: JsonEditPayload) => {
-        setAttributes(edit.updated_src);
-        onChange?.(edit.updated_src);
+    const handleEdit = (edit: { updated_src?: Record<string, unknown>; src?: Record<string, unknown> }) => {
+        const next = edit.updated_src ?? edit.src ?? {};
+        setAttributes(next);
+        onChange?.(next);
     };
 
     return (

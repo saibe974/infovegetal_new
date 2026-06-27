@@ -24,11 +24,11 @@ class DbProductsController extends Controller
                 || $user->hasPermissionTo('users.db_products.manage.all');
 
             if (!$canManageAll) {
-                $hasCanSell = Schema::hasColumn('db_products_users', 'can_sell');
+                $hasCanSell = Schema::hasColumn('db_product_user', 'can_sell');
                 $query->whereHas('users', function ($q) use ($user, $hasCanSell) {
                     $q->where('users.id', (int) $user->id);
                     if ($hasCanSell) {
-                        $q->where('db_products_users.can_sell', true);
+                        $q->where('db_product_user.can_sell', true);
                     }
                 });
             }

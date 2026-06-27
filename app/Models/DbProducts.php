@@ -3,7 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DbProducts extends Model
 {
@@ -41,19 +42,35 @@ class DbProducts extends Model
     ];
 
     /**
-     * Inverse many-to-many relation to users via pivot `db_products_users`.
+     * Inverse many-to-many relation to users via pivot `db_product_user`.
      */
-    public function users()
+    public function users(): BelongsToMany
     {
-        $relation = $this->belongsToMany(\App\Models\User::class, 'db_products_users', 'db_product_id', 'user_id')
-            ->withTimestamps()->withPivot('attributes');
-
-        if (Schema::hasColumn('db_products_users', 'can_sell')) {
-            $relation->withPivot('can_sell');
-        }
-
-        return $relation;
+        return $this->belongsToMany(\App\Models\User::class, 'db_product_user', 'db_product_id', 'user_id')
+            ->withTimestamps()
+            ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'attributes']);
     }
 
-    
+    /**
+     * Billing users attached to this DB product.
+     */
+    public function billingUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'db_product_billing_user', 'db_product_id', 'billing_user_id')
+            ->withTimestamps()
+            ->withPivot(['defaults', 'active']);
+    }
+
+    /**
+     * Raw billing rules rows for this DB product.
+     */
+    public function billingRules(): HasMany
+    {
+        return $this->hasMany(DbProductBillingUser::class, 'db_product_id');
+    }
+
+    public function clientSalesConditions(): HasMany
+    {
+        return $this->hasMany(ClientSalesCondition::class, 'db_product_id');
+    }
 }

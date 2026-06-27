@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CategoryProducts;
+use App\Models\DbProductBillingUser;
 use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Services\UserManagementAuthorizationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -24,7 +26,7 @@ class DbProductsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
         $search = $request->get('q');
         $query = DbProducts::query()->orderFromRequest($request);
 
@@ -34,7 +36,7 @@ class DbProductsController extends Controller
         if ($user && !$canManageAll) {
             $query->whereHas('users', function ($q) use ($user, $hasCanSellColumn) {
                 $q->where('users.id', (int) $user->id)
-                    ->when($hasCanSellColumn, fn ($qq) => $qq->where('db_products_users.can_sell', true));
+                    ->when($hasCanSellColumn, fn ($qq) => $qq->where('db_product_user.can_sell', true));
             });
         }
 
@@ -69,12 +71,14 @@ class DbProductsController extends Controller
                 'country' => null,
                 'mod_liv' => null,
                 'mini' => null,
+                'billing_users' => [],
                 'billable_user_ids' => [],
                 'created_at' => null,
                 'updated_at' => null,
             ],
             'categoryOptions' => $this->categoryOptions(),
             'eligibleUsers' => $this->eligibleUsers($request),
+            'carriers' => $this->carrierOptions(),
         ]);
     }
 
@@ -86,11 +90,14 @@ class DbProductsController extends Controller
         $validated = $this->validatePayload($request);
 
         $billableUserIds = $validated['billable_user_ids'] ?? [];
+        $billingUsers = $validated['billing_users'] ?? [];
         unset($validated['billable_user_ids']);
+        unset($validated['billing_users']);
 
         $dbProduct = DbProducts::create($validated);
 
         $this->syncBillableUsers($dbProduct, $billableUserIds);
+        $this->syncDbProductBillingRules($dbProduct, $billingUsers);
 
 
         return redirect()->route('db-products.index')->with('success', __('Database created.'));
@@ -111,17 +118,29 @@ class DbProductsController extends Controller
     {
         $this->ensureCanManageDbProduct($request, $db_product);
 
-        $hasCanSellColumn = Schema::hasColumn('db_products_users', 'can_sell');
+        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
         $db_product->load([
             'users' => fn ($query) => $query
                 ->select('users.id')
-                ->when($hasCanSellColumn, fn ($q) => $q->where('db_products_users.can_sell', true)),
+                ->when($hasCanSellColumn, fn ($q) => $q->where('db_product_user.can_sell', true)),
+            'billingRules' => fn ($query) => $query
+                ->where('active', true)
+                ->with([
+                    'billingUser' => fn ($billingUserQuery) => $billingUserQuery
+                        ->select('users.id', 'users.name', 'users.email')
+                        ->with([
+                            'sellers' => fn ($sellersQuery) => $sellersQuery
+                                ->select('users.id', 'users.name', 'users.email')
+                                ->wherePivot('active', true),
+                        ]),
+                ]),
         ]);
 
         return Inertia::render('products/db-edit', [
             'dbProduct' => DbProductsResource::make($db_product)->resolve(),
             'categoryOptions' => $this->categoryOptions(),
             'eligibleUsers' => $this->eligibleUsers($request),
+            'carriers' => $this->carrierOptions(),
         ]);
     }
 
@@ -135,10 +154,13 @@ class DbProductsController extends Controller
         $validated = $this->validatePayload($request, $db_product);
 
         $billableUserIds = $validated['billable_user_ids'] ?? [];
+        $billingUsers = $validated['billing_users'] ?? [];
         unset($validated['billable_user_ids']);
+        unset($validated['billing_users']);
 
         $db_product->update($validated);
         $this->syncBillableUsers($db_product, $billableUserIds);
+        $this->syncDbProductBillingRules($db_product, $billingUsers);
 
         return redirect()->route('db-products.index')->with('success', __('Database updated.'));
     }
@@ -300,6 +322,12 @@ class DbProductsController extends Controller
             'mini' => ['nullable', 'integer', 'min:0'],
             'billable_user_ids' => ['nullable', 'array'],
             'billable_user_ids.*' => ['integer', 'exists:users,id'],
+            'billing_users' => ['nullable', 'array'],
+            'billing_users.*.billing_user_id' => ['required', 'integer', 'exists:users,id'],
+            'billing_users.*.defaults' => ['nullable', 'array'],
+            'billing_users.*.sellers' => ['nullable', 'array'],
+            'billing_users.*.sellers.*.seller_user_id' => ['required', 'integer', 'exists:users,id'],
+            'billing_users.*.sellers.*.conditions_override' => ['nullable', 'array'],
         ]);
     }
 
@@ -337,6 +365,29 @@ class DbProductsController extends Controller
             ->all();
     }
 
+    private function carrierOptions(): array
+    {
+        return \App\Models\Carrier::query()
+            ->with(['zones:id,carrier_id,name'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'country'])
+            ->map(fn (\App\Models\Carrier $carrier) => [
+                'id' => (int) $carrier->id,
+                'name' => (string) $carrier->name,
+                'country' => $carrier->country,
+                'zones' => $carrier->zones
+                    ->map(fn ($zone) => [
+                        'id' => (int) $zone->id,
+                        'carrier_id' => (int) $zone->carrier_id,
+                        'name' => (string) $zone->name,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     private function syncBillableUsers(DbProducts $dbProduct, array $billableUserIds): void
     {
         $selectedIds = collect($billableUserIds)
@@ -349,7 +400,12 @@ class DbProductsController extends Controller
         if (!empty($selectedIds)) {
             $attachPayload = [];
             foreach ($selectedIds as $selectedId) {
-                $attachPayload[$selectedId] = ['can_sell' => true];
+                $attachPayload[$selectedId] = [
+                    'can_access' => true,
+                    'can_buy' => false,
+                    'can_invoice' => true,
+                    'can_sell' => true,
+                ];
             }
             $dbProduct->users()->syncWithoutDetaching($attachPayload);
         }
@@ -359,9 +415,124 @@ class DbProductsController extends Controller
         foreach ($existingIds as $existingId) {
             $dbProduct->users()->updateExistingPivot(
                 $existingId,
-                ['can_sell' => in_array($existingId, $selectedIds, true)]
+                [
+                    'can_access' => true,
+                    'can_invoice' => in_array($existingId, $selectedIds, true),
+                    'can_sell' => in_array($existingId, $selectedIds, true),
+                ]
             );
         }
+    }
+
+    private function normalizeSalesConditions(?array $value): array
+    {
+        if (!$value) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $normalized[$key] = $this->normalizeSalesConditions($item);
+                continue;
+            }
+
+            $normalized[$key] = $item;
+        }
+
+        ksort($normalized);
+
+        return $normalized;
+    }
+
+    private function syncDbProductBillingRules(DbProducts $dbProduct, array $billingUsers): void
+    {
+        $billingUsers = array_values(array_filter($billingUsers, fn ($rule) => is_array($rule) && !empty($rule['billing_user_id'])));
+
+        $billingUserIds = [];
+
+        foreach ($billingUsers as $rule) {
+            $billingUserId = (int) $rule['billing_user_id'];
+            $billingUserIds[] = $billingUserId;
+
+            DbProductBillingUser::query()->updateOrCreate(
+                [
+                    'db_product_id' => (int) $dbProduct->id,
+                    'billing_user_id' => $billingUserId,
+                ],
+                [
+                    'defaults' => $this->normalizeSalesConditions($rule['defaults'] ?? []),
+                    'active' => true,
+                ]
+            );
+
+            $sellers = collect($rule['sellers'] ?? [])
+                ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
+                ->map(fn ($seller) => [
+                    'seller_user_id' => (int) $seller['seller_user_id'],
+                    'conditions_override' => $this->normalizeSalesConditions($seller['conditions_override'] ?? []),
+                ])
+                ->values();
+
+            $sellerIds = $sellers->pluck('seller_user_id')->unique()->values()->all();
+
+            $billingUser = User::query()->find($billingUserId);
+
+            if (!$billingUser) {
+                continue;
+            }
+
+            if (!empty($sellerIds)) {
+                $activeRows = [];
+                foreach ($sellerIds as $sellerId) {
+                    $override = $sellers->firstWhere('seller_user_id', $sellerId)['conditions_override'] ?? [];
+                    $activeRows[$sellerId] = [
+                        'active' => true,
+                        'conditions_override' => json_encode($override),
+                    ];
+                }
+
+                $billingUser->sellers()->syncWithoutDetaching($activeRows);
+
+                $billingUser->sellers()
+                    ->whereNotIn('users.id', $sellerIds)
+                    ->each(function (User $seller) use ($billingUserId): void {
+                        DB::table('billing_user_seller_user')
+                            ->where('billing_user_id', (int) $billingUserId)
+                            ->where('seller_user_id', (int) $seller->id)
+                            ->update(['active' => false, 'updated_at' => now()]);
+                    });
+            } else {
+                DB::table('billing_user_seller_user')
+                    ->where('billing_user_id', $billingUserId)
+                    ->update(['active' => false, 'updated_at' => now()]);
+            }
+        }
+
+        if (!empty($billingUserIds)) {
+            DbProductBillingUser::query()
+                ->where('db_product_id', (int) $dbProduct->id)
+                ->whereNotIn('billing_user_id', $billingUserIds)
+                ->update(['active' => false]);
+        } else {
+            DbProductBillingUser::query()
+                ->where('db_product_id', (int) $dbProduct->id)
+                ->update(['active' => false]);
+        }
+    }
+
+    private function decodeJsonPivotAttributes(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     private function ensureCanManageDbProduct(Request $request, DbProducts $dbProduct): void
@@ -386,8 +557,8 @@ class DbProductsController extends Controller
 
         $relation = $user->dbProducts()->where('db_products.id', (int) $dbProduct->id);
 
-        if (Schema::hasColumn('db_products_users', 'can_sell')) {
-            $relation->where('db_products_users.can_sell', true);
+        if (Schema::hasColumn('db_product_user', 'can_sell')) {
+            $relation->where('db_product_user.can_sell', true);
         }
 
         if (!$relation->exists()) {

@@ -710,8 +710,8 @@ class ProductController extends Controller
 
         $relation = $user->dbProducts()->where('db_products.id', $dbProductsId);
 
-        if (Schema::hasColumn('db_products_users', 'can_sell')) {
-            $relation->where('db_products_users.can_sell', true);
+        if (Schema::hasColumn('db_product_user', 'can_sell')) {
+            $relation->where('db_product_user.can_sell', true);
         }
 
         if (!$relation->exists()) {
@@ -939,7 +939,7 @@ class ProductController extends Controller
         return false;
     }
 
-    private function writeReportLine($handle, int $line, string $message, array $rawRow, array $mapped): void
+    private function writeReportLine(mixed $handle, int $line, string $message, array $rawRow, array $mapped): void
     {
         if (!$handle) {
             return;

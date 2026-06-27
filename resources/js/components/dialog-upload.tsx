@@ -24,6 +24,8 @@ type PostTreatmentBaseProps = {
     handleRetryImport: () => void;
     uploadId: string | null;
     fileSize?: number | null;
+    dbProductsId?: number;
+    strategy?: string;
     onStartImport?: (settings?: { dbProductsId?: number; strategy?: string }) => void;
 };
 
