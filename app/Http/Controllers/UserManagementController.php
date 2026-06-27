@@ -819,7 +819,7 @@ class UserManagementController extends Controller
 
         $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
-        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
+        $hasCanAccessColumn = Schema::hasColumn('db_product_user', 'can_access');
         $canManageAllDb = $actor
             && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
         $allowedDbIds = $this->selectableDbProductIds($request->user(), $user);
@@ -851,9 +851,9 @@ class UserManagementController extends Controller
             ->toArray();
 
         $editableCurrent = $allCurrent;
-        if ($isSelfManagement && $hasCanSellColumn) {
+        if ($isSelfManagement && $hasCanAccessColumn) {
             $editableCurrent = $user->dbProducts()
-                ->where('db_product_user.can_sell', true)
+            ->where('db_product_user.can_access', true)
                 ->get()
                 ->mapWithKeys(function ($dbProduct) {
                     $attrs = $this->normalizeSalesConditions(
@@ -908,13 +908,16 @@ class UserManagementController extends Controller
 
         foreach (array_keys($syncData) as $dbId) {
             if (!isset($syncData[$dbId]['can_sell'])) {
-                $syncData[$dbId]['can_sell'] = true;
+                $syncData[$dbId]['can_sell'] = false;
             }
             if (!isset($syncData[$dbId]['can_invoice'])) {
-                $syncData[$dbId]['can_invoice'] = true;
+                $syncData[$dbId]['can_invoice'] = false;
             }
             if (!isset($syncData[$dbId]['can_buy'])) {
-                $syncData[$dbId]['can_buy'] = false;
+                $syncData[$dbId]['can_buy'] = true;
+            }
+            if (!isset($syncData[$dbId]['can_manage'])) {
+                $syncData[$dbId]['can_manage'] = false;
             }
         }
 
@@ -1031,7 +1034,7 @@ class UserManagementController extends Controller
 
         $actor = $request->user();
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
-        $hasCanSellColumn = Schema::hasColumn('db_product_user', 'can_sell');
+        $hasCanInvoiceColumn = Schema::hasColumn('db_product_user', 'can_invoice');
 
         $canManageAllDb = $actor
             && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
@@ -1075,15 +1078,15 @@ class UserManagementController extends Controller
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
             ->orderBy('name');
 
-        if ($hasCanSellColumn) {
-            $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_product_user.can_sell', true));
+        if ($hasCanInvoiceColumn) {
+            $billableUsersQuery->whereHas('dbProducts', fn ($q) => $q->where('db_product_user.can_invoice', true));
         }
 
         $billableEligibleUsers = $billableUsersQuery
-            ->with(['dbProducts' => function ($query) use ($hasCanSellColumn) {
+            ->with(['dbProducts' => function ($query) use ($hasCanInvoiceColumn) {
                 $query->select('db_products.id');
-                if ($hasCanSellColumn) {
-                    $query->where('db_product_user.can_sell', true);
+                if ($hasCanInvoiceColumn) {
+                    $query->where('db_product_user.can_invoice', true);
                 }
             }])
             ->get(['id', 'name', 'email'])
@@ -1092,6 +1095,7 @@ class UserManagementController extends Controller
                     'id' => (int) $billableUser->id,
                     'name' => (string) $billableUser->name,
                     'email' => (string) $billableUser->email,
+                    'can_invoice_db_ids' => $billableUser->dbProducts->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                     'can_sell_db_ids' => $billableUser->dbProducts->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                 ];
             })

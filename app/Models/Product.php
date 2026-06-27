@@ -145,6 +145,11 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(\App\Models\DbProducts::class, 'db_products_id');
     }
 
+    public function orderLines()
+    {
+        return $this->hasMany(OrderLine::class, 'product_id');
+    }
+
     /**
      * Backwards-compatible accessor expected by API: price_ex_vat
      */

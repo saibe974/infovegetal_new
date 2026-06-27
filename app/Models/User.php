@@ -167,6 +167,21 @@ class User extends Authenticatable implements HasMedia
         return $this->hasMany(UserMeta::class);
     }
 
+    public function clientOrders(): HasMany
+    {
+        return $this->hasMany(OrderHeader::class, 'client_user_id');
+    }
+
+    public function billingOrders(): HasMany
+    {
+        return $this->hasMany(OrderHeader::class, 'billing_user_id');
+    }
+
+    public function sellerOrders(): HasMany
+    {
+        return $this->hasMany(OrderHeader::class, 'seller_user_id');
+    }
+
     /**
      * Media collections for user profile assets.
      */

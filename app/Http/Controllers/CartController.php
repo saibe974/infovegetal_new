@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Support\RenderedTransportCalculator;
 use App\Services\PdfRollDistributionService;
 use App\Services\CartTcpdfService;
+use App\Services\OrderSnapshotService;
 use App\Services\PriceCalculatorService;
 use App\Services\ProductMediaService;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class CartController extends Controller
     /**
      * Place an order: persist cart, generate PDF, store it and notify stakeholders.
      */
-    public function placeOrder(Request $request)
+    public function placeOrder(Request $request, OrderSnapshotService $orderSnapshotService)
     {
         $data = $request->validate([
             'items' => 'required|array|min:1',
@@ -131,6 +132,20 @@ class CartController extends Controller
             $orderNumber,
             $user,
         );
+
+        $existingSnapshot = \App\Models\OrderHeader::query()
+            ->where('cart_id', $cart->id)
+            ->latest('id')
+            ->first();
+
+        if (!$existingSnapshot) {
+            $orderSnapshotService->createFromPayload(
+                $cart,
+                $user,
+                $pdfPayload,
+                ['source' => 'place_order']
+            );
+        }
 
         return response()->json([
             'status' => 'ok',
@@ -512,7 +527,7 @@ class CartController extends Controller
     /**
      * Generate PDF from cart items using TCPDF (fallback/simple renderer).
      */
-    public function generatePdfTcpdf(Request $request, CartTcpdfService $cartTcpdfService)
+    public function generatePdfTcpdf(Request $request, CartTcpdfService $cartTcpdfService, OrderSnapshotService $orderSnapshotService)
     {
         $data = $request->validate([
             'items' => 'required|array|min:1',
@@ -564,6 +579,21 @@ class CartController extends Controller
             $cartTcpdfService,
             true,
         );
+
+        $existingSnapshot = \App\Models\OrderHeader::query()
+            ->where('cart_id', $cart->id)
+            ->latest('id')
+            ->first();
+
+        if (!$existingSnapshot) {
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, true);
+            $orderSnapshotService->createFromPayload(
+                $cart,
+                $user,
+                $payloadForSnapshot,
+                ['source' => 'generate_pdf_tcpdf']
+            );
+        }
 
         return response($result['pdf_binary'], 200, [
             'Content-Type' => 'application/pdf',

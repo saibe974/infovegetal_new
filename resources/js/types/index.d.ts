@@ -50,6 +50,7 @@ export interface dbProduct {
     mod_liv?: string | null;
     mini?: number | null;
     billable_user_ids?: number[];
+    manageable_user_ids?: number[];
     billing_users?: BillingUserRule[];
     abilities?: {
         update?: boolean;
@@ -95,6 +96,7 @@ export interface SellerUserRule {
     name: string;
     email: string;
     conditions_override?: SalesConditions;
+    can_manage?: boolean;
 }
 
 export interface BillingUserRule {

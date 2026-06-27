@@ -133,9 +133,17 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    <Link href={dbProducts.edit(item.id).url} className="hover:underline font-medium">
-                                        {item.name}
-                                    </Link>
+                                    {item.abilities?.update ? (
+                                        <Link href={dbProducts.edit(item.id).url} className="hover:underline font-medium">
+                                            {item.name}
+                                        </Link>
+                                    ) : item.abilities?.billing ? (
+                                        <Link href={dbProducts.billing(item.id).url} className="hover:underline font-medium">
+                                            {item.name}
+                                        </Link>
+                                    ) : (
+                                        <span className="font-medium">{item.name}</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-muted-foreground text-sm">
                                     {item.description || '-'}
@@ -148,18 +156,20 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">
-                                        <DialogUpload
-                                            title={`Mettre à jour la base de données ${item.name}`}
-                                            uploadUrl='/upload'
-                                            importProcessUrl={products.admin.import.process.url()}
-                                            importProcessChunkUrl={products.admin.import.process_chunk.url()}
-                                            importCancelUrl={products.admin.import.cancel.url()}
-                                            importProgressUrl={(id) => products.admin.import.progress.url({ id })}
-                                            postTreatmentComponent={ProductsImportTreatment}
-                                            postTreatmentProps={{ dbProductsId: item.id }}
-                                            successRedirectUrl={products.index().url}
-                                            buttonLabel=''
-                                        />
+                                        {item.abilities?.manage ? (
+                                            <DialogUpload
+                                                title={`Mettre à jour la base de données ${item.name}`}
+                                                uploadUrl='/upload'
+                                                importProcessUrl={products.admin.import.process.url()}
+                                                importProcessChunkUrl={products.admin.import.process_chunk.url()}
+                                                importCancelUrl={products.admin.import.cancel.url()}
+                                                importProgressUrl={(id) => products.admin.import.progress.url({ id })}
+                                                postTreatmentComponent={ProductsImportTreatment}
+                                                postTreatmentProps={{ dbProductsId: item.id }}
+                                                successRedirectUrl={products.index().url}
+                                                buttonLabel=''
+                                            />
+                                        ) : null}
 
                                         {item.abilities?.update ? (
                                             <Button asChild size="icon" variant="outline">

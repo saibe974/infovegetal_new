@@ -8,7 +8,6 @@ use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
 use App\Models\User;
 use App\Services\ProductImportPreAnalyzer;
-use App\Services\UserManagementAuthorizationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Inertia\Inertia;
 
 class DbProductsController extends Controller
@@ -136,13 +136,19 @@ class DbProductsController extends Controller
 
     public function billing(Request $request, DbProducts $db_product)
     {
-        $this->ensureCanManageDbProduct($request, $db_product);
-
         $user = $request->user();
-        $canManageAll = $this->canManageAll($user);
+        if (!$user) {
+            abort(403, 'Unauthorized');
+        }
+
+        $permissions = $this->resolveBillingPermissions($user, $db_product);
+
+        if (!$permissions['can_view']) {
+            abort(403, 'Unauthorized');
+        }
 
         $db_product->load([
-            'users' => fn ($query) => $query->select('users.id')->where('users.id', (int) $request->user()->id),
+            'users' => fn ($query) => $query->select('users.id'),
             'billingRules' => fn ($query) => $query
                 ->where('active', true)
                 ->with([
@@ -156,9 +162,9 @@ class DbProductsController extends Controller
                 ]),
         ]);
 
-        if ($user && !$canManageAll) {
+                if (!$permissions['can_manage_all'] && !$permissions['is_db_manager']) {
             $filteredRules = $db_product->billingRules
-                ->filter(function (DbProductBillingUser $rule) use ($user) {
+                    ->filter(function (DbProductBillingUser $rule) use ($user) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
                     if (!$billingUser) {
@@ -182,9 +188,20 @@ class DbProductsController extends Controller
 
         return Inertia::render('products/db-billing', [
             'dbProduct' => DbProductsResource::make($db_product)->resolve(),
-            'eligibleBillingUsers' => $this->eligibleBillingUsers($request),
-            'eligibleSellerUsers' => $this->eligibleSellerUsers($request),
+            'eligibleBillingUsers' => $permissions['can_manage_billing_users']
+                ? $this->eligibleBillingUsers()
+                : [],
+            'eligibleSellerUsers' => $permissions['can_manage_sellers']
+                ? $this->eligibleSellerUsers()
+                : [],
             'carriers' => $this->carrierOptions(),
+            'billingAbilities' => [
+                'can_manage_billing_users' => $permissions['can_manage_billing_users'],
+                'can_manage_sellers' => $permissions['can_manage_sellers'],
+                'can_delegate_manage' => $permissions['can_delegate_manage'],
+                'is_global_manager' => $permissions['can_manage_all'],
+            ],
+            'currentUserId' => (int) $user->id,
         ]);
     }
 
@@ -204,10 +221,24 @@ class DbProductsController extends Controller
 
     public function updateBilling(Request $request, DbProducts $db_product)
     {
-        $this->ensureCanManageDbProduct($request, $db_product);
+        $user = $request->user();
+        if (!$user) {
+            abort(403, 'Unauthorized');
+        }
+
+        $permissions = $this->resolveBillingPermissions($user, $db_product);
+
+        if (!$permissions['can_view']) {
+            abort(403, 'Unauthorized');
+        }
 
         $validated = $this->validateBillingPayload($request);
-        $billingUsers = $validated['billing_users'] ?? [];
+        $billingUsers = $this->sanitizeBillingPayload(
+            $db_product,
+            $user,
+            $validated['billing_users'] ?? [],
+            $permissions,
+        );
 
         $billableUserIds = collect($billingUsers)
             ->map(fn ($rule) => (int) ($rule['billing_user_id'] ?? 0))
@@ -390,6 +421,7 @@ class DbProductsController extends Controller
             'billing_users.*.sellers' => ['nullable', 'array'],
             'billing_users.*.sellers.*.seller_user_id' => ['required', 'integer', 'exists:users,id'],
             'billing_users.*.sellers.*.conditions_override' => ['nullable', 'array'],
+            'billing_users.*.sellers.*.can_manage' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -407,14 +439,11 @@ class DbProductsController extends Controller
             ->all();
     }
 
-    private function eligibleBillingUsers(Request $request): array
+    private function eligibleBillingUsers(): array
     {
         $query = User::query()
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['admin', 'dev', 'commercial', 'seller', 'vendeur', 'facturant']))
             ->orderBy('name');
-
-        app(UserManagementAuthorizationService::class)
-            ->scopeManageableUsers($request->user(), $query);
 
         return $query
             ->get(['id', 'name', 'email'])
@@ -427,9 +456,9 @@ class DbProductsController extends Controller
             ->all();
     }
 
-    private function eligibleSellerUsers(Request $request): array
+    private function eligibleSellerUsers(): array
     {
-        return $this->eligibleBillingUsers($request);
+        return $this->eligibleBillingUsers();
     }
 
     private function carrierOptions(): array
@@ -487,6 +516,7 @@ class DbProductsController extends Controller
                     'can_access' => true,
                     'can_invoice' => in_array($existingId, $selectedIds, true),
                     'can_sell' => in_array($existingId, $selectedIds, true),
+                    'can_manage' => (bool) ($dbProduct->users()->where('users.id', $existingId)->first()?->pivot?->can_manage ?? false),
                 ]
             );
         }
@@ -539,6 +569,7 @@ class DbProductsController extends Controller
                 ->map(fn ($seller) => [
                     'seller_user_id' => (int) $seller['seller_user_id'],
                     'conditions_override' => $this->normalizeSalesConditions($seller['conditions_override'] ?? []),
+                    'can_manage' => (bool) ($seller['can_manage'] ?? false),
                 ])
                 ->values();
 
@@ -558,6 +589,18 @@ class DbProductsController extends Controller
                         'active' => true,
                         'conditions_override' => json_encode($override),
                     ];
+
+                    // Ajout vendeur => donne acces + vente sur la DB, sans facturation ni gestion par defaut.
+                    $sellerRule = $sellers->firstWhere('seller_user_id', $sellerId);
+                    $dbProduct->users()->syncWithoutDetaching([
+                        $sellerId => [
+                            'can_access' => true,
+                            'can_buy' => false,
+                            'can_invoice' => false,
+                            'can_sell' => true,
+                            'can_manage' => (bool) ($sellerRule['can_manage'] ?? false),
+                        ],
+                    ]);
                 }
 
                 $billingUser->sellers()->syncWithoutDetaching($activeRows);
@@ -646,5 +689,110 @@ class DbProductsController extends Controller
         }
 
         return $relation->exists();
+    }
+
+    private function resolveBillingPermissions(User $user, DbProducts $dbProduct): array
+    {
+        $canManageAll = $this->canManageAll($user);
+        $isDbManager = $this->canManageDbProduct($user, $dbProduct);
+
+        $isBillingUser = DbProductBillingUser::query()
+            ->where('db_product_id', (int) $dbProduct->id)
+            ->where('billing_user_id', (int) $user->id)
+            ->where('active', true)
+            ->exists();
+
+        $isSeller = DB::table('db_product_billing_user as dbu')
+            ->join('billing_user_seller_user as bs', 'bs.billing_user_id', '=', 'dbu.billing_user_id')
+            ->where('dbu.db_product_id', (int) $dbProduct->id)
+            ->where('dbu.active', true)
+            ->where('bs.seller_user_id', (int) $user->id)
+            ->where('bs.active', true)
+            ->exists();
+
+        $canManageSellersByPermission = $this->hasPermissionSafe($user, 'db_products.billing.manage_sellers');
+        $canDelegateByPermission = $this->hasPermissionSafe($user, 'db_products.billing.delegate_manage');
+
+        $canManageSellers = $canManageAll || $isDbManager || $isBillingUser || $canManageSellersByPermission;
+        $canDelegateManage = $canManageAll || $isDbManager || $canDelegateByPermission;
+
+        return [
+            'can_manage_all' => $canManageAll,
+            'is_db_manager' => $isDbManager,
+            'is_billing_user' => $isBillingUser,
+            'is_seller' => $isSeller,
+            'can_view' => $canManageAll || $isDbManager || $isBillingUser || $isSeller,
+            'can_manage_billing_users' => $canManageAll || $isDbManager,
+            'can_manage_sellers' => $canManageSellers,
+            'can_delegate_manage' => $canDelegateManage,
+        ];
+    }
+
+    private function sanitizeBillingPayload(DbProducts $dbProduct, User $actor, array $billingUsers, array $permissions): array
+    {
+        if ($permissions['can_manage_billing_users']) {
+            return $billingUsers;
+        }
+
+        $allowedBillingUserIds = DbProductBillingUser::query()
+            ->where('db_product_id', (int) $dbProduct->id)
+            ->where('active', true)
+            ->where(function ($q) use ($actor) {
+                $q->where('billing_user_id', (int) $actor->id)
+                    ->orWhereExists(function ($sub) use ($actor) {
+                        $sub->selectRaw('1')
+                            ->from('billing_user_seller_user as bs')
+                            ->whereColumn('bs.billing_user_id', 'db_product_billing_user.billing_user_id')
+                            ->where('bs.seller_user_id', (int) $actor->id)
+                            ->where('bs.active', true);
+                    });
+            })
+            ->pluck('billing_user_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $allowedSet = array_fill_keys($allowedBillingUserIds, true);
+
+        return collect($billingUsers)
+            ->filter(fn ($rule) => is_array($rule) && isset($allowedSet[(int) ($rule['billing_user_id'] ?? 0)]))
+            ->map(function ($rule) use ($permissions, $actor) {
+                $filteredSellers = collect($rule['sellers'] ?? [])
+                    ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
+                    ->map(function ($seller) use ($permissions, $actor) {
+                        $sellerId = (int) $seller['seller_user_id'];
+
+                        // Un commercial non manager ne peut modifier que ses propres conditions.
+                        if (!$permissions['can_manage_sellers'] && $sellerId !== (int) $actor->id) {
+                            return null;
+                        }
+
+                        return [
+                            'seller_user_id' => $sellerId,
+                            'conditions_override' => is_array($seller['conditions_override'] ?? null) ? $seller['conditions_override'] : [],
+                            'can_manage' => $permissions['can_delegate_manage'] ? (bool) ($seller['can_manage'] ?? false) : false,
+                        ];
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                return [
+                    'billing_user_id' => (int) $rule['billing_user_id'],
+                    'defaults' => is_array($rule['defaults'] ?? null) ? $rule['defaults'] : [],
+                    'sellers' => $filteredSellers,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function hasPermissionSafe(User $user, string $permissionName): bool
+    {
+        try {
+            return $user->hasPermissionTo($permissionName);
+        } catch (PermissionDoesNotExist $e) {
+            return false;
+        }
     }
 }

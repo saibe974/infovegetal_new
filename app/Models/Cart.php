@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cart extends Model
 {
@@ -28,5 +29,10 @@ class Cart extends Model
         return $this->belongsToMany(Product::class, 'cart_product')
             ->withPivot('quantity')
             ->withTimestamps();
+    }
+
+    public function orderHeaders(): HasMany
+    {
+        return $this->hasMany(OrderHeader::class, 'cart_id');
     }
 }

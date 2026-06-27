@@ -73,4 +73,14 @@ class DbProducts extends Model
     {
         return $this->hasMany(ClientSalesCondition::class, 'db_product_id');
     }
+
+    public function orderHeaders(): HasMany
+    {
+        return $this->hasMany(OrderHeader::class, 'db_product_id');
+    }
+
+    public function orderLines(): HasMany
+    {
+        return $this->hasMany(OrderLine::class, 'db_product_id');
+    }
 }

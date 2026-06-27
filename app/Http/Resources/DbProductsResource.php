@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\DbProductBillingUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
 
 class DbProductsResource extends JsonResource
 {
@@ -19,16 +20,24 @@ class DbProductsResource extends JsonResource
         $canManageAll = $actor
             && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
         $canManageFromPivot = $this->relationLoaded('users')
-            ? $this->users->contains(fn ($user) => (bool) ($user->pivot?->can_manage ?? false))
+            ? $this->users->contains(fn ($user) => $actor && (int) $user->id === (int) $actor->id && (bool) ($user->pivot?->can_manage ?? false))
             : false;
         $canManage = (bool) ($canManageAll || $canManageFromPivot);
+        $canBilling = $canManage || $this->canViewBilling($actor);
+
+        $sellerManageById = [];
+        if ($this->relationLoaded('users')) {
+            foreach ($this->users as $dbUser) {
+                $sellerManageById[(int) $dbUser->id] = (bool) ($dbUser->pivot?->can_manage ?? false);
+            }
+        }
 
         $billingUsers = [];
 
         if ($this->relationLoaded('billingRules')) {
             $billingUsers = $this->billingRules
                 ->filter(fn (DbProductBillingUser $rule) => (bool) ($rule->active ?? true))
-                ->map(function (DbProductBillingUser $rule) {
+                ->map(function (DbProductBillingUser $rule) use ($sellerManageById) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
                     if (!$billingUser) {
@@ -38,7 +47,7 @@ class DbProductsResource extends JsonResource
                     $sellers = $billingUser->relationLoaded('sellers')
                         ? $billingUser->sellers
                             ->filter(fn ($seller) => (bool) ($seller->pivot?->active ?? true))
-                            ->map(function ($seller) {
+                            ->map(function ($seller) use ($sellerManageById) {
                                 $override = $seller->pivot?->conditions_override;
 
                                 if (is_string($override)) {
@@ -51,6 +60,7 @@ class DbProductsResource extends JsonResource
                                     'name' => (string) $seller->name,
                                     'email' => (string) ($seller->email ?? ''),
                                     'conditions_override' => is_array($override) ? $override : [],
+                                    'can_manage' => (bool) ($sellerManageById[(int) $seller->id] ?? false),
                                 ];
                             })
                             ->values()
@@ -105,11 +115,41 @@ class DbProductsResource extends JsonResource
                 'update' => $canManage,
                 'manage' => $canManage,
                 'delete' => $canManage,
-                'billing' => $canManage,
+                'billing' => $canBilling,
             ],
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    private function canViewBilling(mixed $actor): bool
+    {
+        if (!$actor || !isset($this->id)) {
+            return false;
+        }
+
+        $actorId = (int) ($actor->id ?? 0);
+        if ($actorId <= 0) {
+            return false;
+        }
+
+        $isBillingUser = DbProductBillingUser::query()
+            ->where('db_product_id', (int) $this->id)
+            ->where('billing_user_id', $actorId)
+            ->where('active', true)
+            ->exists();
+
+        if ($isBillingUser) {
+            return true;
+        }
+
+        return DB::table('db_product_billing_user as dbu')
+            ->join('billing_user_seller_user as bs', 'bs.billing_user_id', '=', 'dbu.billing_user_id')
+            ->where('dbu.db_product_id', (int) $this->id)
+            ->where('dbu.active', true)
+            ->where('bs.seller_user_id', $actorId)
+            ->where('bs.active', true)
+            ->exists();
     }
 
     private function normalizeBillingDefaults(mixed $defaults): array
