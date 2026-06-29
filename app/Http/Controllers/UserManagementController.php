@@ -388,6 +388,14 @@ class UserManagementController extends Controller
 
         $this->authorize('create', [User::class, $parent, $requestedRoleNames]);
 
+        $scopeAll = $request->user()->hasRole('admin')
+            || $request->user()->hasRole('dev')
+            || $request->user()->getAllPermissions()->contains('name', 'users.create.all');
+
+        if (!$scopeAll && $parent && (int) $parent->id === (int) $request->user()->id) {
+            abort(403, 'Unauthorized');
+        }
+
         $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
 
         $email = trim((string) ($validated['email'] ?? ''));
@@ -821,7 +829,12 @@ class UserManagementController extends Controller
         $isSelfManagement = (int) $request->user()->id === (int) $user->id;
         $hasCanAccessColumn = Schema::hasColumn('db_product_user', 'can_access');
         $canManageAllDb = $actor
-            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+            && (
+                $actor->hasRole('admin')
+                || $actor->hasRole('dev')
+                || $actor->getAllPermissions()->contains('name', 'users.db_products.manage.all')
+            );
+        $canSelectAnyDbProducts = $actor && $this->authorization()->canSelectAnyDbProducts($actor);
         $allowedDbIds = $this->selectableDbProductIds($request->user(), $user);
 
         $request->validate([
@@ -864,7 +877,7 @@ class UserManagementController extends Controller
                 ->toArray();
         }
 
-        if (!$canManageAllDb) {
+        if (!$canManageAllDb && !$canSelectAnyDbProducts) {
             $unauthorizedIds = array_diff($dbIds, $allowedDbIds);
             if (!empty($unauthorizedIds)) {
                 abort(403, 'Unauthorized');
@@ -1037,7 +1050,11 @@ class UserManagementController extends Controller
         $hasCanInvoiceColumn = Schema::hasColumn('db_product_user', 'can_invoice');
 
         $canManageAllDb = $actor
-            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+            && (
+                $actor->hasRole('admin')
+                || $actor->hasRole('dev')
+                || $actor->getAllPermissions()->contains('name', 'users.db_products.manage.all')
+            );
 
         $dbProductsQuery = $canManageAllDb
             ? DbProducts::query()->orderBy('name')
@@ -1056,6 +1073,9 @@ class UserManagementController extends Controller
                                     ->wherePivot('active', true),
                             ]),
                     ]),
+                    'sellerRules' => fn ($query) => $query
+                        ->where('active', true)
+                                ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
             ])
             ->get(['id', 'name', 'description']);
 
@@ -1351,6 +1371,12 @@ class UserManagementController extends Controller
 
     private function selectableDbProducts(User $actor, User $target)
     {
+        if ($this->authorization()->canSelectAnyDbProducts($actor)) {
+            return DbProducts::query()
+                ->select('db_products.id', 'db_products.name', 'db_products.description')
+                ->orderBy('db_products.name');
+        }
+
         $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
 
         if (!$sourceUser) {
@@ -1367,6 +1393,14 @@ class UserManagementController extends Controller
      */
     private function selectableDbProductIds(User $actor, User $target): array
     {
+        if ($this->authorization()->canSelectAnyDbProducts($actor)) {
+            return DbProducts::query()
+                ->pluck('db_products.id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
         $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
 
         if (!$sourceUser) {

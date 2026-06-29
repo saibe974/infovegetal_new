@@ -121,6 +121,23 @@ class User extends Authenticatable implements HasMedia
             ->withPivot(['defaults', 'active']);
     }
 
+    public function sellerDbProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            \App\Models\DbProducts::class,
+            'db_product_seller_user',
+            'seller_user_id',
+            'db_product_id',
+        )
+            ->withTimestamps()
+            ->withPivot(['billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active']);
+    }
+
+    public function dbProductSellerRules(): HasMany
+    {
+        return $this->hasMany(DbProductSellerUser::class, 'seller_user_id');
+    }
+
     /**
      * Sellers linked to this billing user.
      */

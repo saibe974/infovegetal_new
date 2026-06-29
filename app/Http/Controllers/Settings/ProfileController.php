@@ -102,7 +102,7 @@ class ProfileController extends Controller
         $target->save();
 
         // Redirect back to the same edit page (preserve route name)
-        return to_route('profile.edit', ['user' => $target->id])
+        return to_route('profile.edit')
             ->with('success', 'Profil mis a jour avec succes');
     }
 

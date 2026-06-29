@@ -41,7 +41,8 @@ class Product extends Model implements HasMedia
         'unite'
     ];
 
-    protected $sortable = [
+    /** @var array<string> */
+    protected array $sortable = [
         'id',
         'sku',
         'name',
@@ -158,7 +159,7 @@ class Product extends Model implements HasMedia
         return isset($this->attributes['price']) ? $this->attributes['price'] : null;
     }
 
-    public function getPriceRollAttribute($value): ?string
+    public function getPriceRollAttribute(mixed $value): ?string
     {
         $roll = is_numeric($value) ? (float) $value : 0.0;
         if ($roll > 0) {

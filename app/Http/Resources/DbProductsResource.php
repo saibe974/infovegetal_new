@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\DbProductBillingUser;
+use App\Models\DbProductSellerUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,11 @@ class DbProductsResource extends JsonResource
     {
         $actor = $request->user();
         $canManageAll = $actor
-            && ($actor->hasRole('admin') || $actor->hasRole('dev') || $actor->hasPermissionTo('users.db_products.manage.all'));
+            && (
+                $actor->hasRole('admin')
+                || $actor->hasRole('dev')
+                || $actor->getAllPermissions()->contains('name', 'users.db_products.manage.all')
+            );
         $canManageFromPivot = $this->relationLoaded('users')
             ? $this->users->contains(fn ($user) => $actor && (int) $user->id === (int) $actor->id && (bool) ($user->pivot?->can_manage ?? false))
             : false;
@@ -34,10 +39,28 @@ class DbProductsResource extends JsonResource
 
         $billingUsers = [];
 
+        $sellerRuleByKey = [];
+        if ($this->relationLoaded('sellerRules')) {
+            foreach ($this->sellerRules as $sellerRule) {
+                if (!$sellerRule instanceof DbProductSellerUser || !(bool) ($sellerRule->active ?? true)) {
+                    continue;
+                }
+
+                $key = sprintf('%d:%d', (int) ($sellerRule->billing_user_id ?? 0), (int) ($sellerRule->seller_user_id ?? 0));
+                $sellerRuleByKey[$key] = [
+                    'conditions' => is_array($sellerRule->conditions) ? $sellerRule->conditions : [],
+                    'use_billing_profile' => (bool) ($sellerRule->use_billing_profile ?? true),
+                    'billing_profile_id' => isset($sellerRule->billing_profile_id) ? (string) $sellerRule->billing_profile_id : null,
+                    'seller_defaults' => $this->normalizeBillingDefaults($sellerRule->seller_defaults),
+                    'can_manage' => (bool) ($sellerRule->can_manage ?? false),
+                ];
+            }
+        }
+
         if ($this->relationLoaded('billingRules')) {
             $billingUsers = $this->billingRules
                 ->filter(fn (DbProductBillingUser $rule) => (bool) ($rule->active ?? true))
-                ->map(function (DbProductBillingUser $rule) use ($sellerManageById) {
+                ->map(function (DbProductBillingUser $rule) use ($sellerManageById, $sellerRuleByKey) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
                     if (!$billingUser) {
@@ -47,20 +70,29 @@ class DbProductsResource extends JsonResource
                     $sellers = $billingUser->relationLoaded('sellers')
                         ? $billingUser->sellers
                             ->filter(fn ($seller) => (bool) ($seller->pivot?->active ?? true))
-                            ->map(function ($seller) use ($sellerManageById) {
-                                $override = $seller->pivot?->conditions_override;
+                            ->map(function ($seller) use ($sellerManageById, $billingUser, $sellerRuleByKey) {
 
-                                if (is_string($override)) {
-                                    $decoded = json_decode($override, true);
-                                    $override = is_array($decoded) ? $decoded : [];
-                                }
+                                $sellerDefaultsKey = sprintf('%d:%d', (int) ($billingUser->id ?? 0), (int) $seller->id);
+                                $sellerRule = $sellerRuleByKey[$sellerDefaultsKey] ?? [
+                                    'conditions' => [],
+                                    'use_billing_profile' => true,
+                                    'billing_profile_id' => null,
+                                    'seller_defaults' => [
+                                        'profiles' => [],
+                                        'default_profile_id' => null,
+                                    ],
+                                    'can_manage' => false,
+                                ];
 
                                 return [
                                     'id' => (int) $seller->id,
                                     'name' => (string) $seller->name,
                                     'email' => (string) ($seller->email ?? ''),
-                                    'conditions_override' => is_array($override) ? $override : [],
-                                    'can_manage' => (bool) ($sellerManageById[(int) $seller->id] ?? false),
+                                    'conditions' => $sellerRule['conditions'],
+                                    'use_billing_profile' => (bool) $sellerRule['use_billing_profile'],
+                                    'billing_profile_id' => $sellerRule['billing_profile_id'],
+                                    'seller_defaults' => $sellerRule['seller_defaults'],
+                                    'can_manage' => (bool) ($sellerRule['can_manage'] ?? $sellerManageById[(int) $seller->id] ?? false),
                                 ];
                             })
                             ->values()
@@ -140,6 +172,16 @@ class DbProductsResource extends JsonResource
             ->exists();
 
         if ($isBillingUser) {
+            return true;
+        }
+
+        $isDirectSeller = DbProductSellerUser::query()
+            ->where('db_product_id', (int) $this->id)
+            ->where('seller_user_id', $actorId)
+            ->where('active', true)
+            ->exists();
+
+        if ($isDirectSeller) {
             return true;
         }
 

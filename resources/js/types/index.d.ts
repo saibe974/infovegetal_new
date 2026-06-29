@@ -73,6 +73,11 @@ export interface BillingDefaults {
     default_profile_id?: string | null;
 }
 
+export interface SellerDefaults {
+    profiles: SalesConditionProfile[];
+    default_profile_id?: string | null;
+}
+
 export interface SalesConditions {
     m?: number;
     mm?: number;
@@ -95,7 +100,10 @@ export interface SellerUserRule {
     id: number;
     name: string;
     email: string;
-    conditions_override?: SalesConditions;
+    conditions?: SalesConditions;
+    use_billing_profile?: boolean;
+    billing_profile_id?: string | null;
+    seller_defaults?: SellerDefaults;
     can_manage?: boolean;
 }
 

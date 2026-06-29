@@ -1,13 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { edit as editAdminAppearance } from '@/routes/appearance';
-import { edit as editAdminPassword } from '@/routes/password';
+import { edit as editAdminPassword } from '@/routes/admin/password';
 import { edit as editAdminUser } from '@/routes/users';
-import { show as showAdminTwoFactor } from '@/routes/two-factor';
+import { show as showAdminTwoFactor } from '@/routes/admin/two-factor';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSettingsAppearance } from '@/routes/settings/appearance';
-import { edit as editSettingsPassword } from '@/routes/settings/password';
-import { show as showSettingsTwoFactor } from '@/routes/settings/two-factor';
+import { edit as editSettingsPassword } from '@/routes/password';
+import { show as showSettingsTwoFactor } from '@/routes/two-factor';
 import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';

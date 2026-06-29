@@ -9,8 +9,8 @@ import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { edit as editAdminPassword, update as updateAdminPassword } from '@/routes/password';
-import { edit as editSettingsPassword, update as updateSettingsPassword } from '@/routes/settings/password';
+import { edit as editAdminPassword, update as updateAdminPassword } from '@/routes/admin/password';
+import { edit as editSettingsPassword, update as updateSettingsPassword } from '@/routes/password';
 import { usePage } from '@inertiajs/react';
 import { Card } from '@/components/ui/card';
 

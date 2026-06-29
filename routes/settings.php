@@ -33,12 +33,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/password', function (Request $request, PasswordController $controller) {
         return $controller->edit($request);
-    })->name('settings.password.edit');
+    })->name('password.edit');
 
-    Route::put('settings/password', function (Request $request, PasswordController $controller) {
+        Route::put('settings/password', function (Request $request, PasswordController $controller) {
         return $controller->update($request);
     })->middleware('throttle:6,1')
-      ->name('settings.password.update');
+            ->name('password.update');
 
     Route::get('settings/appearance', function (Request $request) {
         $user = $request->user();
@@ -48,7 +48,7 @@ Route::middleware('auth')->group(function () {
     })->name('settings.appearance.edit');
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
-        ->name('settings.two-factor.show');
+        ->name('two-factor.show');
 
     Route::get('settings/additional-info', [UserAdditionalInfoController::class, 'edit'])
         ->name('settings.additional.edit');
@@ -68,7 +68,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('admin/users/{user}/password', function (Request $request, PasswordController $controller) {
         return $controller->edit($request);
-    })->name('password.edit');
+    })->name('admin.password.edit');
 
     Route::get('admin/users/{user}/permissions', [ProfileController::class, 'editPermissions'])
         ->name('permissions.edit');
@@ -76,10 +76,10 @@ Route::middleware('auth')->group(function () {
     Route::patch('admin/users/{user}/permissions', [ProfileController::class, 'updatePermissions'])
         ->name('permissions.update');
 
-    Route::put('admin/users/{user}/password', function (Request $request, PasswordController $controller) {
+        Route::put('admin/users/{user}/password', function (Request $request, PasswordController $controller) {
         return $controller->update($request);
     })->middleware('throttle:6,1')
-      ->name('password.update');
+            ->name('admin.password.update');
 
     Route::get('admin/users/{user}/appearance', function (Request $request) {
         $user = User::findOrFail($request->route('user'));
@@ -94,7 +94,7 @@ Route::middleware('auth')->group(function () {
     })->name('appearance.edit');
 
     Route::get('admin/users/{user}/two-factor', [TwoFactorAuthenticationController::class, 'show'])
-        ->name('two-factor.show');
+        ->name('admin.two-factor.show');
 
     Route::get('admin/users/{user}/additional-info', [UserAdditionalInfoController::class, 'edit'])
         ->name('additional.edit');

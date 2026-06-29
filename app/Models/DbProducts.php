@@ -69,6 +69,18 @@ class DbProducts extends Model
         return $this->hasMany(DbProductBillingUser::class, 'db_product_id');
     }
 
+    public function sellerRules(): HasMany
+    {
+        return $this->hasMany(DbProductSellerUser::class, 'db_product_id');
+    }
+
+    public function sellerUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\User::class, 'db_product_seller_user', 'db_product_id', 'seller_user_id')
+            ->withPivot(['billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'])
+            ->withTimestamps();
+    }
+
     public function clientSalesConditions(): HasMany
     {
         return $this->hasMany(ClientSalesCondition::class, 'db_product_id');

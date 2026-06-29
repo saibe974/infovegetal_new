@@ -14,6 +14,7 @@ import { StickyBar } from '@/components/ui/sticky-bar';
 import { TrashIcon, ServerIcon } from 'lucide-react';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { Separator } from '@/components/ui/separator';
+import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
 
 type CarrierOption = {
     id: number;
@@ -127,6 +128,7 @@ export default function UserDbPage() {
     });
 
     const [activeIndex, setActiveIndex] = useState<number>(0);
+    const [selectedProfileKey, setSelectedProfileKey] = useState<string>('');
 
     const dbOptions = useMemo(
         () => dbProductsList.map((db) => ({ value: String(db.id), label: String(db.name) })),
@@ -168,6 +170,48 @@ export default function UserDbPage() {
         }));
     }, [activeRow, dbById]);
 
+    const availableProfiles = useMemo(() => {
+        if (!activeRow || !activeRow.billing_user_id) {
+            return [];
+        }
+
+        const db = dbById.get(Number(activeRow.db_product_id));
+        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
+
+        if (!billing) {
+            return [];
+        }
+
+        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
+        const merged = billingDefaults.profiles.map((profile) => ({
+            key: `billing:${profile.id}`,
+            label: `${t('Billing')} - ${profile.name}`,
+            conditions: normalizeConditions(profile.conditions),
+        }));
+
+        if (activeRow.seller_user_id) {
+            const seller = (billing.sellers ?? []).find((row) => Number(row.id) === Number(activeRow.seller_user_id));
+            if (seller?.conditions && Object.keys(seller.conditions).length > 0) {
+                merged.push({
+                    key: 'seller:base',
+                    label: `${t('Seller')} - ${t('Assigned conditions')}`,
+                    conditions: normalizeConditions(seller.conditions),
+                });
+            }
+            const sellerDefaults = normalizeBillingDefaultsToProfiles(seller?.seller_defaults);
+
+            sellerDefaults.profiles.forEach((profile) => {
+                merged.push({
+                    key: `seller:${profile.id}`,
+                    label: `${t('Seller')} - ${profile.name}`,
+                    conditions: normalizeConditions(profile.conditions),
+                });
+            });
+        }
+
+        return merged;
+    }, [activeRow, dbById, t]);
+
     const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
 
     const updateRow = (index: number, patch: Partial<SalesConditionDraft>) => {
@@ -180,6 +224,19 @@ export default function UserDbPage() {
 
     const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
         setRows((prev) => prev.map((row, rowIndex) => (rowIndex === activeIndex ? { ...row, conditions_override: { ...DEFAULT_VALUES, ...(row.conditions_override ?? {}), [key]: nextValue } } : row)));
+    };
+
+    const applySelectedProfile = () => {
+        if (!selectedProfileKey) {
+            return;
+        }
+
+        const profile = availableProfiles.find((item) => item.key === selectedProfileKey);
+        if (!profile) {
+            return;
+        }
+
+        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
     };
 
     const submit = () => {
@@ -343,6 +400,26 @@ export default function UserDbPage() {
                                                         loading={false}
                                                         minQueryLength={0}
                                                     />
+                                                </FormField>
+
+                                                <FormField label={t('Apply profile (Billing/Seller)')}>
+                                                    <div className="flex items-center gap-2">
+                                                        <Select value={selectedProfileKey} onValueChange={setSelectedProfileKey}>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={t('Select a profile')} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {availableProfiles.map((profile) => (
+                                                                    <SelectItem key={profile.key} value={profile.key}>
+                                                                        {profile.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button type="button" variant="outline" onClick={applySelectedProfile} disabled={!selectedProfileKey}>
+                                                            {t('Apply')}
+                                                        </Button>
+                                                    </div>
                                                 </FormField>
                                             </div>
 

@@ -4,6 +4,7 @@ import {
     type BillingDefaults,
     type BillingUserRule,
     type BreadcrumbItem,
+    type SellerDefaults,
     type SalesConditionProfile,
     type SalesConditions,
     type SellerUserRule,
@@ -23,6 +24,7 @@ import dbProducts from '@/routes/db-products';
 import { ArrowLeftCircle, SaveIcon, TrashIcon } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import InputError from '@/components/ui/input-error';
+import { Separator } from '@/components/ui/separator';
 
 type UserOption = { id: number; name: string; email: string };
 
@@ -47,7 +49,11 @@ type Props = {
 
 type SellerDraft = {
     seller_user_id: number;
-    conditions_override: SalesConditions;
+    conditions: SalesConditions;
+    use_billing_profile: boolean;
+    billing_profile_id: string | null;
+    seller_defaults?: SellerDefaults;
+    has_seller_defaults?: boolean;
     can_manage: boolean;
 };
 
@@ -87,7 +93,10 @@ const normalizeBillingUsers = (rules: BillingDraft[]): BillingDraft[] => {
             },
             sellers: (rule.sellers ?? []).map((seller) => ({
                 seller_user_id: Number(seller.seller_user_id),
-                conditions_override: normalizeConditions(seller.conditions_override),
+                conditions: normalizeConditions(seller.conditions),
+                use_billing_profile: Boolean(seller.use_billing_profile ?? true),
+                billing_profile_id: seller.billing_profile_id ?? null,
+                ...(seller.has_seller_defaults && seller.seller_defaults ? { seller_defaults: profilesToBillingDefaults(seller.seller_defaults) } : {}),
                 can_manage: Boolean(seller.can_manage ?? false),
             })),
         };
@@ -102,7 +111,17 @@ const normalizeRowToDraft = (row: BillingUserRule): BillingDraft => {
         defaults,
         sellers: (row.sellers ?? []).map((seller: SellerUserRule) => ({
             seller_user_id: Number(seller.id),
-            conditions_override: normalizeConditions(seller.conditions_override ?? {}),
+            conditions: normalizeConditions(seller.conditions ?? {}),
+            use_billing_profile: Boolean(seller.use_billing_profile ?? true),
+            billing_profile_id: seller.billing_profile_id ?? null,
+            seller_defaults: seller.seller_defaults && typeof seller.seller_defaults === 'object' && Array.isArray((seller.seller_defaults as SellerDefaults).profiles)
+                ? normalizeBillingDefaultsToProfiles(seller.seller_defaults)
+                : undefined,
+            has_seller_defaults: Boolean(
+                seller.seller_defaults
+                && typeof seller.seller_defaults === 'object'
+                && Array.isArray((seller.seller_defaults as SellerDefaults).profiles),
+            ),
             can_manage: Boolean(seller.can_manage ?? false),
         })),
     };
@@ -167,6 +186,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     const [activeTab, setActiveTab] = useState<string>(() => viewPrefs.tab);
 
     const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(() => viewPrefs.panelItem);
+    const [activeSellerProfileId, setActiveSellerProfileId] = useState<string | null>(null);
 
     const { data, setData, put, processing, errors, transform } = useForm({
         billing_users: initialBillingUsers,
@@ -236,6 +256,56 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
 
         return (activeBillingRule.sellers ?? []).find((seller) => Number(seller.seller_user_id) === Number(activePanelItem.id)) ?? null;
     }, [activeBillingRule, activePanelItem]);
+
+    const currentSellerDefaults = useMemo(() => {
+        if (!currentSeller) {
+            return null;
+        }
+
+        return normalizeBillingDefaultsToProfiles(currentSeller.seller_defaults);
+    }, [currentSeller]);
+
+    const currentSellerInheritedProfile = useMemo(() => {
+        if (!activeBillingRule) {
+            return null;
+        }
+
+        const defaults = normalizeBillingDefaultsToProfiles(activeBillingRule.defaults);
+        const defaultProfileId = defaults.default_profile_id ?? defaults.profiles[0]?.id;
+
+        return defaults.profiles.find((profile) => profile.id === defaultProfileId) ?? defaults.profiles[0] ?? null;
+    }, [activeBillingRule]);
+
+    const currentSellerProfile = useMemo(() => {
+        if (!currentSellerDefaults) {
+            return null;
+        }
+
+        const requestedId = activeSellerProfileId ?? currentSellerDefaults.default_profile_id ?? currentSellerDefaults.profiles[0]?.id ?? null;
+        if (!requestedId) {
+            return null;
+        }
+
+        return currentSellerDefaults.profiles.find((profile) => profile.id === requestedId) ?? currentSellerDefaults.profiles[0] ?? null;
+    }, [activeSellerProfileId, currentSellerDefaults]);
+
+    const canManageSellerProfiles = useMemo(() => {
+        if (!currentSeller) {
+            return false;
+        }
+
+        return canManageSellers || Number(currentSeller.seller_user_id) === Number(currentUserId);
+    }, [canManageSellers, currentSeller, currentUserId]);
+
+    useEffect(() => {
+        if (!currentSellerDefaults) {
+            setActiveSellerProfileId(null);
+            return;
+        }
+
+        const nextId = currentSellerDefaults.default_profile_id ?? currentSellerDefaults.profiles[0]?.id ?? null;
+        setActiveSellerProfileId(nextId);
+    }, [currentSellerDefaults]);
 
     const canManageProfiles = useMemo(() => {
         if (!activeBillingRule) {
@@ -501,7 +571,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
 
                                                                     return {
                                                                         ...rule,
-                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
+                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions: {}, use_billing_profile: true, billing_profile_id: null, can_manage: false, seller_defaults: undefined }],
                                                                     };
                                                                 });
                                                                 setActivePanelItem({ type: 'seller', id });
@@ -532,7 +602,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
 
                                                                     return {
                                                                         ...rule,
-                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
+                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions: {}, use_billing_profile: true, billing_profile_id: null, can_manage: false, seller_defaults: undefined }],
                                                                     };
                                                                 });
                                                                 setActivePanelItem({ type: 'seller', id });
@@ -602,133 +672,354 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                 {!activeBillingRule ? (
                                     <p className="text-sm text-muted-foreground">{t('Select a billing user to edit profiles and seller conditions.')}</p>
                                 ) : activePanelItem?.type === 'profile' && currentProfile ? (
-                                <>
-                                    <CardHeader className="px-0">
-                                        <div className="flex items-center gap-5 align-middle px-0">
-                                            {t('Condition predefinie')}&nbsp;-&nbsp;
-                                            <FormField label=''>
-                                                <input
-                                                    className="w-full rounded-md border px-3 py-2"
-                                                    value={currentProfile.name}
-                                                    disabled={!canManageProfiles}
-                                                    onChange={(e) => {
-                                                        if (!canManageProfiles) {
-                                                            return;
-                                                        }
-
-                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                            ...rule,
-                                                            defaults: {
-                                                                ...rule.defaults,
-                                                                profiles: (rule.defaults.profiles ?? []).map((profile) => {
-                                                                    if (profile.id !== currentProfile.id) {
-                                                                        return profile;
-                                                                    }
-
-                                                                    return {
-                                                                        ...profile,
-                                                                        name: e.target.value,
-                                                                    };
-                                                                }),
-                                                            },
-                                                        }));
-                                                    }}
-                                                />
-                                            </FormField>
-                                        </div>
-                                    </CardHeader>
-
-
-                                    <CardContent className="px-0 space-y-4">
-
-
-                                        <SalesConditionsForm
-                                            value={currentProfile.conditions ?? {}}
-                                            onChange={(next) => {
-                                                if (!canManageProfiles) {
-                                                    return;
-                                                }
-
-                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                    ...rule,
-                                                    defaults: {
-                                                        ...rule.defaults,
-                                                        profiles: (rule.defaults.profiles ?? []).map((profile) => {
-                                                            if (profile.id !== currentProfile.id) {
-                                                                return profile;
+                                    <>
+                                        <CardHeader className="px-0">
+                                            <div className="flex items-center gap-5 align-middle px-0">
+                                                {t('Condition predefinie')}&nbsp;-&nbsp;
+                                                <FormField label=''>
+                                                    <input
+                                                        className="w-full rounded-md border px-3 py-2"
+                                                        value={currentProfile.name}
+                                                        disabled={!canManageProfiles}
+                                                        onChange={(e) => {
+                                                            if (!canManageProfiles) {
+                                                                return;
                                                             }
 
-                                                            return {
-                                                                ...profile,
-                                                                conditions: normalizeConditions(next),
-                                                            };
-                                                        }),
-                                                    },
-                                                }));
-                                            }}
-                                            carriers={carriers ?? []}
-                                            mode="defaults"
-                                        />
-                                    </CardContent>
-                                </>
-                            ) : activePanelItem?.type === 'seller' && currentSeller ? (
-                                <>
-                                    <CardHeader className="px-0">
-                                        <CardTitle>
-                                            {t('Condition vendeur')} - {userOptionById.get(Number(currentSeller.seller_user_id))?.label ?? `#${currentSeller.seller_user_id}`}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="px-0">
-                                        {canDelegateManage ? (
-                                            <label className="mb-4 flex items-center gap-2 text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={Boolean(currentSeller.can_manage)}
-                                                    onChange={(e) => {
-                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                            ...rule,
-                                                            sellers: (rule.sellers ?? []).map((seller) => {
-                                                                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                                                                    return seller;
+                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                ...rule,
+                                                                defaults: {
+                                                                    ...rule.defaults,
+                                                                    profiles: (rule.defaults.profiles ?? []).map((profile) => {
+                                                                        if (profile.id !== currentProfile.id) {
+                                                                            return profile;
+                                                                        }
+
+                                                                        return {
+                                                                            ...profile,
+                                                                            name: e.target.value,
+                                                                        };
+                                                                    }),
+                                                                },
+                                                            }));
+                                                        }}
+                                                    />
+                                                </FormField>
+                                            </div>
+                                        </CardHeader>
+
+
+                                        <CardContent className="px-0 space-y-4">
+
+
+                                            <SalesConditionsForm
+                                                value={currentProfile.conditions ?? {}}
+                                                onChange={(next) => {
+                                                    if (!canManageProfiles) {
+                                                        return;
+                                                    }
+
+                                                    updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                        ...rule,
+                                                        defaults: {
+                                                            ...rule.defaults,
+                                                            profiles: (rule.defaults.profiles ?? []).map((profile) => {
+                                                                if (profile.id !== currentProfile.id) {
+                                                                    return profile;
                                                                 }
 
                                                                 return {
-                                                                    ...seller,
-                                                                    can_manage: e.target.checked,
+                                                                    ...profile,
+                                                                    conditions: normalizeConditions(next),
                                                                 };
                                                             }),
-                                                        }));
-                                                    }}
-                                                />
-                                                <span>{t('Peut gerer cette DB')}</span>
-                                            </label>
-                                        ) : null}
+                                                        },
+                                                    }));
+                                                }}
+                                                carriers={carriers ?? []}
+                                                mode="defaults"
+                                            />
+                                        </CardContent>
+                                    </>
+                                ) : activePanelItem?.type === 'seller' && currentSeller ? (
+                                    <>
+                                        <CardHeader className="px-0">
+                                            <CardTitle>
+                                                {t('Condition vendeur')} - {userOptionById.get(Number(currentSeller.seller_user_id))?.label ?? `#${currentSeller.seller_user_id}`}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="px-0 space-y-6">
 
-                                        <SalesConditionsForm
-                                            value={currentSeller.conditions_override ?? {}}
-                                            onChange={(next) => {
-                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                    ...rule,
-                                                    sellers: (rule.sellers ?? []).map((seller) => {
-                                                        if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                                                            return seller;
-                                                        }
+                                            <div className="space-y-2">
+                                                {canDelegateManage ? (
+                                                    <label className="mb-4 flex items-center gap-2 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={Boolean(currentSeller.can_manage)}
+                                                            onChange={(e) => {
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                    ...rule,
+                                                                    sellers: (rule.sellers ?? []).map((seller) => {
+                                                                        if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                            return seller;
+                                                                        }
 
-                                                        return {
-                                                            ...seller,
-                                                            conditions_override: normalizeConditions(next),
-                                                        };
-                                                    }),
-                                                }));
-                                            }}
-                                            carriers={carriers ?? []}
-                                            mode="override"
-                                        />
-                                    </CardContent>
-                                </>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">{t('Select a profile or seller to edit conditions.')}</p>
-                            )}
+                                                                        return {
+                                                                            ...seller,
+                                                                            can_manage: e.target.checked,
+                                                                        };
+                                                                    }),
+                                                                }));
+                                                            }}
+                                                        />
+                                                        <span>{t('Peut gerer cette DB')}</span>
+                                                    </label>
+                                                ) : null}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <h3 className="text-sm font-semibold">{t('A. Conditions liées au facturant')}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <FormField label={t('Utiliser un profil prédéfini du facturant')}>
+                                                        <select
+                                                            className="w-full rounded-md border px-3 py-2 text-sm"
+                                                            value={currentSeller.use_billing_profile ? '1' : '0'}
+                                                            onChange={(e) => {
+                                                                const useProfile = e.target.value === '1';
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                    ...rule,
+                                                                    sellers: (rule.sellers ?? []).map((seller) => Number(seller.seller_user_id) === Number(currentSeller.seller_user_id)
+                                                                        ? { ...seller, use_billing_profile: useProfile, billing_profile_id: useProfile ? (seller.billing_profile_id ?? currentSellerInheritedProfile?.id ?? null) : null }
+                                                                        : seller),
+                                                                }));
+                                                            }}
+                                                        >
+                                                            <option value="1">{t('Oui')}</option>
+                                                            <option value="0">{t('Paramétrage custom')}</option>
+                                                        </select>
+                                                    </FormField>
+
+                                                    {currentSeller.use_billing_profile ? (
+                                                        <FormField label={t('Profil facturant')}>
+                                                            <select
+                                                                className="w-full rounded-md border px-3 py-2 text-sm"
+                                                                value={currentSeller.billing_profile_id ?? currentSellerInheritedProfile?.id ?? ''}
+                                                                onChange={(e) => {
+                                                                    const profileId = e.target.value || null;
+                                                                    updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                        ...rule,
+                                                                        sellers: (rule.sellers ?? []).map((seller) => Number(seller.seller_user_id) === Number(currentSeller.seller_user_id)
+                                                                            ? { ...seller, billing_profile_id: profileId, use_billing_profile: true }
+                                                                            : seller),
+                                                                    }));
+                                                                }}
+                                                            >
+                                                                {(activeBillingRule.defaults.profiles ?? []).map((profile) => (
+                                                                    <option key={profile.id} value={profile.id}>{profile.name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </FormField>
+                                                    ) : null}
+                                                </div>
+
+                                                {currentSeller.use_billing_profile ? (
+                                                    // <div className="rounded-md border p-3 text-sm space-y-2">
+                                                    //     <p className="font-medium">{t('Conditions issues du profil facturant sélectionné')}</p>
+                                                    //     <pre className="max-h-56 overflow-auto rounded bg-muted p-2 text-xs">
+                                                    //         {JSON.stringify((activeBillingRule.defaults.profiles ?? []).find((p) => p.id === (currentSeller.billing_profile_id ?? currentSellerInheritedProfile?.id))?.conditions ?? {}, null, 2)}
+                                                    //     </pre>
+                                                    // </div>
+                                                    null
+                                                ) : (
+                                                    <SalesConditionsForm
+                                                        value={currentSeller.conditions ?? {}}
+                                                        onChange={(next) => {
+                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                ...rule,
+                                                                sellers: (rule.sellers ?? []).map((seller) => {
+                                                                    if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                        return seller;
+                                                                    }
+
+                                                                    return {
+                                                                        ...seller,
+                                                                        use_billing_profile: false,
+                                                                        conditions: normalizeConditions(next),
+                                                                    };
+                                                                }),
+                                                            }));
+                                                        }}
+                                                        carriers={carriers ?? []}
+                                                        mode="override"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <Separator className="my-4" />
+
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="text-sm font-semibold">{t('B. Profils propres du commercial')}</h3>
+                                                    {canManageSellerProfiles ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const nextId = `seller-profile-${Date.now()}`;
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                    ...rule,
+                                                                    sellers: (rule.sellers ?? []).map((seller) => {
+                                                                        if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                            return seller;
+                                                                        }
+
+                                                                        const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
+                                                                        const profiles = [...defaults.profiles, { id: nextId, name: t('New profile'), conditions: {} }];
+
+                                                                        return {
+                                                                            ...seller,
+                                                                            has_seller_defaults: true,
+                                                                            seller_defaults: {
+                                                                                profiles,
+                                                                                default_profile_id: defaults.default_profile_id ?? nextId,
+                                                                            },
+                                                                        };
+                                                                    }),
+                                                                }));
+                                                                setActiveSellerProfileId(nextId);
+                                                            }}
+                                                        >
+                                                            + {t('Add')}
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+
+                                                <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                                                    {(currentSellerDefaults?.profiles ?? []).map((profile) => (
+                                                        <div key={profile.id} className="flex items-center justify-between gap-2">
+                                                            <button
+                                                                type="button"
+                                                                className={`text-left rounded-md px-3 py-2 w-full border ${currentSellerProfile?.id === profile.id ? 'bg-muted border-primary' : 'border-border'}`}
+                                                                onClick={() => setActiveSellerProfileId(profile.id)}
+                                                            >
+                                                                <span className="font-medium">{profile.name}</span>
+                                                            </button>
+                                                            {canManageSellerProfiles ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="destructive-outline"
+                                                                    size="icon"
+                                                                    onClick={() => {
+                                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                            ...rule,
+                                                                            sellers: (rule.sellers ?? []).map((seller) => {
+                                                                                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                                    return seller;
+                                                                                }
+
+                                                                                const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
+                                                                                const profiles = defaults.profiles.filter((current) => current.id !== profile.id);
+                                                                                return {
+                                                                                    ...seller,
+                                                                                    has_seller_defaults: true,
+                                                                                    seller_defaults: {
+                                                                                        profiles,
+                                                                                        default_profile_id: defaults.default_profile_id === profile.id ? (profiles[0]?.id ?? null) : defaults.default_profile_id,
+                                                                                    },
+                                                                                };
+                                                                            }),
+                                                                        }));
+
+                                                                        if (currentSellerProfile?.id === profile.id) {
+                                                                            setActiveSellerProfileId(null);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <TrashIcon className="h-4 w-4" />
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {currentSellerProfile ? (
+                                                    <div className="space-y-3 rounded-md border p-3">
+                                                        <input
+                                                            className="w-full rounded-md border px-3 py-2"
+                                                            value={currentSellerProfile.name}
+                                                            disabled={!canManageSellerProfiles}
+                                                            onChange={(e) => {
+                                                                if (!canManageSellerProfiles) {
+                                                                    return;
+                                                                }
+
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                    ...rule,
+                                                                    sellers: (rule.sellers ?? []).map((seller) => {
+                                                                        if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                            return seller;
+                                                                        }
+
+                                                                        const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
+                                                                        return {
+                                                                            ...seller,
+                                                                            has_seller_defaults: true,
+                                                                            seller_defaults: {
+                                                                                ...defaults,
+                                                                                profiles: defaults.profiles.map((profile) => profile.id === currentSellerProfile.id
+                                                                                    ? { ...profile, name: e.target.value }
+                                                                                    : profile),
+                                                                            },
+                                                                        };
+                                                                    }),
+                                                                }));
+                                                            }}
+                                                        />
+
+                                                        <SalesConditionsForm
+                                                            value={currentSellerProfile.conditions ?? {}}
+                                                            onChange={(next) => {
+                                                                if (!canManageSellerProfiles) {
+                                                                    return;
+                                                                }
+
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                    ...rule,
+                                                                    sellers: (rule.sellers ?? []).map((seller) => {
+                                                                        if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
+                                                                            return seller;
+                                                                        }
+
+                                                                        const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
+                                                                        return {
+                                                                            ...seller,
+                                                                            has_seller_defaults: true,
+                                                                            seller_defaults: {
+                                                                                ...defaults,
+                                                                                profiles: defaults.profiles.map((profile) => profile.id === currentSellerProfile.id
+                                                                                    ? { ...profile, conditions: normalizeConditions(next) }
+                                                                                    : profile),
+                                                                            },
+                                                                        };
+                                                                    }),
+                                                                }));
+                                                            }}
+                                                            carriers={carriers ?? []}
+                                                            mode="defaults"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-muted-foreground">{t('Aucun profil commercial défini.')}</p>
+                                                )}
+                                            </div>
+
+
+                                        </CardContent>
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">{t('Select a profile or seller to edit conditions.')}</p>
+                                )}
                             </Card>
                         ) : null}
                     </div>

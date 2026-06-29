@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CategoryProducts;
 use App\Models\DbProductBillingUser;
+use App\Models\DbProductSellerUser;
 use App\Models\DbProducts;
 use App\Http\Resources\DbProductsResource;
 use App\Models\User;
@@ -160,6 +161,9 @@ class DbProductsController extends Controller
                                 ->wherePivot('active', true),
                         ]),
                 ]),
+                        'sellerRules' => fn ($query) => $query
+                        ->where('active', true)
+                        ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
         ]);
 
                 if (!$permissions['can_manage_all'] && !$permissions['is_db_manager']) {
@@ -420,7 +424,10 @@ class DbProductsController extends Controller
             'billing_users.*.defaults' => ['nullable', 'array'],
             'billing_users.*.sellers' => ['nullable', 'array'],
             'billing_users.*.sellers.*.seller_user_id' => ['required', 'integer', 'exists:users,id'],
-            'billing_users.*.sellers.*.conditions_override' => ['nullable', 'array'],
+            'billing_users.*.sellers.*.conditions' => ['nullable', 'array'],
+            'billing_users.*.sellers.*.use_billing_profile' => ['nullable', 'boolean'],
+            'billing_users.*.sellers.*.billing_profile_id' => ['nullable', 'string', 'max:190'],
+            'billing_users.*.sellers.*.seller_defaults' => ['nullable', 'array'],
             'billing_users.*.sellers.*.can_manage' => ['nullable', 'boolean'],
         ]);
     }
@@ -568,7 +575,16 @@ class DbProductsController extends Controller
                 ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
                 ->map(fn ($seller) => [
                     'seller_user_id' => (int) $seller['seller_user_id'],
-                    'conditions_override' => $this->normalizeSalesConditions($seller['conditions_override'] ?? []),
+                    'conditions' => $this->normalizeSalesConditions($seller['conditions'] ?? []),
+                    'use_billing_profile' => array_key_exists('use_billing_profile', $seller)
+                        ? (bool) $seller['use_billing_profile']
+                        : true,
+                    'billing_profile_id' => !empty($seller['billing_profile_id'])
+                        ? (string) $seller['billing_profile_id']
+                        : null,
+                    'seller_defaults' => array_key_exists('seller_defaults', $seller)
+                        ? $this->normalizeSalesConditions(is_array($seller['seller_defaults'] ?? null) ? $seller['seller_defaults'] : [])
+                        : null,
                     'can_manage' => (bool) ($seller['can_manage'] ?? false),
                 ])
                 ->values();
@@ -584,22 +600,55 @@ class DbProductsController extends Controller
             if (!empty($sellerIds)) {
                 $activeRows = [];
                 foreach ($sellerIds as $sellerId) {
-                    $override = $sellers->firstWhere('seller_user_id', $sellerId)['conditions_override'] ?? [];
                     $activeRows[$sellerId] = [
                         'active' => true,
-                        'conditions_override' => json_encode($override),
                     ];
 
-                    // Ajout vendeur => donne acces + vente sur la DB, sans facturation ni gestion par defaut.
-                    $sellerRule = $sellers->firstWhere('seller_user_id', $sellerId);
+                    $sellerRule = DbProductSellerUser::query()->firstOrNew([
+                        'db_product_id' => (int) $dbProduct->id,
+                        'seller_user_id' => (int) $sellerId,
+                        'billing_user_id' => (int) $billingUserId,
+                    ]);
+
+                    $sellerRule->active = true;
+                    $sellerRulePayload = $sellers->firstWhere('seller_user_id', $sellerId) ?? [];
+
+                    $sellerRule->conditions = is_array($sellerRulePayload['conditions'] ?? null)
+                        ? $sellerRulePayload['conditions']
+                        : [];
+                    $sellerRule->use_billing_profile = array_key_exists('use_billing_profile', $sellerRulePayload)
+                        ? (bool) $sellerRulePayload['use_billing_profile']
+                        : true;
+                    $sellerRule->billing_profile_id = !empty($sellerRulePayload['billing_profile_id'])
+                        ? (string) $sellerRulePayload['billing_profile_id']
+                        : null;
+                    $sellerRule->can_manage = (bool) ($sellerRulePayload['can_manage'] ?? false);
+
+                    $incomingSellerDefaults = $sellerRulePayload['seller_defaults'] ?? null;
+
+                    if (!$sellerRule->exists) {
+                        $sellerRule->seller_defaults = is_array($incomingSellerDefaults) ? $incomingSellerDefaults : null;
+                    } elseif (is_array($incomingSellerDefaults)) {
+                        $sellerRule->seller_defaults = $incomingSellerDefaults;
+                    }
+
+                    $sellerRule->save();
+
+                    // Ajout vendeur => acces + vente sur la DB; facturation toujours false pour commercial.
                     $dbProduct->users()->syncWithoutDetaching([
                         $sellerId => [
                             'can_access' => true,
                             'can_buy' => false,
                             'can_invoice' => false,
                             'can_sell' => true,
-                            'can_manage' => (bool) ($sellerRule['can_manage'] ?? false),
+                            'can_manage' => (bool) $sellerRule->can_manage,
                         ],
+                    ]);
+
+                    $dbProduct->users()->updateExistingPivot($sellerId, [
+                        'can_manage' => (bool) $sellerRule->can_manage,
+                        'can_invoice' => false,
+                        'updated_at' => now(),
                     ]);
                 }
 
@@ -613,9 +662,20 @@ class DbProductsController extends Controller
                             ->where('seller_user_id', (int) $seller->id)
                             ->update(['active' => false, 'updated_at' => now()]);
                     });
+
+                DbProductSellerUser::query()
+                    ->where('db_product_id', (int) $dbProduct->id)
+                    ->where('billing_user_id', (int) $billingUserId)
+                    ->whereNotIn('seller_user_id', $sellerIds)
+                    ->update(['active' => false, 'updated_at' => now()]);
             } else {
                 DB::table('billing_user_seller_user')
                     ->where('billing_user_id', $billingUserId)
+                    ->update(['active' => false, 'updated_at' => now()]);
+
+                DbProductSellerUser::query()
+                    ->where('db_product_id', (int) $dbProduct->id)
+                    ->where('billing_user_id', (int) $billingUserId)
                     ->update(['active' => false, 'updated_at' => now()]);
             }
         }
@@ -710,6 +770,14 @@ class DbProductsController extends Controller
             ->where('bs.active', true)
             ->exists();
 
+        if (!$isSeller) {
+            $isSeller = DbProductSellerUser::query()
+                ->where('db_product_id', (int) $dbProduct->id)
+                ->where('seller_user_id', (int) $user->id)
+                ->where('active', true)
+                ->exists();
+        }
+
         $canManageSellersByPermission = $this->hasPermissionSafe($user, 'db_products.billing.manage_sellers');
         $canDelegateByPermission = $this->hasPermissionSafe($user, 'db_products.billing.delegate_manage');
 
@@ -769,7 +837,14 @@ class DbProductsController extends Controller
 
                         return [
                             'seller_user_id' => $sellerId,
-                            'conditions_override' => is_array($seller['conditions_override'] ?? null) ? $seller['conditions_override'] : [],
+                            'conditions' => is_array($seller['conditions'] ?? null) ? $seller['conditions'] : [],
+                            'use_billing_profile' => array_key_exists('use_billing_profile', $seller)
+                                ? (bool) $seller['use_billing_profile']
+                                : true,
+                            'billing_profile_id' => !empty($seller['billing_profile_id']) ? (string) $seller['billing_profile_id'] : null,
+                            'seller_defaults' => array_key_exists('seller_defaults', $seller) && is_array($seller['seller_defaults'])
+                                ? $seller['seller_defaults']
+                                : null,
                             'can_manage' => $permissions['can_delegate_manage'] ? (bool) ($seller['can_manage'] ?? false) : false,
                         ];
                     })

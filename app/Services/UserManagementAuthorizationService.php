@@ -209,7 +209,8 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if (!$this->canAssignRequestedRoles($actor, null, $requestedRoleNames)) {
+        if (!$this->canAssignRequestedRoles($actor, null, $requestedRoleNames)
+            && !$this->canAssignRequestedRolesForCreation($actor, $requestedRoleNames)) {
             return false;
         }
 
@@ -230,8 +231,8 @@ class UserManagementAuthorizationService
         }
 
         if ($actor->isSameAs($parent)) {
-            // scope['branch'] est vrai ici (all a déjà été géré) :
-            // un acteur avec le droit de créer dans sa branche peut se choisir comme parent.
+            // Le policy level autorise le parent self; les endpoints peuvent appliquer
+            // des contraintes plus strictes selon le contexte métier.
             return true;
         }
 
@@ -419,7 +420,9 @@ class UserManagementAuthorizationService
 
         $canManageAll = $this->isGlobalManager($actor) || $this->hasPermission($actor, 'users.db_products.manage.all');
         $canManageHis = $canManageAll || $this->hasPermission($actor, 'users.db_products.manage.his');
-        $canAccessDatabase = $canManageHis || $this->hasPermission($actor, 'users.db_products.access');
+        $canAccessDatabase = $canManageHis
+            || $this->hasPermission($actor, 'users.db_products.access')
+            || $this->hasOwnClientManagementCapability($actor);
 
         if (!$canAccessDatabase) {
             return false;
@@ -438,6 +441,16 @@ class UserManagementAuthorizationService
         }
 
         return $this->canManageTarget($actor, $target, allowSelf: false);
+    }
+
+    public function canSelectAnyDbProducts(User $actor): bool
+    {
+        $actor = $this->resolveActor($actor);
+
+        return $this->isGlobalManager($actor)
+            || $this->hasPermission($actor, 'users.db_products.manage.all')
+            || $this->hasPermission($actor, 'users.db_products.manage.his')
+            || $this->hasOwnClientManagementCapability($actor);
     }
 
     /**
@@ -659,6 +672,48 @@ class UserManagementAuthorizationService
         $scope = $this->resolveUserActionScope($actor, 'assign_roles');
 
         return $scope['all'] || $scope['branch'];
+    }
+
+    private function canAssignRequestedRolesForCreation(User $actor, array $requestedRoleNames): bool
+    {
+        $actor = $this->resolveActor($actor);
+        $requestedRoleNames = array_values(array_unique(array_filter($requestedRoleNames)));
+
+        if (empty($requestedRoleNames)) {
+            return true;
+        }
+
+        if ($actor->hasRole('admin')) {
+            return true;
+        }
+
+        if ($actor->hasRole('dev')) {
+            return !in_array('admin', $requestedRoleNames, true);
+        }
+
+        $requestedRoles = Role::query()
+            ->whereIn('name', $requestedRoleNames)
+            ->with('permissions:id,name')
+            ->get();
+
+        if ($requestedRoles->count() !== count($requestedRoleNames)) {
+            return false;
+        }
+
+        $actorPermissionNames = $actor->getAllPermissions()->pluck('name')->unique()->values()->all();
+
+        foreach ($requestedRoles as $role) {
+            if (in_array($role->name, self::PROTECTED_ROLE_NAMES, true)) {
+                return false;
+            }
+
+            $rolePermissionNames = $role->permissions->pluck('name')->unique()->values()->all();
+            if (array_diff($rolePermissionNames, $actorPermissionNames) !== []) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function hasLegacyCreateSelfParentCapability(User $actor): bool
