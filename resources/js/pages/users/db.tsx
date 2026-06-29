@@ -6,11 +6,14 @@ import { Button } from '@/components/ui/button';
 import { BreadcrumbItem, type SharedData, type User, type dbProduct, type ClientSalesCondition, type SalesConditions } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchSelect from '@/components/app/search-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { TrashIcon, ServerIcon } from 'lucide-react';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
+import { Separator } from '@/components/ui/separator';
 
 type CarrierOption = {
     id: number;
@@ -38,6 +41,7 @@ type DbPageProps = SharedData & {
     salesConditions?: ClientSalesCondition[];
 };
 
+
 const normalizeConditions = (value: SalesConditions | undefined): SalesConditions => {
     if (!value) {
         return {};
@@ -45,6 +49,50 @@ const normalizeConditions = (value: SalesConditions | undefined): SalesCondition
 
     const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
     return Object.fromEntries(entries);
+};
+
+const DEFAULT_VALUES: SalesConditions = {
+    m: 0,
+    mm: 0,
+    pd: 0,
+    h: 1,
+    l: 0,
+    c: '',
+    mc: 0,
+    me: 0,
+    mr: 0,
+    tvap: 0,
+    tvat: null,
+    t: null,
+    z: null,
+    p: '-1',
+};
+
+const normalizePriceMode = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') {
+        return '-1';
+    }
+
+    const raw = String(value).trim().toLowerCase();
+
+    if (raw === 'price_depart' || raw === 'depart' || raw === 'departure' || raw === '0') {
+        return 'price_depart';
+    }
+
+    if (raw === 'price_render' || raw === 'price_rendu' || raw === 'render' || raw === 'rendered' || raw === 'rendu' || raw === '1') {
+        return 'price_render';
+    }
+
+    if (raw === 'price' || raw === 'price_floor' || raw === 'price_roll' || raw === 'price_promo') {
+        return raw;
+    }
+
+    return raw === '-1' ? '-1' : '-1';
+};
+
+const toNumber = (value: string, fallback = 0): number => {
+    const parsed = Number(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 export default function UserDbPage() {
@@ -126,6 +174,14 @@ export default function UserDbPage() {
         setRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
     };
 
+    const merged: SalesConditions = { ...DEFAULT_VALUES, ...(activeRow?.conditions_override ?? {}) };
+    const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
+    const zones = carriersList.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
+
+    const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
+        setRows((prev) => prev.map((row, rowIndex) => (rowIndex === activeIndex ? { ...row, conditions_override: { ...DEFAULT_VALUES, ...(row.conditions_override ?? {}), [key]: nextValue } } : row)));
+    };
+
     const submit = () => {
         const normalizedRows = rows
             .filter((row) => Number(row.db_product_id) > 0 && Number(row.billing_user_id ?? 0) > 0)
@@ -157,11 +213,14 @@ export default function UserDbPage() {
 
             <SettingsLayout>
                 <div className="space-y-4">
-                    <StickyBar>
-                        <Button type="button" onClick={submit}>
-                            {t('Save')}
-                        </Button>
+                    <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
+                        <div className="ml-auto">
+                            <Button type="button" onClick={submit}>
+                                {t('Save')}
+                            </Button>
+                        </div>
                     </StickyBar>
+
 
                     <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -287,12 +346,102 @@ export default function UserDbPage() {
                                                 </FormField>
                                             </div>
 
+                                            <Separator />
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField label={t('Price mode')}>
+                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update('p', v)}>
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
+                                                            <SelectItem value="price_depart">{t('Departure price')}</SelectItem>
+                                                            <SelectItem value="price_render">{t('Rendered price')}</SelectItem>
+                                                            <SelectItem value="price">{t('Base price')}</SelectItem>
+                                                            <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
+                                                            <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
+                                                            <SelectItem value="price_promo">{t('Promo price')}</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormField>
+
+                                            </div>
+
                                             <SalesConditionsForm
                                                 value={activeRow.conditions_override ?? {}}
                                                 onChange={(next) => updateRow(activeIndex, { conditions_override: normalizeConditions(next) })}
                                                 carriers={carriersList}
                                                 mode="client"
                                             />
+
+                                            <Separator />
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <FormField label={t('Higher roll')}>
+                                                    <Input
+                                                        type="checkbox"
+                                                        checked={Number(merged.h ?? 0) === 1}
+                                                        onChange={(e) => update('h', e.target.checked ? 1 : 0)}
+                                                    />
+                                                </FormField>
+                                                <FormField label={t('Carrier')}>
+                                                    <Select
+                                                        value={currentCarrierId !== null ? String(currentCarrierId) : 'none'}
+                                                        onValueChange={(v) => {
+                                                            const nextCarrierId = v === 'none' ? null : Number(v);
+                                                            update('t', nextCarrierId);
+                                                            if (!nextCarrierId) {
+                                                                update('z', null);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder={t('Select a carrier')} />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                            {carriersList.map((carrier) => (
+                                                                <SelectItem key={carrier.id} value={String(carrier.id)}>
+                                                                    {carrier.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormField>
+                                                <FormField label={t('Zone')}>
+                                                    <Select
+                                                        value={merged.z !== null && merged.z !== undefined ? String(merged.z) : 'none'}
+                                                        onValueChange={(v) => update('z', v === 'none' ? null : Number(v))}
+                                                        disabled={!currentCarrierId}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder={t('Select a zone')} />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                            {zones.map((zone) => (
+                                                                <SelectItem key={zone.id} value={String(zone.id)}>
+                                                                    {zone.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormField>
+                                                <FormField label={t('Delivery (€)')}>
+                                                    <Input type="number" step="0.01" value={String(merged.l ?? 0)} onChange={(e) => update('l', toNumber(e.target.value))} />
+                                                </FormField>
+
+                                                <FormField label={t('Transport VAT (%)')}>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat)}
+                                                        onChange={(e) => update('tvat', e.target.value === '' ? null : toNumber(e.target.value))}
+                                                    />
+                                                </FormField>
+                                            </div>
+
                                         </CardContent>
                                     </>
                                 )}

@@ -1,5 +1,6 @@
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Form, Head, usePage } from '@inertiajs/react';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import { useState, useEffect, useMemo } from 'react';
 import { Shield } from 'lucide-react';
 
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
 import PermissionsChecklistCard from '@/components/users/permissions-checklist-card';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
@@ -166,6 +168,14 @@ export default function PermissionsSettings({
 
             <SettingsLayout>
                 <div className='space-y-6'>
+                    <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
+                        <div className="ml-auto">
+                            <Button type="submit">
+                                {t('Save')}
+                            </Button>
+                        </div>
+                    </StickyBar>
+
                     <Form method='patch' action={formAction} className='space-y-6'>
                         {canManageRoles && (
                             <Card className='p-6'>

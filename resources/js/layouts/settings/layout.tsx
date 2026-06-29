@@ -130,7 +130,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     return (
         <div className="p-2 lg:p-4 space-y-6">
             {/* Header */}
-            <StickyBar className='mb-4 w-full'>
+            <StickyBar className='mb-4 w-full settings-sticky'>
                 <div className='flex w-full items-center justify-between'>
 
                     <div className="flex items-center gap-4 ">

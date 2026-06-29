@@ -23,8 +23,12 @@ export function StickyBar({
 
     useEffect(() => {
         const getHeight = () => {
-            const el = document.querySelector(topOffsetElement) as HTMLElement | null;
-            return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+            const els = document.querySelectorAll(topOffsetElement) as NodeListOf<HTMLElement>;
+            let total = 0;
+            els.forEach((el) => {
+                total += Math.ceil(el.getBoundingClientRect().height);
+            });
+            return total;
         };
 
         const getWidth = () => {

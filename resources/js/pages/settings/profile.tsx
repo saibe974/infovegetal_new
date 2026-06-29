@@ -1,6 +1,7 @@
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import { useState, useMemo, useRef } from 'react';
 import { Mail, AlertCircle, Users2Icon } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -112,34 +113,42 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    {/* Vérification d'email non vérifiée */}
-                    {mustVerifyEmail &&
-                        targetUserWithParent.email_verified_at === null && (
-                            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                                <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 flex-shrink-0" />
-                                <div className="flex-1">
-                                    <p className="text-sm text-amber-900">
-                                        {t('The user email address is unverified.')}{' '}
-                                        {/* Only allow resend for own profile */}
-                                        {!editingUser && (
-                                            <Link
-                                                href={send()}
-                                                as="button"
-                                                className="font-medium underline hover:no-underline"
-                                            >
-                                                {t('Click here to resend the verification email.')}
-                                            </Link>
-                                        )}
-                                    </p>
-                                    {status ===
-                                        'verification-link-sent' && (
-                                            <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
-                                        )}
-                                </div>
-                            </div>
-                        )}
 
                     <Form {...formAction} className='space-y-6'>
+
+                        <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
+                            <div className="ml-auto">
+                                <Button type="submit">{t('Save')}</Button>
+                            </div>
+                        </StickyBar>
+
+                        {/* Vérification d'email non vérifiée */}
+                        {mustVerifyEmail &&
+                            targetUserWithParent.email_verified_at === null && (
+                                <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                    <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 flex-shrink-0" />
+                                    <div className="flex-1">
+                                        <p className="text-sm text-amber-900">
+                                            {t('The user email address is unverified.')}{' '}
+                                            {/* Only allow resend for own profile */}
+                                            {!editingUser && (
+                                                <Link
+                                                    href={send()}
+                                                    as="button"
+                                                    className="font-medium underline hover:no-underline"
+                                                >
+                                                    {t('Click here to resend the verification email.')}
+                                                </Link>
+                                            )}
+                                        </p>
+                                        {status ===
+                                            'verification-link-sent' && (
+                                                <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
+
 
                         {/* Informations Personnelles */}
                         <Card className="p-6">
@@ -220,9 +229,7 @@ export default function Profile({
                             </Card>
                         )}
 
-                        <div className="flex items-center gap-4 pt-4">
-                            <Button type="submit">{t('Save')}</Button>
-                        </div>
+
                     </Form>
 
                     {/* Modale sélection parent */}

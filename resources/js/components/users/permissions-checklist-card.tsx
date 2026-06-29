@@ -34,7 +34,7 @@ type PermissionsChecklistCardProps = {
     selectedPermissionIds: number[];
     onTogglePermission: (permissionId: number, checked: boolean) => void;
     translate: (key: string) => string;
-    submit: SubmitConfig;
+    submit?: SubmitConfig;
     createPermission?: CreatePermissionConfig;
     onDeletePermission?: (permission: PermissionItem) => void;
     officialPermissionNames?: string[];
@@ -187,7 +187,7 @@ export default function PermissionsChecklistCard({
                 ))}
             </div>
 
-            <div className='pt-2'>
+            {/* <div className='pt-2'>
                 <Button
                     type={submit.type ?? 'button'}
                     onClick={submit.onClick}
@@ -195,7 +195,7 @@ export default function PermissionsChecklistCard({
                 >
                     {translate(submit.label)}
                 </Button>
-            </div>
+            </div> */}
         </Card>
     );
 }

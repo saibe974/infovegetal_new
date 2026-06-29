@@ -13,7 +13,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SearchSelect from '@/components/app/search-select';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { useI18n } from '@/lib/i18n';
@@ -21,7 +21,7 @@ import { normalizeBillingDefaultsToProfiles, profilesToBillingDefaults } from '@
 import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
 import { ArrowLeftCircle, SaveIcon, TrashIcon } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import InputError from '@/components/ui/input-error';
 
 type UserOption = { id: number; name: string; email: string };
@@ -133,15 +133,40 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     const [billingSearch, setBillingSearch] = useState('');
     const [sellerSearch, setSellerSearch] = useState('');
 
+    const STORAGE_KEY = `db-billing-view-${dbProduct.id}`;
+
+    const loadViewPrefs = (): { billingUserId: number | null; tab: string; panelItem: ActivePanelItem } => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                return {
+                    billingUserId: parsed.billingUserId ?? null,
+                    tab: parsed.tab ?? 'predefined',
+                    panelItem: parsed.panelItem ?? null,
+                };
+            }
+        } catch { }
+        return { billingUserId: null, tab: 'predefined', panelItem: null };
+    };
+
     const initialBillingUsers: BillingDraft[] = useMemo(() => {
         const rows = Array.isArray(dbProduct.billing_users) ? (dbProduct.billing_users as BillingUserRule[]) : [];
         return rows.map(normalizeRowToDraft);
     }, [dbProduct.billing_users]);
 
-    const [activeBillingUserId, setActiveBillingUserId] = useState<number | null>(
-        initialBillingUsers.length > 0 ? initialBillingUsers[0].billing_user_id : null,
-    );
-    const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(null);
+    const viewPrefs = useMemo(() => loadViewPrefs(), []);
+
+    const [activeBillingUserId, setActiveBillingUserId] = useState<number | null>(() => {
+        if (viewPrefs.billingUserId !== null && initialBillingUsers.some((u) => Number(u.billing_user_id) === Number(viewPrefs.billingUserId))) {
+            return viewPrefs.billingUserId;
+        }
+        return initialBillingUsers.length > 0 ? initialBillingUsers[0].billing_user_id : null;
+    });
+
+    const [activeTab, setActiveTab] = useState<string>(() => viewPrefs.tab);
+
+    const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(() => viewPrefs.panelItem);
 
     const { data, setData, put, processing, errors, transform } = useForm({
         billing_users: initialBillingUsers,
@@ -220,6 +245,12 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
         return canManageSellers || Number(activeBillingRule.billing_user_id) === Number(currentUserId);
     }, [activeBillingRule, canManageSellers, currentUserId]);
 
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ billingUserId: activeBillingUserId, tab: activeTab, panelItem: activePanelItem }));
+        } catch { }
+    }, [activeBillingUserId, activeTab, activePanelItem]);
+
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
 
@@ -267,7 +298,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
                         {isGlobalManager ? (
                             <Card className="p-6 space-y-4 xl:col-span-3">
-                                <FormField label={t('Facturants')}>
+                                <FormField label={t('Ajouter un Facturant')}>
                                     <SearchSelect
                                         value={billingSearch}
                                         onChange={setBillingSearch}
@@ -296,6 +327,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                             ];
                                             setData('billing_users', nextRules);
                                             setActiveBillingUserId(id);
+                                            setActiveTab('predefined');
                                             setActivePanelItem({ type: 'profile', id: 'standard' });
                                             setBillingSearch('');
                                         }}
@@ -322,12 +354,8 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                                     className={`text-left rounded-md px-3 py-2 w-full border ${activeBillingUserId === id ? 'bg-muted border-primary' : 'border-border'}`}
                                                     onClick={() => {
                                                         setActiveBillingUserId(id);
-                                                        const firstProfile = rule.defaults.profiles[0];
-                                                        if (firstProfile) {
-                                                            setActivePanelItem({ type: 'profile', id: firstProfile.id });
-                                                        } else {
-                                                            setActivePanelItem(null);
-                                                        }
+                                                        setActiveTab('predefined');
+                                                        setActivePanelItem(null);
                                                     }}
                                                 >
                                                     <span className="font-medium">{option.label}</span>
@@ -362,186 +390,83 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                 <>
                                     <CardHeader className="px-0 pb-2">
                                         <CardTitle>
-                                            {t('Facturant')} - {userOptionById.get(Number(activeBillingRule.billing_user_id))?.label ?? `#${activeBillingRule.billing_user_id}`}
+                                            {userOptionById.get(Number(activeBillingRule.billing_user_id))?.label ?? `#${activeBillingRule.billing_user_id}`}
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="px-0 space-y-5">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <h3 className="text-sm font-semibold">{t('Conditions predefinies')}</h3>
-                                                {canManageProfiles ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            const nextId = `profile-${Date.now()}`;
-                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-                                                                const profile: SalesConditionProfile = {
-                                                                    id: nextId,
-                                                                    name: t('New profile'),
-                                                                    conditions: {},
-                                                                };
-                                                                const profiles = [...(rule.defaults.profiles ?? []), profile];
-                                                                return {
-                                                                    ...rule,
-                                                                    defaults: {
-                                                                        profiles,
-                                                                        default_profile_id: rule.defaults.default_profile_id ?? profile.id,
-                                                                    },
-                                                                };
-                                                            });
-                                                            setActivePanelItem({ type: 'profile', id: nextId });
-                                                        }}
-                                                    >
-                                                        + {t('Add')}
-                                                    </Button>
-                                                ) : null}
-                                            </div>
+                                        <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); setActivePanelItem(null); }}>
+                                            <TabsList className="grid w-full grid-cols-3">
+                                                <TabsTrigger value="predefined">{t('Prédéfinie')}</TabsTrigger>
+                                                <TabsTrigger value="commercial">{t('Commerciaux')}</TabsTrigger>
+                                                <TabsTrigger value="users">{t('Users')}</TabsTrigger>
+                                            </TabsList>
 
-                                            <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                                                {(activeBillingRule.defaults.profiles ?? []).map((profile) => (
-                                                    <div key={profile.id} className="flex items-center justify-between gap-2">
-                                                        <button
+                                            <TabsContent value="predefined" className="space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="text-sm font-semibold">{t('Conditions predefinies')}</h3>
+                                                    {canManageProfiles ? (
+                                                        <Button
                                                             type="button"
-                                                            className={`text-left rounded-md px-3 py-2 w-full border ${activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id ? 'bg-muted border-primary' : 'border-border'}`}
-                                                            onClick={() => setActivePanelItem({ type: 'profile', id: profile.id })}
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const nextId = `profile-${Date.now()}`;
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
+                                                                    const profile: SalesConditionProfile = {
+                                                                        id: nextId,
+                                                                        name: t('New profile'),
+                                                                        conditions: {},
+                                                                    };
+                                                                    const profiles = [...(rule.defaults.profiles ?? []), profile];
+                                                                    return {
+                                                                        ...rule,
+                                                                        defaults: {
+                                                                            profiles,
+                                                                            default_profile_id: rule.defaults.default_profile_id ?? profile.id,
+                                                                        },
+                                                                    };
+                                                                });
+                                                                setActivePanelItem({ type: 'profile', id: nextId });
+                                                            }}
                                                         >
-                                                            <span className="font-medium">{profile.name}</span>
-                                                        </button>
-                                                        {canManageProfiles ? (
-                                                            <Button
-                                                                type="button"
-                                                                variant="destructive-outline"
-                                                                size="icon"
-                                                                onClick={() => {
-                                                                    updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-                                                                        const profiles = (rule.defaults.profiles ?? []).filter((current) => current.id !== profile.id);
-                                                                        const default_profile_id =
-                                                                            rule.defaults.default_profile_id === profile.id
-                                                                                ? (profiles[0]?.id ?? null)
-                                                                                : rule.defaults.default_profile_id;
+                                                            + {t('Add')}
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
 
-                                                                        return {
-                                                                            ...rule,
-                                                                            defaults: {
-                                                                                profiles,
-                                                                                default_profile_id,
-                                                                            },
-                                                                        };
-                                                                    });
-
-                                                                    if (activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id) {
-                                                                        setActivePanelItem(null);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <TrashIcon className="h-4 w-4" />
-                                                            </Button>
-                                                        ) : null}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <Separator />
-
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <h3 className="text-sm font-semibold">{t('Vendeurs / commerciaux')}</h3>
-                                                {canManageSellers ? (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            const id = Number(sellerSearch.trim().split(/\s+/).pop() ?? '');
-                                                            if (!Number.isInteger(id) || id <= 0) {
-                                                                return;
-                                                            }
-
-                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-                                                                const exists = (rule.sellers ?? []).some((seller) => Number(seller.seller_user_id) === id);
-                                                                if (exists) {
-                                                                    return rule;
-                                                                }
-
-                                                                return {
-                                                                    ...rule,
-                                                                    sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
-                                                                };
-                                                            });
-                                                            setActivePanelItem({ type: 'seller', id });
-                                                            setSellerSearch('');
-                                                        }}
-                                                    >
-                                                        + {t('Add')}
-                                                    </Button>
-                                                ) : null}
-                                            </div>
-
-                                            {canManageSellers ? (
-                                                <FormField label={t('Ajouter vendeur')}>
-                                                    <SearchSelect
-                                                        value={sellerSearch}
-                                                        onChange={setSellerSearch}
-                                                        onSubmit={(value) => {
-                                                            const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                            if (!Number.isInteger(id) || id <= 0) {
-                                                                return;
-                                                            }
-
-                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-                                                                const exists = (rule.sellers ?? []).some((seller) => Number(seller.seller_user_id) === id);
-                                                                if (exists) {
-                                                                    return rule;
-                                                                }
-
-                                                                return {
-                                                                    ...rule,
-                                                                    sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
-                                                                };
-                                                            });
-                                                            setActivePanelItem({ type: 'seller', id });
-                                                            setSellerSearch('');
-                                                        }}
-                                                        propositions={availableSellerOptions}
-                                                        selection={[]}
-                                                        loading={false}
-                                                        minQueryLength={0}
-                                                    />
-                                                </FormField>
-                                            ) : null}
-
-                                            <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                                                {(activeBillingRule.sellers ?? []).map((seller) => {
-                                                    const id = Number(seller.seller_user_id);
-                                                    const option = userOptionById.get(id);
-                                                    if (!option) {
-                                                        return null;
-                                                    }
-
-                                                    return (
-                                                        <div key={id} className="flex items-center justify-between gap-2">
+                                                <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                                                    {(activeBillingRule.defaults.profiles ?? []).map((profile) => (
+                                                        <div key={profile.id} className="flex items-center justify-between gap-2">
                                                             <button
                                                                 type="button"
-                                                                className={`text-left rounded-md px-3 py-2 w-full border ${activePanelItem?.type === 'seller' && Number(activePanelItem.id) === id ? 'bg-muted border-primary' : 'border-border'}`}
-                                                                onClick={() => setActivePanelItem({ type: 'seller', id })}
+                                                                className={`text-left rounded-md px-3 py-2 w-full border ${activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id ? 'bg-muted border-primary' : 'border-border'}`}
+                                                                onClick={() => setActivePanelItem({ type: 'profile', id: profile.id })}
                                                             >
-                                                                <span className="font-medium">{option.label}</span>
+                                                                <span className="font-medium">{profile.name}</span>
                                                             </button>
-                                                            {canManageSellers ? (
+                                                            {canManageProfiles ? (
                                                                 <Button
                                                                     type="button"
                                                                     variant="destructive-outline"
                                                                     size="icon"
                                                                     onClick={() => {
-                                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                                            ...rule,
-                                                                            sellers: (rule.sellers ?? []).filter((current) => Number(current.seller_user_id) !== id),
-                                                                        }));
+                                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
+                                                                            const profiles = (rule.defaults.profiles ?? []).filter((current) => current.id !== profile.id);
+                                                                            const default_profile_id =
+                                                                                rule.defaults.default_profile_id === profile.id
+                                                                                    ? (profiles[0]?.id ?? null)
+                                                                                    : rule.defaults.default_profile_id;
 
-                                                                        if (activePanelItem?.type === 'seller' && Number(activePanelItem.id) === id) {
+                                                                            return {
+                                                                                ...rule,
+                                                                                defaults: {
+                                                                                    profiles,
+                                                                                    default_profile_id,
+                                                                                },
+                                                                            };
+                                                                        });
+
+                                                                        if (activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id) {
                                                                             setActivePanelItem(null);
                                                                         }
                                                                     }}
@@ -550,53 +475,172 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                                                 </Button>
                                                             ) : null}
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
+                                                    ))}
+                                                </div>
+                                            </TabsContent>
+
+                                            <TabsContent value="commercial" className="space-y-3">
+                                                {/* <div className="flex items-center justify-between gap-2">
+                                                    <h3 className="text-sm font-semibold">{t('Vendeurs / commerciaux')}</h3>
+                                                    {canManageSellers ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const id = Number(sellerSearch.trim().split(/\s+/).pop() ?? '');
+                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
+
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
+                                                                    const exists = (rule.sellers ?? []).some((seller) => Number(seller.seller_user_id) === id);
+                                                                    if (exists) {
+                                                                        return rule;
+                                                                    }
+
+                                                                    return {
+                                                                        ...rule,
+                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
+                                                                    };
+                                                                });
+                                                                setActivePanelItem({ type: 'seller', id });
+                                                                setSellerSearch('');
+                                                            }}
+                                                        >
+                                                            + {t('Add')}
+                                                        </Button>
+                                                    ) : null}
+                                                </div> */}
+
+                                                {canManageSellers ? (
+                                                    <FormField label={t('Ajouter un commercial')}>
+                                                        <SearchSelect
+                                                            value={sellerSearch}
+                                                            onChange={setSellerSearch}
+                                                            onSubmit={(value) => {
+                                                                const id = Number(value.trim().split(/\s+/).pop() ?? '');
+                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
+
+                                                                updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
+                                                                    const exists = (rule.sellers ?? []).some((seller) => Number(seller.seller_user_id) === id);
+                                                                    if (exists) {
+                                                                        return rule;
+                                                                    }
+
+                                                                    return {
+                                                                        ...rule,
+                                                                        sellers: [...(rule.sellers ?? []), { seller_user_id: id, conditions_override: {}, can_manage: false }],
+                                                                    };
+                                                                });
+                                                                setActivePanelItem({ type: 'seller', id });
+                                                                setSellerSearch('');
+                                                            }}
+                                                            propositions={availableSellerOptions}
+                                                            selection={[]}
+                                                            loading={false}
+                                                            minQueryLength={0}
+                                                        />
+                                                    </FormField>
+                                                ) : null}
+
+                                                <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                                                    {(activeBillingRule.sellers ?? []).map((seller) => {
+                                                        const id = Number(seller.seller_user_id);
+                                                        const option = userOptionById.get(id);
+                                                        if (!option) {
+                                                            return null;
+                                                        }
+
+                                                        return (
+                                                            <div key={id} className="flex items-center justify-between gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    className={`text-left rounded-md px-3 py-2 w-full border ${activePanelItem?.type === 'seller' && Number(activePanelItem.id) === id ? 'bg-muted border-primary' : 'border-border'}`}
+                                                                    onClick={() => setActivePanelItem({ type: 'seller', id })}
+                                                                >
+                                                                    <span className="font-medium">{option.label}</span>
+                                                                </button>
+                                                                {canManageSellers ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="destructive-outline"
+                                                                        size="icon"
+                                                                        onClick={() => {
+                                                                            updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                                                ...rule,
+                                                                                sellers: (rule.sellers ?? []).filter((current) => Number(current.seller_user_id) !== id),
+                                                                            }));
+
+                                                                            if (activePanelItem?.type === 'seller' && Number(activePanelItem.id) === id) {
+                                                                                setActivePanelItem(null);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                    </Button>
+                                                                ) : null}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </TabsContent>
+
+                                            <TabsContent value="users">
+                                                <p className="text-sm text-muted-foreground">{t('À développer')}</p>
+                                            </TabsContent>
+                                        </Tabs>
                                     </CardContent>
                                 </>
                             )}
                         </Card>
 
-                        <Card className={`p-6 space-y-4 ${isGlobalManager ? 'xl:col-span-5' : 'xl:col-span-7'}`}>
-                            {!activeBillingRule ? (
-                                <p className="text-sm text-muted-foreground">{t('Select a billing user to edit profiles and seller conditions.')}</p>
-                            ) : activePanelItem?.type === 'profile' && currentProfile ? (
+                        {activeBillingRule && ((activePanelItem?.type === 'profile' && currentProfile) || (activePanelItem?.type === 'seller' && currentSeller)) ? (
+                            <Card className={`p-6 space-y-4 ${isGlobalManager ? 'xl:col-span-5' : 'xl:col-span-7'}`}>
+                                {!activeBillingRule ? (
+                                    <p className="text-sm text-muted-foreground">{t('Select a billing user to edit profiles and seller conditions.')}</p>
+                                ) : activePanelItem?.type === 'profile' && currentProfile ? (
                                 <>
                                     <CardHeader className="px-0">
-                                        <CardTitle>{t('Condition predefinie')}</CardTitle>
+                                        <div className="flex items-center gap-5 align-middle px-0">
+                                            {t('Condition predefinie')}&nbsp;-&nbsp;
+                                            <FormField label=''>
+                                                <input
+                                                    className="w-full rounded-md border px-3 py-2"
+                                                    value={currentProfile.name}
+                                                    disabled={!canManageProfiles}
+                                                    onChange={(e) => {
+                                                        if (!canManageProfiles) {
+                                                            return;
+                                                        }
+
+                                                        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
+                                                            ...rule,
+                                                            defaults: {
+                                                                ...rule.defaults,
+                                                                profiles: (rule.defaults.profiles ?? []).map((profile) => {
+                                                                    if (profile.id !== currentProfile.id) {
+                                                                        return profile;
+                                                                    }
+
+                                                                    return {
+                                                                        ...profile,
+                                                                        name: e.target.value,
+                                                                    };
+                                                                }),
+                                                            },
+                                                        }));
+                                                    }}
+                                                />
+                                            </FormField>
+                                        </div>
                                     </CardHeader>
+
+
                                     <CardContent className="px-0 space-y-4">
-                                        <FormField label={t('Nom du profil')}>
-                                            <input
-                                                className="w-full rounded-md border px-3 py-2 text-sm"
-                                                value={currentProfile.name}
-                                                disabled={!canManageProfiles}
-                                                onChange={(e) => {
-                                                    if (!canManageProfiles) {
-                                                        return;
-                                                    }
 
-                                                    updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-                                                        ...rule,
-                                                        defaults: {
-                                                            ...rule.defaults,
-                                                            profiles: (rule.defaults.profiles ?? []).map((profile) => {
-                                                                if (profile.id !== currentProfile.id) {
-                                                                    return profile;
-                                                                }
-
-                                                                return {
-                                                                    ...profile,
-                                                                    name: e.target.value,
-                                                                };
-                                                            }),
-                                                        },
-                                                    }));
-                                                }}
-                                            />
-                                        </FormField>
 
                                         <SalesConditionsForm
                                             value={currentProfile.conditions ?? {}}
@@ -685,7 +729,8 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                             ) : (
                                 <p className="text-sm text-muted-foreground">{t('Select a profile or seller to edit conditions.')}</p>
                             )}
-                        </Card>
+                            </Card>
+                        ) : null}
                     </div>
                 </form>
             </div>

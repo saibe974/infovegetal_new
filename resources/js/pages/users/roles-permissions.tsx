@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import PermissionsChecklistCard from '@/components/users/permissions-checklist-card';
 import { TrashIcon } from 'lucide-react';
 
@@ -186,6 +187,18 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ roles, permissions, of
             <Head title={t('Roles & permissions')} />
 
             <div className='space-y-6'>
+                <StickyBar>
+                    <div className='ml-auto'>
+                        <Button
+                            type='button'
+                            onClick={syncRolePermissions}
+                            disabled={!selectedRoleId}
+                        >
+                            {t('Save')}
+                        </Button>
+                    </div>
+                </StickyBar>
+
                 <Card className='p-6'>
                     <h1 className='text-2xl font-semibold'>{t('Roles & permissions')}</h1>
                     <p className='text-sm text-muted-foreground mt-2'>
@@ -251,12 +264,6 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ roles, permissions, of
                             disabled: !newPermissionName,
                         }}
                         onDeletePermission={deletePermission}
-                        submit={{
-                            label: 'Save',
-                            disabled: !selectedRoleId,
-                            onClick: syncRolePermissions,
-                            type: 'button',
-                        }}
                     />
                 </div>
             </div>
