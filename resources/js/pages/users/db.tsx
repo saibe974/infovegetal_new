@@ -152,7 +152,8 @@ export default function UserDbPage() {
 
         return list.map((billing) => ({
             value: String(billing.id),
-            label: `${billing.name} (${billing.email})`,
+            label: billing.name,
+            description: billing.email,
         }));
     }, [activeRow, dbById]);
 
@@ -166,51 +167,57 @@ export default function UserDbPage() {
 
         return (billing?.sellers ?? []).map((seller) => ({
             value: String(seller.id),
-            label: `${seller.name} (${seller.email})`,
+            label: seller.name,
+            description: seller.email,
         }));
     }, [activeRow, dbById]);
 
-    const availableProfiles = useMemo(() => {
-        if (!activeRow || !activeRow.billing_user_id) {
-            return [];
+    const activeSellerData = useMemo(() => {
+        if (!activeRow || !activeRow.billing_user_id || !activeRow.seller_user_id) {
+            return null;
         }
 
         const db = dbById.get(Number(activeRow.db_product_id));
         const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
+        return (billing?.sellers ?? []).find((seller) => Number(seller.id) === Number(activeRow.seller_user_id)) ?? null;
+    }, [activeRow, dbById]);
 
+    const activeBillingProfileName = useMemo(() => {
+        if (!activeSellerData || !activeRow?.billing_user_id) {
+            return '';
+        }
+
+        const db = dbById.get(Number(activeRow.db_product_id));
+        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
         if (!billing) {
-            return [];
+            return '';
         }
 
         const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
-        const merged = billingDefaults.profiles.map((profile) => ({
-            key: `billing:${profile.id}`,
-            label: `${t('Billing')} - ${profile.name}`,
-            conditions: normalizeConditions(profile.conditions),
-        }));
+        const profileId = activeSellerData.use_billing_profile
+            ? (activeSellerData.billing_profile_id ?? billingDefaults.default_profile_id ?? null)
+            : null;
 
-        if (activeRow.seller_user_id) {
-            const seller = (billing.sellers ?? []).find((row) => Number(row.id) === Number(activeRow.seller_user_id));
-            if (seller?.conditions && Object.keys(seller.conditions).length > 0) {
-                merged.push({
-                    key: 'seller:base',
-                    label: `${t('Seller')} - ${t('Assigned conditions')}`,
-                    conditions: normalizeConditions(seller.conditions),
-                });
-            }
-            const sellerDefaults = normalizeBillingDefaultsToProfiles(seller?.seller_defaults);
-
-            sellerDefaults.profiles.forEach((profile) => {
-                merged.push({
-                    key: `seller:${profile.id}`,
-                    label: `${t('Seller')} - ${profile.name}`,
-                    conditions: normalizeConditions(profile.conditions),
-                });
-            });
+        if (!profileId) {
+            return t('Paramétrage custom');
         }
 
-        return merged;
-    }, [activeRow, dbById, t]);
+        const profile = billingDefaults.profiles.find((p) => p.id === String(profileId));
+        return profile?.name ?? String(profileId);
+    }, [activeSellerData, activeRow, dbById, t]);
+
+    const sellerProfiles = useMemo(() => {
+        if (!activeSellerData) {
+            return [];
+        }
+
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(activeSellerData.seller_defaults);
+        return sellerDefaults.profiles.map((profile) => ({
+            key: `seller:${profile.id}`,
+            label: profile.name,
+            conditions: normalizeConditions(profile.conditions),
+        }));
+    }, [activeSellerData, t]);
 
     const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
 
@@ -224,19 +231,6 @@ export default function UserDbPage() {
 
     const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
         setRows((prev) => prev.map((row, rowIndex) => (rowIndex === activeIndex ? { ...row, conditions_override: { ...DEFAULT_VALUES, ...(row.conditions_override ?? {}), [key]: nextValue } } : row)));
-    };
-
-    const applySelectedProfile = () => {
-        if (!selectedProfileKey) {
-            return;
-        }
-
-        const profile = availableProfiles.find((item) => item.key === selectedProfileKey);
-        if (!profile) {
-            return;
-        }
-
-        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
     };
 
     const submit = () => {
@@ -353,9 +347,9 @@ export default function UserDbPage() {
                                         </CardHeader>
                                         <CardContent className="px-0 space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField label={t('Billing user')}>
+                                                <FormField label={t('Facturant')}>
                                                     <SearchSelect
-                                                        value={activeRow.billing_user_id ? String(activeRow.billing_user_id) : ''}
+                                                        value={activeRow.billing_user_id ? (billingOptions.find((opt) => Number(opt.value) === Number(activeRow.billing_user_id))?.label ?? '') : ''}
                                                         onChange={() => undefined}
                                                         onSubmit={(value) => {
                                                             const id = Number(value.trim().split(/\s+/).pop() ?? '');
@@ -377,11 +371,17 @@ export default function UserDbPage() {
                                                         loading={false}
                                                         minQueryLength={0}
                                                     />
+                                                    <Input
+                                                        disabled
+                                                        readOnly
+                                                        value={activeBillingProfileName}
+                                                        placeholder={t('Profil facturant assigné')}
+                                                    />
                                                 </FormField>
 
-                                                <FormField label={t('Seller')}>
+                                                <FormField label={t('Commercial')}>
                                                     <SearchSelect
-                                                        value={activeRow.seller_user_id ? String(activeRow.seller_user_id) : ''}
+                                                        value={activeRow.seller_user_id ? (sellerOptions.find((opt) => Number(opt.value) === Number(activeRow.seller_user_id))?.label ?? '') : ''}
                                                         onChange={() => undefined}
                                                         onSubmit={(value) => {
                                                             const id = Number(value.trim().split(/\s+/).pop() ?? '');
@@ -400,30 +400,33 @@ export default function UserDbPage() {
                                                         loading={false}
                                                         minQueryLength={0}
                                                     />
+                                                    <Select
+                                                        value={selectedProfileKey}
+                                                        onValueChange={(val) => {
+                                                            setSelectedProfileKey(val);
+                                                            if (val === '__custom__') {
+                                                                updateRow(activeIndex, { conditions_override: {} });
+                                                            } else {
+                                                                const profile = sellerProfiles.find((item) => item.key === val);
+                                                                if (profile) {
+                                                                    updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                }
+                                                            }
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder={t('Select a seller profile')} />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
+                                                            {sellerProfiles.map((profile) => (
+                                                                <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
                                                 </FormField>
 
-                                                <FormField label={t('Apply profile (Billing/Seller)')}>
-                                                    <div className="flex items-center gap-2">
-                                                        <Select value={selectedProfileKey} onValueChange={setSelectedProfileKey}>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder={t('Select a profile')} />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableProfiles.map((profile) => (
-                                                                    <SelectItem key={profile.key} value={profile.key}>
-                                                                        {profile.label}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button type="button" variant="outline" onClick={applySelectedProfile} disabled={!selectedProfileKey}>
-                                                            {t('Apply')}
-                                                        </Button>
-                                                    </div>
-                                                </FormField>
                                             </div>
-
-                                            <Separator />
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField label={t('Price mode')}>
@@ -445,12 +448,14 @@ export default function UserDbPage() {
 
                                             </div>
 
-                                            <SalesConditionsForm
-                                                value={activeRow.conditions_override ?? {}}
-                                                onChange={(next) => updateRow(activeIndex, { conditions_override: normalizeConditions(next) })}
-                                                carriers={carriersList}
-                                                mode="client"
-                                            />
+                                            {selectedProfileKey === '__custom__' ? (
+                                                <SalesConditionsForm
+                                                    value={activeRow.conditions_override ?? {}}
+                                                    onChange={(next) => updateRow(activeIndex, { conditions_override: normalizeConditions(next) })}
+                                                    carriers={carriersList}
+                                                    mode="client"
+                                                />
+                                            ) : null}
 
                                             <Separator />
 

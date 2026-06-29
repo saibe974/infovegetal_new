@@ -27,6 +27,7 @@ interface SearchBarProps {
 export type Option = {
     value: string;
     label: string;
+    description?: string;
 };
 
 export default function SearchSelect({
@@ -276,6 +277,7 @@ export default function SearchSelect({
                 {selected.map((opt) => (
                     <span
                         key={opt.value}
+                        title={opt.description ?? undefined}
                         className="flex items-center gap-1 bg-muted text-sm px-2 py-0.5 rounded-xl"
                     >
                         {opt.label}
@@ -294,7 +296,7 @@ export default function SearchSelect({
 
                 <input
                     ref={inputRef}
-                    value={value}
+                    // value={value}
                     onChange={(e) => {
                         const v = e.target.value;
                         onChange(v);
@@ -386,7 +388,10 @@ export default function SearchSelect({
                                                     : "hover:bg-accent/60 hover:text-accent-foreground"
                                             )}
                                         >
-                                            {option.label}
+                                            <span>{option.label}</span>
+                                            {option.description ? (
+                                                <span className="block text-xs text-muted-foreground">{option.description}</span>
+                                            ) : null}
                                         </button>
                                     ))
                                 ) : (
