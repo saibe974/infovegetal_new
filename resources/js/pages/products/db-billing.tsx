@@ -73,7 +73,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     const { t } = useI18n();
     const auth = usePage<any>().props.auth;
     const isGlobalManager = billingAbilities?.is_global_manager ?? false;
-    const isBillingUser = eligibleBillingUsers.some((u) => Number(u.value) === currentUserId);
+    const isBillingUser = Array.isArray(dbProduct.billing_users) && dbProduct.billing_users.some((u: BillingUserRule) => Number(u.id) === Number(currentUserId));
     const isFullAccess = isGlobalManager || isBillingUser;
     const canManageBillingUsers = billingAbilities?.can_manage_billing_users ?? false;
     const canManageSellers = billingAbilities?.can_manage_sellers ?? false;

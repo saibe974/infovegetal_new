@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ButtonsActions } from '../buttons-actions';
 import { TrashIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { type BillingDefaults } from '@/types';
@@ -39,9 +40,9 @@ export default function SellerProfilesPanel({
             <CardContent className="px-0 space-y-4">
                 {canManageSellerProfiles && currentSeller ? (
                     <div className="flex justify-end">
-                        <Button type="button" size="sm" variant="outline" onClick={onAddSellerProfile}>
-                            + {t('Add')}
-                        </Button>
+                        <ButtonsActions
+                            add={onAddSellerProfile}
+                        />
                     </div>
                 ) : null}
 
