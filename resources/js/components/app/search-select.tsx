@@ -30,6 +30,21 @@ export type Option = {
     description?: string;
 };
 
+const areOptionsEqual = (a: Option[], b: Option[]): boolean => {
+    if (a.length !== b.length) {
+        return false;
+    }
+
+    return a.every((opt, index) => {
+        const other = b[index];
+        return (
+            opt.value === other?.value
+            && opt.label === other?.label
+            && (opt.description ?? '') === (other?.description ?? '')
+        );
+    });
+};
+
 export default function SearchSelect({
     value,
     onChange,
@@ -67,11 +82,16 @@ export default function SearchSelect({
     const listOptions = toOptions(propositions);
     // Track last submitted query to avoid duplicate submit loops
     const lastSubmittedRef = useRef<string | null>(null);
+    const onSubmitRef = useRef(onSubmit);
+
+    useEffect(() => {
+        onSubmitRef.current = onSubmit;
+    }, [onSubmit]);
 
     // Keep internal `selected` in sync when `selection` prop changes (e.g. parent initializes or updates selections)
     useEffect(() => {
         const opts = toOptions(selection);
-        setSelected(opts);
+        setSelected((prev) => (areOptionsEqual(prev, opts) ? prev : opts));
         // Prevent immediate onSubmit triggered by selected-change effect
         lastSubmittedRef.current = opts.map((s) => s.value).join(" ");
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,7 +196,7 @@ export default function SearchSelect({
             .filter((t) => t.length > 0);
         const uniq = Array.from(new Set(tokens));
         const opts = uniq.map((t) => ({ value: t, label: t }));
-        setSelected(opts);
+        setSelected((prev) => (areOptionsEqual(prev, opts) ? prev : opts));
         // Prevent immediate resubmit with the same value
         lastSubmittedRef.current = uniq.join(" ");
     }, [query]);
@@ -187,8 +207,8 @@ export default function SearchSelect({
         const next = selected.map((s) => s.value).join(" ");
         if (lastSubmittedRef.current === next) return;
         lastSubmittedRef.current = next;
-        onSubmit(next);
-    }, [selected, onSubmit]);
+        onSubmitRef.current(next);
+    }, [selected]);
 
     useEffect(() => {
         const handleOutsidePointerDown = (event: PointerEvent) => {

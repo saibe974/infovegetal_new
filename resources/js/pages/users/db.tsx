@@ -34,6 +34,14 @@ type SalesConditionDraft = {
     conditions_override: SalesConditions;
 };
 
+type SearchSelectOption = {
+    value: string;
+    label: string;
+    description?: string;
+};
+
+const EMPTY_SEARCH_SELECTION: SearchSelectOption[] = [];
+
 type DbPageProps = SharedData & {
     user: User;
     dbProducts: dbProduct[];
@@ -172,18 +180,42 @@ export default function UserDbPage() {
         }));
     }, [activeRow, dbById]);
 
+    const selectedBillingOption = useMemo(() => {
+        if (!activeRow?.billing_user_id) {
+            return EMPTY_SEARCH_SELECTION;
+        }
+
+        return billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id));
+    }, [activeRow?.billing_user_id, billingOptions]);
+
+    const selectedSellerOption = useMemo(() => {
+        if (!activeRow?.seller_user_id) {
+            return EMPTY_SEARCH_SELECTION;
+        }
+
+        return sellerOptions.filter((opt) => Number(opt.value) === Number(activeRow.seller_user_id));
+    }, [activeRow?.seller_user_id, sellerOptions]);
+
     useEffect(() => {
         if (!activeRow) return;
-        if (billingOptions.length === 1 && !activeRow.billing_user_id) {
-            updateRow(activeIndex, { billing_user_id: Number(billingOptions[0].value), seller_user_id: null });
-        }
+        if (billingOptions.length !== 1) return;
+
+        const nextBillingId = Number(billingOptions[0]?.value);
+        if (!Number.isInteger(nextBillingId) || nextBillingId <= 0) return;
+        if (Number(activeRow.billing_user_id) === nextBillingId) return;
+
+        updateRow(activeIndex, { billing_user_id: nextBillingId, seller_user_id: null });
     }, [billingOptions, activeRow?.billing_user_id, activeIndex]);
 
     useEffect(() => {
         if (!activeRow) return;
-        if (sellerOptions.length === 1 && !activeRow.seller_user_id) {
-            updateRow(activeIndex, { seller_user_id: Number(sellerOptions[0].value) });
-        }
+        if (sellerOptions.length !== 1) return;
+
+        const nextSellerId = Number(sellerOptions[0]?.value);
+        if (!Number.isInteger(nextSellerId) || nextSellerId <= 0) return;
+        if (Number(activeRow.seller_user_id) === nextSellerId) return;
+
+        updateRow(activeIndex, { seller_user_id: nextSellerId });
     }, [sellerOptions, activeRow?.seller_user_id, activeIndex]);
 
     const activeSellerData = useMemo(() => {
@@ -236,7 +268,20 @@ export default function UserDbPage() {
     const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
 
     const updateRow = (index: number, patch: Partial<SalesConditionDraft>) => {
-        setRows((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+        setRows((prev) => prev.map((row, rowIndex) => {
+            if (rowIndex !== index) {
+                return row;
+            }
+
+            const patchEntries = Object.entries(patch) as Array<[keyof SalesConditionDraft, SalesConditionDraft[keyof SalesConditionDraft]]>;
+            const hasChanges = patchEntries.some(([key, value]) => !Object.is(row[key], value));
+
+            if (!hasChanges) {
+                return row;
+            }
+
+            return { ...row, ...patch };
+        }));
     };
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...(activeRow?.conditions_override ?? {}) };
@@ -312,7 +357,7 @@ export default function UserDbPage() {
                                             setSearch('');
                                         }}
                                         propositions={availableDbOptions}
-                                        selection={[]}
+                                        selection={EMPTY_SEARCH_SELECTION}
                                         loading={false}
                                         minQueryLength={0}
                                     />
@@ -371,11 +416,15 @@ export default function UserDbPage() {
                                                         />
                                                     ) : (
                                                         <SearchSelect
-                                                            value={activeRow.billing_user_id ? (billingOptions.find((opt) => Number(opt.value) === Number(activeRow.billing_user_id))?.label ?? '') : ''}
+                                                            value={''}
                                                             onChange={() => undefined}
                                                             onSubmit={(value) => {
                                                                 const id = Number(value.trim().split(/\s+/).pop() ?? '');
                                                                 if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
+
+                                                                if (Number(activeRow.billing_user_id) === id) {
                                                                     return;
                                                                 }
 
@@ -385,11 +434,7 @@ export default function UserDbPage() {
                                                                 });
                                                             }}
                                                             propositions={billingOptions}
-                                                            selection={
-                                                                activeRow.billing_user_id
-                                                                    ? billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id))
-                                                                    : []
-                                                            }
+                                                            selection={selectedBillingOption}
                                                             loading={false}
                                                             minQueryLength={0}
                                                         />
@@ -403,67 +448,63 @@ export default function UserDbPage() {
                                                 </FormField>
 
                                                 {sellerOptions.length > 0 && (
-                                                <FormField label={t('Commercial')}>
-                                                    {sellerOptions.length <= 1 ? (
-                                                        <Input
-                                                            disabled
-                                                            readOnly
-                                                            value={sellerOptions[0]?.label ?? ''}
-                                                            placeholder={t('Commercial')}
-                                                        />
-                                                    ) : (
-                                                        <SearchSelect
-                                                            value={activeRow.seller_user_id ? (sellerOptions.find((opt) => Number(opt.value) === Number(activeRow.seller_user_id))?.label ?? '') : ''}
-                                                            onChange={() => undefined}
-                                                            onSubmit={(value) => {
-                                                                const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                                if (!Number.isInteger(id) || id <= 0) {
-                                                                    return;
-                                                                }
+                                                    <FormField label={t('Commercial')}>
+                                                        {sellerOptions.length <= 1 ? (
+                                                            <Input
+                                                                disabled
+                                                                readOnly
+                                                                value={sellerOptions[0]?.label ?? ''}
+                                                                placeholder={t('Commercial')}
+                                                            />
+                                                        ) : (
+                                                            <SearchSelect
+                                                                value={''}
+                                                                onChange={() => undefined}
+                                                                onSubmit={(value) => {
+                                                                    const id = Number(value.trim().split(/\s+/).pop() ?? '');
+                                                                    if (!Number.isInteger(id) || id <= 0) {
+                                                                        return;
+                                                                    }
 
-                                                                updateRow(activeIndex, { seller_user_id: id });
-                                                            }}
-                                                            propositions={sellerOptions}
-                                                            selection={
-                                                                activeRow.seller_user_id
-                                                                    ? sellerOptions.filter((opt) => Number(opt.value) === Number(activeRow.seller_user_id))
-                                                                    : []
-                                                            }
-                                                            loading={false}
-                                                            minQueryLength={0}
-                                                        />
-                                                    )}
-                                                    <Select
-                                                        value={selectedProfileKey}
-                                                        onValueChange={(val) => {
-                                                            setSelectedProfileKey(val);
-                                                            if (val === '__custom__') {
-                                                                updateRow(activeIndex, { conditions_override: {} });
-                                                            } else {
-                                                                const profile = sellerProfiles.find((item) => item.key === val);
-                                                                if (profile) {
-                                                                    updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                    updateRow(activeIndex, { seller_user_id: id });
+                                                                }}
+                                                                propositions={sellerOptions}
+                                                                selection={selectedSellerOption}
+                                                                loading={false}
+                                                                minQueryLength={0}
+                                                            />
+                                                        )}
+                                                        <Select
+                                                            value={selectedProfileKey}
+                                                            onValueChange={(val) => {
+                                                                setSelectedProfileKey(val);
+                                                                if (val === '__custom__') {
+                                                                    updateRow(activeIndex, { conditions_override: {} });
+                                                                } else {
+                                                                    const profile = sellerProfiles.find((item) => item.key === val);
+                                                                    if (profile) {
+                                                                        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                    }
                                                                 }
-                                                            }
-                                                        }}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder={t('Select a seller profile')} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
-                                                            {sellerProfiles.map((profile) => (
-                                                                <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                 </FormField>
+                                                            }}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={t('Select a seller profile')} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
+                                                                {sellerProfiles.map((profile) => (
+                                                                    <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </FormField>
                                                 )}
 
-                                             </div>
+                                            </div>
 
-                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                 <FormField label={t('Price mode')}>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField label={t('Price mode')}>
                                                     <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update('p', v)}>
                                                         <SelectTrigger>
                                                             <SelectValue />
@@ -555,17 +596,17 @@ export default function UserDbPage() {
                                                         value={merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat)}
                                                         onChange={(e) => update('tvat', e.target.value === '' ? null : toNumber(e.target.value))}
                                                     />
-                                                 </FormField>
+                                                </FormField>
 
-                                             </div>
-                                         </CardContent>
-                                     </>
-                                 )}
-                             </Card>
-                         </div>
-                     </Form>
-                 </div>
-             </SettingsLayout>
-         </AppLayout>
-     );
- }
+                                            </div>
+                                        </CardContent>
+                                    </>
+                                )}
+                            </Card>
+                        </div>
+                    </Form>
+                </div>
+            </SettingsLayout>
+        </AppLayout>
+    );
+}

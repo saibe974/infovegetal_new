@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { edit as editAdminAppearance } from '@/routes/appearance';
 import { edit as editAdminPassword } from '@/routes/admin/password';
@@ -164,55 +164,47 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 align="end"
                                 side={'bottom'}
                             >
-                                {sidebarNavItems.map((item, index) => (
-                                    <Button
-                                        key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
-                                        size="sm"
-                                        variant="ghost"
-                                        asChild
-                                        className={cn(' justify-start w-full', {
-                                            'bg-accent':
-                                                currentPath ===
-                                                (typeof item.href === 'string'
-                                                    ? item.href
-                                                    : item.href.url),
-                                        })}
-                                    >
-                                        <Link href={item.href}>
-                                            {item.icon && (
-                                                <item.icon className="h-4 w-4" />
+                                {sidebarNavItems.map((item, index) => {
+                                    const href = typeof item.href === 'string' ? item.href : item.href.url;
+                                    const isActive = currentPath === href;
+                                    return (
+                                        <Link
+                                            key={`${href}-${index}`}
+                                            href={item.href}
+                                            className={cn(
+                                                buttonVariants({ variant: "ghost", size: "sm" }),
+                                                'justify-start w-full',
+                                                isActive && 'bg-accent'
                                             )}
+                                        >
+                                            {item.icon && <item.icon className="h-4 w-4" />}
                                             {item.title}
                                         </Link>
-                                    </Button>
-                                ))}
+                                    );
+                                })}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
 
                     <nav className="hidden md:flex gap-2">
-                        {sidebarNavItems.map((item, index) => (
-                            <Button
-                                key={`${typeof item.href === 'string' ? item.href : item.href.url}-${index}`}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn(' justify-start', {
-                                    'bg-muted':
-                                        currentPath ===
-                                        (typeof item.href === 'string'
-                                            ? item.href
-                                            : item.href.url),
-                                })}
-                            >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
+                        {sidebarNavItems.map((item, index) => {
+                            const href = typeof item.href === 'string' ? item.href : item.href.url;
+                            const isActive = currentPath === href;
+                            return (
+                                <Link
+                                    key={`${href}-${index}`}
+                                    href={item.href}
+                                    className={cn(
+                                        buttonVariants({ variant: "ghost", size: "sm" }),
+                                        'justify-start',
+                                        isActive && 'bg-muted'
                                     )}
+                                >
+                                    {item.icon && <item.icon className="h-4 w-4" />}
                                     {item.title}
                                 </Link>
-                            </Button>
-                        ))}
+                            );
+                        })}
                     </nav>
                 </div>
             </StickyBar>

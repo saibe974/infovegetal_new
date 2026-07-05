@@ -83,11 +83,9 @@ export default function BillingTreePanel({
                                     <h3 className="text-lg font-semibold">{t('Profils')}</h3>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles && openSection === 'profiles' ? (
-                                            <div onClick={(e) => e.stopPropagation()}>
-                                                <ButtonsActions
-                                                    add={() => { onAddProfile(); }}
-                                                />
-                                            </div>
+                                            <ButtonsActions
+                                                add={() => { onAddProfile(); }}
+                                            />
                                         ) : null}
                                         <ChevronDown
                                             className={`size-4 transition-transform duration-200 ${openSection === 'profiles' ? 'rotate-180' : ''}`}
@@ -132,11 +130,9 @@ export default function BillingTreePanel({
                                     <h3 className="text-lg font-semibold">{t('Commerciaux')}</h3>
                                     <div className="flex items-center gap-1">
                                         {canManageSellers && openSection === 'sellers' ? (
-                                            <div onClick={(e) => e.stopPropagation()}>
-                                                <ButtonsActions
-                                                    add={() => setShowSellerSearch((prev) => !prev)}
-                                                />
-                                            </div>
+                                            <ButtonsActions
+                                                add={() => setShowSellerSearch((prev) => !prev)}
+                                            />
                                         ) : null}
                                         <ChevronDown
                                             className={`size-4 transition-transform duration-200 ${openSection === 'sellers' ? 'rotate-180' : ''}`}

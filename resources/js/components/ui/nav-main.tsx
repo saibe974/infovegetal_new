@@ -11,6 +11,17 @@ import { type NavItem, type NavItemExtended } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 
+const areNumberRecordsEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+
+    if (aKeys.length !== bKeys.length) {
+        return false;
+    }
+
+    return aKeys.every((key) => a[key] === b[key]);
+};
+
 function NavMain({ items = [] }: { items: NavItem[] }) {
     const page = usePage();
     const { state } = useSidebar();
@@ -103,7 +114,7 @@ export function NavMainExtended({
                 const el = subRefs.current[item.title];
                 if (el) newHeights[item.title] = el.scrollHeight;
             });
-            setHeights(newHeights);
+            setHeights((prev) => (areNumberRecordsEqual(prev, newHeights) ? prev : newHeights));
         };
 
         measure();
@@ -114,17 +125,26 @@ export function NavMainExtended({
 
     useEffect(() => {
         // when path changes, ensure matching item is opened
-        const newMap = { ...openMap };
-        items.forEach((item) => {
-            const itemMatch = (href: NavItem['href'] | undefined) => {
-                const candidate = getCandidateUrl(href);
-                return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
-            };
-            if (itemMatch(item.href) || (item.subItems || []).some((s) => itemMatch(s.href))) {
-                newMap[item.title] = true;
-            }
+        setOpenMap((prev) => {
+            const next = { ...prev };
+            let changed = false;
+
+            items.forEach((item) => {
+                const itemMatch = (href: NavItem['href'] | undefined) => {
+                    const candidate = getCandidateUrl(href);
+                    return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
+                };
+
+                if (itemMatch(item.href) || (item.subItems || []).some((s) => itemMatch(s.href))) {
+                    if (!next[item.title]) {
+                        next[item.title] = true;
+                        changed = true;
+                    }
+                }
+            });
+
+            return changed ? next : prev;
         });
-        setOpenMap(newMap);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPath]);
 

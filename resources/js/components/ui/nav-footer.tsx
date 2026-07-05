@@ -13,6 +13,17 @@ import { NavItemExtended, type NavItem } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
+const areNumberRecordsEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+
+    if (aKeys.length !== bKeys.length) {
+        return false;
+    }
+
+    return aKeys.every((key) => a[key] === b[key]);
+};
+
 export function NavFooter({
     items,
     className,
@@ -116,7 +127,7 @@ export function NavFooterExtended({
                 const el = subRefs.current[item.title];
                 if (el) newHeights[item.title] = el.scrollHeight;
             });
-            setHeights(newHeights);
+            setHeights((prev) => (areNumberRecordsEqual(prev, newHeights) ? prev : newHeights));
         };
         measure();
         window.addEventListener('resize', measure);
@@ -125,17 +136,26 @@ export function NavFooterExtended({
 
     useEffect(() => {
         // update open state when path changes
-        const newMap = { ...openMap };
-        (items as NavItemExtended[]).forEach((item) => {
-            const itemMatch = (href: NavItem['href'] | undefined) => {
-                const candidate = getCandidateUrl(href);
-                return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
-            };
-            if (itemMatch((item as NavItemExtended).href) || ((item as NavItemExtended).subItems || []).some((s) => itemMatch(s.href))) {
-                newMap[item.title] = true;
-            }
+        setOpenMap((prev) => {
+            const next = { ...prev };
+            let changed = false;
+
+            (items as NavItemExtended[]).forEach((item) => {
+                const itemMatch = (href: NavItem['href'] | undefined) => {
+                    const candidate = getCandidateUrl(href);
+                    return typeof currentPath === 'string' && candidate && currentPath.startsWith(candidate);
+                };
+
+                if (itemMatch((item as NavItemExtended).href) || ((item as NavItemExtended).subItems || []).some((s) => itemMatch(s.href))) {
+                    if (!next[item.title]) {
+                        next[item.title] = true;
+                        changed = true;
+                    }
+                }
+            });
+
+            return changed ? next : prev;
         });
-        setOpenMap(newMap);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPath]);
 

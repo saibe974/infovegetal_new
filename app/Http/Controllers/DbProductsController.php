@@ -824,15 +824,37 @@ class DbProductsController extends Controller
 
         return collect($billingUsers)
             ->filter(fn ($rule) => is_array($rule) && isset($allowedSet[(int) ($rule['billing_user_id'] ?? 0)]))
-            ->map(function ($rule) use ($permissions, $actor) {
+            ->map(function ($rule) use ($dbProduct, $permissions, $actor) {
+                $billingUserId = (int) $rule['billing_user_id'];
+
+                $existingSellers = DbProductSellerUser::query()
+                    ->where('db_product_id', (int) $dbProduct->id)
+                    ->where('billing_user_id', $billingUserId)
+                    ->where('active', true)
+                    ->get()
+                    ->keyBy('seller_user_id');
+
                 $filteredSellers = collect($rule['sellers'] ?? [])
                     ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
-                    ->map(function ($seller) use ($permissions, $actor) {
+                    ->map(function ($seller) use ($permissions, $actor, $existingSellers) {
                         $sellerId = (int) $seller['seller_user_id'];
 
                         // Un commercial non manager ne peut modifier que ses propres conditions.
+                        // Les autres commerciaux existants sont conservés sans modification.
                         if (!$permissions['can_manage_sellers'] && $sellerId !== (int) $actor->id) {
-                            return null;
+                            $existing = $existingSellers->get($sellerId);
+                            if (!$existing) {
+                                return null;
+                            }
+
+                            return [
+                                'seller_user_id' => $sellerId,
+                                'conditions' => $existing->conditions ?? [],
+                                'use_billing_profile' => $existing->use_billing_profile ?? true,
+                                'billing_profile_id' => $existing->billing_profile_id ?? null,
+                                'seller_defaults' => $existing->seller_defaults,
+                                'can_manage' => $existing->can_manage ?? false,
+                            ];
                         }
 
                         return [
@@ -852,8 +874,24 @@ class DbProductsController extends Controller
                     ->values()
                     ->all();
 
+                // Inclure les vendeurs existants qui n'ont pas été envoyés par le client
+                // pour éviter la désactivation des vendeurs que l'utilisateur ne peut pas gérer.
+                $incomingIds = collect($filteredSellers)->pluck('seller_user_id')->map(fn ($id) => (int) $id)->all();
+                foreach ($existingSellers as $sellerId => $existing) {
+                    if (!in_array($sellerId, $incomingIds, true)) {
+                        $filteredSellers[] = [
+                            'seller_user_id' => $sellerId,
+                            'conditions' => $existing->conditions ?? [],
+                            'use_billing_profile' => $existing->use_billing_profile ?? true,
+                            'billing_profile_id' => $existing->billing_profile_id ?? null,
+                            'seller_defaults' => $existing->seller_defaults,
+                            'can_manage' => $existing->can_manage ?? false,
+                        ];
+                    }
+                }
+
                 return [
-                    'billing_user_id' => (int) $rule['billing_user_id'],
+                    'billing_user_id' => $billingUserId,
                     'defaults' => is_array($rule['defaults'] ?? null) ? $rule['defaults'] : [],
                     'sellers' => $filteredSellers,
                 ];

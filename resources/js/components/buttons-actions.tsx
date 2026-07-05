@@ -49,7 +49,7 @@ export function ButtonsActions({
             }
 
             {onExport &&
-                <Button type="button" onClick={typeof onExport === 'function' ? onExport : undefined} variant={'outline'} title={t('Export CSV')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); typeof onExport === 'function' ? onExport() : undefined; }} variant={'outline'} title={t('Export CSV')} disabled={saving} size={'icon'}>
                     <a href={typeof onExport === 'string' ? onExport : undefined}>
                         <UploadIcon />
                     </a>
@@ -57,25 +57,25 @@ export function ButtonsActions({
             }
 
             {onPreview &&
-                <Button type="button" onClick={onPreview} variant={'outline'} title={t('Preview')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onPreview(); }} variant={'outline'} title={t('Preview')} disabled={saving} size={'icon'}>
                     <EyeIcon />
                 </Button>
             }
 
             {onRefresh &&
-                <Button type="button" onClick={onRefresh} variant={'outline'} title={t('Refresh')} disabled={saving || refreshing} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onRefresh(); }} variant={'outline'} title={t('Refresh')} disabled={saving || refreshing} size={'icon'}>
                     {refreshing ? <Loader2Icon className="animate-spin" /> : <RefreshCw />}
                 </Button>
             }
 
             {onEdit &&
-                <Button type="button" onClick={onEdit} variant={'outline'} title={t('Edit')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onEdit(); }} variant={'outline'} title={t('Edit')} disabled={saving} size={'icon'}>
                     <PencilIcon />
                 </Button>
             }
 
             {onSave &&
-                <Button type="button" onClick={onSave} title={t('Save')} disabled={saving} size={'icon'} className="bg-green-700 hover:bg-green-800 text-white">
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onSave(); }} title={t('Save')} disabled={saving} size={'icon'} className="bg-green-700 hover:bg-green-800 text-white">
                     {saving ?
                         <>
                             <Loader2Icon className="animate-spin" />
@@ -91,19 +91,19 @@ export function ButtonsActions({
             }
 
             {onAdd &&
-                <Button type="button" onClick={onAdd} title={t('Add')} disabled={saving} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onAdd(); }} title={t('Add')} disabled={saving} size={'icon'} variant={'outline'} className="text-green-500 hover:text-green-500 hover:bg-green-500/30 border-green-500">
                     <CirclePlus />
                 </Button>
             }
 
             {onDelete &&
-                <Button type="button" onClick={onDelete} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onDelete(); }} variant={'destructive-outline'} title={t('Delete')} disabled={saving} size={'icon'}>
                     <TrashIcon />
                 </Button>
             }
 
             {onImpersonate &&
-                <Button type="button" onClick={onImpersonate} variant={'outline'} title={t('Impersonate')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); onImpersonate(); }} variant={'outline'} title={t('Impersonate')} disabled={saving} size={'icon'}>
                     <UserRound />
                 </Button>
             }
