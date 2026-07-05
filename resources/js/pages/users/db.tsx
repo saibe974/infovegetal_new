@@ -1,5 +1,5 @@
 import { Head, router, usePage, Form } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { Button } from '@/components/ui/button';
@@ -171,6 +171,20 @@ export default function UserDbPage() {
             description: seller.email,
         }));
     }, [activeRow, dbById]);
+
+    useEffect(() => {
+        if (!activeRow) return;
+        if (billingOptions.length === 1 && !activeRow.billing_user_id) {
+            updateRow(activeIndex, { billing_user_id: Number(billingOptions[0].value), seller_user_id: null });
+        }
+    }, [billingOptions, activeRow?.billing_user_id, activeIndex]);
+
+    useEffect(() => {
+        if (!activeRow) return;
+        if (sellerOptions.length === 1 && !activeRow.seller_user_id) {
+            updateRow(activeIndex, { seller_user_id: Number(sellerOptions[0].value) });
+        }
+    }, [sellerOptions, activeRow?.seller_user_id, activeIndex]);
 
     const activeSellerData = useMemo(() => {
         if (!activeRow || !activeRow.billing_user_id || !activeRow.seller_user_id) {
@@ -348,29 +362,38 @@ export default function UserDbPage() {
                                         <CardContent className="px-0 space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField label={t('Facturant')}>
-                                                    <SearchSelect
-                                                        value={activeRow.billing_user_id ? (billingOptions.find((opt) => Number(opt.value) === Number(activeRow.billing_user_id))?.label ?? '') : ''}
-                                                        onChange={() => undefined}
-                                                        onSubmit={(value) => {
-                                                            const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                            if (!Number.isInteger(id) || id <= 0) {
-                                                                return;
-                                                            }
+                                                    {billingOptions.length <= 1 ? (
+                                                        <Input
+                                                            disabled
+                                                            readOnly
+                                                            value={billingOptions[0]?.label ?? ''}
+                                                            placeholder={t('Facturant')}
+                                                        />
+                                                    ) : (
+                                                        <SearchSelect
+                                                            value={activeRow.billing_user_id ? (billingOptions.find((opt) => Number(opt.value) === Number(activeRow.billing_user_id))?.label ?? '') : ''}
+                                                            onChange={() => undefined}
+                                                            onSubmit={(value) => {
+                                                                const id = Number(value.trim().split(/\s+/).pop() ?? '');
+                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
 
-                                                            updateRow(activeIndex, {
-                                                                billing_user_id: id,
-                                                                seller_user_id: null,
-                                                            });
-                                                        }}
-                                                        propositions={billingOptions}
-                                                        selection={
-                                                            activeRow.billing_user_id
-                                                                ? billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id))
-                                                                : []
-                                                        }
-                                                        loading={false}
-                                                        minQueryLength={0}
-                                                    />
+                                                                updateRow(activeIndex, {
+                                                                    billing_user_id: id,
+                                                                    seller_user_id: null,
+                                                                });
+                                                            }}
+                                                            propositions={billingOptions}
+                                                            selection={
+                                                                activeRow.billing_user_id
+                                                                    ? billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id))
+                                                                    : []
+                                                            }
+                                                            loading={false}
+                                                            minQueryLength={0}
+                                                        />
+                                                    )}
                                                     <Input
                                                         disabled
                                                         readOnly
@@ -379,27 +402,37 @@ export default function UserDbPage() {
                                                     />
                                                 </FormField>
 
+                                                {sellerOptions.length > 0 && (
                                                 <FormField label={t('Commercial')}>
-                                                    <SearchSelect
-                                                        value={activeRow.seller_user_id ? (sellerOptions.find((opt) => Number(opt.value) === Number(activeRow.seller_user_id))?.label ?? '') : ''}
-                                                        onChange={() => undefined}
-                                                        onSubmit={(value) => {
-                                                            const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                            if (!Number.isInteger(id) || id <= 0) {
-                                                                return;
-                                                            }
+                                                    {sellerOptions.length <= 1 ? (
+                                                        <Input
+                                                            disabled
+                                                            readOnly
+                                                            value={sellerOptions[0]?.label ?? ''}
+                                                            placeholder={t('Commercial')}
+                                                        />
+                                                    ) : (
+                                                        <SearchSelect
+                                                            value={activeRow.seller_user_id ? (sellerOptions.find((opt) => Number(opt.value) === Number(activeRow.seller_user_id))?.label ?? '') : ''}
+                                                            onChange={() => undefined}
+                                                            onSubmit={(value) => {
+                                                                const id = Number(value.trim().split(/\s+/).pop() ?? '');
+                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
 
-                                                            updateRow(activeIndex, { seller_user_id: id });
-                                                        }}
-                                                        propositions={sellerOptions}
-                                                        selection={
-                                                            activeRow.seller_user_id
-                                                                ? sellerOptions.filter((opt) => Number(opt.value) === Number(activeRow.seller_user_id))
-                                                                : []
-                                                        }
-                                                        loading={false}
-                                                        minQueryLength={0}
-                                                    />
+                                                                updateRow(activeIndex, { seller_user_id: id });
+                                                            }}
+                                                            propositions={sellerOptions}
+                                                            selection={
+                                                                activeRow.seller_user_id
+                                                                    ? sellerOptions.filter((opt) => Number(opt.value) === Number(activeRow.seller_user_id))
+                                                                    : []
+                                                            }
+                                                            loading={false}
+                                                            minQueryLength={0}
+                                                        />
+                                                    )}
                                                     <Select
                                                         value={selectedProfileKey}
                                                         onValueChange={(val) => {
@@ -424,12 +457,13 @@ export default function UserDbPage() {
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
-                                                </FormField>
+                                                 </FormField>
+                                                )}
 
-                                            </div>
+                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField label={t('Price mode')}>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                 <FormField label={t('Price mode')}>
                                                     <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update('p', v)}>
                                                         <SelectTrigger>
                                                             <SelectValue />
@@ -521,17 +555,17 @@ export default function UserDbPage() {
                                                         value={merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat)}
                                                         onChange={(e) => update('tvat', e.target.value === '' ? null : toNumber(e.target.value))}
                                                     />
-                                                </FormField>
-                                            </div>
+                                                 </FormField>
 
-                                        </CardContent>
-                                    </>
-                                )}
-                            </Card>
-                        </div>
-                    </Form>
-                </div>
-            </SettingsLayout>
-        </AppLayout>
-    );
-}
+                                             </div>
+                                         </CardContent>
+                                     </>
+                                 )}
+                             </Card>
+                         </div>
+                     </Form>
+                 </div>
+             </SettingsLayout>
+         </AppLayout>
+     );
+ }

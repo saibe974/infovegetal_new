@@ -4,6 +4,7 @@ import {
 } from '@/types';
 
 export type UserOption = {
+    value: any;
     id: number;
     name: string;
     email: string;

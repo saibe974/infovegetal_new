@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
+import { ButtonsActions } from '../buttons-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { type ActivePanelItem, type BillingDraft, type SellerDraft } from '@/components/sales/types';
@@ -179,9 +180,9 @@ export default function BillingConditionsEditor({
                             <div className="flex items-center justify-between gap-2">
                                 <h3 className="text-sm font-semibold">{t('B. Profils commercial')}</h3>
                                 {canManageSellerProfiles ? (
-                                    <Button type="button" size="sm" variant="outline" onClick={onAddSellerProfile}>
-                                        + {t('Add')}
-                                    </Button>
+                                    <ButtonsActions
+                                        add={onAddSellerProfile}
+                                    />
                                 ) : null}
                             </div>
 

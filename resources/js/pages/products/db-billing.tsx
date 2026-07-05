@@ -1,5 +1,14 @@
 import { withAppLayout } from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { leave as impersonateLeave, take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
+import {
+    Breadcrumb,
+    BreadcrumbList,
+    BreadcrumbItem as BreadcrumbItemUI,
+    BreadcrumbLink,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import {
     type BreadcrumbItem,
     type dbProduct,
@@ -62,7 +71,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBillingUsers, eligibleSellerUsers, billingAbilities, currentUserId, carriers }) => {
     const { t } = useI18n();
+    const auth = usePage<any>().props.auth;
     const isGlobalManager = billingAbilities?.is_global_manager ?? false;
+    const isBillingUser = eligibleBillingUsers.some((u) => Number(u.value) === currentUserId);
+    const isFullAccess = isGlobalManager || isBillingUser;
     const canManageBillingUsers = billingAbilities?.can_manage_billing_users ?? false;
     const canManageSellers = billingAbilities?.can_manage_sellers ?? false;
     const canDelegateManage = billingAbilities?.can_delegate_manage ?? false;
@@ -72,7 +84,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
 
     const STORAGE_KEY = `db-billing-view-${dbProduct.id}`;
 
-    const loadViewPrefs = (): { billingUserId: number | null; panelItem: ActivePanelItem } => {
+    const loadViewPrefs = (): { billingUserId: number | null; panelItem: ActivePanelItem; openSection: 'profiles' | 'sellers' | null; sellerProfileId: string | null } => {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) {
@@ -80,10 +92,12 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                 return {
                     billingUserId: parsed.billingUserId ?? null,
                     panelItem: parsed.panelItem ?? null,
+                    openSection: parsed.openSection ?? 'profiles',
+                    sellerProfileId: parsed.sellerProfileId ?? null,
                 };
             }
         } catch { }
-        return { billingUserId: null, panelItem: null };
+        return { billingUserId: null, panelItem: null, openSection: 'profiles', sellerProfileId: null };
     };
 
     const initialBillingUsers: BillingDraft[] = useMemo(() => {
@@ -101,7 +115,8 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     });
 
     const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(() => viewPrefs.panelItem);
-    const [activeSellerProfileId, setActiveSellerProfileId] = useState<string | null>(null);
+    const [openSection, setOpenSection] = useState<'profiles' | 'sellers' | null>(() => viewPrefs.openSection);
+    const [activeSellerProfileId, setActiveSellerProfileId] = useState<string | null>(() => viewPrefs.sellerProfileId);
 
     const { data, setData, put, processing, errors, transform } = useForm({
         billing_users: initialBillingUsers,
@@ -110,12 +125,20 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     const errorBag = errors as Record<string, string>;
 
     const billingUserOptions = useMemo(
-        () => (eligibleBillingUsers ?? []).map((user) => ({ value: String(user.id), label: `${user.name} (${user.email})` })),
+        () => (eligibleBillingUsers ?? []).map((user) => ({
+            value: String(user.id),
+            label: user.name,
+            description: user.email
+        })),
         [eligibleBillingUsers],
     );
 
     const sellerUserOptions = useMemo(
-        () => (eligibleSellerUsers ?? []).map((user) => ({ value: String(user.id), label: `${user.name} (${user.email})` })),
+        () => (eligibleSellerUsers ?? []).map((user) => ({
+            value: String(user.id),
+            label: user.name,
+            description: user.email
+        })),
         [eligibleSellerUsers],
     );
 
@@ -123,7 +146,11 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
         return new Map(
             [...(eligibleBillingUsers ?? []), ...(eligibleSellerUsers ?? [])].map((user) => [
                 user.id,
-                { value: String(user.id), label: `${user.name} (${user.email})` },
+                {
+                    value: String(user.id),
+                    label: user.name,
+                    description: user.email
+                },
             ]),
         );
     }, [eligibleBillingUsers, eligibleSellerUsers]);
@@ -238,7 +265,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
     }, [activeBillingRule, canManageSellers, currentUserId]);
 
     useEffect(() => {
-        if (isGlobalManager || !activeBillingRule) {
+        if (isFullAccess || !activeBillingRule) {
             return;
         }
 
@@ -255,13 +282,13 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
         if (activePanelItem?.type !== 'seller' || Number(activePanelItem.id) !== Number(fallbackSeller.seller_user_id)) {
             setActivePanelItem({ type: 'seller', id: Number(fallbackSeller.seller_user_id) });
         }
-    }, [isGlobalManager, activeBillingRule, currentUserId, activePanelItem]);
+    }, [isFullAccess, activeBillingRule, currentUserId, activePanelItem]);
 
     useEffect(() => {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ billingUserId: activeBillingUserId, panelItem: activePanelItem }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ billingUserId: activeBillingUserId, panelItem: activePanelItem, openSection, sellerProfileId: activeSellerProfileId }));
         } catch { }
-    }, [activeBillingUserId, activePanelItem]);
+    }, [activeBillingUserId, activePanelItem, openSection, activeSellerProfileId]);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -361,6 +388,32 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
 
         if (activePanelItem?.type === 'profile' && String(activePanelItem.id) === profileId) {
             setActivePanelItem(null);
+        }
+    };
+
+    const handleImpersonateSeller = async (sellerId: number) => {
+        const isImpersonating = !!auth?.impersonate_from;
+
+        try {
+            if (isImpersonating) {
+                const leaveRes = await fetch(impersonateLeave().url, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!leaveRes.ok) throw new Error('Unable to leave impersonation');
+            }
+
+            const takeRes = await fetch(impersonateTake({ id: sellerId }).url, {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!takeRes.ok) throw new Error('Impersonation failed');
+
+            window.location.reload();
+        } catch {
+            // silently fail; impersonation errors handled server-side
         }
     };
 
@@ -645,7 +698,42 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                 <ArrowLeftCircle size={35} />
                             </Link>
                             <div className="flex flex-col">
-                                <h1 className="text-3xl font-bold capitalize">{dbProduct.name || t('Database')}</h1>
+                                <Breadcrumb>
+                                    <BreadcrumbList>
+                                        <BreadcrumbItemUI>
+                                            <BreadcrumbPage className="text-3xl font-bold capitalize">{dbProduct.name || t('Database')}</BreadcrumbPage>
+                                        </BreadcrumbItemUI>
+                                        {activeBillingRule && (
+                                            <>
+                                                <BreadcrumbSeparator />
+                                                <BreadcrumbItemUI>
+                                                    <BreadcrumbPage className="text-3xl font-bold">{billingLabel}</BreadcrumbPage>
+                                                </BreadcrumbItemUI>
+                                            </>
+                                        )}
+                                        {activePanelItem && (
+                                            <>
+                                                <BreadcrumbSeparator />
+                                                <BreadcrumbItemUI>
+                                                    <BreadcrumbPage className="text-3xl font-bold">
+                                                        {activePanelItem.type === 'profile'
+                                                            ? (currentProfile?.name ?? t('Profile'))
+                                                            : (userOptionById.get(Number(activePanelItem.id))?.label ?? t('Commercial'))
+                                                        }
+                                                    </BreadcrumbPage>
+                                                </BreadcrumbItemUI>
+                                            </>
+                                        )}
+                                        {activeSellerProfileId && currentSellerProfile && (
+                                            <>
+                                                <BreadcrumbSeparator />
+                                                <BreadcrumbItemUI>
+                                                    <BreadcrumbPage className="text-3xl font-bold">{currentSellerProfile.name}</BreadcrumbPage>
+                                                </BreadcrumbItemUI>
+                                            </>
+                                        )}
+                                    </BreadcrumbList>
+                                </Breadcrumb>
                             </div>
                         </div>
 
@@ -658,7 +746,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                     </StickyBar>
 
                     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                        {isGlobalManager && (
+                        {isFullAccess && (
                             <BillingUserSelector
                                 className="xl:col-span-3"
                                 billingUsers={data.billing_users ?? []}
@@ -674,11 +762,12 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                 }}
                                 onAddBillingUser={addBillingUser}
                                 onDeleteBillingUser={deleteBillingUser}
+                                onImpersonateBillingUser={handleImpersonateSeller}
                                 errors={errorBag}
                             />
                         )}
 
-                        {isGlobalManager ? (
+                        {isFullAccess ? (
                             <BillingTreePanel
                                 className="xl:col-span-4"
                                 activeBillingRule={activeBillingRule}
@@ -691,10 +780,13 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                 setSellerSearch={setSellerSearch}
                                 availableSellerOptions={availableSellerOptions}
                                 userOptionById={userOptionById}
+                                openSection={openSection}
+                                onOpenSectionChange={setOpenSection}
                                 onAddProfile={addBillingProfile}
                                 onDeleteProfile={deleteBillingProfile}
                                 onAddSeller={addSellerToBilling}
                                 onDeleteSeller={deleteSellerFromBilling}
+                                onImpersonateSeller={handleImpersonateSeller}
                             />
                         ) : (
                             <SellerProfilesPanel
@@ -710,7 +802,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                             />
                         )}
 
-                        {isGlobalManager ? (
+                        {isFullAccess ? (
                             <BillingConditionsEditor
                                 className="xl:col-span-5"
                                 activeBillingRule={activeBillingRule}
