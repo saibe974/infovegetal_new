@@ -3,6 +3,7 @@ import { Loader2, X, SearchIcon, SlidersHorizontalIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import * as Flags from "country-flag-icons/react/3x2";
+import CountryFlag from "../ui/country-flag";
 
 interface SearchBarProps {
     value: string;
@@ -28,6 +29,8 @@ export type Option = {
     value: string;
     label: string;
     description?: string;
+    country?: string;
+    icone?: string;
 };
 
 const areOptionsEqual = (a: Option[], b: Option[]): boolean => {
@@ -408,7 +411,7 @@ export default function SearchSelect({
                                                     : "hover:bg-accent/60 hover:text-accent-foreground"
                                             )}
                                         >
-                                            <span>{option.label}</span>
+                                            <span>{option.country ? (<CountryFlag countryCode={option.country} className="w-4 inline mr-2" />) : null}{option.label}</span>
                                             {option.description ? (
                                                 <span className="block text-xs text-muted-foreground">{option.description}</span>
                                             ) : null}

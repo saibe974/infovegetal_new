@@ -1077,7 +1077,7 @@ class UserManagementController extends Controller
                         ->where('active', true)
                                 ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
             ])
-            ->get(['id', 'name', 'description']);
+            ->get(['id', 'name', 'description', 'country']);
 
         $eligibleUsersQuery = User::query()
             ->whereHas('roles', fn ($q) => $q->whereIn('name', ['commercial', 'admin', 'dev']))

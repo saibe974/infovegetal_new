@@ -40,13 +40,13 @@ export interface ProductCategory {
 export interface dbProduct {
     id: number | null;
     name: string;
+    country?: string;
     description: string | null;
     champs: Record<string, unknown> | null;
     categories: Record<string, unknown> | null;
     traitement: string | null;
     header_row_index?: number | null;
     source_delimiter?: string | null;
-    country?: string | null;
     mod_liv?: string | null;
     mini?: number | null;
     billable_user_ids?: number[];

@@ -14,6 +14,7 @@ import { useI18n } from '@/lib/i18n';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { DialogUpload } from '@/components/dialog-upload';
 import ProductsImportTreatment from '@/components/products/import';
+import { CountryFlag } from '@/components/ui/country-flag';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -28,6 +29,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type DbProduct = {
     id: number;
+    country?: string;
     name: string;
     description: string | null;
     champs: Record<string, unknown> | null;
@@ -121,6 +123,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                     <TableHeader>
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
+                            <SortableTableHead field="country">{t('Country')}</SortableTableHead>
                             <SortableTableHead field="name">{t('Name')}</SortableTableHead>
                             <TableHead>{t('Description')}</TableHead>
                             <TableHead>{t('Treatment')}</TableHead>
@@ -132,6 +135,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                         {collection.data.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
+                                <TableCell>{item.country ? (<CountryFlag countryCode={item.country} title={item.country} className="w-4" />) : ('')}</TableCell>
                                 <TableCell>
                                     {item.abilities?.update ? (
                                         <Link href={dbProducts.edit(item.id).url} className="hover:underline font-medium">

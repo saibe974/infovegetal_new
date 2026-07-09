@@ -34,6 +34,7 @@ import {
     type BillingDraft,
     type UserOption,
 } from '@/components/sales/types';
+import CountryFlag from '@/components/ui/country-flag';
 
 type Props = {
     dbProduct: dbProduct;
@@ -70,6 +71,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBillingUsers, eligibleSellerUsers, billingAbilities, currentUserId, carriers }) => {
+    // console.log(dbProduct);
     const { t } = useI18n();
     const auth = usePage<any>().props.auth;
     const isGlobalManager = billingAbilities?.is_global_manager ?? false;
@@ -700,6 +702,9 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                             <div className="flex flex-col">
                                 <Breadcrumb>
                                     <BreadcrumbList>
+                                        <BreadcrumbItemUI>
+                                            <CountryFlag countryCode={dbProduct.country} title={dbProduct.country} className="w-4" />
+                                        </BreadcrumbItemUI>
                                         <BreadcrumbItemUI>
                                             <BreadcrumbPage className="text-3xl font-bold capitalize">{dbProduct.name || t('Database')}</BreadcrumbPage>
                                         </BreadcrumbItemUI>

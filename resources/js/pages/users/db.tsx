@@ -15,6 +15,7 @@ import { TrashIcon, ServerIcon } from 'lucide-react';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { Separator } from '@/components/ui/separator';
 import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
+import CountryFlag from '@/components/ui/country-flag';
 
 type CarrierOption = {
     id: number;
@@ -139,7 +140,7 @@ export default function UserDbPage() {
     const [selectedProfileKey, setSelectedProfileKey] = useState<string>('');
 
     const dbOptions = useMemo(
-        () => dbProductsList.map((db) => ({ value: String(db.id), label: String(db.name) })),
+        () => dbProductsList.map((db) => ({ value: String(db.id), label: (db.name), country: (db.country) })),
         [dbProductsList],
     );
 
@@ -372,6 +373,7 @@ export default function UserDbPage() {
 
                                         return (
                                             <div key={`${row.db_product_id}-${index}`} className="flex items-center justify-between gap-2">
+                                                <CountryFlag countryCode={db.country} title={db.country} className="w-4" />
                                                 <button
                                                     type="button"
                                                     className={`text-left rounded-md px-3 py-2 w-full border ${activeIndex === index ? 'bg-muted border-primary' : 'border-border'}`}
