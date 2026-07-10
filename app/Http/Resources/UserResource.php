@@ -31,6 +31,14 @@ class UserResource extends JsonResource
             'parent_id' => $this->parent_id,
             '_lft' => $this->_lft,
             '_rgt' => $this->_rgt,
+            'logo_url' => $this->whenLoaded('usersMeta', function () {
+                $logo = $this->usersMeta->firstWhere('key', 'logo');
+                if (!$logo || !$logo->value) {
+                    return null;
+                }
+                $decoded = json_decode($logo->value, true);
+                return $decoded['url'] ?? null;
+            }),
             'roles' => $this->roles->map(fn($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -39,6 +47,7 @@ class UserResource extends JsonResource
                 'id' => $permission->id,
                 'name' => $permission->name,
             ]),
+            'created_at' => $this->created_at?->toIso8601String(),
             'abilities' => $actor ? [
                 'view' => $actor->can('view', $this->resource),
                 'update' => $actor->can('update', $this->resource),

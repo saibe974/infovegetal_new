@@ -47,7 +47,7 @@ class UserManagementController extends Controller
     {
         $this->authorize('viewAny', User::class);
 
-        $query = User::with(['roles', 'permissions']);
+        $query = User::with(['roles', 'permissions', 'usersMeta' => fn ($q) => $q->where('key', 'logo')]);
         $this->authorization()->scopeManageableUsers($request->user(), $query);
         
         $search = $request->get('q');
@@ -71,7 +71,19 @@ class UserManagementController extends Controller
             });
         }
 
-        $users = $query->orderBy('_lft', 'asc')->paginate(24);
+        $sort = $request->get('sort');
+        $dir = in_array($request->get('dir'), ['asc', 'desc'], true) ? $request->get('dir') : 'desc';
+
+        if ($sort && in_array($sort, ['name', 'email', 'created_at'], true)) {
+            $query->orderBy($sort, $dir);
+        } elseif ($sort === 'roles') {
+            $query->orderByRaw(
+                "(SELECT COUNT(DISTINCT rp.permission_id) FROM model_has_roles mhr JOIN role_has_permissions rp ON rp.role_id = mhr.role_id WHERE mhr.model_type = 'App\\\\Models\\\\User' AND mhr.model_id = users.id) {$dir}"
+            );
+        }
+        $query->orderBy('_lft', 'asc');
+
+        $users = $query->paginate(24);
         $roles = $this->assignableRolesQuery($request)->get(['id', 'name']);
 
         return Inertia::render('users/index', [
@@ -120,6 +132,7 @@ class UserManagementController extends Controller
                 '_lft',
                 '_rgt',
             ])
+            ->with(['roles:id,name', 'usersMeta' => fn ($q) => $q->where('key', 'logo')->select(['id', 'user_id', 'key', 'value'])])
             ->where('parent_id', $parentId)
             ->orderBy('_lft', 'asc');
 
@@ -160,7 +173,14 @@ class UserManagementController extends Controller
 
         $hasChildrenLookup = array_fill_keys($parentsWithChildren, true);
 
-        $items = $users->map(function (User $user) use ($parentId, $treeRootParentId) {
+        $items = $users->map(function (User $user) use ($parentId, $treeRootParentId, $request) {
+            $logoMeta = $user->usersMeta->firstWhere('key', 'logo');
+            $logoUrl = null;
+            if ($logoMeta && $logoMeta->value) {
+                $decoded = json_decode($logoMeta->value, true);
+                $logoUrl = $decoded['url'] ?? null;
+            }
+
             return [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -171,6 +191,11 @@ class UserManagementController extends Controller
                 '_rgt' => $user->_rgt,
                 'depth' => $parentId === null || $parentId === $treeRootParentId ? 0 : null,
                 'has_children' => false,
+                'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values()->all(),
+                'logo_url' => $logoUrl,
+                'abilities' => [
+                    'impersonate' => $request->user()->can('impersonate', $user),
+                ],
             ];
         })->map(function (array $item) use ($hasChildrenLookup) {
             $item['has_children'] = isset($hasChildrenLookup[(int) $item['id']]);
@@ -242,6 +267,7 @@ class UserManagementController extends Controller
 
         $allUsersQuery = User::query()
             ->select(['id', 'name', 'email', 'active', 'parent_id', '_lft', '_rgt'])
+            ->with(['roles:id,name', 'usersMeta' => fn ($q) => $q->where('key', 'logo')->select(['id', 'user_id', 'key', 'value'])])
             ->orderBy('_lft', 'asc');
 
         $this->authorization()->scopeManageableUsers($request->user(), $allUsersQuery);
@@ -280,7 +306,7 @@ class UserManagementController extends Controller
             $subsetChildrenByParent[$pid] = true;
         }
 
-        $items = $subset->map(function (User $user) use ($keepIds, $subsetChildrenByParent, $byId) {
+        $items = $subset->map(function (User $user) use ($keepIds, $subsetChildrenByParent, $byId, $request) {
             $depth = 0;
             $cursor = $user->parent_id !== null ? (int) $user->parent_id : null;
 
@@ -293,6 +319,13 @@ class UserManagementController extends Controller
                 $cursor = $parent->parent_id !== null ? (int) $parent->parent_id : null;
             }
 
+            $logoMeta = $user->usersMeta->firstWhere('key', 'logo');
+            $logoUrl = null;
+            if ($logoMeta && $logoMeta->value) {
+                $decoded = json_decode($logoMeta->value, true);
+                $logoUrl = $decoded['url'] ?? null;
+            }
+
             return [
                 'id' => (int) $user->id,
                 'name' => $user->name,
@@ -303,6 +336,11 @@ class UserManagementController extends Controller
                 '_rgt' => $user->_rgt,
                 'depth' => $depth,
                 'has_children' => isset($subsetChildrenByParent[(int) $user->id]),
+                'roles' => $user->roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->name])->values()->all(),
+                'logo_url' => $logoUrl,
+                'abilities' => [
+                    'impersonate' => $request->user()->can('impersonate', $user),
+                ],
             ];
         })->values();
 
@@ -318,28 +356,6 @@ class UserManagementController extends Controller
             'matched_ids' => array_values(array_unique($matchedIds)),
         ]);
     }
-
-    public function show(Request $request, User $user): Response
-    {
-        $this->authorize('view', $user);
-
-        $user->load(['roles.permissions']);
-        
-        // Charger le parent si parent_id existe
-        if ($user->parent_id) {
-            $user->setAttribute('parent', User::find($user->parent_id));
-        }
-        
-        // Extraire les permissions des rôles (role_has_permissions)
-        $permissions = $user->roles->flatMap(fn($role) => $role->permissions)->unique('id')->values();
-        $user->setAttribute('permissions', $permissions);
-
-        return Inertia::render('users/show', [
-            'user' => $user,
-            'userAbilities' => $this->userAbilities($request, $user),
-        ]);
-    }
-
 
     public function edit(Request $request, User $user): Response
     {

@@ -15,6 +15,7 @@ use Lab404\Impersonate\Models\Impersonate;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use App\Models\Traits\HasSortable;
 use App\Services\UserManagementAuthorizationService;
 
 class User extends Authenticatable implements HasMedia
@@ -24,7 +25,9 @@ class User extends Authenticatable implements HasMedia
         hasRole as protected hasRoleTrait;
         hasAnyRole as protected hasAnyRoleTrait;
     }
-    use NodeTrait, Impersonate, InteractsWithMedia;
+    use NodeTrait, Impersonate, InteractsWithMedia, HasSortable;
+
+    protected array $sortable = ['name', 'email', 'created_at'];
 
     public function cart(): HasOne
     {

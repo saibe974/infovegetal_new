@@ -256,6 +256,7 @@ export interface User {
     mailing?: boolean;
     email: string;
     avatar?: string;
+    logo_url?: string | null;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     created_at: string;

@@ -17,6 +17,8 @@ interface SortableTreeItemProps<T> {
     highlightCondition?: (item: T) => boolean;
     /** Rend le nom cliquable comme un lien Inertia */
     nameHref?: string | ((item: T) => string);
+    /** Rendu personnalisé de la zone nom (remplace le nom par défaut + loader) */
+    renderName?: (item: T, name: string, loading: boolean) => ReactNode;
 }
 
 export function SortableTreeItem<T extends { id: number; name?: string }>({
@@ -31,6 +33,7 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
     extraContent,
     highlightCondition,
     nameHref,
+    renderName,
 }: SortableTreeItemProps<T>) {
     const {
         item,
@@ -131,7 +134,9 @@ export function SortableTreeItem<T extends { id: number; name?: string }>({
             </div>
 
             {/* Nom + loader */}
-            {resolvedHref ? (
+            {renderName ? (
+                renderName(item, name, effectiveLoading)
+            ) : resolvedHref ? (
                 <Link href={resolvedHref} className="truncate font-medium flex-1 flex items-center gap-2 hover:underline">
                     {name}
                     {effectiveLoading && <Loader2Icon size={15} className="animate-spin" />}

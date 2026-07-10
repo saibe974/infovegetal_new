@@ -8,6 +8,8 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import AppLayout, { withAppLayout } from '@/layouts/app-layout';
 import { Loader2Icon, UserCheck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Link } from '@inertiajs/react';
 import SearchSelect from '@/components/app/search-select';
 import { DialogUpload } from '@/components/dialog-upload';
 import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, hasPermission } from '@/lib/roles';
@@ -421,6 +423,47 @@ export default withAppLayout<UsersPageProps>(
                 canDelete={canDelete && props.item.id !== 1}
                 onEdit={(item) => handleEdit(item.id)}
                 onDelete={(item) => handleDelete(item.id)}
+                renderName={(item, name, loading) => {
+                    const isGroup = (item.roles ?? []).some((r) => r.name === 'group');
+                    return (
+                        <Link href={'/admin/users/' + item.id} className="truncate font-medium flex-1 flex items-center gap-2 hover:underline">
+                            {item.logo_url ? (
+                                <img
+                                    src={item.logo_url as string}
+                                    alt={name}
+                                    className="size-6 rounded border object-contain shrink-0"
+                                />
+                            ) : null}
+                            <span className="truncate">{name}</span>
+                            {(item.roles ?? []).map((role) => (
+                                <Badge
+                                    key={role.id}
+                                    variant={
+                                        role.name === 'dev'
+                                            ? 'destructive'
+                                            : role.name === 'admin'
+                                                ? 'default'
+                                                : role.name === 'client'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                    }
+                                    className={
+                                        role.name === 'commercial'
+                                            ? 'border-transparent bg-blue-500 text-white hover:bg-blue-500/90'
+                                            : role.name === 'group'
+                                                ? 'border-transparent bg-purple-500 text-white hover:bg-purple-500/90'
+                                                : role.name === 'supplier'
+                                                    ? 'border-transparent bg-amber-500 text-white hover:bg-amber-500/90'
+                                                    : undefined
+                                    }
+                                >
+                                    {t(role.name)}
+                                </Badge>
+                            ))}
+                            {loading && <Loader2Icon size={15} className="animate-spin" />}
+                        </Link>
+                    );
+                }}
                 extraContent={(item) => (
                     canImpersonateUsers && item.abilities?.impersonate ? (
                         <Button

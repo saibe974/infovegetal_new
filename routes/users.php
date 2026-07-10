@@ -13,7 +13,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
-    Route::get('admin/users/{user}', [UserManagementController::class, 'show'])->whereNumber('user')->name('users.show');
     Route::get('admin/users/{user}/edit', [UserManagementController::class, 'edit'])->whereNumber('user')->name('users.edit');
     Route::put('admin/users/{user}', [UserManagementController::class, 'update'])->whereNumber('user')->name('users.update');
     Route::delete('admin/users/{user}', [UserManagementController::class, 'destroy'])->whereNumber('user')->name('users.destroy');

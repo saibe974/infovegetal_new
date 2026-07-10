@@ -41,6 +41,7 @@ export function UserCard({
 }: UserCardProps) {
     const { t } = useI18n();
     const [isUpdating, setIsUpdating] = useState(false);
+    const isGroup = (user.roles ?? []).some((role) => role.name === 'group');
 
     const handleEdit = (id: number) => {
         if (editUser) return editUser(id);
@@ -77,25 +78,40 @@ export function UserCard({
     return (
         <Link
             key={user.id}
-            href={'/admin/users/' + user.id}
+            href={`/admin/users/${user.id}/edit`}
             className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
             aria-label={`Voir ${user.name}`}
         >
-            <Card className={`relative h-105 w-75 flex flex-col p-4 gap-4 ${className ?? ""}`}>
-                <CardHeader className="p-0">
-                    <CardTitle className="text-lg font-semibold">
-                        {user.name}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        {user.email}
-                    </p>
+            <Card className={`relative w-75 flex flex-col p-4 gap-4 ${className ?? ""}`}>
+                <CardHeader className="p-0 flex items-center gap-3">
+                    {user.logo_url ? (
+                        <img
+                            src={user.logo_url}
+                            alt={user.name}
+                            className="size-12 rounded-lg border object-contain shrink-0"
+                        />
+                    ) : (
+                        <div className="flex size-12 items-center justify-center rounded-lg border bg-muted text-muted-foreground text-sm font-medium shrink-0">
+                            {user.name?.charAt(0)?.toUpperCase() ?? '?'}
+                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <CardTitle className="text-lg font-semibold truncate">
+                            {user.name}
+                        </CardTitle>
+                        {!isGroup && (
+                            <p className="text-sm text-muted-foreground mt-1 truncate">
+                                {user.email}
+                            </p>
+                        )}
+                        {isGroup && (
+                            <p className="text-sm text-muted-foreground mt-1 truncate">—</p>
+                        )}
+                    </div>
                 </CardHeader>
 
                 <CardContent className="p-0 flex-1 space-y-3">
                     <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2">
-                            {t('Rôles actuels')}
-                        </p>
                         <div className="flex flex-wrap gap-1.5">
                             {user.roles && user.roles.length > 0 ? (
                                 user.roles.map((role) => (
@@ -110,6 +126,15 @@ export function UserCard({
                                                         ? 'secondary'
                                                         : 'outline'
                                         }
+                                        className={
+                                            role.name === 'commercial'
+                                                ? 'border-transparent bg-blue-500 text-white hover:bg-blue-500/90'
+                                                : role.name === 'group'
+                                                    ? 'border-transparent bg-purple-500 text-white hover:bg-purple-500/90'
+                                                    : role.name === 'supplier'
+                                                        ? 'border-transparent bg-amber-500 text-white hover:bg-amber-500/90'
+                                                        : undefined
+                                        }
                                     >
                                         {t(role.name)}
                                     </Badge>
@@ -122,36 +147,7 @@ export function UserCard({
                         </div>
                     </div>
 
-                    {canChangeRole && (
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">
-                                {t('Change role')}
-                            </p>
-                            <Select
-                                onValueChange={handleRoleChange}
-                                disabled={isUpdating || isCurrentUser}
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder={t('Select role')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {roles.map((role) => (
-                                        <SelectItem
-                                            key={role.id}
-                                            value={role.name}
-                                        >
-                                            {t(role.name)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {isCurrentUser && (
-                                <p className="mt-2 text-xs text-muted-foreground">
-                                    {t('Cannot modify your own role')}
-                                </p>
-                            )}
-                        </div>
-                    )}
+
 
                     <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1">
