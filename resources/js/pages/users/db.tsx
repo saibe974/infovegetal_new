@@ -266,6 +266,25 @@ export default function UserDbPage() {
         }));
     }, [activeSellerData, t]);
 
+    const billingProfiles = useMemo(() => {
+        if (!activeRow?.billing_user_id) {
+            return [];
+        }
+
+        const db = dbById.get(Number(activeRow.db_product_id));
+        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
+        if (!billing) {
+            return [];
+        }
+
+        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
+        return billingDefaults.profiles.map((profile) => ({
+            key: `billing:${profile.id}`,
+            label: profile.name,
+            conditions: normalizeConditions(profile.conditions),
+        }));
+    }, [activeRow, dbById]);
+
     const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
 
     const updateRow = (index: number, patch: Partial<SalesConditionDraft>) => {
@@ -373,7 +392,7 @@ export default function UserDbPage() {
 
                                         return (
                                             <div key={`${row.db_product_id}-${index}`} className="flex items-center justify-between gap-2">
-                                                <CountryFlag countryCode={db.country} title={db.country} className="w-4" />
+                                                {db.country && <CountryFlag countryCode={db.country} title={db.country} className="w-4" />}
                                                 <button
                                                     type="button"
                                                     className={`text-left rounded-md px-3 py-2 w-full border ${activeIndex === index ? 'bg-muted border-primary' : 'border-border'}`}
@@ -404,7 +423,10 @@ export default function UserDbPage() {
                                 ) : (
                                     <>
                                         <CardHeader className="px-0">
-                                            <CardTitle>{dbById.get(Number(activeRow.db_product_id))?.name}</CardTitle>
+                                            <CardTitle className="flex items-center gap-2">
+                                                {dbById.get(Number(activeRow.db_product_id))?.country && <CountryFlag countryCode={dbById.get(Number(activeRow.db_product_id))!.country!} title={dbById.get(Number(activeRow.db_product_id))!.country!} className="w-5" />}
+                                                {dbById.get(Number(activeRow.db_product_id))?.name}
+                                            </CardTitle>
                                         </CardHeader>
                                         <CardContent className="px-0 space-y-6">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -449,7 +471,34 @@ export default function UserDbPage() {
                                                     />
                                                 </FormField>
 
-                                                {sellerOptions.length > 0 && (
+                                                {sellerOptions.length === 0 ? (
+                                                    <FormField label={t('Commercial')}>
+                                                        <Select
+                                                            value={selectedProfileKey}
+                                                            onValueChange={(val) => {
+                                                                setSelectedProfileKey(val);
+                                                                if (val === '__custom__') {
+                                                                    updateRow(activeIndex, { conditions_override: {} });
+                                                                } else {
+                                                                    const profile = billingProfiles.find((item) => item.key === val);
+                                                                    if (profile) {
+                                                                        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                    }
+                                                                }
+                                                            }}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={t('Select a billing profile')} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
+                                                                {billingProfiles.map((profile) => (
+                                                                    <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </FormField>
+                                                ) : (
                                                     <FormField label={t('Commercial')}>
                                                         {sellerOptions.length <= 1 ? (
                                                             <Input
