@@ -12,7 +12,6 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 use Kalnoy\Nestedset\NodeTrait;
 use Lab404\Impersonate\Models\Impersonate;
-use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -204,23 +203,13 @@ class User extends Authenticatable implements HasMedia
      */
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('user_logos')->singleFile();
+        $this->addMediaCollection('user_logos');
         $this->addMediaCollection('user_photos');
         $this->addMediaCollection('user_meta_files');
     }
 
-    /**
-     * Standard image conversions for previews and cards.
-     */
     public function registerMediaConversions(?Media $media = null): void
     {
-        $this->addMediaConversion('thumb')
-            ->fit(Fit::Crop, 240, 240)
-            ->performOnCollections('user_logos', 'user_photos', 'user_meta_files');
-
-        $this->addMediaConversion('medium')
-            ->width(900)
-            ->performOnCollections('user_logos', 'user_photos', 'user_meta_files');
     }
 
     /**

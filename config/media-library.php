@@ -96,6 +96,7 @@ return [
         // or
         // 'model_morph_alias' => PathGenerator::class
         App\Models\Product::class => App\Media\PathGenerator\ProductPathGenerator::class,
+        App\Models\User::class => App\Media\PathGenerator\UserPathGenerator::class,
     ],
 
     /*

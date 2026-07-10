@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Cart;
 use App\Models\ClientSalesCondition;
 use App\Models\User;
+use App\Models\UserOption;
 use App\Services\PriceCalculatorService;
 use App\Services\UserManagementAuthorizationService;
 use App\Services\UserImportService;
@@ -363,7 +364,51 @@ class UserManagementController extends Controller
                     ->get(['id', 'name'])
                 : collect(),
             'userAbilities' => $this->userAbilities($request, $user),
+            'userMeta' => $user->usersMeta()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get(['id', 'user_id', 'key', 'value', 'type', 'sort_order']),
+            'metaKeyOptions' => UserOption::query()
+                ->where('key', 'users_meta.allowed_key')
+                ->where('active', true)
+                ->orderBy('sort_order')
+                ->get(['value', 'label'])
+                ->map(fn (UserOption $row) => [
+                    'value' => (string) $row->value,
+                    'label' => (string) ($row->label ?: $row->value),
+                ])
+                ->values()
+                ->all(),
+            'metaKeyConfig' => $this->metaKeyConfig(),
         ]);
+    }
+
+    private function metaKeyConfig(): array
+    {
+        $kinds = UserOption::query()
+            ->where('key', 'users_meta.input_kind')
+            ->where('active', true)
+            ->get(['value', 'label', 'type'])
+            ->keyBy('value');
+
+        $fields = UserOption::query()
+            ->where('key', 'users_meta.input_fields')
+            ->where('active', true)
+            ->get(['value', 'label'])
+            ->keyBy('value');
+
+        $config = [];
+        foreach ($kinds as $value => $row) {
+            $fieldRow = $fields->get($value);
+            $config[$value] = [
+                'input' => (string) ($row->label ?: $row->type ?: 'input'),
+                'fields' => $fieldRow && $fieldRow->label
+                    ? array_values(array_filter(array_map('trim', explode(',', (string) $fieldRow->label))))
+                    : [],
+            ];
+        }
+
+        return $config;
     }
 
     public function create(Request $request): Response

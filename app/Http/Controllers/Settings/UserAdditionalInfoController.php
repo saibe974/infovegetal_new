@@ -9,9 +9,6 @@ use App\Models\UserOption;
 use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Inertia\Inertia;
-use Inertia\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserAdditionalInfoController extends Controller
@@ -19,56 +16,6 @@ class UserAdditionalInfoController extends Controller
     public function __construct(
         private readonly UserManagementAuthorizationService $authorization,
     ) {
-    }
-
-    public function edit(Request $request, ?User $user = null): Response
-    {
-        $target = $user ?? $request->user();
-
-        $this->authorizeTarget($request, $target);
-
-        return Inertia::render('settings/additional-info', [
-            'editingUser' => $target->loadMissing(['roles', 'permissions']),
-            'userAbilities' => [
-                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
-            ],
-            'userMeta' => $target->usersMeta()
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get(['id', 'user_id', 'key', 'value', 'type', 'sort_order', 'created_at', 'updated_at']),
-            'metaKeyOptions' => $this->metaKeyOptions(),
-            'metaKeyConfig' => $this->metaKeyConfig(),
-        ]);
-    }
-
-    public function update(Request $request, ?User $user = null): RedirectResponse
-    {
-        $target = $user ?? $request->user();
-
-        $this->authorizeTarget($request, $target);
-
-        $validated = $request->validate([
-            'alias' => ['nullable', 'string', 'max:255', Rule::unique('users', 'alias')->ignore($target->id)],
-            'ref' => ['nullable', 'string', 'max:50'],
-            'phone' => ['nullable', 'string', 'max:25'],
-            'address_road' => ['nullable', 'string', 'max:255'],
-            'address_zip' => ['nullable', 'string', 'max:32'],
-            'address_town' => ['nullable', 'string', 'max:120'],
-            'active' => ['nullable', 'boolean'],
-            'mailing' => ['nullable', 'boolean'],
-        ]);
-
-        $target->alias = $validated['alias'] ?? null;
-        $target->ref = $validated['ref'] ?? null;
-        $target->phone = $validated['phone'] ?? null;
-        $target->address_road = $validated['address_road'] ?? null;
-        $target->address_zip = $validated['address_zip'] ?? null;
-        $target->address_town = $validated['address_town'] ?? null;
-        $target->active = array_key_exists('active', $validated) ? (bool) $validated['active'] : $target->active;
-        $target->mailing = array_key_exists('mailing', $validated) ? (bool) $validated['mailing'] : $target->mailing;
-        $target->save();
-
-        return back()->with('success', 'Informations complementaires mises a jour');
     }
 
     public function storeMeta(Request $request, ?User $user = null): RedirectResponse
@@ -162,21 +109,6 @@ class UserAdditionalInfoController extends Controller
         $this->authorize('update', $target);
     }
 
-    private function metaKeyOptions(): array
-    {
-        return UserOption::query()
-            ->where('key', 'users_meta.allowed_key')
-            ->where('active', true)
-            ->orderBy('sort_order')
-            ->get(['value', 'label'])
-            ->map(fn (UserOption $row) => [
-                'value' => (string) $row->value,
-                'label' => (string) ($row->label ?: $row->value),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function metaKeyConfig(): array
     {
         $kinds = UserOption::query()
@@ -233,6 +165,10 @@ class UserAdditionalInfoController extends Controller
                 Media::query()->whereKey($previousMediaId)->delete();
             }
 
+            if ($collection === 'user_logos') {
+                $target->clearMediaCollection('user_logos');
+            }
+
             $media = $target
                 ->addMediaFromRequest('value_file')
                 ->toMediaCollection($collection);
@@ -241,8 +177,6 @@ class UserAdditionalInfoController extends Controller
                 'media_id' => $media->id,
                 'collection' => $collection,
                 'url' => $media->getUrl(),
-                'thumb_url' => $media->getUrl('thumb'),
-                'medium_url' => $media->getUrl('medium'),
                 'file_name' => $media->file_name,
             ]);
         }

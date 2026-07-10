@@ -50,12 +50,6 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
 
-    Route::get('settings/additional-info', [UserAdditionalInfoController::class, 'edit'])
-        ->name('settings.additional.edit');
-
-    Route::patch('settings/additional-info', [UserAdditionalInfoController::class, 'update'])
-        ->name('settings.additional.update');
-
     Route::post('settings/additional-info/meta', [UserAdditionalInfoController::class, 'storeMeta'])
         ->name('settings.additional.meta.store');
 
@@ -95,12 +89,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('admin/users/{user}/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('admin.two-factor.show');
-
-    Route::get('admin/users/{user}/additional-info', [UserAdditionalInfoController::class, 'edit'])
-        ->name('additional.edit');
-
-    Route::patch('admin/users/{user}/additional-info', [UserAdditionalInfoController::class, 'update'])
-        ->name('additional.update');
 
     Route::post('admin/users/{user}/additional-info/meta', [UserAdditionalInfoController::class, 'storeMeta'])
         ->name('additional.meta.store');

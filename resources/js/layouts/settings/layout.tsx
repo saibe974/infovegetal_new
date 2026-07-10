@@ -68,11 +68,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 href: editSettingsAppearance(),
                 icon: null,
             },
-            {
-                title: 'Additional info',
-                href: '/settings/additional-info',
-                icon: null,
-            }
         );
 
     } else if (canManageChildSections) {
@@ -82,11 +77,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 href: `/admin/users/${userId}/permissions`,
                 icon: null,
             },
-            {
-                title: 'Additional info',
-                href: `/admin/users/${userId}/additional-info`,
-                icon: null,
-            }
         );
 
         if (canManageSensitiveChildSections) {
@@ -145,8 +135,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                             <p className="text-gray-500">
                                 {currentPath === `/admin/users/${userId}/db` ? `Manage database access` :
                                     currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :
-                                        currentPath === `/admin/users/${userId}/additional-info` ? `Manage additional user information` :
-                                            currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
+                                        currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
                                                 currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
                                                     currentPath === `/admin/users/${userId}/edit` ? `Edit user information` :
                                                         ``}

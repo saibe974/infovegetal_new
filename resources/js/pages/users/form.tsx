@@ -111,7 +111,6 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ user, allRoles = [] }
                     <h2>{isNew ? 'Créer un utilisateur' : 'Editer un utilisateur'}</h2>
                 </div>
             </div>
-
             <div className="grid items-start gap-8 md:grid-cols-[1fr_350px]">
                 <main className="space-y-4">
                     {/* Nom */}
