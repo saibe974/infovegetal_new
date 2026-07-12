@@ -1,0 +1,1524 @@
+﻿# BusinessRules
+
+Date de reference: 2026-07-12
+Portee: contrat fonctionnel officiel du moteur de calcul Infovegetal.
+
+## Convention
+- Identifiant stable: BR-XXX.
+- Confidence: ✅ Confirmee, ⚠ A valider, ❓ Hypothese.
+- Core Rule: Oui/Non.
+- Une Business Rule est la plus petite unite de travail.
+- Une PR ne doit implementer qu une ou deux Business Rules.
+
+## Prix
+
+### BR-001
+- Titre: Prix standard unitaire
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Prix de base applique quand aucun palier superieur ne s applique.
+- Justification metier: Garantir un prix de reference stable.
+- Preconditions:
+  - Produit identifie.
+  - Prix de base disponible ou fallback activable.
+- Invariants:
+  - Le prix standard est toujours >= 0.
+  - Le prix standard ne depend pas du transport.
+  - Le prix standard est deterministe pour un meme contexte.
+- Postconditions:
+  - Le prix standard applicable est connu.
+  - La ligne peut entrer en calcul panier.
+- Exemples:
+  - Quantite sous seuil carton -> prix standard.
+- Cas limites:
+  - Prix absent -> BR-008 puis BR-007.
+- Impact sur le calcul: Base du prix unitaire client.
+- Criteres d acceptation:
+  - Meme resultat que legacy a donnees equivalentes.
+  - Utilise en runtime.
+  - Teste en nominal + bords.
+- Tests attendus:
+  - Cas nominal.
+  - Valeur nulle.
+  - Valeur minimale.
+  - Cas historique.
+- Regles liees: BR-007, BR-008, BR-045.
+
+### BR-002
+- Titre: Prix carton
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Palier prix applique a partir du seuil carton.
+- Justification metier: Repercuter l economie de volume.
+- Preconditions:
+  - Cond carton connu.
+  - Quantite connue.
+- Invariants:
+  - Si quantite >= seuil carton, un palier >= standard est selectionne.
+  - Le palier selectionne est unique.
+- Postconditions:
+  - Prix unitaire carton ou fallback inferieur determine.
+- Exemples:
+  - Quantite au seuil carton -> prix carton.
+- Cas limites:
+  - Seuil carton invalide -> BR-001.
+- Impact sur le calcul: Premier palier volume.
+- Criteres d acceptation:
+  - Parite legacy sur seuil exact et au-dela.
+  - Runtime actif.
+- Tests attendus:
+  - Seuil atteint.
+  - Seuil non atteint.
+  - Seuil invalide.
+  - Cas historique.
+- Regles liees: BR-001, BR-003, BR-005.
+
+### BR-003
+- Titre: Prix etage
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Palier prix applique a partir du seuil etage.
+- Justification metier: Coherence prix/logistique.
+- Preconditions:
+  - Cond et floor connus.
+  - Quantite connue.
+- Invariants:
+  - Si seuil etage atteint, le moteur ne revient pas au palier carton.
+  - Le palier reste deterministic.
+- Postconditions:
+  - Prix etage calcule ou fallback valide.
+- Exemples:
+  - Quantite >= cond*floor -> prix etage.
+- Cas limites:
+  - Floor absent -> BR-002.
+- Impact sur le calcul: Palier volume intermediaire.
+- Criteres d acceptation:
+  - Parite legacy sur seuil etage.
+  - Runtime actif.
+- Tests attendus:
+  - Seuil exact.
+  - Seuil inferieur.
+  - Donnees manquantes.
+- Regles liees: BR-002, BR-005, BR-041.
+
+### BR-004
+- Titre: Prix demi-etage
+- Core Rule: Non
+- Confidence: ❓ Hypothese
+- Description: Palier intermediaire entre carton et etage quand defini metierement.
+- Justification metier: Raffiner la courbe de prix sur certains fournisseurs.
+- Preconditions:
+  - Definition metier explicite du demi-etage.
+  - Seuil demi-etage parametre.
+- Invariants:
+  - Ne s applique que si la regle est activee pour la base concernee.
+  - Ne doit pas contredire l ordre des paliers.
+- Postconditions:
+  - Prix demi-etage determine ou regle ignoree proprement.
+- Exemples:
+  - Quantite entre carton et etage complet.
+- Cas limites:
+  - Regle absente -> ignorer sans erreur.
+- Impact sur le calcul: Palier additionnel optionnel.
+- Criteres d acceptation:
+  - Regle formalisee puis validee metier.
+  - Parite legacy si cas historique existant.
+- Tests attendus:
+  - Cas actif.
+  - Cas inactif.
+  - Bords de seuil.
+- Regles liees: BR-002, BR-003.
+
+### BR-005
+- Titre: Prix roll
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Palier prix applique au seuil roll.
+- Justification metier: Prix de gros volume.
+- Preconditions:
+  - Cond, floor, roll connus.
+  - Quantite connue.
+- Invariants:
+  - Le seuil roll est calcule de facon stable.
+  - Si seuil roll atteint, palier roll prioritaire sur etage/carton hors promo.
+- Postconditions:
+  - Prix roll actif ou fallback inferieur valide.
+- Exemples:
+  - Quantite >= cond*floor*roll.
+- Cas limites:
+  - Roll invalide -> BR-003.
+- Impact sur le calcul: Palier principal gros volume.
+- Criteres d acceptation:
+  - Parite legacy sur seuil roll.
+  - Runtime actif.
+- Tests attendus:
+  - Seuil exact.
+  - Au-dessus seuil.
+  - Roll nul.
+- Regles liees: BR-003, BR-006, BR-041.
+
+### BR-006
+- Titre: Prix promotion
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Prix promo prioritaire sur prix roll quand actif.
+- Justification metier: Prioriser les operations commerciales.
+- Preconditions:
+  - Promotion active et valide.
+  - Prix promo definissable.
+- Invariants:
+  - Un prix promo inactif n est jamais applique.
+  - Le promo n est pas applique hors contexte autorise.
+- Postconditions:
+  - Prix promo applique ou non de facon explicable.
+- Exemples:
+  - Promo active -> prix promo.
+- Cas limites:
+  - Promo 0 -> BR-005.
+- Impact sur le calcul: Reduction ponctuelle prix unitaire.
+- Criteres d acceptation:
+  - Parite legacy des campagnes promo.
+  - Runtime actif.
+- Tests attendus:
+  - Promo active.
+  - Promo inactive.
+  - Promo invalide.
+- Regles liees: BR-005, BR-045.
+
+### BR-007
+- Titre: Prix minimum positif
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Une ligne ne doit jamais sortir avec un prix negatif ou nul involontaire.
+- Justification metier: Eviter facturation incoherente.
+- Preconditions:
+  - Resultat prix preliminaire disponible.
+- Invariants:
+  - Prix final unitaire >= 0.
+  - Si tous les prix sources sont invalides, une borne de securite est appliquee.
+- Postconditions:
+  - Prix unitaire final securise.
+- Exemples:
+  - Donnees incompletes -> borne minimale.
+- Cas limites:
+  - Toutes sources nulles.
+- Impact sur le calcul: Securite globale du moteur.
+- Criteres d acceptation:
+  - Aucun prix negatif en runtime.
+  - Parite legacy sur borne historique.
+- Tests attendus:
+  - Valeur nulle.
+  - Valeur negative.
+  - Toutes sources invalides.
+- Regles liees: BR-001, BR-008, BR-045.
+
+### BR-008
+- Titre: Fallback de prix
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Strategie de repli quand certains paliers ne sont pas disponibles.
+- Justification metier: Continuer a vendre malgre des donnees imparfaites.
+- Preconditions:
+  - Au moins une source de prix candidate.
+- Invariants:
+  - Le fallback suit toujours le meme ordre.
+  - Le fallback ne produit pas de non-determinisme.
+- Postconditions:
+  - Prix resolu ou echec explicite securise.
+- Exemples:
+  - Prix etage absent -> prix standard.
+- Cas limites:
+  - Aucune source valide -> BR-007.
+- Impact sur le calcul: Robustesse du calcul prix.
+- Criteres d acceptation:
+  - Ordre de fallback documente et respecte.
+  - Parite legacy.
+- Tests attendus:
+  - Fallback 1er niveau.
+  - Fallback dernier niveau.
+  - Aucune source valide.
+- Regles liees: BR-001, BR-007.
+
+### BR-009
+- Titre: Prix speciaux legacy
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Regles historiques de prix speciaux hors schema palier standard.
+- Justification metier: Preserver les anciens accords durant la migration.
+- Preconditions:
+  - Contexte legacy identifie.
+  - Regle speciale active.
+- Invariants:
+  - Un prix special ne s applique que dans son contexte.
+  - Le fallback standard reste disponible.
+- Postconditions:
+  - Source de prix finale explicite.
+- Exemples:
+  - Canal historique avec champ prix dedie.
+- Cas limites:
+  - Champ special absent.
+- Impact sur le calcul: Compatibilite legacy.
+- Criteres d acceptation:
+  - Cas historiques reproduits.
+  - Aucun impact hors contexte legacy.
+- Tests attendus:
+  - Cas special actif.
+  - Cas special absent.
+  - Cas historique compare.
+- Regles liees: BR-001, BR-008, BR-018.
+
+## Acteurs
+
+### BR-010
+- Titre: DB Owner
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Acteur economique de reference de la base produit.
+- Justification metier: Determiner l origine de valeur produit.
+- Preconditions:
+  - Base produit identifiee.
+  - Proprietaire resolu.
+- Invariants:
+  - Une base produit reference au plus un DB Owner actif.
+  - Le DB Owner est stable pour le calcul d une commande donnee.
+- Postconditions:
+  - DB Owner associe a la commande.
+- Exemples:
+  - Base A -> owner X.
+- Cas limites:
+  - Owner manquant.
+- Impact sur le calcul: Cle des reversements.
+- Criteres d acceptation:
+  - Resolution deterministe du DB Owner.
+  - Coherence avec reversements.
+- Tests attendus:
+  - Cas nominal.
+  - Owner manquant.
+  - Changement historique.
+- Regles liees: BR-051, BR-053.
+
+### BR-011
+- Titre: BillingUser
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Acteur qui facture le client.
+- Justification metier: Coherence du flux de vente.
+- Preconditions:
+  - Client identifie.
+  - Relation commerciale active.
+- Invariants:
+  - Une commande a un BillingUser unique.
+  - Le BillingUser porte les montants factures client.
+- Postconditions:
+  - BillingUser associe a la commande et au calcul.
+- Exemples:
+  - Client C facture par B.
+- Cas limites:
+  - BillingUser absent.
+- Impact sur le calcul: Porteur des marges et de la facture.
+- Criteres d acceptation:
+  - BillingUser identique entre panier et commande.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Absence de billing.
+  - Changement relationnel.
+- Regles liees: BR-014, BR-022, BR-049.
+
+### BR-012
+- Titre: SellerUser
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Commercial rattache a la relation client.
+- Justification metier: Pilotage remuneration commerciale.
+- Preconditions:
+  - Relation commerciale definie.
+- Invariants:
+  - SellerUser optionnel selon parcours.
+  - Si present, unique pour le calcul commande.
+- Postconditions:
+  - SellerUser resolu ou explicitement absent.
+- Exemples:
+  - Parcours avec commercial.
+- Cas limites:
+  - Parcours sans commercial.
+- Impact sur le calcul: Impacte remises et gains commerciaux.
+- Criteres d acceptation:
+  - Parite legacy sur cas avec/sans seller.
+  - Runtime actif quand parcours 2.
+- Tests attendus:
+  - Avec seller.
+  - Sans seller.
+  - Seller inactif.
+- Regles liees: BR-015, BR-022, BR-050, BR-053.
+
+### BR-013
+- Titre: Client
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Destinataire du prix final et de la commande.
+- Justification metier: Le moteur sert la verite prix client.
+- Preconditions:
+  - Client valide.
+- Invariants:
+  - Le calcul final est toujours exprimable pour le client.
+  - Le client ne paie jamais deux fois un meme poste.
+- Postconditions:
+  - Total client calcule et explicable.
+- Exemples:
+  - Panier client converti en commande.
+- Cas limites:
+  - Client sans rattachement complet.
+- Impact sur le calcul: Sortie principale visible.
+- Criteres d acceptation:
+  - Total client stable entre ecrans et commande.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Donnees incompletes.
+  - Cas historique.
+- Regles liees: BR-045, BR-046, BR-047.
+
+## Marges et conditions
+
+### BR-014
+- Titre: Marge facturant
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Marge facturant calculee sur la base DB.
+- Justification metier: Eviter la marge sur marge.
+- Preconditions:
+  - Base DB resolue.
+  - Taux marge facturant resolu.
+- Invariants:
+  - La marge est toujours calculee sur le prix DB.
+  - La marge ne depend jamais de la marge commerciale.
+  - La marge facturant est independante du transport.
+  - Une remise commerciale ne diminue pas automatiquement la marge facturant.
+- Postconditions:
+  - Gain brut facturant connu.
+  - Prix HT incluant marge facturant disponible.
+- Exemples:
+  - Base 100, marge facturant 10% -> +10.
+- Cas limites:
+  - Taux nul.
+- Impact sur le calcul: Pilier de rentabilite facturant.
+- Criteres d acceptation:
+  - Parite legacy stricte.
+  - Tests de comparaison legacy/nouveau verts.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Taux 0.
+  - Taux max autorise.
+  - Cas historique.
+- Regles liees: BR-015, BR-049.
+
+### BR-015
+- Titre: Marge commercial
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Marge commercial calculee sur base de reference metier.
+- Justification metier: Retribution commerciale lisible.
+- Preconditions:
+  - SellerUser resolu.
+  - Taux marge commercial resolu.
+- Invariants:
+  - La marge commercial est calculable independamment du transport.
+  - La base de calcul est stable pour une commande donnee.
+- Postconditions:
+  - Gain brut commercial connu.
+- Exemples:
+  - Base 100, marge 15% -> +15.
+- Cas limites:
+  - Seller absent -> marge commercial nulle.
+- Impact sur le calcul: Base du gain commercial.
+- Criteres d acceptation:
+  - Parite legacy sur parcours commercial.
+  - Runtime actif.
+- Tests attendus:
+  - Avec seller.
+  - Sans seller.
+  - Taux extremes.
+- Regles liees: BR-014, BR-050.
+
+### BR-016
+- Titre: Marge minimum
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Marge minimale imposee, souvent liee au roll.
+- Justification metier: Protection rentabilite.
+- Preconditions:
+  - Parametre marge minimum resolu.
+- Invariants:
+  - La marge appliquee >= marge minimum definie.
+  - La marge minimum ne casse pas les paliers prix.
+- Postconditions:
+  - Marge finale conforme au minimum.
+- Exemples:
+  - Marge % trop faible -> minimum applique.
+- Cas limites:
+  - Minimum absent.
+- Impact sur le calcul: Borne economique.
+- Criteres d acceptation:
+  - Cas minima valides metier.
+  - Parite legacy sur cas historiques.
+- Tests attendus:
+  - Minimum applique.
+  - Minimum non applique.
+  - Minimum invalide.
+- Regles liees: BR-005, BR-017.
+
+### BR-017
+- Titre: Ponderation pd
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Coefficient historique d ajustement de prix.
+- Justification metier: Conserver accords historiques.
+- Preconditions:
+  - Coefficient pd resolu.
+- Invariants:
+  - Le coefficient est applique de maniere deterministe.
+  - L ordre d application est stable.
+- Postconditions:
+  - Prix ajuste par pd connu.
+- Exemples:
+  - Prix ajuste par coefficient.
+- Cas limites:
+  - pd nul.
+  - pd invalide.
+- Impact sur le calcul: Ajustement prix legacy.
+- Criteres d acceptation:
+  - Regle validee metier.
+  - Parite legacy sur jeux historiques.
+- Tests attendus:
+  - pd nominal.
+  - pd nul.
+  - pd hors bornes.
+- Regles liees: BR-016, BR-018.
+
+### BR-018
+- Titre: Heritage des conditions
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Propagation de conditions sur la chaine commerciale.
+- Justification metier: Factoriser politiques de vente.
+- Preconditions:
+  - Chaine acteurs resolue.
+  - Conditions ancetres accessibles.
+- Invariants:
+  - L heritage suit un ordre fixe.
+  - Une surcharge explicite prime sur heritage.
+- Postconditions:
+  - Ensemble des conditions candidates etabli.
+- Exemples:
+  - Condition parent reprise chez enfant.
+- Cas limites:
+  - Conflits multi-niveaux.
+- Impact sur le calcul: Source de verite conditions.
+- Criteres d acceptation:
+  - Regles de priorite validees metier.
+  - Parite legacy.
+- Tests attendus:
+  - Heritage simple.
+  - Heritage multi-niveaux.
+  - Conflit de priorite.
+- Regles liees: BR-019, BR-020, BR-021.
+
+### BR-019
+- Titre: Profils
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Conditions regroupees par profil selectionnable.
+- Justification metier: Standardisation commerciale.
+- Preconditions:
+  - Profils disponibles.
+- Invariants:
+  - Un profil actif est selectionne selon regle metier.
+  - Un profil invalide ne bloque pas le moteur, fallback possible.
+- Postconditions:
+  - Conditions du profil actif resolues.
+- Exemples:
+  - Profil standard vs premium.
+- Cas limites:
+  - Profil manquant.
+- Impact sur le calcul: Selection des conditions.
+- Criteres d acceptation:
+  - Profil selectionne identique au legacy.
+  - Runtime actif sur parcours concernes.
+- Tests attendus:
+  - Profil valide.
+  - Profil absent.
+  - Fallback profil.
+- Regles liees: BR-018, BR-020.
+
+### BR-020
+- Titre: Profil actif relation
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Profil effectif dependant de la relation facturant-commercial.
+- Justification metier: Ajuster les accords par relation.
+- Preconditions:
+  - BillingUser et SellerUser resolus.
+  - Parametrage relation disponible.
+- Invariants:
+  - Le profil actif est unique pour la relation.
+  - Le choix du profil est explicable.
+- Postconditions:
+  - Profil final relationnel determine.
+- Exemples:
+  - Relation A -> profil 2.
+- Cas limites:
+  - Profil relationnel absent.
+- Impact sur le calcul: Conditionne marges/remises.
+- Criteres d acceptation:
+  - Parite legacy sur relations configurees.
+  - Validation metier du fallback.
+- Tests attendus:
+  - Relation nominale.
+  - Profil relation absent.
+  - Multi-relations.
+- Regles liees: BR-019, BR-021.
+
+### BR-021
+- Titre: Override client
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Surcharge client prioritaire sur conditions heritees.
+- Justification metier: Respect accords specifiques.
+- Preconditions:
+  - Client identifie.
+  - Override actif disponible.
+- Invariants:
+  - Override client prime sur profil/heritage.
+  - Override partiel conserve les autres regles valides.
+- Postconditions:
+  - Conditions finales client resolues.
+- Exemples:
+  - Client grand compte avec remise dediee.
+- Cas limites:
+  - Override incomplet.
+- Impact sur le calcul: Personnalisation finale des conditions.
+- Criteres d acceptation:
+  - Parite legacy des clients overrides.
+  - Runtime actif.
+- Tests attendus:
+  - Override complet.
+  - Override partiel.
+  - Absence override.
+- Regles liees: BR-018, BR-022, BR-023.
+
+## Remises
+
+### BR-022
+- Titre: Remise pourcentage
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Remise en % appliquee sur base commerciale definie.
+- Justification metier: Flexibilite de negociation.
+- Preconditions:
+  - Taux remise % valide.
+  - Base de remise determinee.
+- Invariants:
+  - Remise % >= 0.
+  - Remise % appliquee selon ordre metier.
+- Postconditions:
+  - Montant remise % calcule.
+- Exemples:
+  - 5% sur sous-total commercial.
+- Cas limites:
+  - 0%.
+- Impact sur le calcul: Diminue total client.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif sur parcours commercial.
+- Tests attendus:
+  - Taux nominal.
+  - 0%.
+  - Taux max.
+- Regles liees: BR-024, BR-025, BR-050.
+
+### BR-023
+- Titre: Remise montant fixe
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Remise fixe appliquee a l unite ou a la ligne.
+- Justification metier: Repondre aux accords ponctuels.
+- Preconditions:
+  - Montant fixe valide.
+  - Scope unite/ligne defini.
+- Invariants:
+  - Montant remise fixe >= 0.
+  - Scope applique de facon deterministe.
+- Postconditions:
+  - Montant remise fixe calcule.
+- Exemples:
+  - 8 EUR sur la ligne.
+- Cas limites:
+  - Montant > gain supportable.
+- Impact sur le calcul: Reduit prix final.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - Scope ligne.
+  - Scope unite.
+  - Montant excessif.
+- Regles liees: BR-024, BR-025.
+
+### BR-024
+- Titre: Ordre d application remises
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Ordre strict d application des remises.
+- Justification metier: Eviter ecarts de calcul.
+- Preconditions:
+  - Ensemble remises resolu.
+- Invariants:
+  - L ordre est stable dans le temps.
+  - Meme entree -> meme sequence.
+- Postconditions:
+  - Remise totale calculee de facon reproductible.
+- Exemples:
+  - Remise % puis fixe.
+- Cas limites:
+  - Une seule remise.
+- Impact sur le calcul: Determinisme des reductions.
+- Criteres d acceptation:
+  - Sequence identique au legacy.
+  - Validation tests d ordre.
+- Tests attendus:
+  - Deux remises.
+  - Une remise.
+  - Remises nulles.
+- Regles liees: BR-022, BR-023.
+
+### BR-025
+- Titre: Acteur supportant la remise
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: La remise est supportee par l acteur defini, en general commercial.
+- Justification metier: Eviter remises sans financeur.
+- Preconditions:
+  - Acteur support identifie.
+  - Gain disponible connu.
+- Invariants:
+  - Remise supportee <= gain de l acteur support.
+  - Le support de remise est explicite.
+- Postconditions:
+  - Gain net acteur support calcule.
+- Exemples:
+  - Remise deduite du gain commercial.
+- Cas limites:
+  - Remise depasse gain.
+- Impact sur le calcul: Conditionne net commercial et reversement.
+- Criteres d acceptation:
+  - Parite legacy sur plafonnements/rejets.
+  - Runtime actif.
+- Tests attendus:
+  - Gain suffisant.
+  - Gain insuffisant.
+  - Acteur support absent.
+- Regles liees: BR-022, BR-023, BR-050, BR-053.
+
+## TVA
+
+### BR-026
+- Titre: TVA produit
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Taux TVA produit prioritaire s il existe.
+- Justification metier: Conformite fiscale.
+- Preconditions:
+  - Produit identifie.
+  - Taux produit lisible.
+- Invariants:
+  - Taux TVA produit >= 0.
+  - Priorite produit sur categorie.
+- Postconditions:
+  - TVA ligne produit calculee.
+- Exemples:
+  - Produit a 10%.
+- Cas limites:
+  - Taux produit absent -> BR-027.
+- Impact sur le calcul: Base TTC produit.
+- Criteres d acceptation:
+  - Parite legacy TVA produit.
+  - Runtime actif.
+- Tests attendus:
+  - Taux produit present.
+  - Taux produit nul.
+  - Arrondis.
+- Regles liees: BR-027, BR-046.
+
+### BR-027
+- Titre: TVA categorie
+- Core Rule: Oui
+- Confidence: ⚠ A valider
+- Description: Fallback TVA categorie en absence de TVA produit.
+- Justification metier: Eviter impasse fiscale.
+- Preconditions:
+  - Categorie identifiee.
+  - Taux categorie disponible.
+- Invariants:
+  - TVA categorie n est utilisee que si TVA produit absente.
+  - Une TVA resolue est toujours >= 0.
+- Postconditions:
+  - Taux TVA final resolu.
+- Exemples:
+  - Produit sans taux -> categorie 5.5%.
+- Cas limites:
+  - Produit et categorie sans taux.
+- Impact sur le calcul: Continuite du calcul TVA.
+- Criteres d acceptation:
+  - Fallback valide metierement.
+  - Cas sans taux traite explicitement.
+- Tests attendus:
+  - Fallback nominal.
+  - Absence totale taux.
+  - Cas historique.
+- Regles liees: BR-026.
+
+### BR-028
+- Titre: TVA transport
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Le transport est soumis a son taux TVA applicable.
+- Justification metier: Conformite fiscale transport.
+- Preconditions:
+  - Montant transport HT connu.
+  - Taux TVA transport connu.
+- Invariants:
+  - TVA transport >= 0.
+  - TTC transport = HT transport + TVA transport.
+- Postconditions:
+  - TVA transport et TTC transport calcules.
+- Exemples:
+  - Transport HT 100, TVA 20 -> TTC 120.
+- Cas limites:
+  - Transport HT 0.
+- Impact sur le calcul: Influence total TVA commande.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - Cas nominal.
+  - HT nul.
+  - Taux differents.
+- Regles liees: BR-029, BR-030, BR-046.
+
+## Transport
+
+### BR-029
+- Titre: Prix depart
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Le transport est facture en plus selon la grille applicable.
+- Justification metier: Transparence du cout logistique.
+- Preconditions:
+  - Zone et transporteur resolus.
+  - Grille tarifaire disponible.
+- Invariants:
+  - Cout transport depart >= 0.
+  - Le cout suit la grille et les minima.
+- Postconditions:
+  - Transport depart facture determine.
+- Exemples:
+  - Produits + frais transport visibles.
+- Cas limites:
+  - Zone non tariffee.
+- Impact sur le calcul: Ajoute composante transport au total.
+- Criteres d acceptation:
+  - Parite legacy sur grilles et minima.
+  - Runtime actif.
+- Tests attendus:
+  - Zone nominale.
+  - Minimum applique.
+  - Zone absente.
+- Regles liees: BR-034, BR-035, BR-045.
+
+### BR-030
+- Titre: Prix rendu
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Le transport client est ventile entre part incorporee et residuelle.
+- Justification metier: Eviter la double facturation transport.
+- Preconditions:
+  - Rolls calcules.
+  - Cout reel transport connu.
+  - Cout incorpore calcule.
+- Invariants:
+  - Le transport reel est toujours >= 0.
+  - Le transport incorpore est toujours >= 0.
+  - Le transport residuel est toujours >= 0.
+  - Transport reel = transport incorpore + transport residuel.
+  - Le client ne paie jamais deux fois le meme transport.
+- Postconditions:
+  - Cout residuel calcule.
+  - Cout total transport conserve.
+- Exemples:
+  - Reel 100, incorpore 70, residuel 30.
+- Cas limites:
+  - Incore > reel -> residuel force a 0.
+- Impact sur le calcul: Regle cle du rendu.
+- Criteres d acceptation:
+  - Identique legacy sur cas reels.
+  - Comparaison legacy/nouveau verte.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Residuel nul.
+  - Incoherence corrigee.
+  - Cas historique.
+- Regles liees: BR-031, BR-032, BR-033.
+
+### BR-031
+- Titre: Cout reel transport
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Cout economique total du transport avant ventilation client.
+- Justification metier: Verite economique.
+- Preconditions:
+  - Donnees expedition disponibles.
+- Invariants:
+  - Cout reel >= 0.
+  - Cout reel est unique pour un contexte donne.
+- Postconditions:
+  - Cout reel transport disponible pour BR-030.
+- Exemples:
+  - Cout transporteur calcule.
+- Cas limites:
+  - Cout indisponible temporaire.
+- Impact sur le calcul: Reference des ventilations.
+- Criteres d acceptation:
+  - Parite legacy sur echantillon reel.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Zero.
+  - Valeur haute.
+- Regles liees: BR-030, BR-052.
+
+### BR-032
+- Titre: Cout incorpore
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Part deja incluse dans les prix produits.
+- Justification metier: Eviter double paiement.
+- Preconditions:
+  - Occupation/logistique calculee.
+- Invariants:
+  - Cout incorpore >= 0.
+  - Cout incorpore <= cout reel pour une ventilation valide.
+- Postconditions:
+  - Part incorporee disponible.
+- Exemples:
+  - 70 EUR deja dans prix.
+- Cas limites:
+  - Donnees d occupation degradees.
+- Impact sur le calcul: Conditionne residuel client.
+- Criteres d acceptation:
+  - Correspondance legacy sur cas rendus.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Incore nul.
+  - Incore proche reel.
+- Regles liees: BR-030, BR-033.
+
+### BR-033
+- Titre: Cout residuel
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Part de transport restant a facturer.
+- Justification metier: Facturer le juste reste.
+- Preconditions:
+  - Cout reel et incorpore connus.
+- Invariants:
+  - Cout residuel >= 0.
+  - Cout residuel = max(0, reel - incorpore).
+- Postconditions:
+  - Cout additionnel a facturer connu.
+- Exemples:
+  - 100 - 70 = 30.
+- Cas limites:
+  - Incore > reel.
+- Impact sur le calcul: Partie transport visible client.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Reel egal incorpore.
+  - Incore superieur reel.
+- Regles liees: BR-030, BR-031, BR-032.
+
+### BR-034
+- Titre: Minimum transport
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Seuil minimal de facturation transport.
+- Justification metier: Couvrir couts incompressibles.
+- Preconditions:
+  - Politique de minimum disponible.
+- Invariants:
+  - Cout facture >= minimum applicable.
+  - Minimum ne s applique qu au contexte defini.
+- Postconditions:
+  - Cout transport apres minimum determine.
+- Exemples:
+  - Calcule 20, minimum 35 -> 35.
+- Cas limites:
+  - Minimum nul.
+- Impact sur le calcul: Borne basse transport.
+- Criteres d acceptation:
+  - Parite legacy sur minima.
+  - Runtime actif.
+- Tests attendus:
+  - Sous minimum.
+  - Egal minimum.
+  - Au-dessus minimum.
+- Regles liees: BR-029, BR-035.
+
+### BR-035
+- Titre: Transport par zone
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Tarif dependant de la zone de livraison.
+- Justification metier: Cout logistique geographique.
+- Preconditions:
+  - Zone resolue.
+  - Grille zone disponible.
+- Invariants:
+  - Une zone valide mappe un tarif valide.
+  - Mapping zone->tarif deterministic.
+- Postconditions:
+  - Tarif zone retenu.
+- Exemples:
+  - Zone A differente de zone B.
+- Cas limites:
+  - Zone absente/non tariffee.
+- Impact sur le calcul: Parametre cle du transport.
+- Criteres d acceptation:
+  - Parite legacy des zones.
+  - Runtime actif.
+- Tests attendus:
+  - Zone nominale.
+  - Zone inconnue.
+  - Changement de zone.
+- Regles liees: BR-034, BR-036, BR-037.
+
+### BR-036
+- Titre: Transporteur applicable
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Transporteur applicable selon contexte commercial.
+- Justification metier: Respect contrats transport.
+- Preconditions:
+  - Acteurs resolus.
+  - Liste transporteurs applicables.
+- Invariants:
+  - Le transporteur applique est actif.
+  - Le transporteur est coherent avec la base et la zone.
+- Postconditions:
+  - Transporteur calcule retenu.
+- Exemples:
+  - Transporteur A pour base X.
+- Cas limites:
+  - Aucun transporteur actif.
+- Impact sur le calcul: Oriente tarif et TVA transport.
+- Criteres d acceptation:
+  - Validation metier des regles d eligibilite.
+  - Runtime actif sur parcours transport.
+- Tests attendus:
+  - Nominal.
+  - Inactif.
+  - Aucun eligibile.
+- Regles liees: BR-035, BR-037.
+
+### BR-037
+- Titre: Choix du transporteur
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Choix client/commercial dans le perimetre autorise.
+- Justification metier: Eviter choix hors politique.
+- Preconditions:
+  - Ensemble transporteurs autorises connu.
+- Invariants:
+  - Le transporteur choisi appartient au set autorise.
+  - Un choix invalide n est jamais applique silencieusement.
+- Postconditions:
+  - Choix final valide ou rejet explicite.
+- Exemples:
+  - Client choisit parmi options.
+- Cas limites:
+  - Choix absent.
+  - Choix non autorise.
+- Impact sur le calcul: Selection finale grille transport.
+- Criteres d acceptation:
+  - Politique d autorisation validee.
+  - Runtime actif.
+- Tests attendus:
+  - Choix valide.
+  - Choix invalide.
+  - Aucun choix.
+- Regles liees: BR-035, BR-036.
+
+## Logistique
+
+### BR-038
+- Titre: Cartons
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Conversion quantites en cartons.
+- Justification metier: Unite logistique de base.
+- Preconditions:
+  - Conditionnements connus.
+- Invariants:
+  - Nombre cartons >= 0.
+  - Conversion deterministe.
+- Postconditions:
+  - Cartons calcules.
+- Exemples:
+  - Quantite -> n cartons.
+- Cas limites:
+  - Cond absent.
+- Impact sur le calcul: Base des etages/rolls.
+- Criteres d acceptation:
+  - Parite legacy conversion.
+  - Runtime actif quand logistique utilisee.
+- Tests attendus:
+  - Nominal.
+  - Cond nul.
+  - Quantite faible/forte.
+- Regles liees: BR-039, BR-041.
+
+### BR-039
+- Titre: Etages
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Organisation des cartons en etages.
+- Justification metier: Mesurer occupation.
+- Preconditions:
+  - Cartons calcules.
+  - Capacite etage connue.
+- Invariants:
+  - Nombre etages >= 0.
+  - Repartition respecte capacite definie.
+- Postconditions:
+  - Etages calcules.
+- Exemples:
+  - Cartons regroupes par etage.
+- Cas limites:
+  - Etage incomplet.
+- Impact sur le calcul: Preparation rolls.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - Etage complet.
+  - Etage partiel.
+  - Capacite absente.
+- Regles liees: BR-038, BR-042.
+
+### BR-040
+- Titre: Demi-etages logistiques
+- Core Rule: Non
+- Confidence: ❓ Hypothese
+- Description: Niveau partiel d etage selon contraintes operationnelles.
+- Justification metier: Coller aux cas reels non pleins.
+- Preconditions:
+  - Definition metier explicite.
+- Invariants:
+  - Un demi-etage ne depasse jamais un etage plein.
+  - Ne casse pas la conservation des cartons.
+- Postconditions:
+  - Occupation partielle representee.
+- Exemples:
+  - Etage partiellement rempli.
+- Cas limites:
+  - Absence regle fournisseur.
+- Impact sur le calcul: Affine occupation et transport.
+- Criteres d acceptation:
+  - Validation metier prerequise.
+  - Cas historiques identifies.
+- Tests attendus:
+  - Cas actif.
+  - Cas inactif.
+  - Conservation cartons.
+- Regles liees: BR-039, BR-042.
+
+### BR-041
+- Titre: Rolls
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Regroupement final des etages en rolls.
+- Justification metier: Unite logistique d expedition.
+- Preconditions:
+  - Etages calcules.
+- Invariants:
+  - Nombre rolls >= 0.
+  - Conservation des volumes entre etages et rolls.
+- Postconditions:
+  - Rolls et compteurs disponibles.
+- Exemples:
+  - n etages -> m rolls.
+- Cas limites:
+  - Rolls partiels.
+- Impact sur le calcul: Alimente transport.
+- Criteres d acceptation:
+  - Parite legacy sur comptages.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Roll partiel.
+  - Aucun roll.
+- Regles liees: BR-005, BR-042.
+
+### BR-042
+- Titre: Remplissage
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Taux d occupation des rolls.
+- Justification metier: Mesurer la part de transport deja absorbee.
+- Preconditions:
+  - Rolls calcules.
+  - Dimensions/occupation disponibles.
+- Invariants:
+  - Taux occupation entre 0 et 1.
+  - Normalisation des valeurs hors bornes.
+- Postconditions:
+  - Fill rates exploitables par transport rendu.
+- Exemples:
+  - Roll a 0.8.
+- Cas limites:
+  - Valeurs negatives ou >1.
+- Impact sur le calcul: Cle BR-030.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - 0.
+  - 1.
+  - Hors bornes.
+- Regles liees: BR-030, BR-033, BR-041.
+
+### BR-043
+- Titre: Plusieurs producteurs
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Gestion d un panier multi-producteurs.
+- Justification metier: Cas reel du catalogue.
+- Preconditions:
+  - Producteurs identifies par ligne.
+- Invariants:
+  - Segmentation producteur conservee jusqu au calcul transport.
+  - Aucun melange invalide inter-producteurs.
+- Postconditions:
+  - Agregats logistiques par producteur calcules.
+- Exemples:
+  - Panier avec fournisseurs differents.
+- Cas limites:
+  - Producteur manquant.
+- Impact sur le calcul: Influence regroupement et transport.
+- Criteres d acceptation:
+  - Parite legacy multi-producteurs.
+  - Runtime actif parcours 5.
+- Tests attendus:
+  - Deux producteurs.
+  - Producteur manquant.
+  - Producteurs multiples.
+- Regles liees: BR-044, BR-045.
+
+### BR-044
+- Titre: Regroupement logistique
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Regroupement pour optimiser pertes et couts.
+- Justification metier: Efficacite expedition.
+- Preconditions:
+  - Donnees de compatibilite colis disponibles.
+- Invariants:
+  - Le regroupement ne perd aucune unite.
+  - Le regroupement reste explicable.
+- Postconditions:
+  - Plan de regroupement calcule.
+- Exemples:
+  - Cartons compatibles fusionnes.
+- Cas limites:
+  - Incompatibilites strictes.
+- Impact sur le calcul: Peut reduire cout transport.
+- Criteres d acceptation:
+  - Comportement identique legacy.
+  - Runtime actif parcours 5.
+- Tests attendus:
+  - Regroupable.
+  - Non regroupable.
+  - Cas mixte.
+- Regles liees: BR-041, BR-042, BR-043.
+
+## Commandes
+
+### BR-045
+- Titre: Calcul panier
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Le panier affiche un total coherent produits + transport.
+- Justification metier: Verite prix avant achat.
+- Preconditions:
+  - Lignes produits resolues.
+  - Regles prix/transport resolues.
+- Invariants:
+  - Total panier = somme lignes + transport.
+  - Total panier >= 0.
+- Postconditions:
+  - Total panier pret pour validation.
+- Exemples:
+  - Panier affiche HT/transport coherents.
+- Cas limites:
+  - Ligne invalide.
+- Impact sur le calcul: Point de decision client.
+- Criteres d acceptation:
+  - Parite legacy stricte.
+  - Runtime nouveau actif.
+  - Tests feature verts.
+- Tests attendus:
+  - Nominal.
+  - Ligne invalide.
+  - Panier vide.
+  - Cas historique.
+- Regles liees: BR-001 a BR-037.
+
+### BR-046
+- Titre: Calcul commande
+- Core Rule: Oui
+- Confidence: ✅ Confirmee
+- Description: Conversion panier en montants commande HT/TVA/TTC figes.
+- Justification metier: Fiabilite contractuelle.
+- Preconditions:
+  - Panier valide.
+  - TVA resolue.
+- Invariants:
+  - Total TTC = Total HT + Total TVA.
+  - Conservation des montants entre projection et commande finale.
+- Postconditions:
+  - Totaux commande officiels disponibles.
+- Exemples:
+  - Validation panier -> commande.
+- Cas limites:
+  - Ecart de donnees entre etapes.
+- Impact sur le calcul: Sortie financiere officielle.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+  - Tests integration verts.
+- Tests attendus:
+  - Nominal.
+  - Arrondis.
+  - Ecart source.
+- Regles liees: BR-026, BR-028, BR-045.
+
+### BR-047
+- Titre: Snapshot
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Historisation immutable de l etat commande.
+- Justification metier: Eviter recalcul historique.
+- Preconditions:
+  - Commande validee.
+- Invariants:
+  - Un snapshot valide ne change pas apres creation.
+  - Les donnees snapshot suffisent a relire l historique.
+- Postconditions:
+  - Snapshot persiste et exploitable.
+- Exemples:
+  - Commande archivee avec contexte.
+- Cas limites:
+  - Donnees partiellement disponibles.
+- Impact sur le calcul: Stabilite historique.
+- Criteres d acceptation:
+  - Snapshot coherent avec commande.
+  - Runtime actif.
+- Tests attendus:
+  - Creation snapshot.
+  - Relecture snapshot.
+  - Idempotence.
+- Regles liees: BR-046, BR-048.
+
+### BR-048
+- Titre: Audit
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Explicabilite des resultats de calcul.
+- Justification metier: Support, controle, confiance.
+- Preconditions:
+  - Traces de calcul disponibles.
+- Invariants:
+  - Un resultat commande doit etre explicable.
+  - Les traces ne doivent pas se contredire.
+- Postconditions:
+  - Piste d audit consultable.
+- Exemples:
+  - Reconstituer un total litige.
+- Cas limites:
+  - Traces partielles.
+- Impact sur le calcul: Qualite operationnelle.
+- Criteres d acceptation:
+  - Audit lisible sur cas reel.
+  - Validation metier/support.
+- Tests attendus:
+  - Cas nominal.
+  - Trace manquante.
+  - Integrite trace.
+- Regles liees: BR-047.
+
+## Reversements et flux financiers
+
+### BR-049
+- Titre: Gains facturant
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Calcul du gain facturant brut/net.
+- Justification metier: Pilotage marge facturant.
+- Preconditions:
+  - Marge facturant calculee.
+  - Montants commande connus.
+- Invariants:
+  - Gain facturant explicable par composantes.
+  - Gain facturant ne depend pas directement des remises commerciales supportees par seller.
+- Postconditions:
+  - Gain facturant calcule.
+- Exemples:
+  - Gain par ligne puis total.
+- Cas limites:
+  - Gain nul.
+- Impact sur le calcul: Pilotage economique facturant.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif parcours flux.
+- Tests attendus:
+  - Nominal.
+  - Gain nul.
+  - Multi-lignes.
+- Regles liees: BR-014, BR-051.
+
+### BR-050
+- Titre: Gains commercial
+- Core Rule: Non
+- Confidence: ✅ Confirmee
+- Description: Gain commercial net apres remises supportees.
+- Justification metier: Transparence remuneration.
+- Preconditions:
+  - Marge commercial calculee.
+  - Remises supportees calculees.
+- Invariants:
+  - Gain net commercial = gain brut - remises supportees.
+  - Gain net ne devient pas incoherent sans politique explicite.
+- Postconditions:
+  - Gain net commercial connu.
+- Exemples:
+  - Gain brut 30, remise 10 -> net 20.
+- Cas limites:
+  - Remise = gain brut.
+- Impact sur le calcul: Base reversement commercial.
+- Criteres d acceptation:
+  - Parite legacy.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Net nul.
+  - Remise excessive.
+- Regles liees: BR-015, BR-022, BR-025, BR-053.
+
+### BR-051
+- Titre: Reversements DB Owner
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Flux de reversement vers DB Owner.
+- Justification metier: Restituer la part due au proprietaire de base.
+- Preconditions:
+  - DB Owner resolu.
+  - Montants reversement calcules.
+- Invariants:
+  - Reversement DB Owner >= 0.
+  - Reversement explicable par regles de settlement.
+- Postconditions:
+  - Montant reversement DB Owner etabli.
+- Exemples:
+  - Reversement base produit.
+- Cas limites:
+  - DB Owner = BillingUser.
+- Impact sur le calcul: Flux inter-acteurs.
+- Criteres d acceptation:
+  - Regles comptables validees.
+  - Runtime actif parcours reversements.
+- Tests attendus:
+  - Nominal.
+  - Acteurs identiques.
+  - Montant nul.
+- Regles liees: BR-010, BR-049.
+
+### BR-052
+- Titre: Reversements transporteur
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Affectation du cout transport a l acteur transport.
+- Justification metier: Verite economique du poste transport.
+- Preconditions:
+  - Cout reel transport etabli.
+  - Acteur transporteur resolu.
+- Invariants:
+  - Reversement transporteur >= 0.
+  - Pas de double comptabilisation transport.
+- Postconditions:
+  - Montant reversement transporteur connu.
+- Exemples:
+  - Cout transport affecte au transporteur.
+- Cas limites:
+  - Cout nul.
+- Impact sur le calcul: Fermeture du bilan transport.
+- Criteres d acceptation:
+  - Validation comptable metier.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Cout nul.
+  - Multi-transporteurs.
+- Regles liees: BR-031, BR-033.
+
+### BR-053
+- Titre: Reversements commerciaux
+- Core Rule: Non
+- Confidence: ⚠ A valider
+- Description: Flux de reversement vers le commercial selon gain net.
+- Justification metier: Aligner paie et performance reelle.
+- Preconditions:
+  - Gain net commercial calcule.
+  - SellerUser resolu.
+- Invariants:
+  - Reversement commercial >= 0.
+  - Base reversement = gain net commercial retenu.
+- Postconditions:
+  - Montant reversement commercial etabli.
+- Exemples:
+  - Reversement proportionnel au net.
+- Cas limites:
+  - Seller absent.
+- Impact sur le calcul: Cloture flux commerciaux.
+- Criteres d acceptation:
+  - Validation metier/compta.
+  - Runtime actif.
+- Tests attendus:
+  - Nominal.
+  - Seller absent.
+  - Net nul.
+- Regles liees: BR-012, BR-025, BR-050.
+
+## Definition de termine (Business Rule)
+Une Business Rule est terminee uniquement si:
+- sa documentation est a jour,
+- ses invariants sont respectes,
+- ses criteres d acceptation sont valides,
+- ses tests sont ecrits et passent,
+- elle est utilisee en runtime,
+- la partie legacy correspondante est supprimable.
