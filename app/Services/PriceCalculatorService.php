@@ -81,7 +81,7 @@ class PriceCalculatorService
     /**
      * Récupère un prix spécial depuis le produit.
      */
-    protected function getSpecialPrice(Product $product, $priceField): float
+    protected function getSpecialPrice(Product $product, string $priceField): float
     {
         // Le champ peut être un nom de colonne comme 'price_special_1', etc.
         return $product->{$priceField} ?? $product->price ?? 0;
@@ -228,7 +228,7 @@ class PriceCalculatorService
         /**
          * Normalise les modes de prix (legacy numerique et alias explicites).
          */
-        protected function normalizePriceMode($value)
+        protected function normalizePriceMode(mixed $value)
         {
             if ($value === null || $value === '') {
                 return 0; // Par défaut, considérer comme "price_depart"

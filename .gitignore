@@ -31,3 +31,5 @@ yarn-error.log
 /storage/debugbar
 
 .dev.json
+
+/docs
