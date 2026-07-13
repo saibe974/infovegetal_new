@@ -37,6 +37,34 @@ it('keeps additional transport as order fee in separate mode', function (): void
         ->and($result->lineAllocations[1]->transportAdditionalHt->minorAmount)->toBe(0);
 });
 
+/**
+ * Business Rules:
+ * BR-028
+ */
+it('keeps transport vat at zero when the transport vat rate is zero', function (): void {
+    $calculator = new TransportAllocationCalculator();
+
+    $result = $calculator->calculate(new OrderTransportCalculationInput(
+        presentationMode: TransportPresentationMode::SeparateAdditionalFee,
+        tariffGrossHt: new Money(1000, Currency::EUR),
+        minimumAppliedHt: new Money(0, Currency::EUR),
+        transportRealHt: new Money(1000, Currency::EUR),
+        transportVatRate: Percentage::fromString('0'),
+        lines: [
+            new TransportLineInput(1, 7000, new Money(300, Currency::EUR)),
+            new TransportLineInput(2, 3000, new Money(200, Currency::EUR)),
+        ],
+        carrierId: 10,
+        zoneId: 20,
+        rollCount: 12,
+    ));
+
+    expect($result->orderBreakdown->transportVatTotal->minorAmount)->toBe(0)
+        ->and($result->orderBreakdown->transportTtc->minorAmount)->toBe(1000)
+        ->and($result->lineAllocations[0]->transportVatAmount->minorAmount)->toBe(0)
+        ->and($result->lineAllocations[1]->transportVatAmount->minorAmount)->toBe(0);
+});
+
 it('redistributes remaining transport on lines in redistribute mode', function (): void {
     $calculator = new TransportAllocationCalculator();
 

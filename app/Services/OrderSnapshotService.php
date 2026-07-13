@@ -71,6 +71,11 @@ class OrderSnapshotService
                 'meta' => [
                     'source' => $options['source'] ?? 'cart_validation',
                     'cart_status' => (string) ($cart->status ?? ''),
+                    'resolved_actors' => [
+                        'db_product_id' => $actors['db_product_id'],
+                        'billing_user_id' => $actors['billing_user_id'],
+                        'seller_user_id' => $actors['seller_user_id'],
+                    ],
                 ],
             ]);
 

@@ -38,8 +38,10 @@ final class ProductSalesPriceCalculator
             ->multiplyByQuantity($input->quantity);
         $dbBaseLine = $dbBaseLinePrecise->toMoney();
 
-        $billingMarginCondition = $input->conditions->first(ConditionType::MarginPercent, ActorType::BillingUser);
-        $sellerMarginCondition = $input->conditions->first(ConditionType::MarginPercent, ActorType::Seller);
+        $billingMarginCondition = $this->firstMarginPercentCondition($input->conditions, ActorType::BillingUser);
+        $billingMinimumMarginCondition = $this->firstMinimumMarginCondition($input->conditions, ActorType::BillingUser);
+        $sellerMarginCondition = $this->firstMarginPercentCondition($input->conditions, ActorType::Seller);
+        $sellerMinimumMarginCondition = $this->firstMinimumMarginCondition($input->conditions, ActorType::Seller);
 
         if (count($input->conditions->ofType(ConditionType::MarginPercent)) > 2) {
             $warnings[] = new CalculationWarning(
@@ -52,11 +54,30 @@ final class ProductSalesPriceCalculator
             ? $dbBaseLinePrecise->multiplyByPercentage($billingMarginCondition->percentageValue)
             : PreciseAmount::zero($currency);
 
+        if ($billingMinimumMarginCondition?->moneyValue) {
+            $billingMinimumPrecise = PreciseAmount::fromMoney($billingMinimumMarginCondition->moneyValue);
+            if ($billingMinimumPrecise->rawAmount > $billingMarginPrecise->rawAmount) {
+                $billingMarginPrecise = $billingMinimumPrecise;
+            }
+        }
+
         $sellerMarginPrecise = $sellerMarginCondition?->percentageValue
             ? $dbBaseLinePrecise->multiplyByPercentage($sellerMarginCondition->percentageValue)
             : PreciseAmount::zero($currency);
 
+        if ($sellerMinimumMarginCondition?->moneyValue) {
+            $sellerMinimumPrecise = PreciseAmount::fromMoney($sellerMinimumMarginCondition->moneyValue);
+            if ($sellerMinimumPrecise->rawAmount > $sellerMarginPrecise->rawAmount) {
+                $sellerMarginPrecise = $sellerMinimumPrecise;
+            }
+        }
+
         $subtotalPrecise = $dbBaseLinePrecise->add($billingMarginPrecise)->add($sellerMarginPrecise);
+
+        if ($input->priceReference->weightingPercent) {
+            $weightingPrecise = $subtotalPrecise->multiplyByPercentage($input->priceReference->weightingPercent);
+            $subtotalPrecise = $subtotalPrecise->add($weightingPrecise);
+        }
 
         $discountPercentCondition = $input->conditions->first(ConditionType::DiscountPercent, ActorType::Seller);
         $discountFixedCondition = $input->conditions->first(ConditionType::DiscountFixed, ActorType::Seller);
@@ -225,5 +246,37 @@ final class ProductSalesPriceCalculator
             outputAmount: $outputAmount,
             formulaId: $formulaId,
         );
+    }
+
+    private function firstMarginPercentCondition(\App\Domain\Sales\DTO\ResolvedConditionCollection $conditions, ActorType $actorType): ?ResolvedCondition
+    {
+        $filtered = array_values(array_filter(
+            $conditions->ofType(ConditionType::MarginPercent),
+            static fn (ResolvedCondition $condition): bool => $condition->sourceActorType === $actorType
+                && $condition->percentageValue !== null
+        ));
+
+        usort(
+            $filtered,
+            static fn (ResolvedCondition $a, ResolvedCondition $b): int => $a->priority <=> $b->priority
+        );
+
+        return $filtered[0] ?? null;
+    }
+
+    private function firstMinimumMarginCondition(\App\Domain\Sales\DTO\ResolvedConditionCollection $conditions, ActorType $actorType): ?ResolvedCondition
+    {
+        $filtered = array_values(array_filter(
+            $conditions->ofType(ConditionType::MarginPercent),
+            static fn (ResolvedCondition $condition): bool => $condition->sourceActorType === $actorType
+                && $condition->moneyValue !== null
+        ));
+
+        usort(
+            $filtered,
+            static fn (ResolvedCondition $a, ResolvedCondition $b): int => $a->priority <=> $b->priority
+        );
+
+        return $filtered[0] ?? null;
     }
 }

@@ -2,6 +2,18 @@
 
 namespace App\Services;
 
+use App\Domain\Sales\DTO\ActorChain;
+use App\Domain\Sales\DTO\LineCalculationInput;
+use App\Domain\Sales\DTO\ProductPriceReference;
+use App\Domain\Sales\DTO\ProductTaxContext;
+use App\Domain\Sales\DTO\ResolvedConditionCollection;
+use App\Domain\Sales\Enums\PriceSourceType;
+use App\Domain\Sales\Enums\SalesMode;
+use App\Domain\Sales\Services\ProductSalesPriceCalculator;
+use App\Domain\Sales\ValueObjects\Currency;
+use App\Domain\Sales\ValueObjects\Money;
+use App\Domain\Sales\ValueObjects\Percentage;
+use App\Domain\Sales\ValueObjects\Quantity;
 use App\Models\User;
 use App\Models\Product;
 use Illuminate\Support\Collection;
@@ -23,22 +35,16 @@ class PriceCalculatorService
         
         if (!$userAttributes) {
             // Pas d'attributs = retourner les prix de base
-            return $this->roundPrices([
-                $product->price ?? 0,
-                $product->price_floor ?? 0,
-                $product->price_roll ?? 0,
-                $product->price_promo ?? 0,
-            ]);
+            return $this->roundPrices($this->ensureFallbackPrices(
+                $this->resolveTargetStandardPrices($product)
+            ));
         }
 
         // Si c'est le produit de l'utilisateur lui-même
         if (isset($product->user_id) && $product->user_id == $user->id) {
-            return $this->roundPrices([
-                $product->price ?? 0,
-                $product->price_floor ?? 0,
-                $product->price_roll ?? 0,
-                $product->price_promo ?? 0,
-            ]);
+            return $this->roundPrices($this->ensureFallbackPrices(
+                $this->resolveTargetStandardPrices($product)
+            ));
         }
 
         // Prix spéciaux fixes (si p n'est pas -1, 0 ou 1)
@@ -94,24 +100,12 @@ class PriceCalculatorService
     {
         // Récupérer les ancêtres (parents) de l'utilisateur
         $ancestors = $user->ancestors()->get();
+        $currentPrices = $this->resolveTargetStandardPrices($product);
 
         if ($ancestors->isEmpty()) {
-            // Pas de parents = prix de base du produit
-            return [
-                $product->price ?? 0,
-                $product->price_floor ?? 0,
-                $product->price_roll ?? 0,
-                $product->price_promo ?? 0,
-            ];
+            // Pas de parents = prix de base deja resolu
+            return $currentPrices;
         }
-
-        // Remonter la hiérarchie en partant de la racine
-        $currentPrices = [
-            $product->price ?? 0,
-            $product->price_floor ?? 0,
-            $product->price_roll ?? 0,
-            $product->price_promo ?? 0,
-        ];
 
         // Inverser pour partir de la racine
         $ancestors = $ancestors->reverse();
@@ -201,28 +195,93 @@ class PriceCalculatorService
         }
 
         // Garantir 3 prix non nuls (carton, etage, roll)
+        return $this->roundPrices($this->ensureFallbackPrices($result));
+    }
+
+    /**
+     * Garantit un prix standard positif quand les prix de base sont absents.
+     */
+    protected function ensureFallbackPrices(array $prices): array
+    {
         $fallback = 0.0;
-        foreach ([$result[0] ?? 0, $result[1] ?? 0, $result[2] ?? 0, $prices[0] ?? 0, $prices[1] ?? 0, $prices[2] ?? 0] as $candidate) {
+
+        foreach ([$prices[0] ?? 0, $prices[1] ?? 0, $prices[2] ?? 0] as $candidate) {
             if ($candidate > 0) {
                 $fallback = (float) $candidate;
                 break;
             }
         }
+
         if ($fallback <= 0) {
             $fallback = 0.01;
         }
 
-        if (($result[0] ?? 0) <= 0) {
-            $result[0] = $fallback;
+        if (($prices[0] ?? 0) <= 0) {
+            $prices[0] = $fallback;
         }
-        if (($result[1] ?? 0) <= 0) {
-            $result[1] = $fallback;
+        if (($prices[1] ?? 0) <= 0) {
+            $prices[1] = $fallback;
         }
-        if (($result[2] ?? 0) <= 0) {
-            $result[2] = $fallback;
+        if (($prices[2] ?? 0) <= 0) {
+            $prices[2] = $fallback;
+        }
+        if (!array_key_exists(3, $prices)) {
+            $prices[3] = 0;
         }
 
-        return $this->roundPrices($result);
+        return $prices;
+    }
+
+    /**
+     * @return array{0: float|int, 1: float|int, 2: float|int, 3: float|int}
+     */
+    private function resolveTargetStandardPrices(Product $product): array
+    {
+        $legacyPrices = [
+            (float) ($product->price ?? 0),
+            (float) ($product->price_floor ?? 0),
+            (float) ($product->price_roll ?? 0),
+            (float) ($product->price_promo ?? 0),
+        ];
+
+        if (($product->price ?? 0) <= 0) {
+            return $legacyPrices;
+        }
+
+        try {
+            $targetPrice = $this->calculateTargetStandardPrice($product);
+            if ($targetPrice > 0) {
+                $legacyPrices[0] = $targetPrice;
+            }
+        } catch (\Throwable) {
+            // Legacy fallback retained for compatibility while BR-001 is rolled out.
+        }
+
+        return $legacyPrices;
+    }
+
+    private function calculateTargetStandardPrice(Product $product): float
+    {
+        $calculator = new ProductSalesPriceCalculator();
+        $priceMinor = (int) round(((float) ($product->price ?? 0)) * 100);
+
+        $result = $calculator->calculate(new LineCalculationInput(
+            lineId: (int) ($product->id ?? 1),
+            priceReference: new ProductPriceReference(
+                productId: (int) ($product->id ?? 1),
+                dbProductId: (int) ($product->db_products_id ?? 0),
+                priceSource: PriceSourceType::Standard,
+                baseUnitPriceHt: new Money($priceMinor, Currency::EUR),
+                weightingPercent: null,
+            ),
+            quantity: Quantity::fromInt(1),
+            actorChain: new ActorChain(0, 0, null),
+            conditions: new ResolvedConditionCollection([]),
+            taxContext: new ProductTaxContext(Percentage::fromString('0')),
+            salesMode: SalesMode::Depart,
+        ));
+
+        return ((float) $result->product->finalLineHt->minorAmount) / 100.0;
     }
 
         /**

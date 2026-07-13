@@ -22,6 +22,12 @@ use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-051
+ * BR-052
+ * BR-053
+ */
 it('builds internal settlements for db base, seller net earning and transport', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,
@@ -33,6 +39,7 @@ it('builds internal settlements for db base, seller net earning and transport', 
             new TransportLineInput(1, 6000, new Money(250, Currency::EUR)),
             new TransportLineInput(2, 4000, new Money(150, Currency::EUR)),
         ],
+        carrierId: 77,
     ));
 
     $line1 = settlementLine(1, 3000, 5000, 275, 400);
@@ -61,6 +68,10 @@ it('builds internal settlements for db base, seller net earning and transport', 
         ->and($byReason[SettlementReason::TransportCostRecovery->value]->taxTreatmentStatus)->toBe(TaxTreatmentStatus::PendingConfiguration);
 });
 
+/**
+ * Business Rules:
+ * BR-053
+ */
 it('skips self settlements and seller settlement when no seller is defined', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,
@@ -81,6 +92,38 @@ it('skips self settlements and seller settlement when no seller is defined', fun
     ));
 
     expect($collection->lines)->toHaveCount(0);
+});
+
+/**
+ * Business Rules:
+ * BR-052
+ */
+it('creates a transport reversement line when transport cost is present and actors are distinct', function (): void {
+    $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
+        presentationMode: TransportPresentationMode::SeparateAdditionalFee,
+        tariffGrossHt: new Money(750, Currency::EUR),
+        minimumAppliedHt: new Money(0, Currency::EUR),
+        transportRealHt: new Money(750, Currency::EUR),
+        transportVatRate: Percentage::fromString('20'),
+        lines: [new TransportLineInput(1, 10_000, new Money(750, Currency::EUR))],
+        carrierId: 77,
+    ));
+
+    $line = settlementLine(1, 1000, 1200, 66, 0);
+    $breakdown = (new OrderCalculationBreakdownAssembler())->assemble([$line], $transport);
+
+    $collection = (new ExpectedSettlementBuilder())->build($breakdown, new ActorChain(
+        databaseOwnerId: 10,
+        billingUserId: 20,
+        sellerId: null,
+    ));
+
+    expect($collection->lines)->toHaveCount(2)
+        ->and($collection->lines[1]->reason)->toBe(SettlementReason::TransportCostRecovery)
+        ->and($collection->lines[1]->amountHt->minorAmount)->toBe(750)
+        ->and($collection->lines[1]->fromActorId)->toBe(20)
+        ->and($collection->lines[1]->toActorType->value)->toBe('transporter')
+        ->and($collection->lines[1]->toActorId)->toBe(77);
 });
 
 function settlementLine(int $lineId, int $dbBaseMinor, int $finalHtMinor, int $vatMinor, int $sellerNetMinor): SalesLineBreakdown

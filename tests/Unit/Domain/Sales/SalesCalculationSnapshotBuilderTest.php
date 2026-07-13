@@ -24,6 +24,10 @@ use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-048
+ */
 it('builds deterministic snapshot checksum regardless of input context key order', function (): void {
     [$breakdown, $invoice, $settlements] = buildSnapshotArtifacts();
 
@@ -61,6 +65,10 @@ it('builds deterministic snapshot checksum regardless of input context key order
         ]);
 });
 
+/**
+ * Business Rules:
+ * BR-048
+ */
 it('includes order, invoice and settlements sections with consistent totals', function (): void {
     [$breakdown, $invoice, $settlements] = buildSnapshotArtifacts();
 

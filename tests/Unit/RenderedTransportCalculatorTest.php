@@ -33,3 +33,13 @@ it('handles case E with three rolls at 145', function () {
     expect($fullCost)->toBe(0.0)
         ->and($partialCost)->toBe(29.0);
 });
+
+/**
+ * Business Rules:
+ * BR-031
+ */
+it('returns zero rendered transport cost when no rolls are provided', function () {
+    $cost = RenderedTransportCalculator::calculateRenderedTransportCost([], 150.0, 300.0);
+
+    expect($cost)->toBe(0.0);
+});

@@ -71,13 +71,13 @@ final class ExpectedSettlementBuilder
 
         if (
             $breakdown->transportHt->minorAmount > 0
-            && $actorChain->billingUserId !== $actorChain->databaseOwnerId
+            && ($breakdown->transport->orderBreakdown->carrierId ?? null)
         ) {
             $lines[] = new ExpectedSettlementLine(
                 fromActorType: ActorType::BillingUser,
                 fromActorId: $actorChain->billingUserId,
-                toActorType: ActorType::DatabaseOwner,
-                toActorId: $actorChain->databaseOwnerId,
+                toActorType: ActorType::Transporter,
+                toActorId: (int) $breakdown->transport->orderBreakdown->carrierId,
                 reason: SettlementReason::TransportCostRecovery,
                 amountHt: $breakdown->transportHt,
                 vatRate: null,

@@ -19,6 +19,10 @@ use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-047
+ */
 it('projects customer invoice totals and line transport split', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,
@@ -53,6 +57,10 @@ it('projects customer invoice totals and line transport split', function (): voi
         ->and($invoice->lines[1]->transportHt->minorAmount)->toBe(150);
 });
 
+/**
+ * Business Rules:
+ * BR-047
+ */
 it('throws when breakdown totals are inconsistent', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,

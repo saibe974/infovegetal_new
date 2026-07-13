@@ -18,6 +18,10 @@ use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-046
+ */
 it('assembles order totals from product lines and transport breakdown', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,
@@ -48,6 +52,10 @@ it('assembles order totals from product lines and transport breakdown', function
         ->and(count($breakdown->warnings))->toBe(1);
 });
 
+/**
+ * Business Rules:
+ * BR-046
+ */
 it('throws when a line currency does not match transport currency', function (): void {
     $transport = (new TransportAllocationCalculator())->calculate(new OrderTransportCalculationInput(
         presentationMode: TransportPresentationMode::SeparateAdditionalFee,
