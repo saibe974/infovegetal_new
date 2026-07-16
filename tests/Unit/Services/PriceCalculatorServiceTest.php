@@ -107,19 +107,19 @@ it('keeps the standard unit price below the carton threshold', function () {
 it('applies the floor price exactly at the floor threshold', function () {
     $product = makeProduct(10.0, 8.0, 0.0, 0.0);
     $product->cond = 4;
-    $product->floor = 2;
+    $product->floor = 3;
     $product->roll = 0;
 
-    expect(invokeCartPricing($product, 8))->toBe([8.0, 64.0]);
+    expect(invokeCartPricing($product, 12))->toBe([8.0, 96.0]);
 });
 
 it('keeps the carton price below the floor threshold', function () {
     $product = makeProduct(10.0, 8.0, 0.0, 0.0);
     $product->cond = 4;
-    $product->floor = 2;
+    $product->floor = 3;
     $product->roll = 0;
 
-    expect(invokeCartPricing($product, 7))->toBe([10.0, 70.0]);
+    expect(invokeCartPricing($product, 11))->toBe([10.0, 110.0]);
 });
 
 it('applies the roll price exactly at the roll threshold', function () {

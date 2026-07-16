@@ -213,6 +213,13 @@ it('returns a null seller user when the relation has no seller actor', function 
     ]);
 });
 
+/**
+ * Business Rules:
+ * BR-018
+ * BR-019
+ * BR-020
+ * BR-021
+ */
 it('merges billing profile conditions seller defaults and client overrides in order', function (): void {
     $client = User::factory()->create();
     $billingUser = User::factory()->create();
@@ -383,6 +390,10 @@ it('inherits billing profile conditions when no seller or client override exists
         ->and($snapshot['client_override'])->toBe([]);
 });
 
+/**
+ * Business Rules:
+ * BR-019
+ */
 it('selects the default profile and falls back to the first profile when needed', function (): void {
     $service = new OrderSnapshotService();
     $method = new ReflectionMethod($service, 'extractDefaultConditions');
@@ -436,6 +447,11 @@ it('returns an empty condition set when no profile exists', function (): void {
     ]))->toBe([]);
 });
 
+/**
+ * Business Rules:
+ * BR-019
+ * BR-020
+ */
 it('applies the active billing profile to the billing-to-seller conditions', function (): void {
     $client = User::factory()->create();
     $billingUser = User::factory()->create();
@@ -500,6 +516,10 @@ it('applies the active billing profile to the billing-to-seller conditions', fun
         ]);
 });
 
+/**
+ * Business Rules:
+ * BR-020
+ */
 it('falls back to direct seller conditions when the billing profile is disabled', function (): void {
     $client = User::factory()->create();
     $billingUser = User::factory()->create();
@@ -564,6 +584,10 @@ it('falls back to direct seller conditions when the billing profile is disabled'
         ]);
 });
 
+/**
+ * Business Rules:
+ * BR-021
+ */
 it('applies the client override on top of relation conditions', function (): void {
     $client = User::factory()->create();
     $billingUser = User::factory()->create();

@@ -10,6 +10,10 @@ use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-028
+ */
 it('keeps additional transport as order fee in separate mode', function (): void {
     $calculator = new TransportAllocationCalculator();
 

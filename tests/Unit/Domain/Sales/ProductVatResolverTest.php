@@ -7,6 +7,10 @@ use App\Domain\Sales\Enums\ProductVatSource;
 use App\Domain\Sales\Services\ProductVatResolver;
 use App\Domain\Sales\ValueObjects\Percentage;
 
+/**
+ * Business Rules:
+ * BR-026
+ */
 it('uses product vat rate when available', function (): void {
     $resolver = new ProductVatResolver();
 
@@ -41,6 +45,10 @@ it('allows a zero product vat rate when the product rate is explicitly provided'
         ->and($result->categoryId)->toBe(5);
 });
 
+/**
+ * Business Rules:
+ * BR-027
+ */
 it('falls back to category vat rate when product vat is missing', function (): void {
     $resolver = new ProductVatResolver();
 

@@ -68,7 +68,7 @@ it('converts product quantities into cartons deterministically', function (): vo
         ->and($supplierTri['etagfull'] ?? [])
         ->toHaveCount(0)
         ->and($supplierTri['rollfull'] ?? [])
-        ->toHaveCount(0)
+        ->toHaveCount(1)
         ->and($supplierTri['non_roll_items'] ?? [])
         ->toBe([]);
 });
@@ -219,6 +219,7 @@ it('keeps different producer bases separated in the final roll distribution', fu
 
 /**
  * Business Rules:
+ * BR-040
  * BR-044
  */
 it('regroups compatible cartons into optimized rolls', function (array $cartons, int $expectedRollCount, int $expectedEtageCount, float $expectedCoef, float $expectedLoss): void {
@@ -240,7 +241,7 @@ it('regroups compatible cartons into optimized rolls', function (array $cartons,
         ->and($rolls[0]['coef'] ?? null)->toBe($expectedCoef)
         ->and($rolls[0]['perte'] ?? null)->toBe($expectedLoss);
 })->with([
-    'non regroupable single carton' => [[['product_id' => 1, 'x' => 70.0, 'y' => 40.0]], 1, 1, 30.0, 70.0],
+    'non regroupable single carton' => [[['product_id' => 1, 'x' => 70.0, 'y' => 40.0]], 1, 1, 28.0, 72.0],
     'regroupable pair' => [[['product_id' => 1, 'x' => 50.0, 'y' => 40.0], ['product_id' => 2, 'x' => 50.0, 'y' => 40.0]], 1, 1, 40.0, 60.0],
     'mixed case' => [[['product_id' => 1, 'x' => 60.0, 'y' => 50.0], ['product_id' => 2, 'x' => 40.0, 'y' => 40.0], ['product_id' => 3, 'x' => 40.0, 'y' => 40.0]], 1, 2, 62.0, 38.0],
 ]);

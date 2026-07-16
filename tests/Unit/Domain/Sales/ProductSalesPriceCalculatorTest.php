@@ -129,6 +129,11 @@ it('keeps the db base unchanged when seller margin is absent', function () {
         ->and($result->product->finalLineHt->minorAmount)->toBe(22_000);
 });
 
+/**
+ * Business Rules:
+ * BR-014
+ * BR-016
+ */
 it('applies the minimum margin when the percentage margin is too low', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
@@ -172,6 +177,10 @@ it('applies the minimum margin when the percentage margin is too low', function 
         ->and($result->actorEarnings[0]->netEarningHt->minorAmount)->toBe(5_000);
 });
 
+/**
+ * Business Rules:
+ * BR-017
+ */
 it('applies the weighting coefficient deterministically', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
@@ -211,6 +220,12 @@ it('applies the weighting coefficient deterministically', function () {
         ->and($result->actorEarnings[0]->netEarningHt->minorAmount)->toBe(2_000);
 });
 
+/**
+ * Business Rules:
+ * BR-014
+ * BR-015
+ * BR-049
+ */
 it('calculates line with billing and seller margins on db base', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
@@ -332,6 +347,7 @@ it('applies fixed discount with line scope without creating unit discount in dom
 /**
  * Business Rules:
  * BR-023
+ * BR-050
  */
 it('applies fixed discount with unit scope across the quantity', function () {
     $conditions = new ResolvedConditionCollection([
@@ -376,6 +392,11 @@ it('applies fixed discount with unit scope across the quantity', function () {
         ->and($result->actorEarnings[1]->netEarningHt->minorAmount)->toBe(1_400);
 });
 
+/**
+ * Business Rules:
+ * BR-024
+ * BR-050
+ */
 it('applies percent discount before fixed discount in the commercial subtotal flow', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
@@ -477,6 +498,10 @@ it('keeps the commercial subtotal unchanged when the percent discount is zero', 
         ->and($result->actorEarnings[1]->netEarningHt->minorAmount)->toBe(3_000);
 });
 
+/**
+ * Business Rules:
+ * BR-025
+ */
 it('throws when commercial discount exceeds commercial gross margin', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
@@ -562,6 +587,10 @@ it('throws when a commercial discount has no supporting seller actor', function 
         ->toThrow(DiscountExceedsActorMarginException::class);
 });
 
+/**
+ * Business Rules:
+ * BR-026
+ */
 it('calculates vat on final rounded line ht', function () {
     $conditions = new ResolvedConditionCollection([
         new ResolvedCondition(
