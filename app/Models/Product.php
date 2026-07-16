@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Sales\Services\ProductPriceFallbackResolver;
 use App\Models\CategoryProducts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -161,19 +162,17 @@ class Product extends Model implements HasMedia
 
     public function getPriceRollAttribute(mixed $value): ?string
     {
-        $roll = is_numeric($value) ? (float) $value : 0.0;
-        if ($roll > 0) {
-            return number_format($roll, 2, '.', '');
-        }
+        $resolved = (new ProductPriceFallbackResolver())->resolve(
+            is_numeric($this->attributes['price'] ?? null) ? (float) $this->attributes['price'] : 0.0,
+            is_numeric($this->attributes['price_floor'] ?? null) ? (float) $this->attributes['price_floor'] : 0.0,
+            is_numeric($value) ? (float) $value : 0.0,
+            0.0,
+            false,
+            true,
+        );
 
-        $floor = $this->attributes['price_floor'] ?? null;
-        if (is_numeric($floor) && (float) $floor > 0) {
-            return number_format((float) $floor, 2, '.', '');
-        }
-
-        $price = $this->attributes['price'] ?? null;
-        if (is_numeric($price) && (float) $price > 0) {
-            return number_format((float) $price, 2, '.', '');
+        if ($resolved[2] > 0) {
+            return number_format($resolved[2], 2, '.', '');
         }
 
         return $value;

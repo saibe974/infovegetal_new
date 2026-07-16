@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Models\Product;
-use App\Models\User;
+use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
 use App\Models\Cart;
 use App\Models\DbProducts;
 use App\Models\OrderHeader;
+use App\Models\Product;
+use App\Models\User;
 use App\Services\OrderSnapshotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,7 @@ it('resolves the primary db product deterministically and extracts billing and s
     $actors = $method->invoke($service, $client, $items);
 
     expect($actors)->toBe([
+        'client_user_id' => $client->id,
         'db_product_id' => $primaryDbProductId,
         'billing_user_id' => $billingUser->id,
         'seller_user_id' => $sellerUser->id,
@@ -134,6 +136,7 @@ it('stores resolved actors in the order snapshot metadata', function (): void {
             'source' => 'unit-test',
             'resolved_actors' => [
                 'db_product_id' => $dbProductId,
+                'client_user_id' => $client->id,
                 'billing_user_id' => $billingUser->id,
                 'seller_user_id' => $sellerUser->id,
             ],
@@ -170,6 +173,7 @@ it('returns a null billing user when the relation has no billing actor', functio
     ]));
 
     expect($actors)->toBe([
+        'client_user_id' => $client->id,
         'db_product_id' => $dbProductId,
         'billing_user_id' => null,
         'seller_user_id' => null,
@@ -207,6 +211,7 @@ it('returns a null seller user when the relation has no seller actor', function 
     ]));
 
     expect($actors)->toBe([
+        'client_user_id' => $client->id,
         'db_product_id' => $dbProductId,
         'billing_user_id' => $billingUser->id,
         'seller_user_id' => null,
@@ -395,9 +400,7 @@ it('inherits billing profile conditions when no seller or client override exists
  * BR-019
  */
 it('selects the default profile and falls back to the first profile when needed', function (): void {
-    $service = new OrderSnapshotService();
-    $method = new ReflectionMethod($service, 'extractDefaultConditions');
-    $method->setAccessible(true);
+    $resolver = new SalesConditionSnapshotResolver();
 
     $defaultsWithActiveProfile = [
         'default_profile_id' => 'pro',
@@ -427,21 +430,19 @@ it('selects the default profile and falls back to the first profile when needed'
         ],
     ];
 
-    expect($method->invoke($service, $defaultsWithActiveProfile))->toBe([
+    expect($resolver->extractDefaultConditions($defaultsWithActiveProfile))->toBe([
         'priority' => 'pro',
         'shipping' => ['fee' => 200],
-    ])->and($method->invoke($service, $defaultsWithoutMatch))->toBe([
+    ])->and($resolver->extractDefaultConditions($defaultsWithoutMatch))->toBe([
         'priority' => 'base',
         'shipping' => ['fee' => 120],
     ]);
 });
 
 it('returns an empty condition set when no profile exists', function (): void {
-    $service = new OrderSnapshotService();
-    $method = new ReflectionMethod($service, 'extractDefaultConditions');
-    $method->setAccessible(true);
+    $resolver = new SalesConditionSnapshotResolver();
 
-    expect($method->invoke($service, [
+    expect($resolver->extractDefaultConditions([
         'default_profile_id' => 'missing',
         'profiles' => [],
     ]))->toBe([]);

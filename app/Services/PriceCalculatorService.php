@@ -2,18 +2,9 @@
 
 namespace App\Services;
 
-use App\Domain\Sales\DTO\ActorChain;
-use App\Domain\Sales\DTO\LineCalculationInput;
-use App\Domain\Sales\DTO\ProductPriceReference;
-use App\Domain\Sales\DTO\ProductTaxContext;
-use App\Domain\Sales\DTO\ResolvedConditionCollection;
-use App\Domain\Sales\Enums\PriceSourceType;
-use App\Domain\Sales\Enums\SalesMode;
-use App\Domain\Sales\Services\ProductSalesPriceCalculator;
-use App\Domain\Sales\ValueObjects\Currency;
-use App\Domain\Sales\ValueObjects\Money;
-use App\Domain\Sales\ValueObjects\Percentage;
-use App\Domain\Sales\ValueObjects\Quantity;
+use App\Domain\Sales\Services\ProductPriceFallbackResolver;
+use App\Domain\Sales\Services\ProductPriceMarginApplier;
+use App\Domain\Sales\Services\ProductPriceSourceResolver;
 use App\Models\User;
 use App\Models\Product;
 use Illuminate\Support\Collection;
@@ -30,33 +21,29 @@ class PriceCalculatorService
      */
     public function calculatePrice(Product $product, User $user, int $dbProductId): array
     {
+        $priceSourceResolver = new ProductPriceSourceResolver();
+
         // Récupérer les attributs de l'utilisateur pour ce db_product
         $userAttributes = $this->getUserAttributes($user, $dbProductId);
         
         if (!$userAttributes) {
             // Pas d'attributs = retourner les prix de base
             return $this->roundPrices($this->ensureFallbackPrices(
-                $this->resolveTargetStandardPrices($product)
+                $priceSourceResolver->resolveStandardPrices($product)
             ));
         }
 
         // Si c'est le produit de l'utilisateur lui-même
         if (isset($product->user_id) && $product->user_id == $user->id) {
             return $this->roundPrices($this->ensureFallbackPrices(
-                $this->resolveTargetStandardPrices($product)
+                $priceSourceResolver->resolveStandardPrices($product)
             ));
         }
 
         // Prix spéciaux fixes (si p n'est pas -1, 0 ou 1)
-            $priceMode = $this->normalizePriceMode($userAttributes['p'] ?? -1);
+            $priceMode = $priceSourceResolver->normalizePriceMode($userAttributes['p'] ?? -1);
         if ($priceMode != -1 && $priceMode != 0 && $priceMode != 1) {
-            $specialPrice = $this->getSpecialPrice($product, $priceMode);
-            return $this->roundPrices([
-                $specialPrice,
-                $specialPrice,
-                $specialPrice,
-                0,
-            ]);
+            return $this->roundPrices($priceSourceResolver->resolveSpecialPriceSet($product, $priceMode));
         }
 
         // Calculer les prix de base en remontant la hiérarchie
@@ -85,22 +72,13 @@ class PriceCalculatorService
     }
 
     /**
-     * Récupère un prix spécial depuis le produit.
-     */
-    protected function getSpecialPrice(Product $product, string $priceField): float
-    {
-        // Le champ peut être un nom de colonne comme 'price_special_1', etc.
-        return $product->{$priceField} ?? $product->price ?? 0;
-    }
-
-    /**
      * Calcule les prix de base en remontant la hiérarchie des utilisateurs.
      */
     protected function calculateBasePrices(Product $product, User $user, int $dbProductId): array
     {
         // Récupérer les ancêtres (parents) de l'utilisateur
         $ancestors = $user->ancestors()->get();
-        $currentPrices = $this->resolveTargetStandardPrices($product);
+        $currentPrices = (new ProductPriceSourceResolver())->resolveStandardPrices($product);
 
         if ($ancestors->isEmpty()) {
             // Pas de parents = prix de base deja resolu
@@ -139,12 +117,15 @@ class PriceCalculatorService
      */
     protected function applyMargins(array $prices, Product $product, array $attributes): array
     {
+        $marginApplier = new ProductPriceMarginApplier();
+        $priceSourceResolver = new ProductPriceSourceResolver();
+
         // Extraire les paramètres
         $marge = $attributes['m'] ?? 0;           // marge en %
         $margeMin = $attributes['mm'] ?? 0;       // marge min par roll
         $ponderation = $attributes['pd'] ?? 0;    // coefficient de pondération
         $livraison = $attributes['l'] ?? 0;       // livraison
-            $priceMode = $this->normalizePriceMode($attributes['p'] ?? -1); // 0=depart, 1=rendu
+            $priceMode = $priceSourceResolver->normalizePriceMode($attributes['p'] ?? -1); // 0=depart, 1=rendu
         
         // Marges par quantité
         $margeCarton = $attributes['mc'] ?? 0;    // marge par carton
@@ -170,28 +151,15 @@ class PriceCalculatorService
         $result = [];
 
         foreach ($prices as $k => $price) {
-            if ($price == 0) {
-                $result[$k] = 0;
-                continue;
-            }
-
-            // Ajouter marge par quantité (max entre mmpr et marge en %)
-            $adjustedPrice = $price + max($mmpr, $mpq[$k] * $price / 100);
-
-            // Ajouter livraison si prix rendu
-            if ($priceMode == 1 && $livraison != 0) {
-                $adjustedPrice += $ml;
-            }
-
-            // Appliquer pondération
-            if ($ponderation != 0) {
-                $adjustedPrice = $adjustedPrice / ((100 - $ponderation) / 100);
-            }
-
-            // Appliquer marge finale
-            $adjustedPrice += $marge * $price / 100;
-
-            $result[$k] = $adjustedPrice;
+            $result[$k] = $marginApplier->apply(
+                baseUnitPrice: (float) $price,
+                tierMarginPercent: (float) ($mpq[$k] ?? 0),
+                finalMarginPercent: (float) $marge,
+                minimumMarginPerUnit: (float) $mmpr,
+                deliveryPerUnit: (float) $ml,
+                weightingPercent: (float) $ponderation,
+                priceMode: $priceMode,
+            );
         }
 
         // Garantir 3 prix non nuls (carton, etage, roll)
@@ -203,123 +171,14 @@ class PriceCalculatorService
      */
     protected function ensureFallbackPrices(array $prices): array
     {
-        $fallback = 0.0;
-
-        foreach ([$prices[0] ?? 0, $prices[1] ?? 0, $prices[2] ?? 0] as $candidate) {
-            if ($candidate > 0) {
-                $fallback = (float) $candidate;
-                break;
-            }
-        }
-
-        if ($fallback <= 0) {
-            $fallback = 0.01;
-        }
-
-        if (($prices[0] ?? 0) <= 0) {
-            $prices[0] = $fallback;
-        }
-        if (($prices[1] ?? 0) <= 0) {
-            $prices[1] = $fallback;
-        }
-        if (($prices[2] ?? 0) <= 0) {
-            $prices[2] = $fallback;
-        }
-        if (!array_key_exists(3, $prices)) {
-            $prices[3] = 0;
-        }
-
-        return $prices;
+        return (new ProductPriceFallbackResolver())->resolve(
+            standardUnitPrice: (float) ($prices[0] ?? 0),
+            floorUnitPrice: (float) ($prices[1] ?? 0),
+            rollUnitPrice: (float) ($prices[2] ?? 0),
+            promoUnitPrice: (float) ($prices[3] ?? 0),
+        );
     }
 
-    /**
-     * @return array{0: float|int, 1: float|int, 2: float|int, 3: float|int}
-     */
-    private function resolveTargetStandardPrices(Product $product): array
-    {
-        $legacyPrices = [
-            (float) ($product->price ?? 0),
-            (float) ($product->price_floor ?? 0),
-            (float) ($product->price_roll ?? 0),
-            (float) ($product->price_promo ?? 0),
-        ];
-
-        if (($product->price ?? 0) <= 0) {
-            return $legacyPrices;
-        }
-
-        try {
-            $targetPrice = $this->calculateTargetStandardPrice($product);
-            if ($targetPrice > 0) {
-                $legacyPrices[0] = $targetPrice;
-            }
-        } catch (\Throwable) {
-            // Legacy fallback retained for compatibility while BR-001 is rolled out.
-        }
-
-        return $legacyPrices;
-    }
-
-    private function calculateTargetStandardPrice(Product $product): float
-    {
-        $calculator = new ProductSalesPriceCalculator();
-        $priceMinor = (int) round(((float) ($product->price ?? 0)) * 100);
-
-        $result = $calculator->calculate(new LineCalculationInput(
-            lineId: (int) ($product->id ?? 1),
-            priceReference: new ProductPriceReference(
-                productId: (int) ($product->id ?? 1),
-                dbProductId: (int) ($product->db_products_id ?? 0),
-                priceSource: PriceSourceType::Standard,
-                baseUnitPriceHt: new Money($priceMinor, Currency::EUR),
-                weightingPercent: null,
-            ),
-            quantity: Quantity::fromInt(1),
-            actorChain: new ActorChain(0, 0, null),
-            conditions: new ResolvedConditionCollection([]),
-            taxContext: new ProductTaxContext(Percentage::fromString('0')),
-            salesMode: SalesMode::Depart,
-        ));
-
-        return ((float) $result->product->finalLineHt->minorAmount) / 100.0;
-    }
-
-        /**
-         * Normalise les modes de prix (legacy numerique et alias explicites).
-         */
-        protected function normalizePriceMode(mixed $value)
-        {
-            if ($value === null || $value === '') {
-                return 0; // Par défaut, considérer comme "price_depart"
-            }
-
-            if (is_int($value) || is_float($value)) {
-                $intValue = (int) $value;
-                return in_array($intValue, [-1, 0, 1], true) ? $intValue : (string) $value;
-            }
-
-            $raw = strtolower(trim((string) $value));
-
-            if ($raw === 'price_depart' || $raw === 'depart' || $raw === 'departure') {
-                return 0;
-            }
-
-            if (
-                $raw === 'price_render'
-                || $raw === 'price_rendu'
-                || $raw === 'render'
-                || $raw === 'rendered'
-                || $raw === 'rendu'
-            ) {
-                return 1;
-            }
-
-            if ($raw === '-1' || $raw === '0' || $raw === '1') {
-                return (int) $raw;
-            }
-
-            return (string) $value;
-        }
     /**
      * Arrondit les prix à 2 décimales.
      */

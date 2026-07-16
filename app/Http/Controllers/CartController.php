@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Sales\Services\ProductVolumePriceSelector;
+use App\Domain\Sales\Services\ProductPriceFallbackResolver;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Support\RenderedTransportCalculator;
@@ -108,6 +110,7 @@ class CartController extends Controller
             )),
             $user,
             $shippingTotal,
+            false,
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
@@ -139,10 +142,11 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
-                $pdfPayload,
+                $payloadForSnapshot,
                 ['source' => 'place_order']
             );
         }
@@ -586,7 +590,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, true);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -613,17 +617,18 @@ class CartController extends Controller
         $rollSize = $cond > 0 && $floor > 0 && $roll > 0 ? $cond * $floor * $roll : 0;
 
         [$price, $priceFloor, $priceRoll, $pricePromo] = $this->resolveProductPrices($product, $user, $priceCalculator);
-        $rollPrice = $pricePromo > 0 ? $pricePromo : $priceRoll;
+        $volumePriceSelector = new ProductVolumePriceSelector();
 
-        $unitPrice = $price > 0 ? $price : 0;
-
-        if ($rollSize > 0 && $rollPrice > 0 && $qty >= $rollSize) {
-            $unitPrice = $rollPrice;
-        } elseif ($floorSize > 0 && $priceFloor > 0 && $qty >= $floorSize) {
-            $unitPrice = $priceFloor;
-        } elseif ($traySize > 0 && $price > 0 && $qty >= $traySize) {
-            $unitPrice = $price;
-        }
+        $unitPrice = $volumePriceSelector->selectUnitPrice(
+            quantity: $qty,
+            traySize: $traySize,
+            floorSize: $floorSize,
+            rollSize: $rollSize,
+            standardUnitPrice: $price,
+            floorUnitPrice: $priceFloor,
+            rollUnitPrice: $priceRoll,
+            promoUnitPrice: $pricePromo,
+        );
 
         $lineTotal = $unitPrice * $qty;
 
@@ -645,22 +650,12 @@ class CartController extends Controller
             $pricePromo = (float) ($prices[3] ?? $pricePromo);
         }
 
-        $base = 0.0;
-        foreach ([$price, $priceFloor, $priceRoll] as $candidate) {
-            if ($candidate > 0) {
-                $base = $candidate;
-                break;
-            }
-        }
-
-        $fallback = $base > 0 ? $base : 0.01;
-
-        return [
-            $price > 0 ? $price : $fallback,
-            $priceFloor > 0 ? $priceFloor : $fallback,
-            $priceRoll > 0 ? $priceRoll : $fallback,
-            $pricePromo > 0 ? $pricePromo : 0,
-        ];
+        return (new ProductPriceFallbackResolver())->resolve(
+            standardUnitPrice: $price,
+            floorUnitPrice: $priceFloor,
+            rollUnitPrice: $priceRoll,
+            promoUnitPrice: $pricePromo,
+        );
     }
 
     private function buildPdfPayload(array $itemsInput, \App\Models\User $user, float $shippingTotal, bool $preferInputPrices = false): array
@@ -837,7 +832,7 @@ class CartController extends Controller
         CartTcpdfService $cartTcpdfService,
         bool $sendEmails,
     ): array {
-        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, true);
+        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, false);
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $payload['order_number'] = $orderNumber;
 

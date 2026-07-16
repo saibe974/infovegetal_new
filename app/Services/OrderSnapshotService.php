@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Domain\Sales\Services\OrderActorResolver;
+use App\Domain\Sales\Services\SalesConditionRelationResolver;
+use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
 use App\Models\Cart;
 use App\Models\DbProductBillingUser;
 use App\Models\ClientSalesCondition;
@@ -34,7 +37,7 @@ class OrderSnapshotService
             $actors['db_product_id'],
             $actors['billing_user_id'],
             $actors['seller_user_id'],
-            (int) $client->id,
+            $actors['client_user_id'],
         );
 
         $orderDate = $options['order_date'] ?? now();
@@ -54,7 +57,7 @@ class OrderSnapshotService
         ) {
             $order = OrderHeader::create([
                 'cart_id' => (int) $cart->id,
-                'client_user_id' => (int) $client->id,
+                'client_user_id' => $actors['client_user_id'],
                 'billing_user_id' => $actors['billing_user_id'],
                 'seller_user_id' => $actors['seller_user_id'],
                 'db_product_id' => $actors['db_product_id'],
@@ -73,6 +76,7 @@ class OrderSnapshotService
                     'cart_status' => (string) ($cart->status ?? ''),
                     'resolved_actors' => [
                         'db_product_id' => $actors['db_product_id'],
+                        'client_user_id' => $actors['client_user_id'],
                         'billing_user_id' => $actors['billing_user_id'],
                         'seller_user_id' => $actors['seller_user_id'],
                     ],
@@ -167,44 +171,7 @@ class OrderSnapshotService
 
     private function resolveActors(User $client, Collection $items): array
     {
-        $dbStats = [];
-        foreach ($items as $item) {
-            $product = $item['product'];
-            $dbProductId = (int) ($product->db_products_id ?? 0);
-            if ($dbProductId <= 0) {
-                continue;
-            }
-
-            $lineTotal = (float) ($item['line_total'] ?? 0);
-            $dbStats[$dbProductId] = ($dbStats[$dbProductId] ?? 0.0) + $lineTotal;
-        }
-
-        if (empty($dbStats)) {
-            return [
-                'db_product_id' => null,
-                'billing_user_id' => null,
-                'seller_user_id' => null,
-            ];
-        }
-
-        arsort($dbStats);
-        $primaryDbProductId = (int) array_key_first($dbStats);
-
-        $attributes = DB::table('db_product_user')
-            ->where('user_id', (int) $client->id)
-            ->where('db_product_id', $primaryDbProductId)
-            ->value('attributes');
-
-        $attrs = is_array($attributes)
-            ? $attributes
-            : json_decode((string) $attributes, true);
-        $attrs = is_array($attrs) ? $attrs : [];
-
-        return [
-            'db_product_id' => $primaryDbProductId,
-            'billing_user_id' => !empty($attrs['fact']) ? (int) $attrs['fact'] : null,
-            'seller_user_id' => !empty($attrs['com']) ? (int) $attrs['com'] : null,
-        ];
+        return (new OrderActorResolver())->resolve($client, $items);
     }
 
     private function resolveConditionsSnapshot(?int $dbProductId, ?int $billingUserId, ?int $sellerUserId, ?int $clientUserId = null): array
@@ -213,6 +180,9 @@ class OrderSnapshotService
             return [];
         }
 
+        $conditionsResolver = new SalesConditionSnapshotResolver();
+        $relationResolver = new SalesConditionRelationResolver();
+
         $rule = DbProductBillingUser::query()
             ->where('db_product_id', $dbProductId)
             ->where('billing_user_id', $billingUserId)
@@ -220,121 +190,17 @@ class OrderSnapshotService
             ->first();
 
         $defaults = is_array($rule?->defaults) ? $rule->defaults : [];
-        $defaultConditions = $this->extractDefaultConditions($defaults);
+        $sellerRuleData = $relationResolver->resolveSellerRuleData($dbProductId, $billingUserId, $sellerUserId);
+        $clientOverride = $relationResolver->resolveClientOverride($dbProductId, $billingUserId, $sellerUserId, $clientUserId);
 
-        $billingToSellerConditions = $defaultConditions;
-        $clientOverride = [];
-        $sellerDefaults = [];
-
-        if ($sellerUserId) {
-            $sellerRule = DbProductSellerUser::query()
-                ->where('db_product_id', $dbProductId)
-                ->where('seller_user_id', $sellerUserId)
-                ->where(function ($query) use ($billingUserId) {
-                    $query->where('billing_user_id', $billingUserId)
-                        ->orWhereNull('billing_user_id');
-                })
-                ->where('active', true)
-                ->orderByRaw('CASE WHEN billing_user_id IS NULL THEN 1 ELSE 0 END')
-                ->first();
-
-            $sellerRuleDefaults = is_array($sellerRule?->seller_defaults) ? $sellerRule->seller_defaults : [];
-            $sellerDefaults = $this->extractDefaultConditions($sellerRuleDefaults);
-
-            if ($sellerRule) {
-                if ((bool) ($sellerRule->use_billing_profile ?? true)) {
-                    $profileConditions = $this->extractProfileConditionsById(
-                        $defaults,
-                        $sellerRule->billing_profile_id ? (string) $sellerRule->billing_profile_id : null,
-                    );
-                    $billingToSellerConditions = !empty($profileConditions) ? $profileConditions : $defaultConditions;
-                } else {
-                    $billingToSellerConditions = is_array($sellerRule->conditions) ? $sellerRule->conditions : [];
-                }
-            }
-        }
-
-        if ($clientUserId) {
-            $clientRule = ClientSalesCondition::query()
-                ->where('client_user_id', $clientUserId)
-                ->where('db_product_id', $dbProductId)
-                ->where('billing_user_id', $billingUserId)
-                ->where('seller_user_id', $sellerUserId)
-                ->where('active', true)
-                ->first();
-
-            if ($clientRule && is_array($clientRule->conditions_override)) {
-                $clientOverride = $clientRule->conditions_override;
-            }
-        }
-
-        $resolved = array_replace_recursive($billingToSellerConditions, $sellerDefaults, $clientOverride);
-
-        return [
-            'resolved' => $resolved,
-            'defaults' => $defaults,
-            'billing_to_seller_conditions' => $billingToSellerConditions,
-            'seller_defaults' => $sellerDefaults,
-            'client_override' => $clientOverride,
-            'db_product_id' => $dbProductId,
-            'billing_user_id' => $billingUserId,
-            'seller_user_id' => $sellerUserId,
-        ];
-    }
-
-    private function extractProfileConditionsById(array $defaults, ?string $profileId): array
-    {
-        $profiles = $defaults['profiles'] ?? null;
-        if (!is_array($profiles) || empty($profiles)) {
-            return [];
-        }
-
-        if ($profileId) {
-            foreach ($profiles as $profile) {
-                if (!is_array($profile)) {
-                    continue;
-                }
-
-                if ((string) ($profile['id'] ?? '') === $profileId) {
-                    return is_array($profile['conditions'] ?? null) ? $profile['conditions'] : [];
-                }
-            }
-        }
-
-        return $this->extractDefaultConditions($defaults);
-    }
-
-    private function extractDefaultConditions(array $defaults): array
-    {
-        $profiles = $defaults['profiles'] ?? null;
-        if (!is_array($profiles)) {
-            return $defaults;
-        }
-
-        if (empty($profiles)) {
-            return [];
-        }
-
-        $defaultProfileId = isset($defaults['default_profile_id']) ? (string) $defaults['default_profile_id'] : null;
-        $selected = null;
-
-        foreach ($profiles as $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $profileId = (string) ($profile['id'] ?? '');
-            if ($defaultProfileId !== null && $profileId === $defaultProfileId) {
-                $selected = $profile;
-                break;
-            }
-        }
-
-        if (!$selected) {
-            $selected = is_array($profiles[0] ?? null) ? $profiles[0] : [];
-        }
-
-        return is_array($selected['conditions'] ?? null) ? $selected['conditions'] : [];
+        return array_merge(
+            $conditionsResolver->resolve($defaults, $sellerRuleData, $clientOverride),
+            [
+                'db_product_id' => $dbProductId,
+                'billing_user_id' => $billingUserId,
+                'seller_user_id' => $sellerUserId,
+            ]
+        );
     }
 
     private function resolveTvaRate(Product $product, Collection $ratesById): float
