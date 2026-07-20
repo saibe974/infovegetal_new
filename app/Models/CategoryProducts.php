@@ -12,5 +12,6 @@ class CategoryProducts extends Model
 
     protected $fillable = [
         'name',
+        'tva_id',
     ];
 }

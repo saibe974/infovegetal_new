@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Domain\Sales\Services\ProductVolumePriceSelector;
 use App\Domain\Sales\Services\ProductPriceFallbackResolver;
+use App\Domain\Sales\Services\TransportDeparturePricingService;
+use App\Domain\Sales\Services\TransportZoneTariffResolver;
 use App\Models\Cart;
 use App\Models\Product;
 use App\Support\RenderedTransportCalculator;
@@ -896,154 +898,12 @@ class CartController extends Controller
 
     private function computeShippingFromRollDistribution(array $rollDistribution, array $pivotsByDbProductId): float
     {
-        $suppliers = $rollDistribution['suppliers'] ?? [];
-        if (empty($suppliers) || empty($pivotsByDbProductId)) {
-            return 0.0;
-        }
-
-        // Batch-fetch carriers and zones needed
-        $carrierIds = [];
-        $zoneIds = [];
-        foreach ($suppliers as $supplier) {
-            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
-            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
-            if (!$attrs) {
-                continue;
-            }
-            $carrierId = (int) ($attrs['t'] ?? 0);
-            $zoneId = (int) ($attrs['z'] ?? 0);
-            if ($carrierId > 0) {
-                $carrierIds[] = $carrierId;
-            }
-            if ($zoneId > 0) {
-                $zoneIds[] = $zoneId;
-            }
-        }
-
-        $carriers = empty($carrierIds)
-            ? collect()
-            : \App\Models\Carrier::whereIn('id', array_unique($carrierIds))->get()->keyBy('id');
-        $zones = empty($zoneIds)
-            ? collect()
-            : \App\Models\CarrierZone::whereIn('id', array_unique($zoneIds))->get()->keyBy('id');
-
-        $totalShipping = 0.0;
-
-        foreach ($suppliers as $supplier) {
-            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
-            $modLiv = (string) ($supplier['mod_liv'] ?? '');
-            $rolls = is_array($supplier['rolls'] ?? null) ? $supplier['rolls'] : [];
-
-            if ($modLiv !== 'roll' || empty($rolls)) {
-                continue;
-            }
-
-            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
-            if (!$attrs) {
-                continue;
-            }
-
-            $carrierId = (int) ($attrs['t'] ?? 0);
-            $zoneId = (int) ($attrs['z'] ?? 0);
-            $priceMode = $this->normalizeShippingPriceMode($attrs['p'] ?? 0);
-            $rollCount = count($rolls);
-
-            if ($carrierId > 0 && $zoneId > 0) {
-                $carrier = $carriers->get($carrierId);
-                $zone = $zones->get($zoneId);
-
-                if ($carrier && $zone) {
-                    $tariffs = is_array($zone->tariffs) ? $zone->tariffs : [];
-                    $baseTariffPerRoll = $this->pickZoneTariff($rollCount, $tariffs);
-                    $baseTotal = $baseTariffPerRoll * $rollCount;
-                    $carrierMinimum = max(0.0, $this->tariffToFloat($tariffs['mini'] ?? 0));
-
-                    if ($priceMode === 1 && $rollCount > 0) {
-                        $fillRates = [];
-                        foreach ($rolls as $roll) {
-                            $coef = $this->tariffToFloat($roll['coef'] ?? 0);
-                            $fillRates[] = $this->tariffToFillRatio($coef);
-                        }
-
-                        $adjustedTotal = RenderedTransportCalculator::calculateRenderedTransportCost(
-                            $fillRates,
-                            $baseTariffPerRoll,
-                            $carrierMinimum,
-                        );
-                    } else {
-                        $adjustedTotal = $carrierMinimum > 0.0 && $baseTotal < $carrierMinimum
-                            ? $carrierMinimum
-                            : $baseTotal;
-                    }
-
-                    $taxgoRate = max(0.0, $this->tariffToFloat($carrier->taxgo ?? 0));
-                    $totalShipping += round($adjustedTotal * (1.0 + $taxgoRate / 100.0) * 100) / 100;
-                    continue;
-                }
-            }
-
-            // Fallback: roll_price from attributes
-            $rollPrice = $this->tariffToFloat($attrs['l'] ?? 0);
-            if ($rollPrice <= 0) {
-                continue;
-            }
-
-            if ($priceMode === 0) {
-                $totalShipping += round($rollPrice * $rollCount * 100) / 100;
-            } elseif ($priceMode === 1) {
-                $supplierShipping = 0.0;
-                foreach ($rolls as $roll) {
-                    $coef = $this->tariffToFloat($roll['coef'] ?? 0);
-                    $ratioToPay = 1.0 - $this->tariffToFillRatio($coef);
-                    $supplierShipping += $rollPrice * $ratioToPay;
-                }
-                $totalShipping += round($supplierShipping * 100) / 100;
-            }
-        }
-
-        return round($totalShipping * 100) / 100;
+        return (new TransportDeparturePricingService())->calculate($rollDistribution, $pivotsByDbProductId);
     }
 
     private function pickZoneTariff(int $rollCount, array $tariffs): float
     {
-        if ($rollCount <= 0) {
-            return 0.0;
-        }
-
-        $entries = [];
-        foreach ($tariffs as $key => $value) {
-            if ((string) $key === 'mini') {
-                continue;
-            }
-            $range = $this->parseTariffRange((string) $key);
-            if ($range === null) {
-                continue;
-            }
-            $numValue = $this->tariffToFloat($value);
-            if (!is_finite($numValue) || $numValue <= 0 || $range['min'] <= 0) {
-                continue;
-            }
-            $entries[] = ['min' => $range['min'], 'max' => $range['max'], 'value' => $numValue];
-        }
-
-        usort($entries, fn ($a, $b) => $a['min'] !== $b['min']
-            ? $a['min'] <=> $b['min']
-            : ($a['max'] ?? PHP_INT_MAX) <=> ($b['max'] ?? PHP_INT_MAX));
-
-        if (empty($entries)) {
-            return 0.0;
-        }
-
-        $eligible = array_values(array_filter($entries,
-            fn ($e) => $rollCount >= $e['min'] && ($e['max'] === null || $rollCount <= $e['max'])));
-
-        if (!empty($eligible)) {
-            return array_reduce($eligible, fn ($best, $e) => $e['min'] >= $best['min'] ? $e : $best, $eligible[0])['value'];
-        }
-
-        $lowerOrEqual = array_values(array_filter($entries, fn ($e) => $rollCount >= $e['min']));
-
-        return !empty($lowerOrEqual) ? end($lowerOrEqual)['value'] : 0.0;
+        return (new TransportZoneTariffResolver())->resolve($rollCount, $tariffs);
     }
 
     private function parseTariffRange(string $key): ?array

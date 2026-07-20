@@ -11,10 +11,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
-uses(Tests\TestCase::class, RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function createProductWithTransportChoice(string $name, User $user, int $dbProductId, array $transportAttributes): Product
 {
+    $ean13 = str_pad((string) (($dbProductId % 1000000000000) + 1000000000000), 13, '0', STR_PAD_LEFT);
+
     DB::table('db_product_user')->insert([
         'db_product_id' => $dbProductId,
         'user_id' => $user->id,
@@ -32,7 +34,7 @@ function createProductWithTransportChoice(string $name, User $user, int $dbProdu
         'category_products_id' => null,
         'db_products_id' => $dbProductId,
         'ref' => $name,
-        'ean13' => null,
+        'ean13' => $ean13,
         'pot' => null,
         'height' => null,
         'price_floor' => 9,
@@ -169,7 +171,7 @@ it('returns no transport context when no choice is provided', function (): void 
         'category_products_id' => null,
         'db_products_id' => $dbProductId,
         'ref' => 'no-choice-product',
-        'ean13' => null,
+        'ean13' => str_pad((string) (($dbProductId % 1000000000000) + 1000000000000), 13, '0', STR_PAD_LEFT),
         'pot' => null,
         'height' => null,
         'price_floor' => 9,

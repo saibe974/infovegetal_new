@@ -122,6 +122,59 @@ it('applies the carrier monetary minimum when the tiered total is below the floo
 
 /**
  * Business Rules:
+ * BR-028
+ */
+it('applies transport vat on the computed shipping total', function (): void {
+    $carrier = Carrier::create([
+        'name' => 'Carrier vat',
+        'country' => 'FR',
+        'days' => 2,
+        'minimum' => 0,
+        'taxgo' => 20,
+    ]);
+
+    $zone = CarrierZone::create([
+        'carrier_id' => $carrier->id,
+        'name' => 'Zone VAT',
+        'tariffs' => [
+            'mini' => 0,
+            'roll:1-3' => 150,
+        ],
+    ]);
+
+    $controller = new CartController();
+    $method = new ReflectionMethod($controller, 'computeShippingFromRollDistribution');
+    $method->setAccessible(true);
+
+    $rollDistribution = [
+        'suppliers' => [
+            [
+                'supplier_id' => 1,
+                'mod_liv' => 'roll',
+                'rolls' => [
+                    ['coef' => 1.0],
+                    ['coef' => 1.0],
+                ],
+            ],
+        ],
+    ];
+
+    $pivotsByDbProductId = [
+        1 => [
+            't' => $carrier->id,
+            'z' => $zone->id,
+            'p' => 0,
+            'l' => 20,
+        ],
+    ];
+
+    $shipping = $method->invoke($controller, $rollDistribution, $pivotsByDbProductId);
+
+    expect($shipping)->toBe(360.0);
+});
+
+/**
+ * Business Rules:
  * BR-035
  */
 it('uses the zone-specific tariff when the delivery zone changes', function (): void {

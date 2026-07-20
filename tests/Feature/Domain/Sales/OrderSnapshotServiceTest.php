@@ -143,6 +143,373 @@ it('stores resolved actors in the order snapshot metadata', function (): void {
         ]);
 });
 
+it('uses the category vat rate when the product vat rate is missing', function (): void {
+    $client = User::factory()->create();
+    $billingUser = User::factory()->create();
+    $sellerUser = User::factory()->create();
+
+    $productVatId = DB::table('tva')->insertGetId([
+        'rate' => 10,
+    ]);
+
+    $categoryVatId = DB::table('tva')->insertGetId([
+        'rate' => 5.5,
+    ]);
+
+    $categoryId = DB::table('category_products')->insertGetId([
+        'name' => 'category-with-vat',
+        'tva_id' => $categoryVatId,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-category-vat',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $client->id,
+        'attributes' => json_encode(['fact' => $billingUser->id, 'com' => $sellerUser->id]),
+    ]);
+
+    $cart = Cart::create([
+        'user_id' => $client->id,
+        'status' => 'processing',
+    ]);
+
+    $product = Product::query()->create([
+        'sku' => 'category-vat-product',
+        'name' => 'Category VAT product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => null,
+        'category_products_id' => $categoryId,
+        'db_products_id' => $dbProductId,
+        'ref' => 'CATEGORY-VAT',
+        'ean13' => '1234567890123',
+        'tva_id' => null,
+    ]);
+    $product->setRelation('dbProduct', DbProducts::query()->findOrFail($dbProductId));
+
+    $service = new OrderSnapshotService();
+    $orderHeader = $service->createFromPayload($cart, $client, [
+        'items' => [
+            [
+                'product' => $product,
+                'quantity' => 2,
+                'unit_price' => 10,
+                'line_total' => 20,
+            ],
+        ],
+        'items_total' => 20,
+        'shipping_total' => 0,
+        'total' => 20,
+    ], [
+        'source' => 'unit-test',
+    ]);
+
+    expect($orderHeader)->toBeInstanceOf(OrderHeader::class);
+    expect($orderHeader->lines)->toHaveCount(1);
+    expect($orderHeader->lines->first()->tva_rate)->toBe('5.50');
+});
+
+it('projects order totals through the domain invoice aggregation', function (): void {
+    $client = User::factory()->create();
+    $billingUser = User::factory()->create();
+    $sellerUser = User::factory()->create();
+
+    $vatId = DB::table('tva')->insertGetId([
+        'rate' => 10,
+    ]);
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-order-totals',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $client->id,
+        'attributes' => json_encode(['fact' => $billingUser->id, 'com' => $sellerUser->id]),
+    ]);
+
+    $cart = Cart::create([
+        'user_id' => $client->id,
+        'status' => 'processing',
+    ]);
+
+    $product = Product::query()->create([
+        'sku' => 'order-total-product',
+        'name' => 'Order total product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'ORDER-TOTAL',
+        'ean13' => '1234567890123',
+        'tva_id' => $vatId,
+    ]);
+    $product->setRelation('dbProduct', DbProducts::query()->findOrFail($dbProductId));
+
+    $service = new OrderSnapshotService();
+    $orderHeader = $service->createFromPayload($cart, $client, [
+        'items' => [
+            [
+                'product' => $product,
+                'quantity' => 2,
+                'unit_price' => 10,
+                'line_total' => 20,
+            ],
+        ],
+        'items_total' => 20,
+        'shipping_total' => 5,
+        'total' => 25,
+    ]);
+
+    expect((float) $orderHeader->total_ht)->toBe(25.0)
+        ->and((float) $orderHeader->total_tva)->toBe(2.5)
+        ->and((float) $orderHeader->total_ttc)->toBe(27.5);
+});
+
+it('persists an immutable sales calculation snapshot in order metadata', function (): void {
+    $client = User::factory()->create();
+    $billingUser = User::factory()->create();
+    $sellerUser = User::factory()->create();
+
+    $vatId = DB::table('tva')->insertGetId([
+        'rate' => 20,
+    ]);
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-snapshot-persisted',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $client->id,
+        'attributes' => json_encode(['fact' => $billingUser->id, 'com' => $sellerUser->id]),
+    ]);
+
+    $cart = Cart::create([
+        'user_id' => $client->id,
+        'status' => 'processing',
+    ]);
+
+    $product = Product::query()->create([
+        'sku' => 'snapshot-persisted-product',
+        'name' => 'Snapshot persisted product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'SNAPSHOT-PERSISTED',
+        'ean13' => '1234567890123',
+        'tva_id' => $vatId,
+    ]);
+    $product->setRelation('dbProduct', DbProducts::query()->findOrFail($dbProductId));
+
+    $orderHeader = (new OrderSnapshotService())->createFromPayload($cart, $client, [
+        'items' => [
+            [
+                'product' => $product,
+                'quantity' => 1,
+                'unit_price' => 10,
+                'line_total' => 10,
+            ],
+        ],
+        'items_total' => 10,
+        'shipping_total' => 2,
+        'total' => 12,
+    ], [
+        'source' => 'unit-test-snapshot',
+        'order_date' => now()->setTimezone('UTC'),
+    ]);
+
+    $snapshot = $orderHeader->meta['sales_calculation_snapshot'] ?? null;
+
+    expect($snapshot)->toBeArray()
+        ->and($snapshot['schema_version'] ?? null)->toBe('1.0')
+        ->and($snapshot['engine_version'] ?? null)->toBe('sales-engine-v1')
+        ->and($snapshot['checksum'] ?? null)->not->toBe('')
+        ->and($snapshot['payload']['order_breakdown']['totals']['total_ht']['minor'] ?? null)->toBe(1200)
+        ->and($snapshot['payload']['customer_invoice']['totals']['total_ttc']['minor'] ?? null)->toBe(1440)
+        ->and($snapshot['payload']['expected_settlements']['lines'] ?? null)->toBe([]);
+});
+
+it('stores a readable audit trail in order metadata', function (): void {
+    $client = User::factory()->create();
+    $billingUser = User::factory()->create();
+    $sellerUser = User::factory()->create();
+
+    $vatId = DB::table('tva')->insertGetId([
+        'rate' => 20,
+    ]);
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-audit-trail',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $client->id,
+        'attributes' => json_encode(['fact' => $billingUser->id, 'com' => $sellerUser->id]),
+    ]);
+
+    $cart = Cart::create([
+        'user_id' => $client->id,
+        'status' => 'processing',
+    ]);
+
+    $product = Product::query()->create([
+        'sku' => 'audit-trail-product',
+        'name' => 'Audit trail product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'AUDIT-TRAIL',
+        'ean13' => '1234567890123',
+        'tva_id' => $vatId,
+    ]);
+    $product->setRelation('dbProduct', DbProducts::query()->findOrFail($dbProductId));
+
+    $orderHeader = (new OrderSnapshotService())->createFromPayload($cart, $client, [
+        'items' => [
+            [
+                'product' => $product,
+                'quantity' => 2,
+                'unit_price' => 10,
+                'line_total' => 20,
+            ],
+        ],
+        'items_total' => 20,
+        'shipping_total' => 5,
+        'total' => 25,
+    ], [
+        'source' => 'unit-test-audit',
+        'order_date' => now()->setTimezone('UTC'),
+    ]);
+
+    $snapshot = $orderHeader->meta['sales_calculation_snapshot'] ?? null;
+    $payload = $snapshot['payload'] ?? null;
+
+    expect($payload)->toBeArray()
+        ->and($payload)->toHaveKeys(['input_context', 'order_breakdown', 'customer_invoice', 'expected_settlements'])
+        ->and($payload['input_context']['source'] ?? null)->toBe('unit-test-audit')
+        ->and($payload['order_breakdown']['lines'][0]['line_id'] ?? null)->toBe(1)
+        ->and($payload['order_breakdown']['totals']['total_ht']['minor'] ?? null)->toBe(2500)
+        ->and($payload['order_breakdown']['totals']['total_vat']['minor'] ?? null)->toBe(500)
+        ->and($payload['customer_invoice']['totals']['total_ttc']['minor'] ?? null)->toBe(3000)
+        ->and($snapshot['checksum'] ?? null)->not->toBe('');
+});
+
+it('persists billing gains computed from billing-side sales conditions', function (): void {
+    $client = User::factory()->create();
+    $billingUser = User::factory()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-billing-gain',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $client->id,
+        'attributes' => json_encode(['fact' => $billingUser->id]),
+    ]);
+
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => json_encode([
+            'default_profile_id' => 'base',
+            'profiles' => [
+                [
+                    'id' => 'base',
+                    'conditions' => [
+                        'm' => 10,
+                    ],
+                ],
+            ],
+        ]),
+        'active' => true,
+    ]);
+
+    $cart = Cart::create([
+        'user_id' => $client->id,
+        'status' => 'processing',
+    ]);
+
+    $product = Product::query()->create([
+        'sku' => 'billing-gain-product',
+        'name' => 'Billing gain product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'BILLING-GAIN',
+        'ean13' => '1234567890123',
+        'cond' => 2,
+        'floor' => 2,
+        'roll' => 3,
+    ]);
+    $product->setRelation('dbProduct', DbProducts::query()->findOrFail($dbProductId));
+
+    $orderHeader = (new OrderSnapshotService())->createFromPayload($cart, $client, [
+        'items' => [
+            [
+                'product' => $product,
+                'quantity' => 2,
+                'unit_price' => 11,
+                'line_total' => 22,
+            ],
+        ],
+        'items_total' => 22,
+        'shipping_total' => 0,
+        'total' => 22,
+    ], [
+        'source' => 'unit-test-billing-gain',
+    ]);
+
+    expect((float) ($orderHeader->meta['billing_gain_total_ht'] ?? 0))->toBe(2.0)
+        ->and((float) ($orderHeader->lines->first()->meta['billing_gain_ht'] ?? 0))->toBe(2.0)
+        ->and($orderHeader->meta['sales_calculation_snapshot']['payload']['order_breakdown']['lines'][0]['product']['billing_margin_line_ht']['minor'] ?? null)->toBe(200);
+});
+
 it('returns a null billing user when the relation has no billing actor', function (): void {
     $client = User::factory()->create();
 
