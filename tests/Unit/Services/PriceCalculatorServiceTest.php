@@ -6,6 +6,11 @@ use App\Models\Product;
 use App\Models\User;
 use App\Http\Controllers\CartController;
 use App\Services\PriceCalculatorService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 function makeProduct(?float $price, ?float $priceFloor = null, ?float $priceRoll = null, ?float $pricePromo = null): Product
 {
@@ -196,4 +201,114 @@ it('falls back to the standard price when the special source is absent', functio
     $prices = $service->calculatePrice($product, makeUser(), 42);
 
     expect($prices)->toBe([10.0, 10.0, 10.0, 0.0]);
+});
+
+it('applies the billing profile selected through the billing to seller relation', function (): void {
+    $client = User::factory()->withoutTwoFactor()->create();
+    $billingUser = User::factory()->withoutTwoFactor()->create();
+    $sellerUser = User::factory()->withoutTwoFactor()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-price-calculator-billing-profile',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => json_encode([
+            'default_profile_id' => 'base',
+            'profiles' => [
+                ['id' => 'base', 'conditions' => ['m' => 5]],
+                ['id' => 'pro', 'conditions' => ['m' => 30]],
+            ],
+        ]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_seller_user')->insert([
+        'db_product_id' => $dbProductId,
+        'seller_user_id' => $sellerUser->id,
+        'billing_user_id' => $billingUser->id,
+        'conditions' => json_encode([]),
+        'seller_defaults' => json_encode([]),
+        'use_billing_profile' => true,
+        'billing_profile_id' => 'pro',
+        'can_manage' => false,
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('client_sales_conditions')->insert([
+        'client_user_id' => $client->id,
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'seller_user_id' => $sellerUser->id,
+        'conditions_override' => json_encode([]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $prices = (new PriceCalculatorService())->calculatePrice(
+        makeProduct(10.0, 8.0, 7.0, 0.0),
+        $client,
+        $dbProductId,
+    );
+
+    expect($prices)->toBe([13.0, 10.4, 9.1, 0.0]);
+});
+
+it('applies billing-only client conditions when no seller is selected', function (): void {
+    $client = User::factory()->withoutTwoFactor()->create();
+    $billingUser = User::factory()->withoutTwoFactor()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-price-calculator-billing-only',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => json_encode([
+            'default_profile_id' => 'base',
+            'profiles' => [
+                ['id' => 'base', 'conditions' => ['m' => 5]],
+            ],
+        ]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('client_sales_conditions')->insert([
+        'client_user_id' => $client->id,
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'seller_user_id' => null,
+        'conditions_override' => json_encode(['m' => 25]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $prices = (new PriceCalculatorService())->calculatePrice(
+        makeProduct(10.0, 8.0, 7.0, 0.0),
+        $client,
+        $dbProductId,
+    );
+
+    expect($prices)->toBe([12.5, 10.0, 8.75, 0.0]);
 });

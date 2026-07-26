@@ -5,6 +5,10 @@ namespace App\Services;
 use App\Domain\Sales\Services\ProductPriceFallbackResolver;
 use App\Domain\Sales\Services\ProductPriceMarginApplier;
 use App\Domain\Sales\Services\ProductPriceSourceResolver;
+use App\Domain\Sales\Services\SalesConditionRelationResolver;
+use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
+use App\Models\ClientSalesCondition;
+use App\Models\DbProductBillingUser;
 use App\Models\User;
 use App\Models\Product;
 use Illuminate\Support\Collection;
@@ -58,17 +62,69 @@ class PriceCalculatorService
      */
     protected function getUserAttributes(User $user, int $dbProductId): ?array
     {
+        $legacyAttributes = $this->getLegacyUserAttributes($user, $dbProductId);
+        $resolvedSalesConditions = $this->resolveSalesConditionAttributes($user, $dbProductId, $legacyAttributes);
+
+        if ($resolvedSalesConditions === null) {
+            return $legacyAttributes;
+        }
+
+        $merged = array_replace($legacyAttributes ?? [], $resolvedSalesConditions);
+
+        return $merged !== [] ? $merged : null;
+    }
+
+    protected function getLegacyUserAttributes(User $user, int $dbProductId): ?array
+    {
         $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
-        
+
         if (!$dbProduct || !$dbProduct->pivot->attributes) {
             return null;
         }
 
-        $attributes = is_string($dbProduct->pivot->attributes) 
-            ? json_decode($dbProduct->pivot->attributes, true) 
+        $attributes = is_string($dbProduct->pivot->attributes)
+            ? json_decode($dbProduct->pivot->attributes, true)
             : $dbProduct->pivot->attributes;
 
         return is_array($attributes) ? $attributes : null;
+    }
+
+    protected function resolveSalesConditionAttributes(User $user, int $dbProductId, ?array $legacyAttributes): ?array
+    {
+        $clientRule = ClientSalesCondition::query()
+            ->where('client_user_id', (int) $user->id)
+            ->where('db_product_id', $dbProductId)
+            ->where('active', true)
+            ->latest('updated_at')
+            ->latest('id')
+            ->first(['billing_user_id', 'seller_user_id', 'conditions_override']);
+
+        $billingUserId = isset($legacyAttributes['fact']) ? (int) $legacyAttributes['fact'] : (int) ($clientRule?->billing_user_id ?? 0);
+        $sellerUserId = isset($legacyAttributes['com'])
+            ? (int) $legacyAttributes['com']
+            : ($clientRule?->seller_user_id !== null ? (int) $clientRule->seller_user_id : null);
+
+        if ($billingUserId <= 0) {
+            return null;
+        }
+
+        $billingRule = DbProductBillingUser::query()
+            ->where('db_product_id', $dbProductId)
+            ->where('billing_user_id', $billingUserId)
+            ->where('active', true)
+            ->first(['defaults']);
+
+        $defaults = is_array($billingRule?->defaults) ? $billingRule->defaults : [];
+
+        $relationResolver = new SalesConditionRelationResolver();
+        $snapshotResolver = new SalesConditionSnapshotResolver();
+
+        $sellerRuleData = $relationResolver->resolveSellerRuleData($dbProductId, $billingUserId, $sellerUserId);
+        $clientOverride = $relationResolver->resolveClientOverride($dbProductId, $billingUserId, $sellerUserId, (int) $user->id);
+        $snapshot = $snapshotResolver->resolve($defaults, $sellerRuleData, $clientOverride);
+        $resolved = $snapshot['resolved'] ?? null;
+
+        return is_array($resolved) && $resolved !== [] ? $resolved : null;
     }
 
     /**

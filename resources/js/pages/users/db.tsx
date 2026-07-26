@@ -33,6 +33,7 @@ type SalesConditionDraft = {
     billing_user_id: number | null;
     seller_user_id: number | null;
     conditions_override: SalesConditions;
+    profile_selection_key: string | null;
 };
 
 type SearchSelectOption = {
@@ -59,6 +60,10 @@ const normalizeConditions = (value: SalesConditions | undefined): SalesCondition
 
     const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
     return Object.fromEntries(entries);
+};
+
+const areConditionsEqual = (left: SalesConditions | undefined, right: SalesConditions | undefined): boolean => {
+    return JSON.stringify(normalizeConditions(left)) === JSON.stringify(normalizeConditions(right));
 };
 
 const DEFAULT_VALUES: SalesConditions = {
@@ -125,6 +130,7 @@ export default function UserDbPage() {
                 billing_user_id: row.billing_user_id ? Number(row.billing_user_id) : null,
                 seller_user_id: row.seller_user_id !== null && row.seller_user_id !== undefined ? Number(row.seller_user_id) : null,
                 conditions_override: normalizeConditions(row.conditions_override ?? {}),
+                profile_selection_key: null,
             }));
         }
 
@@ -133,11 +139,11 @@ export default function UserDbPage() {
             billing_user_id: null,
             seller_user_id: null,
             conditions_override: {},
+            profile_selection_key: '',
         }));
     });
 
     const [activeIndex, setActiveIndex] = useState<number>(0);
-    const [selectedProfileKey, setSelectedProfileKey] = useState<string>('');
 
     const dbOptions = useMemo(
         () => dbProductsList.map((db) => ({ value: String(db.id), label: (db.name), country: (db.country) })),
@@ -285,6 +291,46 @@ export default function UserDbPage() {
         }));
     }, [activeRow, dbById]);
 
+    const activeProfileOptions = useMemo(
+        () => (sellerOptions.length === 0 ? billingProfiles : sellerProfiles),
+        [billingProfiles, sellerOptions.length, sellerProfiles],
+    );
+
+    const selectedProfileKey = useMemo(() => {
+        if (!activeRow) {
+            return '';
+        }
+
+        if (activeRow.profile_selection_key === '__custom__') {
+            return '__custom__';
+        }
+
+        if (activeRow.profile_selection_key === '') {
+            return '';
+        }
+
+        if (activeRow.profile_selection_key) {
+            const explicitProfile = activeProfileOptions.find((profile) => profile.key === activeRow.profile_selection_key);
+            return explicitProfile ? explicitProfile.key : '';
+        }
+
+        const matchingProfile = activeProfileOptions.find((profile) => areConditionsEqual(profile.conditions, activeRow.conditions_override ?? {}));
+
+        if (matchingProfile) {
+            return matchingProfile.key;
+        }
+
+        return Object.keys(activeRow.conditions_override ?? {}).length > 0 ? '__custom__' : '';
+    }, [activeProfileOptions, activeRow]);
+
+    const selectedProfile = useMemo(() => {
+        if (!selectedProfileKey || selectedProfileKey === '__custom__') {
+            return null;
+        }
+
+        return activeProfileOptions.find((profile) => profile.key === selectedProfileKey) ?? null;
+    }, [activeProfileOptions, selectedProfileKey]);
+
     const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
 
     const updateRow = (index: number, patch: Partial<SalesConditionDraft>) => {
@@ -304,12 +350,16 @@ export default function UserDbPage() {
         }));
     };
 
-    const merged: SalesConditions = { ...DEFAULT_VALUES, ...(activeRow?.conditions_override ?? {}) };
+    const mergedSource = selectedProfile?.conditions ?? (activeRow?.conditions_override ?? {});
+    const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
     const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
     const zones = carriersList.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
 
     const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
-        setRows((prev) => prev.map((row, rowIndex) => (rowIndex === activeIndex ? { ...row, conditions_override: { ...DEFAULT_VALUES, ...(row.conditions_override ?? {}), [key]: nextValue } } : row)));
+        updateRow(activeIndex, {
+            profile_selection_key: '__custom__',
+            conditions_override: normalizeConditions({ ...merged, [key]: nextValue }),
+        });
     };
 
     const submit = () => {
@@ -319,7 +369,9 @@ export default function UserDbPage() {
                 db_product_id: Number(row.db_product_id),
                 billing_user_id: Number(row.billing_user_id),
                 seller_user_id: row.seller_user_id ? Number(row.seller_user_id) : null,
-                conditions_override: normalizeConditions(row.conditions_override),
+                conditions_override: row.profile_selection_key === '__custom__'
+                    ? normalizeConditions(row.conditions_override)
+                    : {},
             }));
 
         const dbIds = Array.from(new Set(rows.map((row) => Number(row.db_product_id)).filter((id) => id > 0)));
@@ -371,7 +423,7 @@ export default function UserDbPage() {
                                                     return prev;
                                                 }
 
-                                                return [...prev, { db_product_id: id, billing_user_id: null, seller_user_id: null, conditions_override: {} }];
+                                                return [...prev, { db_product_id: id, billing_user_id: null, seller_user_id: null, conditions_override: {}, profile_selection_key: '' }];
                                             });
                                             setActiveIndex(rows.length);
                                             setSearch('');
@@ -455,6 +507,7 @@ export default function UserDbPage() {
                                                                 updateRow(activeIndex, {
                                                                     billing_user_id: id,
                                                                     seller_user_id: null,
+                                                                    profile_selection_key: null,
                                                                 });
                                                             }}
                                                             propositions={billingOptions}
@@ -476,13 +529,18 @@ export default function UserDbPage() {
                                                         <Select
                                                             value={selectedProfileKey}
                                                             onValueChange={(val) => {
-                                                                setSelectedProfileKey(val);
                                                                 if (val === '__custom__') {
-                                                                    updateRow(activeIndex, { conditions_override: {} });
+                                                                    updateRow(activeIndex, {
+                                                                        profile_selection_key: '__custom__',
+                                                                        conditions_override: normalizeConditions(merged),
+                                                                    });
                                                                 } else {
                                                                     const profile = billingProfiles.find((item) => item.key === val);
                                                                     if (profile) {
-                                                                        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                        updateRow(activeIndex, {
+                                                                            profile_selection_key: profile.key,
+                                                                            conditions_override: {},
+                                                                        });
                                                                     }
                                                                 }
                                                             }}
@@ -517,7 +575,10 @@ export default function UserDbPage() {
                                                                         return;
                                                                     }
 
-                                                                    updateRow(activeIndex, { seller_user_id: id });
+                                                                    updateRow(activeIndex, {
+                                                                        seller_user_id: id,
+                                                                        profile_selection_key: null,
+                                                                    });
                                                                 }}
                                                                 propositions={sellerOptions}
                                                                 selection={selectedSellerOption}
@@ -528,13 +589,18 @@ export default function UserDbPage() {
                                                         <Select
                                                             value={selectedProfileKey}
                                                             onValueChange={(val) => {
-                                                                setSelectedProfileKey(val);
                                                                 if (val === '__custom__') {
-                                                                    updateRow(activeIndex, { conditions_override: {} });
+                                                                    updateRow(activeIndex, {
+                                                                        profile_selection_key: '__custom__',
+                                                                        conditions_override: normalizeConditions(merged),
+                                                                    });
                                                                 } else {
                                                                     const profile = sellerProfiles.find((item) => item.key === val);
                                                                     if (profile) {
-                                                                        updateRow(activeIndex, { conditions_override: normalizeConditions(profile.conditions) });
+                                                                        updateRow(activeIndex, {
+                                                                            profile_selection_key: profile.key,
+                                                                            conditions_override: {},
+                                                                        });
                                                                     }
                                                                 }
                                                             }}
@@ -577,7 +643,10 @@ export default function UserDbPage() {
                                             {selectedProfileKey === '__custom__' ? (
                                                 <SalesConditionsForm
                                                     value={activeRow.conditions_override ?? {}}
-                                                    onChange={(next) => updateRow(activeIndex, { conditions_override: normalizeConditions(next) })}
+                                                    onChange={(next) => updateRow(activeIndex, {
+                                                        profile_selection_key: '__custom__',
+                                                        conditions_override: normalizeConditions(next),
+                                                    })}
                                                     carriers={carriersList}
                                                     mode="client"
                                                 />

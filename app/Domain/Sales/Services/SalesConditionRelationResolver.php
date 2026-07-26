@@ -50,17 +50,23 @@ final class SalesConditionRelationResolver
      */
     public function resolveClientOverride(?int $dbProductId, ?int $billingUserId, ?int $sellerUserId, ?int $clientUserId): array
     {
-        if (!$dbProductId || !$billingUserId || !$sellerUserId || !$clientUserId) {
+        if (!$dbProductId || !$billingUserId || !$clientUserId) {
             return [];
         }
 
-        $clientRule = ClientSalesCondition::query()
+        $query = ClientSalesCondition::query()
             ->where('client_user_id', $clientUserId)
             ->where('db_product_id', $dbProductId)
             ->where('billing_user_id', $billingUserId)
-            ->where('seller_user_id', $sellerUserId)
-            ->where('active', true)
-            ->first();
+            ->where('active', true);
+
+        if ($sellerUserId === null) {
+            $query->whereNull('seller_user_id');
+        } else {
+            $query->where('seller_user_id', $sellerUserId);
+        }
+
+        $clientRule = $query->first();
 
         return $clientRule && is_array($clientRule->conditions_override)
             ? $clientRule->conditions_override

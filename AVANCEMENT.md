@@ -318,3 +318,33 @@ Nouveau moteur
 Validation
 
 Le panier affiche exactement le meme prix carton que le legacy au seuil carton.
+
+### Session du 2026-07-26
+
+Business Rules migrées
+
+- BR-019
+- BR-020
+- BR-021
+
+Legacy supprimé
+
+- Aucun
+
+Tests ajoutés
+
+- Aucun nouveau fichier, extension ciblée de `tests/Unit/Services/PriceCalculatorServiceTest.php`.
+
+Décisions prises
+
+- Faire consommer à `PriceCalculatorService` le snapshot de conditions résolues avant repli sur les attributs legacy du pivot `db_product_user`.
+- Réutiliser `SalesConditionRelationResolver` et `SalesConditionSnapshotResolver` au lieu de dupliquer une logique de profil facturant dans le calculateur legacy.
+- Supporter explicitement l override client avec `seller_user_id = null` pour les cas facturant sans commercial.
+
+Prochaine étape
+
+- Vérifier en interface panier/catalogue que les prix visibles suivent bien le profil facturant configuré sur la page association DB utilisateur.
+
+Validation
+
+- `php artisan test tests/Unit/Services/PriceCalculatorServiceTest.php` : 17 tests passes.

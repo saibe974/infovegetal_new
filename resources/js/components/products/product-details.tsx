@@ -27,6 +27,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const isAuthenticated = !!user;
 
     const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
+    const displayPrice = product.price_ttc ?? price;
 
     return (
         <div className="space-y-6">
@@ -106,6 +107,15 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                             <p className="capitalize">
                                 {product.description || t('Aucune description disponible')}
                             </p>
+
+                            <div className="rounded-2xl border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    {t('Prix TTC')}
+                                </div>
+                                <div className="text-3xl font-black leading-none">
+                                    {formatCurrency(displayPrice)}
+                                </div>
+                            </div>
 
                             <div className="space-y-4">
                                 {product.tags && product.tags.length > 0 && (

@@ -161,6 +161,7 @@ export interface Product {
     image_thumb?: string | null;
     description: string;
     price: number;
+    price_ttc?: number | null;
     active: boolean;
     db_products_id?: number | null;
     ref?: string | null;

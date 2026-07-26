@@ -2,13 +2,22 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Sales\DTO\ProductVatResolutionInput;
+use App\Domain\Sales\Services\SalesConditionRelationResolver;
+use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
+use App\Domain\Sales\Services\ProductVatResolver;
+use App\Domain\Sales\ValueObjects\Percentage;
+use App\Models\ClientSalesCondition;
 use App\Models\Product;
 use App\Models\Carrier;
+use App\Models\DbProductBillingUser;
 use App\Http\Resources\DbProductsResource;
 use App\Services\PriceCalculatorService;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * $property Product $resource
@@ -90,6 +99,137 @@ class ProductResource extends JsonResource
         ];
     }
 
+    protected function resolveTvaRate(): float
+    {
+        $ratesById = DB::table('tva')->pluck('rate', 'id');
+        $productVatRate = $this->resolvePercentageRate($this->resource->tva_id, $ratesById);
+        $categoryVatRate = $this->resolvePercentageRate($this->resource->category?->tva_id, $ratesById);
+        $categoryId = $this->resource->category_products_id ? (int) $this->resource->category_products_id : null;
+
+        if ($categoryId === null) {
+            return $productVatRate?->basisPoints !== null
+                ? round($productVatRate->basisPoints / 100, 2)
+                : 0.0;
+        }
+
+        if ($productVatRate === null && $categoryVatRate === null) {
+            return 0.0;
+        }
+
+        try {
+            $resolution = (new ProductVatResolver())->resolve(new ProductVatResolutionInput(
+                productId: (int) $this->resource->id,
+                categoryId: $categoryId,
+                productVatRate: $productVatRate,
+                categoryVatRate: $categoryVatRate,
+            ));
+
+            return round($resolution->vatRate->basisPoints / 100, 2);
+        } catch (\DomainException) {
+            return 0.0;
+        }
+    }
+
+    protected function resolvePercentageRate(mixed $tvaId, Collection $ratesById): ?Percentage
+    {
+        $resolvedTvaId = (int) ($tvaId ?? 0);
+        if ($resolvedTvaId <= 0) {
+            return null;
+        }
+
+        $rawRate = $ratesById->get($resolvedTvaId);
+        if ($rawRate === null) {
+            return null;
+        }
+
+        return Percentage::fromString((string) $rawRate);
+    }
+
+    protected function extractPositiveMargin(?array $conditions): ?float
+    {
+        if (!is_array($conditions) || !array_key_exists('m', $conditions) || !is_numeric($conditions['m'])) {
+            return null;
+        }
+
+        $margin = (float) $conditions['m'];
+
+        return $margin > 0 ? $margin : null;
+    }
+
+    protected function resolveVisibleMarginPercent(Request $request, ?array $dbUserAttributes): ?float
+    {
+        $user = $request->user();
+        $dbProductId = (int) ($this->resource->db_products_id ?? 0);
+
+        if ($user && $dbProductId > 0) {
+            $billingUserId = isset($dbUserAttributes['fact']) ? (int) $dbUserAttributes['fact'] : null;
+            $sellerUserId = isset($dbUserAttributes['com']) ? (int) $dbUserAttributes['com'] : null;
+
+            if (!$billingUserId || !$sellerUserId) {
+                $clientRule = ClientSalesCondition::query()
+                    ->where('client_user_id', (int) $user->id)
+                    ->where('db_product_id', $dbProductId)
+                    ->where('active', true)
+                    ->latest('updated_at')
+                    ->first(['billing_user_id', 'seller_user_id']);
+
+                if ($clientRule) {
+                    $billingUserId ??= (int) ($clientRule->billing_user_id ?? 0);
+                    $sellerUserId ??= (int) ($clientRule->seller_user_id ?? 0);
+                }
+            }
+
+            if ($billingUserId) {
+                $billingRule = DbProductBillingUser::query()
+                    ->where('db_product_id', $dbProductId)
+                    ->where('billing_user_id', $billingUserId)
+                    ->where('active', true)
+                    ->first();
+
+                $defaults = is_array($billingRule?->defaults) ? $billingRule->defaults : [];
+                $relationResolver = new SalesConditionRelationResolver();
+                $snapshotResolver = new SalesConditionSnapshotResolver();
+
+                $sellerRuleData = $relationResolver->resolveSellerRuleData($dbProductId, $billingUserId, $sellerUserId ?: null);
+                $clientOverride = $relationResolver->resolveClientOverride($dbProductId, $billingUserId, $sellerUserId ?: null, (int) $user->id);
+
+                $billingMargin = $this->extractPositiveMargin(
+                    $snapshotResolver->extractProfileConditionsById(
+                        $defaults,
+                        isset($sellerRuleData['billing_profile_id']) ? (string) $sellerRuleData['billing_profile_id'] : null,
+                    )
+                );
+
+                $commercialMargin = null;
+                if (!empty($sellerRuleData)) {
+                    if ((bool) ($sellerRuleData['use_billing_profile'] ?? true)) {
+                        $commercialMargin = $this->extractPositiveMargin(
+                            $snapshotResolver->extractDefaultConditions(
+                                is_array($sellerRuleData['seller_defaults'] ?? null) ? $sellerRuleData['seller_defaults'] : []
+                            )
+                        );
+                    } else {
+                        $commercialMargin = $this->extractPositiveMargin(
+                            is_array($sellerRuleData['conditions'] ?? null) ? $sellerRuleData['conditions'] : []
+                        );
+                    }
+                }
+
+                $clientOverrideMargin = $this->extractPositiveMargin($clientOverride);
+                if ($clientOverrideMargin !== null) {
+                    return $clientOverrideMargin;
+                }
+
+                $totalMargin = ($billingMargin ?? 0.0) + ($commercialMargin ?? 0.0);
+                if ($totalMargin > 0) {
+                    return $totalMargin;
+                }
+            }
+        }
+
+        return $this->extractPositiveMargin($dbUserAttributes);
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -116,6 +256,20 @@ class ProductResource extends JsonResource
             $pricePromo = $prices[3] ?? $pricePromo;
         }
 
+        $visibleMarginPercent = $this->resolveVisibleMarginPercent($request, $dbUserAttributes);
+        $baseResourcePrice = (float) ($this->resource->price ?? 0);
+        $effectivePrice = $baseResourcePrice > 0 ? $baseResourcePrice : $price;
+
+        if ($visibleMarginPercent !== null && $effectivePrice > 0) {
+            $effectivePrice = round($effectivePrice * (1 + ($visibleMarginPercent / 100)), 2);
+        }
+
+        $priceTtc = $effectivePrice;
+        $tvaRate = $this->resolveTvaRate();
+        if ($effectivePrice > 0 && $tvaRate > 0) {
+            $priceTtc = round($effectivePrice * (1 + ($tvaRate / 100)), 2);
+        }
+
         return [
             'id' => $this->resource->id,
             'sku' => $this->resource->sku,
@@ -133,6 +287,7 @@ class ProductResource extends JsonResource
                 ?: $this->resource->getFirstMediaUrl('images')
                 ?: $this->img_link,
             'price' => $price,
+            'price_ttc' => $priceTtc,
             'active' => $this->active,
             'attributes' => $this->attributes,
             'category_products_id' => $this->category_products_id,
