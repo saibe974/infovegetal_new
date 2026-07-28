@@ -72,7 +72,38 @@ it('selects the default profile and falls back to the first profile when needed'
     ]);
 });
 
-it('adds client margin override to billing to commercial base margin when commercial relation exists', function (): void {
+it('computes total margin as billing margin plus commercial standard margin when no client margin is provided', function (): void {
+    $resolver = new SalesConditionSnapshotResolver();
+
+    $snapshot = $resolver->resolve(
+        defaults: [
+            'default_profile_id' => 'standard',
+            'profiles' => [
+                ['id' => 'standard', 'conditions' => ['m' => 20]],
+                ['id' => 'profile-1783695735132', 'conditions' => ['m' => 15]],
+            ],
+        ],
+        sellerRuleData: [
+            'use_billing_profile' => true,
+            'billing_profile_id' => 'profile-1783695735132',
+            'seller_defaults' => [
+                'default_profile_id' => 'standard',
+                'profiles' => [
+                    ['id' => 'standard', 'conditions' => ['m' => 5]],
+                ],
+            ],
+        ],
+        clientOverride: [],
+    );
+
+    expect($snapshot['billing_to_seller_conditions'])->toBe([
+        'm' => 15,
+    ])->and($snapshot['seller_defaults'])->toBe([
+        'm' => 5,
+    ])->and($snapshot['resolved']['m'])->toBe(20.0);
+});
+
+it('uses client margin as commercial margin and adds it to billing margin when commercial relation exists', function (): void {
     $resolver = new SalesConditionSnapshotResolver();
 
     $snapshot = $resolver->resolve(

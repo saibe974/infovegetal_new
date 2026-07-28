@@ -41,14 +41,26 @@ final class SalesConditionSnapshotResolver
 
         $resolved = array_replace_recursive($billingToSellerConditions, $sellerDefaults, $clientOverride);
 
-        // BR: with a commercial relation, client override `m` is additive on top
-        // of the billing->commercial base margin (instead of replacing it).
-        if (!empty($sellerRuleData) && array_key_exists('m', $clientOverride)) {
-            $baseMargin = $this->toNumericOrNull($billingToSellerConditions['m'] ?? null);
-            $deltaMargin = $this->toNumericOrNull($clientOverride['m']);
+        // Business semantic for commercial chain:
+        // total margin = billing margin + active commercial margin
+        // active commercial margin = client m (if provided) else seller default m.
+        if (!empty($sellerRuleData)) {
+            $billingMargin = $this->toNumericOrNull($billingToSellerConditions['m'] ?? null);
+            $sellerMargin = $this->toNumericOrNull($sellerDefaults['m'] ?? null);
 
-            if ($baseMargin !== null && $deltaMargin !== null) {
-                $resolved['m'] = $baseMargin + $deltaMargin;
+            $hasClientMargin = array_key_exists('m', $clientOverride);
+            $clientMargin = $hasClientMargin
+                ? $this->toNumericOrNull($clientOverride['m'])
+                : null;
+
+            if ($billingMargin !== null) {
+                $activeCommercialMargin = $hasClientMargin ? $clientMargin : $sellerMargin;
+
+                if ($activeCommercialMargin !== null) {
+                    $resolved['m'] = $billingMargin + $activeCommercialMargin;
+                } else {
+                    $resolved['m'] = $billingMargin;
+                }
             }
         }
 

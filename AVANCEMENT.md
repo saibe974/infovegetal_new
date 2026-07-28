@@ -2,6 +2,13 @@
 
 Date de reference: 2026-07-16
 
+### Session du 2026-07-28
+
+- Ajustement de la semantique runtime de `m` en contexte commercial dans `SalesConditionSnapshotResolver`.
+- Regle appliquee: marge totale client = marge facturant + marge commerciale active.
+- Marge commerciale active: marge standard commercial si pas de valeur client, sinon marge client specifique.
+- Validation ciblee: `tests/Unit/Domain/Sales/SalesConditionSnapshotResolverTest.php` (4 tests passes).
+
 ## ÉTAT DU PROJET
 
 🟢 Business Rules
