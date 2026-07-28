@@ -54,6 +54,8 @@ class ProductResource extends JsonResource
             ? json_decode($pivotAttributes, true)
             : $pivotAttributes;
 
+            // dd($decoded);
+
         return is_array($decoded) ? $decoded : null;
     }
 
@@ -153,7 +155,8 @@ class ProductResource extends JsonResource
 
         $margin = (float) $conditions['m'];
 
-        return $margin > 0 ? $margin : null;
+        // `m = 0` is an explicit override and must not fall back to inherited/default margins.
+        return $margin;
     }
 
     protected function resolveVisibleMarginPercent(Request $request, ?array $dbUserAttributes): ?float
@@ -256,13 +259,7 @@ class ProductResource extends JsonResource
             $pricePromo = $prices[3] ?? $pricePromo;
         }
 
-        $visibleMarginPercent = $this->resolveVisibleMarginPercent($request, $dbUserAttributes);
-        $baseResourcePrice = (float) ($this->resource->price ?? 0);
-        $effectivePrice = $baseResourcePrice > 0 ? $baseResourcePrice : $price;
-
-        if ($visibleMarginPercent !== null && $effectivePrice > 0) {
-            $effectivePrice = round($effectivePrice * (1 + ($visibleMarginPercent / 100)), 2);
-        }
+        $effectivePrice = (float) $price;
 
         $priceTtc = $effectivePrice;
         $tvaRate = $this->resolveTvaRate();

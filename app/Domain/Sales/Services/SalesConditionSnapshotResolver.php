@@ -41,6 +41,17 @@ final class SalesConditionSnapshotResolver
 
         $resolved = array_replace_recursive($billingToSellerConditions, $sellerDefaults, $clientOverride);
 
+        // BR: with a commercial relation, client override `m` is additive on top
+        // of the billing->commercial base margin (instead of replacing it).
+        if (!empty($sellerRuleData) && array_key_exists('m', $clientOverride)) {
+            $baseMargin = $this->toNumericOrNull($billingToSellerConditions['m'] ?? null);
+            $deltaMargin = $this->toNumericOrNull($clientOverride['m']);
+
+            if ($baseMargin !== null && $deltaMargin !== null) {
+                $resolved['m'] = $baseMargin + $deltaMargin;
+            }
+        }
+
         return [
             'resolved' => $resolved,
             'defaults' => $defaults,
@@ -115,5 +126,10 @@ final class SalesConditionSnapshotResolver
         }
 
         return $this->extractDefaultConditions($defaults);
+    }
+
+    private function toNumericOrNull(mixed $value): ?float
+    {
+        return is_numeric($value) ? (float) $value : null;
     }
 }

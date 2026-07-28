@@ -35,6 +35,8 @@ final class SalesConditionRelationResolver
             return [];
         }
 
+        // dd($sellerRule);
+
         return [
             'conditions' => is_array($sellerRule->conditions) ? $sellerRule->conditions : [],
             'seller_defaults' => is_array($sellerRule->seller_defaults) ? $sellerRule->seller_defaults : [],

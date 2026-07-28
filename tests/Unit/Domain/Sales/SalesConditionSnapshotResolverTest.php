@@ -71,3 +71,34 @@ it('selects the default profile and falls back to the first profile when needed'
         'shipping' => ['fee' => 120],
     ]);
 });
+
+it('adds client margin override to billing to commercial base margin when commercial relation exists', function (): void {
+    $resolver = new SalesConditionSnapshotResolver();
+
+    $snapshot = $resolver->resolve(
+        defaults: [
+            'default_profile_id' => 'standard',
+            'profiles' => [
+                ['id' => 'standard', 'conditions' => ['m' => 20]],
+                ['id' => 'profile-1783695735132', 'conditions' => ['m' => 15]],
+            ],
+        ],
+        sellerRuleData: [
+            'use_billing_profile' => true,
+            'billing_profile_id' => 'profile-1783695735132',
+            'seller_defaults' => [
+                'default_profile_id' => 'standard',
+                'profiles' => [
+                    ['id' => 'standard', 'conditions' => ['m' => 5]],
+                ],
+            ],
+        ],
+        clientOverride: [
+            'm' => 10,
+        ],
+    );
+
+    expect($snapshot['billing_to_seller_conditions'])->toBe([
+        'm' => 15,
+    ])->and($snapshot['resolved']['m'])->toBe(25.0);
+});

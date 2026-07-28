@@ -66,6 +66,30 @@ const areConditionsEqual = (left: SalesConditions | undefined, right: SalesCondi
     return JSON.stringify(normalizeConditions(left)) === JSON.stringify(normalizeConditions(right));
 };
 
+const diffConditions = (base: SalesConditions | undefined, target: SalesConditions | undefined): SalesConditions => {
+    const left = base ?? {};
+    const right = target ?? {};
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+    const diff: SalesConditions = {};
+
+    keys.forEach((key) => {
+        const typedKey = key as keyof SalesConditions;
+        if (!Object.is(left[typedKey], right[typedKey])) {
+            diff[typedKey] = right[typedKey];
+        }
+    });
+
+    return normalizeConditions(diff);
+};
+
+const getDefaultProfileConditions = (defaults: ReturnType<typeof normalizeBillingDefaultsToProfiles>): SalesConditions => {
+    const selected = defaults.profiles.find((profile) => profile.id === defaults.default_profile_id)
+        ?? defaults.profiles[0]
+        ?? null;
+
+    return normalizeConditions(selected?.conditions ?? {});
+};
+
 const DEFAULT_VALUES: SalesConditions = {
     m: 0,
     mm: 0,
@@ -157,6 +181,9 @@ export default function UserDbPage() {
 
     const activeRow = rows[activeIndex] ?? null;
 
+    // console.log(rows)
+    console.log(activeRow)
+
     const billingOptions = useMemo(() => {
         if (!activeRow) {
             return [];
@@ -171,6 +198,7 @@ export default function UserDbPage() {
             description: billing.email,
         }));
     }, [activeRow, dbById]);
+    // console.log(billingOptions)
 
     const sellerOptions = useMemo(() => {
         if (!activeRow || !activeRow.billing_user_id) {
@@ -187,6 +215,8 @@ export default function UserDbPage() {
         }));
     }, [activeRow, dbById]);
 
+    // console.log(sellerOptions)
+
     const selectedBillingOption = useMemo(() => {
         if (!activeRow?.billing_user_id) {
             return EMPTY_SEARCH_SELECTION;
@@ -195,13 +225,7 @@ export default function UserDbPage() {
         return billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id));
     }, [activeRow?.billing_user_id, billingOptions]);
 
-    const selectedSellerOption = useMemo(() => {
-        if (!activeRow?.seller_user_id) {
-            return EMPTY_SEARCH_SELECTION;
-        }
-
-        return sellerOptions.filter((opt) => Number(opt.value) === Number(activeRow.seller_user_id));
-    }, [activeRow?.seller_user_id, sellerOptions]);
+    // console.log(selectedBillingOption)
 
     useEffect(() => {
         if (!activeRow) return;
@@ -214,17 +238,6 @@ export default function UserDbPage() {
         updateRow(activeIndex, { billing_user_id: nextBillingId, seller_user_id: null });
     }, [billingOptions, activeRow?.billing_user_id, activeIndex]);
 
-    useEffect(() => {
-        if (!activeRow) return;
-        if (sellerOptions.length !== 1) return;
-
-        const nextSellerId = Number(sellerOptions[0]?.value);
-        if (!Number.isInteger(nextSellerId) || nextSellerId <= 0) return;
-        if (Number(activeRow.seller_user_id) === nextSellerId) return;
-
-        updateRow(activeIndex, { seller_user_id: nextSellerId });
-    }, [sellerOptions, activeRow?.seller_user_id, activeIndex]);
-
     const activeSellerData = useMemo(() => {
         if (!activeRow || !activeRow.billing_user_id || !activeRow.seller_user_id) {
             return null;
@@ -234,30 +247,47 @@ export default function UserDbPage() {
         const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
         return (billing?.sellers ?? []).find((seller) => Number(seller.id) === Number(activeRow.seller_user_id)) ?? null;
     }, [activeRow, dbById]);
+    console.log(activeSellerData);
 
-    const activeBillingProfileName = useMemo(() => {
-        if (!activeSellerData || !activeRow?.billing_user_id) {
-            return '';
+    const activeBillingData = useMemo(() => {
+        if (!activeRow?.billing_user_id) {
+            return null;
         }
 
         const db = dbById.get(Number(activeRow.db_product_id));
-        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
-        if (!billing) {
+        return (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id)) ?? null;
+    }, [activeRow, dbById]);
+    console.log(activeBillingData);
+
+    const activeBillingDefaults = useMemo(
+        () => normalizeBillingDefaultsToProfiles(activeBillingData?.defaults),
+        [activeBillingData],
+    );
+
+    const activeBillingProfileName = useMemo(() => {
+        if (!activeRow?.billing_user_id) {
             return '';
         }
 
-        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
+        if (!activeSellerData) {
+            const profile = activeBillingDefaults.profiles.find((item) => item.id === activeBillingDefaults.default_profile_id)
+                ?? activeBillingDefaults.profiles[0]
+                ?? null;
+
+            return profile?.name ?? '';
+        }
+
         const profileId = activeSellerData.use_billing_profile
-            ? (activeSellerData.billing_profile_id ?? billingDefaults.default_profile_id ?? null)
+            ? (activeSellerData.billing_profile_id ?? activeBillingDefaults.default_profile_id ?? null)
             : null;
 
         if (!profileId) {
             return t('Paramétrage custom');
         }
 
-        const profile = billingDefaults.profiles.find((p) => p.id === String(profileId));
+        const profile = activeBillingDefaults.profiles.find((p) => p.id === String(profileId));
         return profile?.name ?? String(profileId);
-    }, [activeSellerData, activeRow, dbById, t]);
+    }, [activeBillingDefaults, activeSellerData, activeRow?.billing_user_id, t]);
 
     const sellerProfiles = useMemo(() => {
         if (!activeSellerData) {
@@ -273,27 +303,48 @@ export default function UserDbPage() {
     }, [activeSellerData, t]);
 
     const billingProfiles = useMemo(() => {
-        if (!activeRow?.billing_user_id) {
+        if (!activeBillingData) {
             return [];
         }
 
-        const db = dbById.get(Number(activeRow.db_product_id));
-        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
-        if (!billing) {
-            return [];
-        }
-
-        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
-        return billingDefaults.profiles.map((profile) => ({
+        return activeBillingDefaults.profiles.map((profile) => ({
             key: `billing:${profile.id}`,
             label: profile.name,
             conditions: normalizeConditions(profile.conditions),
         }));
-    }, [activeRow, dbById]);
+    }, [activeBillingData, activeBillingDefaults]);
+
+    const inheritedConditions = useMemo(() => {
+        if (!activeRow?.billing_user_id) {
+            return {};
+        }
+
+        const billingBase = getDefaultProfileConditions(activeBillingDefaults);
+
+        if (!activeRow.seller_user_id || !activeSellerData) {
+            return billingBase;
+        }
+
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(activeSellerData.seller_defaults);
+        const sellerBase = getDefaultProfileConditions(sellerDefaults);
+
+        const billingToSellerBase = activeSellerData.use_billing_profile
+            ? normalizeConditions(
+                activeBillingDefaults.profiles.find((p) => p.id === String(activeSellerData.billing_profile_id ?? activeBillingDefaults.default_profile_id ?? ''))?.conditions
+                ?? billingBase,
+            )
+            : normalizeConditions(activeSellerData.conditions ?? {});
+
+        return normalizeConditions({
+            ...billingToSellerBase,
+            ...sellerBase,
+        });
+    }, [activeBillingDefaults, activeRow, activeSellerData]);
+
 
     const activeProfileOptions = useMemo(
-        () => (sellerOptions.length === 0 ? billingProfiles : sellerProfiles),
-        [billingProfiles, sellerOptions.length, sellerProfiles],
+        () => (activeRow?.seller_user_id ? sellerProfiles : billingProfiles),
+        [activeRow?.seller_user_id, billingProfiles, sellerProfiles],
     );
 
     const selectedProfileKey = useMemo(() => {
@@ -314,14 +365,23 @@ export default function UserDbPage() {
             return explicitProfile ? explicitProfile.key : '';
         }
 
-        const matchingProfile = activeProfileOptions.find((profile) => areConditionsEqual(profile.conditions, activeRow.conditions_override ?? {}));
+        const override = normalizeConditions(activeRow.conditions_override ?? {});
+
+        const matchingProfile = activeProfileOptions.find((profile) => {
+            const profileOverride = diffConditions(
+                inheritedConditions,
+                normalizeConditions({ ...inheritedConditions, ...profile.conditions }),
+            );
+
+            return areConditionsEqual(profileOverride, override);
+        });
 
         if (matchingProfile) {
             return matchingProfile.key;
         }
 
-        return Object.keys(activeRow.conditions_override ?? {}).length > 0 ? '__custom__' : '';
-    }, [activeProfileOptions, activeRow]);
+        return Object.keys(override).length > 0 ? '__custom__' : '';
+    }, [activeProfileOptions, activeRow, inheritedConditions]);
 
     const selectedProfile = useMemo(() => {
         if (!selectedProfileKey || selectedProfileKey === '__custom__') {
@@ -350,16 +410,89 @@ export default function UserDbPage() {
         }));
     };
 
-    const mergedSource = selectedProfile?.conditions ?? (activeRow?.conditions_override ?? {});
+    const mergedSource = selectedProfileKey === '__custom__'
+        ? normalizeConditions({ ...inheritedConditions, ...(activeRow?.conditions_override ?? {}) })
+        : selectedProfile
+            ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions })
+            : inheritedConditions;
+
+
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
     const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
     const zones = carriersList.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
 
     const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
+        const nextResolved = normalizeConditions({ ...merged, [key]: nextValue });
+
         updateRow(activeIndex, {
             profile_selection_key: '__custom__',
-            conditions_override: normalizeConditions({ ...merged, [key]: nextValue }),
+            conditions_override: diffConditions(inheritedConditions, nextResolved),
         });
+    };
+
+    const resolveRowSubmissionOverride = (row: SalesConditionDraft): SalesConditions => {
+        const db = dbById.get(Number(row.db_product_id));
+        const billing = (db?.billing_users ?? []).find((item) => Number(item.id) === Number(row.billing_user_id));
+
+        if (!billing) {
+            return row.profile_selection_key === '__custom__'
+                ? normalizeConditions(row.conditions_override)
+                : {};
+        }
+
+        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
+        const billingBase = getDefaultProfileConditions(billingDefaults);
+
+        const seller = row.seller_user_id
+            ? (billing.sellers ?? []).find((item) => Number(item.id) === Number(row.seller_user_id))
+            : null;
+
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(seller?.seller_defaults);
+        const sellerBase = seller ? getDefaultProfileConditions(sellerDefaults) : {};
+
+        const billingToSellerBase = seller
+            ? ((seller.use_billing_profile ?? true)
+                ? normalizeConditions(
+                    billingDefaults.profiles.find((p) => p.id === String(seller.billing_profile_id ?? billingDefaults.default_profile_id ?? ''))?.conditions
+                    ?? billingBase,
+                )
+                : normalizeConditions(seller.conditions ?? {}))
+            : billingBase;
+
+        const rowBase = normalizeConditions({
+            ...billingToSellerBase,
+            ...sellerBase,
+        });
+
+        if (row.profile_selection_key === '__custom__') {
+            return normalizeConditions(row.conditions_override);
+        }
+
+        if (!row.profile_selection_key) {
+            return {};
+        }
+
+        const profilePool = seller
+            ? sellerDefaults.profiles.map((profile) => ({
+                key: `seller:${profile.id}`,
+                conditions: normalizeConditions(profile.conditions),
+            }))
+            : billingDefaults.profiles.map((profile) => ({
+                key: `billing:${profile.id}`,
+                conditions: normalizeConditions(profile.conditions),
+            }));
+
+        const selected = profilePool.find((profile) => profile.key === row.profile_selection_key);
+        if (!selected) {
+            return {};
+        }
+
+        const selectedResolved = normalizeConditions({
+            ...rowBase,
+            ...selected.conditions,
+        });
+
+        return diffConditions(rowBase, selectedResolved);
     };
 
     const submit = () => {
@@ -369,9 +502,7 @@ export default function UserDbPage() {
                 db_product_id: Number(row.db_product_id),
                 billing_user_id: Number(row.billing_user_id),
                 seller_user_id: row.seller_user_id ? Number(row.seller_user_id) : null,
-                conditions_override: row.profile_selection_key === '__custom__'
-                    ? normalizeConditions(row.conditions_override)
-                    : {},
+                conditions_override: resolveRowSubmissionOverride(row),
             }));
 
         const dbIds = Array.from(new Set(rows.map((row) => Number(row.db_product_id)).filter((id) => id > 0)));
@@ -438,6 +569,7 @@ export default function UserDbPage() {
                                 <div className="space-y-2 max-h-[420px] overflow-y-auto">
                                     {rows.map((row, index) => {
                                         const db = dbById.get(Number(row.db_product_id));
+                                        // console.log(db)
                                         if (!db) {
                                             return null;
                                         }
@@ -516,30 +648,82 @@ export default function UserDbPage() {
                                                             minQueryLength={0}
                                                         />
                                                     )}
-                                                    <Input
-                                                        disabled
-                                                        readOnly
-                                                        value={activeBillingProfileName}
-                                                        placeholder={t('Profil facturant assigné')}
-                                                    />
+
+                                                    {activeRow.seller_user_id ? (
+                                                        <Input
+                                                            disabled
+                                                            readOnly
+                                                            value={activeBillingProfileName}
+                                                            placeholder={t('Profil facturant assigné')}
+                                                        />
+                                                    ) : (<></>)}
+
                                                 </FormField>
 
-                                                {sellerOptions.length === 0 ? (
+                                                {!activeRow.seller_user_id ? (
                                                     <FormField label={t('Commercial')}>
+                                                        {sellerOptions.length > 0 ? (
+                                                            <Select
+                                                                value={activeRow.seller_user_id ? String(activeRow.seller_user_id) : 'none'}
+                                                                onValueChange={(val) => {
+                                                                    if (val === 'none') {
+                                                                        updateRow(activeIndex, {
+                                                                            seller_user_id: null,
+                                                                            profile_selection_key: null,
+                                                                        });
+                                                                        return;
+                                                                    }
+
+                                                                    const id = Number(val);
+                                                                    if (!Number.isInteger(id) || id <= 0) {
+                                                                        return;
+                                                                    }
+
+                                                                    updateRow(activeIndex, {
+                                                                        seller_user_id: id,
+                                                                        profile_selection_key: null,
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder={t('Select a commercial')} />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">{t('No commercial')}</SelectItem>
+                                                                    {sellerOptions.map((seller) => (
+                                                                        <SelectItem key={seller.value} value={seller.value}>
+                                                                            {seller.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        ) : (
+                                                            <Input
+                                                                disabled
+                                                                readOnly
+                                                                value={t('No commercial')}
+                                                                placeholder={t('Commercial')}
+                                                            />
+                                                        )}
                                                         <Select
                                                             value={selectedProfileKey}
                                                             onValueChange={(val) => {
                                                                 if (val === '__custom__') {
                                                                     updateRow(activeIndex, {
                                                                         profile_selection_key: '__custom__',
-                                                                        conditions_override: normalizeConditions(merged),
+                                                                        conditions_override: {},
                                                                     });
                                                                 } else {
                                                                     const profile = billingProfiles.find((item) => item.key === val);
                                                                     if (profile) {
+                                                                        const resolvedProfile = normalizeConditions({
+                                                                            ...inheritedConditions,
+                                                                            ...profile.conditions,
+                                                                        });
+
                                                                         updateRow(activeIndex, {
                                                                             profile_selection_key: profile.key,
-                                                                            conditions_override: {},
+                                                                            conditions_override: diffConditions(inheritedConditions, resolvedProfile),
                                                                         });
                                                                     }
                                                                 }
@@ -558,48 +742,59 @@ export default function UserDbPage() {
                                                     </FormField>
                                                 ) : (
                                                     <FormField label={t('Commercial')}>
-                                                        {sellerOptions.length <= 1 ? (
-                                                            <Input
-                                                                disabled
-                                                                readOnly
-                                                                value={sellerOptions[0]?.label ?? ''}
-                                                                placeholder={t('Commercial')}
-                                                            />
-                                                        ) : (
-                                                            <SearchSelect
-                                                                value={''}
-                                                                onChange={() => undefined}
-                                                                onSubmit={(value) => {
-                                                                    const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                                    if (!Number.isInteger(id) || id <= 0) {
-                                                                        return;
-                                                                    }
-
+                                                        <Select
+                                                            value={activeRow.seller_user_id ? String(activeRow.seller_user_id) : 'none'}
+                                                            onValueChange={(val) => {
+                                                                if (val === 'none') {
                                                                     updateRow(activeIndex, {
-                                                                        seller_user_id: id,
+                                                                        seller_user_id: null,
                                                                         profile_selection_key: null,
                                                                     });
-                                                                }}
-                                                                propositions={sellerOptions}
-                                                                selection={selectedSellerOption}
-                                                                loading={false}
-                                                                minQueryLength={0}
-                                                            />
-                                                        )}
+                                                                    return;
+                                                                }
+
+                                                                const id = Number(val);
+                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                    return;
+                                                                }
+
+                                                                updateRow(activeIndex, {
+                                                                    seller_user_id: id,
+                                                                    profile_selection_key: null,
+                                                                });
+                                                            }}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={t('Select a commercial')} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="none">{t('No commercial')}</SelectItem>
+                                                                {sellerOptions.map((seller) => (
+                                                                    <SelectItem key={seller.value} value={seller.value}>
+                                                                        {seller.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
                                                         <Select
                                                             value={selectedProfileKey}
                                                             onValueChange={(val) => {
                                                                 if (val === '__custom__') {
                                                                     updateRow(activeIndex, {
                                                                         profile_selection_key: '__custom__',
-                                                                        conditions_override: normalizeConditions(merged),
+                                                                        conditions_override: {},
                                                                     });
                                                                 } else {
                                                                     const profile = sellerProfiles.find((item) => item.key === val);
                                                                     if (profile) {
+                                                                        const resolvedProfile = normalizeConditions({
+                                                                            ...inheritedConditions,
+                                                                            ...profile.conditions,
+                                                                        });
+
                                                                         updateRow(activeIndex, {
                                                                             profile_selection_key: profile.key,
-                                                                            conditions_override: {},
+                                                                            conditions_override: diffConditions(inheritedConditions, resolvedProfile),
                                                                         });
                                                                     }
                                                                 }
@@ -642,10 +837,10 @@ export default function UserDbPage() {
 
                                             {selectedProfileKey === '__custom__' ? (
                                                 <SalesConditionsForm
-                                                    value={activeRow.conditions_override ?? {}}
+                                                    value={merged}
                                                     onChange={(next) => updateRow(activeIndex, {
                                                         profile_selection_key: '__custom__',
-                                                        conditions_override: normalizeConditions(next),
+                                                        conditions_override: diffConditions(inheritedConditions, normalizeConditions(next)),
                                                     })}
                                                     carriers={carriersList}
                                                     mode="client"
