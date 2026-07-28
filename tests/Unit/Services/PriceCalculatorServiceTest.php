@@ -312,3 +312,75 @@ it('applies billing-only client conditions when no seller is selected', function
 
     expect($prices)->toBe([12.5, 10.0, 8.75, 0.0]);
 });
+
+it('applies billing mc me mr margins when a commercial relation exists', function (): void {
+    $client = User::factory()->withoutTwoFactor()->create();
+    $billingUser = User::factory()->withoutTwoFactor()->create();
+    $sellerUser = User::factory()->withoutTwoFactor()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-price-calculator-billing-tier-margins',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => json_encode([
+            'default_profile_id' => 'base',
+            'profiles' => [
+                ['id' => 'base', 'conditions' => ['m' => 0, 'mc' => 10, 'me' => 20, 'mr' => 30]],
+            ],
+        ]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_seller_user')->insert([
+        'db_product_id' => $dbProductId,
+        'seller_user_id' => $sellerUser->id,
+        'billing_user_id' => $billingUser->id,
+        'conditions' => json_encode([]),
+        'seller_defaults' => json_encode([
+            'default_profile_id' => 'standard',
+            'profiles' => [
+                ['id' => 'standard', 'conditions' => ['m' => 0, 'mc' => 0, 'me' => 0, 'mr' => 0]],
+            ],
+        ]),
+        'use_billing_profile' => true,
+        'billing_profile_id' => 'base',
+        'can_manage' => false,
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('client_sales_conditions')->insert([
+        'client_user_id' => $client->id,
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'seller_user_id' => $sellerUser->id,
+        'conditions_override' => json_encode([]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $product = makeProduct(10.0, 8.0, 7.0, 0.0);
+    $product->cond = 1;
+    $product->floor = 1;
+    $product->roll = 1;
+
+    $prices = (new PriceCalculatorService())->calculatePrice(
+        $product,
+        $client,
+        $dbProductId,
+    );
+
+    expect($prices)->toBe([11.0, 9.6, 9.1, 0.0]);
+});

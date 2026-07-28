@@ -182,7 +182,7 @@ export default function UserDbPage() {
     const activeRow = rows[activeIndex] ?? null;
 
     // console.log(rows)
-    console.log(activeRow)
+    // console.log(activeRow)
 
     const billingOptions = useMemo(() => {
         if (!activeRow) {
@@ -247,7 +247,7 @@ export default function UserDbPage() {
         const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
         return (billing?.sellers ?? []).find((seller) => Number(seller.id) === Number(activeRow.seller_user_id)) ?? null;
     }, [activeRow, dbById]);
-    console.log(activeSellerData);
+    // console.log(activeSellerData);
 
     const activeBillingData = useMemo(() => {
         if (!activeRow?.billing_user_id) {
@@ -257,7 +257,7 @@ export default function UserDbPage() {
         const db = dbById.get(Number(activeRow.db_product_id));
         return (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id)) ?? null;
     }, [activeRow, dbById]);
-    console.log(activeBillingData);
+    // console.log(activeBillingData);
 
     const activeBillingDefaults = useMemo(
         () => normalizeBillingDefaultsToProfiles(activeBillingData?.defaults),

@@ -133,3 +133,35 @@ it('uses client margin as commercial margin and adds it to billing margin when c
         'm' => 15,
     ])->and($snapshot['resolved']['m'])->toBe(25.0);
 });
+
+it('adds billing and commercial tier margins for mc me mr when commercial relation exists', function (): void {
+    $resolver = new SalesConditionSnapshotResolver();
+
+    $snapshot = $resolver->resolve(
+        defaults: [
+            'default_profile_id' => 'standard',
+            'profiles' => [
+                ['id' => 'standard', 'conditions' => ['mc' => 10, 'me' => 20, 'mr' => 30]],
+            ],
+        ],
+        sellerRuleData: [
+            'use_billing_profile' => true,
+            'billing_profile_id' => 'standard',
+            'seller_defaults' => [
+                'default_profile_id' => 'standard',
+                'profiles' => [
+                    ['id' => 'standard', 'conditions' => ['mc' => 2, 'me' => 3, 'mr' => 4]],
+                ],
+            ],
+        ],
+        clientOverride: [
+            'me' => 5,
+        ],
+    );
+
+    expect($snapshot['resolved'])->toMatchArray([
+        'mc' => 12.0,
+        'me' => 25.0,
+        'mr' => 34.0,
+    ]);
+});

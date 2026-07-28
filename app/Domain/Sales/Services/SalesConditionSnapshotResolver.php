@@ -42,25 +42,17 @@ final class SalesConditionSnapshotResolver
         $resolved = array_replace_recursive($billingToSellerConditions, $sellerDefaults, $clientOverride);
 
         // Business semantic for commercial chain:
-        // total margin = billing margin + active commercial margin
-        // active commercial margin = client m (if provided) else seller default m.
+        // total margin key = billing margin key + active commercial margin key
+        // active commercial margin key = client override key (if provided) else seller default key.
         if (!empty($sellerRuleData)) {
-            $billingMargin = $this->toNumericOrNull($billingToSellerConditions['m'] ?? null);
-            $sellerMargin = $this->toNumericOrNull($sellerDefaults['m'] ?? null);
-
-            $hasClientMargin = array_key_exists('m', $clientOverride);
-            $clientMargin = $hasClientMargin
-                ? $this->toNumericOrNull($clientOverride['m'])
-                : null;
-
-            if ($billingMargin !== null) {
-                $activeCommercialMargin = $hasClientMargin ? $clientMargin : $sellerMargin;
-
-                if ($activeCommercialMargin !== null) {
-                    $resolved['m'] = $billingMargin + $activeCommercialMargin;
-                } else {
-                    $resolved['m'] = $billingMargin;
-                }
+            foreach (['m', 'mc', 'me', 'mr'] as $marginKey) {
+                $this->mergeCommercialMarginKey(
+                    resolved: $resolved,
+                    billingToSellerConditions: $billingToSellerConditions,
+                    sellerDefaults: $sellerDefaults,
+                    clientOverride: $clientOverride,
+                    marginKey: $marginKey,
+                );
             }
         }
 
@@ -143,5 +135,37 @@ final class SalesConditionSnapshotResolver
     private function toNumericOrNull(mixed $value): ?float
     {
         return is_numeric($value) ? (float) $value : null;
+    }
+
+    /**
+     * @param array<string, mixed> $resolved
+     * @param array<string, mixed> $billingToSellerConditions
+     * @param array<string, mixed> $sellerDefaults
+     * @param array<string, mixed> $clientOverride
+     */
+    private function mergeCommercialMarginKey(
+        array &$resolved,
+        array $billingToSellerConditions,
+        array $sellerDefaults,
+        array $clientOverride,
+        string $marginKey,
+    ): void {
+        $billingMargin = $this->toNumericOrNull($billingToSellerConditions[$marginKey] ?? null);
+
+        if ($billingMargin === null) {
+            return;
+        }
+
+        $hasClientMargin = array_key_exists($marginKey, $clientOverride);
+        $clientMargin = $hasClientMargin
+            ? $this->toNumericOrNull($clientOverride[$marginKey])
+            : null;
+        $sellerMargin = $this->toNumericOrNull($sellerDefaults[$marginKey] ?? null);
+
+        $activeCommercialMargin = $hasClientMargin ? $clientMargin : $sellerMargin;
+
+        $resolved[$marginKey] = $activeCommercialMargin !== null
+            ? $billingMargin + $activeCommercialMargin
+            : $billingMargin;
     }
 }

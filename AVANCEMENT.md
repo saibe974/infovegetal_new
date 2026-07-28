@@ -5,9 +5,10 @@ Date de reference: 2026-07-16
 ### Session du 2026-07-28
 
 - Ajustement de la semantique runtime de `m` en contexte commercial dans `SalesConditionSnapshotResolver`.
+- Extension de la semantique additive commerciale aux marges par palier `mc`, `me`, `mr` pour couvrir le cas facturant en marges detaillees.
 - Regle appliquee: marge totale client = marge facturant + marge commerciale active.
-- Marge commerciale active: marge standard commercial si pas de valeur client, sinon marge client specifique.
-- Validation ciblee: `tests/Unit/Domain/Sales/SalesConditionSnapshotResolverTest.php` (4 tests passes).
+- Marge commerciale active: marge standard commercial si pas de valeur client, sinon marge client specifique (pour `m`, `mc`, `me`, `mr`).
+- Validation ciblee: `tests/Unit/Domain/Sales/SalesConditionSnapshotResolverTest.php` (5 tests passes) + `tests/Unit/Services/PriceCalculatorServiceTest.php` (18 tests passes).
 
 ## ÉTAT DU PROJET
 
