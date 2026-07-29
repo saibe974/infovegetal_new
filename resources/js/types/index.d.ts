@@ -84,13 +84,14 @@ export interface SalesConditions {
     pd?: number;
     h?: number;
     l?: number;
+    lm?: number;
     c?: string;
     mc?: number;
     me?: number;
     mr?: number;
     tvap?: number;
     tvat?: number | null;
-    t?: number | null;
+    t?: string | number | null;
     z?: number | null;
     p?: string;
     [key: string]: string | number | boolean | null | undefined;

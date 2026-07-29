@@ -16,6 +16,7 @@ import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { Separator } from '@/components/ui/separator';
 import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
 import CountryFlag from '@/components/ui/country-flag';
+import { ButtonsActions } from '@/components/buttons-actions';
 
 type CarrierOption = {
     id: number;
@@ -96,6 +97,7 @@ const DEFAULT_VALUES: SalesConditions = {
     pd: 0,
     h: 1,
     l: 0,
+    lm: 0,
     c: '',
     mc: 0,
     me: 0,
@@ -146,6 +148,7 @@ export default function UserDbPage() {
 
     const [search, setSearch] = useState('');
     const [deliveryRaw, setDeliveryRaw] = useState('');
+    const [lmRaw, setLmRaw] = useState('');
     const [tvatRaw, setTvatRaw] = useState('');
 
     const [rows, setRows] = useState<SalesConditionDraft[]>(() => {
@@ -173,6 +176,7 @@ export default function UserDbPage() {
 
     useEffect(() => {
         setDeliveryRaw('');
+        setLmRaw('');
         setTvatRaw('');
     }, [activeIndex]);
 
@@ -425,8 +429,26 @@ export default function UserDbPage() {
 
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
-    const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
-    const zones = carriersList.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
+
+    type CarrierAssignment = { carrier_id: number | null; zone_id: number | null; tva?: number | null };
+
+    const [carrierTvaRaw, setCarrierTvaRaw] = useState<Record<number, string>>({});
+
+    const carrierAssignments: CarrierAssignment[] = useMemo(() => {
+        if (merged.t === null || merged.t === undefined || merged.t === '') return [];
+        if (typeof merged.t === 'number') return [{ carrier_id: merged.t, zone_id: merged.z ?? null }];
+        try {
+            const parsed = JSON.parse(merged.t);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }, [merged.t, merged.z]);
+
+    const updateCarrierAssignments = (next: CarrierAssignment[]) => {
+        const json = next.length === 0 ? null : JSON.stringify(next);
+        update({ t: json as unknown as SalesConditions['t'] });
+    };
 
     const update = (patch: Partial<SalesConditions>) => {
         const nextResolved = normalizeConditions({ ...merged, ...patch });
@@ -856,84 +878,141 @@ export default function UserDbPage() {
 
                                             <Separator />
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* <FormField label={t('Higher roll')}>
-                                                    <Input
-                                                        type="checkbox"
-                                                        checked={Number(merged.h ?? 0) === 1}
-                                                         onChange={(e) => update({ h: e.target.checked ? 1 : 0 })}
-                                                    />
-                                                </FormField> */}
-                                                <FormField label={t('Carrier')}>
-                                                    <Select
-                                                        value={currentCarrierId !== null ? String(currentCarrierId) : 'none'}
-                                                        onValueChange={(v) => {
-                                                            const nextCarrierId = v === 'none' ? null : Number(v);
-                                                            update(nextCarrierId ? { t: nextCarrierId } : { t: null, z: null });
-                                                        }}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder={t('Select a carrier')} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="none">{t('None')}</SelectItem>
-                                                            {carriersList.map((carrier) => (
-                                                                <SelectItem key={carrier.id} value={String(carrier.id)}>
-                                                                    {carrier.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
+                                            <div className="space-y-4">
+                                                <FormField label={t('Carriers')}>
+                                                    <div className="space-y-2">
+                                                        {carrierAssignments.map((assignment, index) => {
+                                                            const carrierZones = carriersList.find((c) => c.id === assignment.carrier_id)?.zones ?? [];
+                                                            return (
+                                                                <div key={index} className="flex items-center gap-2">
+                                                                    <Select
+                                                                        value={assignment.carrier_id !== null ? String(assignment.carrier_id) : 'none'}
+                                                                        onValueChange={(v) => {
+                                                                            const next = [...carrierAssignments];
+                                                                            next[index] = { carrier_id: v === 'none' ? null : Number(v), zone_id: null };
+                                                                            updateCarrierAssignments(next);
+                                                                        }}
+                                                                    >
+                                                                        <SelectTrigger className="flex-1">
+                                                                            <SelectValue placeholder={t('Select a carrier')} />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                                            {carriersList.map((carrier) => (
+                                                                                <SelectItem key={carrier.id} value={String(carrier.id)}>
+                                                                                    {carrier.name}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <Select
+                                                                        value={assignment.zone_id !== null ? String(assignment.zone_id) : 'none'}
+                                                                        onValueChange={(v) => {
+                                                                            const next = [...carrierAssignments];
+                                                                            next[index] = { ...next[index], zone_id: v === 'none' ? null : Number(v) };
+                                                                            updateCarrierAssignments(next);
+                                                                        }}
+                                                                        disabled={!assignment.carrier_id}
+                                                                    >
+                                                                        <SelectTrigger className="flex-1">
+                                                                            <SelectValue placeholder={t('Select a zone')} />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            <SelectItem value="none">{t('None')}</SelectItem>
+                                                                            {carrierZones.map((zone) => (
+                                                                                <SelectItem key={zone.id} value={String(zone.id)}>
+                                                                                    {zone.name}
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <Input
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        className="h-9 w-20"
+                                                                        placeholder={t('TVA %')}
+                                                                        value={index in carrierTvaRaw ? carrierTvaRaw[index] : (assignment.tva !== null && assignment.tva !== undefined ? String(assignment.tva) : '')}
+                                                                        onChange={(e) => {
+                                                                            setCarrierTvaRaw((prev) => ({ ...prev, [index]: e.target.value }));
+                                                                            const num = toNumber(e.target.value);
+                                                                            if (Number.isFinite(num)) {
+                                                                                const next = [...carrierAssignments];
+                                                                                next[index] = { ...next[index], tva: num };
+                                                                                updateCarrierAssignments(next);
+                                                                            }
+                                                                        }}
+                                                                        onBlur={() => setCarrierTvaRaw((prev) => {
+                                                                            const next = { ...prev };
+                                                                            delete next[index];
+                                                                            return next;
+                                                                        })}
+                                                                    />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-9 w-9 shrink-0 text-destructive"
+                                                                        onClick={() => {
+                                                                            const next = carrierAssignments.filter((_, i) => i !== index);
+                                                                            updateCarrierAssignments(next);
+                                                                        }}
+                                                                    >
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <ButtonsActions
+                                                            add={() => updateCarrierAssignments([...carrierAssignments, { carrier_id: null, zone_id: null }])}
+                                                        />
+                                                    </div>
                                                 </FormField>
-                                                <FormField label={t('Zone')}>
-                                                    <Select
-                                                        value={merged.z !== null && merged.z !== undefined ? String(merged.z) : 'none'}
-                                                        onValueChange={(v) => update({ z: v === 'none' ? null : Number(v) })}
-                                                        disabled={!currentCarrierId}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder={t('Select a zone')} />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="none">{t('None')}</SelectItem>
-                                                            {zones.map((zone) => (
-                                                                <SelectItem key={zone.id} value={String(zone.id)}>
-                                                                    {zone.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </FormField>
-                                                <FormField label={t('Delivery (€)')}>
-                                                    <Input
-                                                        type="text"
-                                                        inputMode="decimal"
-                                                        value={deliveryRaw || String(merged.l ?? 0)}
-                                                        onChange={(e) => {
-                                                            setDeliveryRaw(e.target.value);
-                                                            const num = toNumber(e.target.value);
-                                                            if (Number.isFinite(num)) {
-                                                                update({ l: num });
-                                                            }
-                                                        }}
-                                                        onBlur={() => setDeliveryRaw('')}
-                                                    />
-                                                </FormField>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                    <FormField label={t('Delivery (€)')}>
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={deliveryRaw || String(merged.l ?? 0)}
+                                                            onChange={(e) => {
+                                                                setDeliveryRaw(e.target.value);
+                                                                const num = toNumber(e.target.value);
+                                                                if (Number.isFinite(num)) {
+                                                                    update({ l: num });
+                                                                }
+                                                            }}
+                                                            onBlur={() => setDeliveryRaw('')}
+                                                        />
+                                                    </FormField>
+                                                    <FormField label={t('Minimum delivery (€)')}>
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={lmRaw || String(merged.lm ?? 0)}
+                                                            onChange={(e) => {
+                                                                setLmRaw(e.target.value);
+                                                                const num = toNumber(e.target.value);
+                                                                if (Number.isFinite(num)) {
+                                                                    update({ lm: num });
+                                                                }
+                                                            }}
+                                                            onBlur={() => setLmRaw('')}
+                                                        />
+                                                    </FormField>
 
-                                                <FormField label={t('Transport VAT (%)')}>
-                                                    <Input
-                                                        type="text"
-                                                        inputMode="decimal"
-                                                        value={tvatRaw !== '' ? tvatRaw : (merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat))}
-                                                        onChange={(e) => {
-                                                            setTvatRaw(e.target.value);
-                                                            const num = toNumber(e.target.value);
-                                                            update({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
-                                                        }}
-                                                        onBlur={() => setTvatRaw('')}
-                                                    />
-                                                </FormField>
+                                                    <FormField label={t('Transport VAT (%)')}>
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={tvatRaw !== '' ? tvatRaw : (merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat))}
+                                                            onChange={(e) => {
+                                                                setTvatRaw(e.target.value);
+                                                                const num = toNumber(e.target.value);
+                                                                update({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
+                                                            }}
+                                                            onBlur={() => setTvatRaw('')}
+                                                        />
+                                                    </FormField>
 
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </>

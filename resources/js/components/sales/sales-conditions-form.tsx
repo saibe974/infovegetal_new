@@ -30,6 +30,7 @@ const DEFAULT_VALUES: SalesConditions = {
     pd: 0,
     h: 1,
     l: 0,
+    lm: 0,
     c: '',
     mc: 0,
     me: 0,
@@ -119,13 +120,11 @@ function AccordionVolet({
     );
 }
 
-export default function SalesConditionsForm({ value, onChange, carriers, mode }: Props) {
+export default function SalesConditionsForm({ value, onChange, mode }: Props) {
     const { t } = useI18n();
     const [rawFloats, setRawFloats] = useState<Record<string, string>>({});
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...(value ?? {}) };
-    const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
-    const zones = carriers.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
 
     const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
         onChange({
