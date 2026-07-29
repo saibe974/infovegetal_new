@@ -51,11 +51,6 @@ export default withAppLayout<Props>(
         const cartId = cart?.id;
         const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
-        const getDisplayUnitPrice = (product: { price_ttc?: number | null }, fallback: number): number => {
-            return typeof product.price_ttc === 'number' && product.price_ttc > 0 ? product.price_ttc : fallback;
-        };
-        // console.log(user)
-
         const [deliveryDate, setDeliveryDate] = useState('');
 
         // const [isRefreshingCart, setIsRefreshingCart] = useState(false);
@@ -68,12 +63,13 @@ export default withAppLayout<Props>(
         const [pageMessage, setPageMessage] = useState<string | null>(null);
 
 
-        const itemsPricing = useMemo(
-                const itemsTotal = group.items.reduce((sum, item) => {
-            const displayUnitPrice = getDisplayUnitPrice(item.product, item.pricing.unitPrice);
-            return sum + (displayUnitPrice * item.quantity);
-        }, 0);
-        [items],
+        const itemsPricing = useMemo(() =>
+            items.map((item) => ({
+                product: item.product,
+                quantity: item.quantity,
+                pricing: getCartPricing(item.product, item.quantity),
+            })),
+            [items],
         );
 
 const getGroupKey = (product: { db_products_id?: number | null; dbProduct?: { id?: number | null } | null }) =>
@@ -473,16 +469,6 @@ return (
                                 className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
                                     ? " text-destructive border border-destructive"
                                     : " text-green-600 border border-green-600"}`}
-                            >
-                                {saveMessage}
-                            </div>
-                        )}
-                        {pageMessage && (
-                            <div
-                                className={`mt-2 text-sm p-2 rounded ${pageMessage.includes("Erreur")
-                                    ? " text-destructive border border-destructive"
-                                    : " text-green-600 border border-green-600"
-                                    }`}
                             >
                                 {saveMessage}
                             </div>

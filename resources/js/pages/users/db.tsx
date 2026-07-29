@@ -145,6 +145,8 @@ export default function UserDbPage() {
     const dbById = useMemo(() => new Map(dbProductsList.map((db) => [Number(db.id), db])), [dbProductsList]);
 
     const [search, setSearch] = useState('');
+    const [deliveryRaw, setDeliveryRaw] = useState('');
+    const [tvatRaw, setTvatRaw] = useState('');
 
     const [rows, setRows] = useState<SalesConditionDraft[]>(() => {
         const existing = Array.isArray(salesConditions) ? salesConditions : [];
@@ -168,6 +170,11 @@ export default function UserDbPage() {
     });
 
     const [activeIndex, setActiveIndex] = useState<number>(0);
+
+    useEffect(() => {
+        setDeliveryRaw('');
+        setTvatRaw('');
+    }, [activeIndex]);
 
     const dbOptions = useMemo(
         () => dbProductsList.map((db) => ({ value: String(db.id), label: (db.name), country: (db.country) })),
@@ -421,8 +428,8 @@ export default function UserDbPage() {
     const currentCarrierId = merged.t !== null && merged.t !== undefined ? Number(merged.t) : null;
     const zones = carriersList.find((carrier) => carrier.id === currentCarrierId)?.zones ?? [];
 
-    const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
-        const nextResolved = normalizeConditions({ ...merged, [key]: nextValue });
+    const update = (patch: Partial<SalesConditions>) => {
+        const nextResolved = normalizeConditions({ ...merged, ...patch });
 
         updateRow(activeIndex, {
             profile_selection_key: '__custom__',
@@ -817,7 +824,7 @@ export default function UserDbPage() {
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField label={t('Price mode')}>
-                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update('p', v)}>
+                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update({ p: v })}>
                                                         <SelectTrigger>
                                                             <SelectValue />
                                                         </SelectTrigger>
@@ -849,23 +856,20 @@ export default function UserDbPage() {
 
                                             <Separator />
 
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <FormField label={t('Higher roll')}>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* <FormField label={t('Higher roll')}>
                                                     <Input
                                                         type="checkbox"
                                                         checked={Number(merged.h ?? 0) === 1}
-                                                        onChange={(e) => update('h', e.target.checked ? 1 : 0)}
+                                                         onChange={(e) => update({ h: e.target.checked ? 1 : 0 })}
                                                     />
-                                                </FormField>
+                                                </FormField> */}
                                                 <FormField label={t('Carrier')}>
                                                     <Select
                                                         value={currentCarrierId !== null ? String(currentCarrierId) : 'none'}
                                                         onValueChange={(v) => {
                                                             const nextCarrierId = v === 'none' ? null : Number(v);
-                                                            update('t', nextCarrierId);
-                                                            if (!nextCarrierId) {
-                                                                update('z', null);
-                                                            }
+                                                            update(nextCarrierId ? { t: nextCarrierId } : { t: null, z: null });
                                                         }}
                                                     >
                                                         <SelectTrigger>
@@ -884,7 +888,7 @@ export default function UserDbPage() {
                                                 <FormField label={t('Zone')}>
                                                     <Select
                                                         value={merged.z !== null && merged.z !== undefined ? String(merged.z) : 'none'}
-                                                        onValueChange={(v) => update('z', v === 'none' ? null : Number(v))}
+                                                        onValueChange={(v) => update({ z: v === 'none' ? null : Number(v) })}
                                                         disabled={!currentCarrierId}
                                                     >
                                                         <SelectTrigger>
@@ -901,15 +905,32 @@ export default function UserDbPage() {
                                                     </Select>
                                                 </FormField>
                                                 <FormField label={t('Delivery (€)')}>
-                                                    <Input type="number" step="0.01" value={String(merged.l ?? 0)} onChange={(e) => update('l', toNumber(e.target.value))} />
+                                                    <Input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={deliveryRaw || String(merged.l ?? 0)}
+                                                        onChange={(e) => {
+                                                            setDeliveryRaw(e.target.value);
+                                                            const num = toNumber(e.target.value);
+                                                            if (Number.isFinite(num)) {
+                                                                update({ l: num });
+                                                            }
+                                                        }}
+                                                        onBlur={() => setDeliveryRaw('')}
+                                                    />
                                                 </FormField>
 
                                                 <FormField label={t('Transport VAT (%)')}>
                                                     <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat)}
-                                                        onChange={(e) => update('tvat', e.target.value === '' ? null : toNumber(e.target.value))}
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={tvatRaw !== '' ? tvatRaw : (merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat))}
+                                                        onChange={(e) => {
+                                                            setTvatRaw(e.target.value);
+                                                            const num = toNumber(e.target.value);
+                                                            update({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
+                                                        }}
+                                                        onBlur={() => setTvatRaw('')}
                                                     />
                                                 </FormField>
 
