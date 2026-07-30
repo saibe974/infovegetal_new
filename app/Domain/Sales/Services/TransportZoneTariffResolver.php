@@ -49,8 +49,12 @@ final class TransportZoneTariffResolver
         }
 
         $lowerOrEqual = array_values(array_filter($entries, fn (array $entry): bool => $rollCount >= $entry['min']));
+        if (!empty($lowerOrEqual)) {
+            return end($lowerOrEqual)['value'];
+        }
 
-        return !empty($lowerOrEqual) ? end($lowerOrEqual)['value'] : 0.0;
+        // No lower tier applies: fallback to the closest upper tier.
+        return $entries[0]['value'];
     }
 
     private function parseTariffRange(string $key): ?array

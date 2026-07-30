@@ -58,13 +58,13 @@ it('selects the matching zone tariff for the given roll count', function (): voi
  * Business Rules:
  * BR-029
  */
-it('returns zero when no zone tariff matches the roll count', function (): void {
+it('falls back to the closest upper tier when no lower tier matches the roll count', function (): void {
     $tariffs = [
         'mini' => 120,
         'roll:4-6' => 110,
     ];
 
-    expect(cartControllerPickZoneTariff(1, $tariffs))->toBe(0.0)
+    expect(cartControllerPickZoneTariff(1, $tariffs))->toBe(110.0)
         ->and(cartControllerPickZoneTariff(0, $tariffs))->toBe(0.0);
 });
 

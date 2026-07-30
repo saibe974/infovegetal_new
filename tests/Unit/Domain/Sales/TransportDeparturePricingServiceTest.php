@@ -72,6 +72,52 @@ it('returns zero when the shipping inputs do not yield a valid tariff', function
  * BR-029
  * BR-035
  */
+it('falls back to the closest upper tier for carrier tariffs when below first range', function (): void {
+    $carrier = Carrier::create([
+        'name' => 'Carrier upper tier fallback',
+        'country' => 'FR',
+        'days' => 2,
+        'minimum' => 0,
+        'taxgo' => 0,
+    ]);
+
+    $zone = CarrierZone::create([
+        'carrier_id' => $carrier->id,
+        'name' => 'Zone upper tier fallback',
+        'tariffs' => [
+            'mini' => 0,
+            'roll:4-6' => 110,
+        ],
+    ]);
+
+    $service = new TransportDeparturePricingService();
+    $shipping = $service->calculate([
+        'suppliers' => [
+            [
+                'supplier_id' => 1,
+                'mod_liv' => 'roll',
+                'rolls' => [
+                    ['coef' => 1.0],
+                ],
+            ],
+        ],
+    ], [
+        1 => [
+            't' => $carrier->id,
+            'z' => $zone->id,
+            'p' => 0,
+            'l' => 20,
+        ],
+    ]);
+
+    expect($shipping)->toBe(110.0);
+});
+
+/**
+ * Business Rules:
+ * BR-029
+ * BR-035
+ */
 it('supports multi-options transport stored as JSON in t', function (): void {
     $carrierA = Carrier::create([
         'name' => 'Carrier A',

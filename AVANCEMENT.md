@@ -22,6 +22,7 @@ Date de reference: 2026-07-16
 	- mode prix depart: transport HT = `max(l * nb_rolls, lm)` puis application de `tvat`.
 	- mode prix rendu: transport HT = part residuelle via taux de remplissage avec plancher `lm`, puis application de `tvat`.
 	- ces regles ne s appliquent qu en custom (sans transporteur/zone valide); en mode transporteur, le calcul reste base sur tarifs zone + minimum zone + `carrier.taxgo`.
+- Ajustement paliers transporteur: quand aucun palier inferieur ou egal ne matche (ex: 1 roll avec premiere tranche `roll:4-6`), le moteur prend maintenant le palier superieur le plus proche au lieu de `0`, cote backend et frontend.
 - Validation ciblee: `tests/Unit/Domain/Sales/TransportDeparturePricingServiceTest.php`, `tests/Unit/Http/Resources/ProductResourceTransportTest.php`, `tests/Unit/Http/Controllers/CartControllerTransportPricingTest.php` (13 tests passes).
 
 - Ajustement de la semantique runtime de `m` en contexte commercial dans `SalesConditionSnapshotResolver`.

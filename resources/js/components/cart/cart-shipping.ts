@@ -213,6 +213,9 @@ const pickZoneTariff = (rollCount: number, tariffs: Record<string, number | stri
             const lowerOrEqual = entries.filter((entry) => rollCount >= entry.min);
             if (lowerOrEqual.length > 0) {
                 base = lowerOrEqual[lowerOrEqual.length - 1].value;
+            } else {
+                // No lower tier applies: fallback to the closest upper tier.
+                base = entries[0]?.value ?? 0;
             }
         }
     }
