@@ -30,13 +30,13 @@ function cartControllerTariffToFillRatio(float $coef): float
     return (float) $method->invoke($controller, $coef);
 }
 
-function cartControllerBuildPdfPayload(array $itemsInput, User $user, float $shippingTotal): array
+function cartControllerBuildPdfPayload(array $itemsInput, User $user, float $shippingTotal, array $transportSelection = []): array
 {
     $controller = new CartController();
     $method = new ReflectionMethod($controller, 'buildPdfPayload');
     $method->setAccessible(true);
 
-    return $method->invoke($controller, $itemsInput, $user, $shippingTotal);
+    return $method->invoke($controller, $itemsInput, $user, $shippingTotal, false, $transportSelection);
 }
 
 /**
@@ -333,4 +333,174 @@ it('adds transport to the product total in the cart payload', function (): void 
     expect($payload['items_total'] ?? null)->toBe(168.0)
         ->and($payload['shipping_total'] ?? null)->toBe(300.0)
         ->and($payload['total'] ?? null)->toBe(($payload['items_total'] ?? 0) + ($payload['shipping_total'] ?? 0));
+});
+
+/**
+ * Business Rules:
+ * BR-045
+ */
+it('uses transport selection from order payload when provided', function (): void {
+    $user = User::factory()->create();
+
+    $carrierA = Carrier::create([
+        'name' => 'Carrier A',
+        'country' => 'FR',
+        'days' => 2,
+        'minimum' => 0,
+        'taxgo' => 0,
+    ]);
+
+    $zoneA = CarrierZone::create([
+        'carrier_id' => $carrierA->id,
+        'name' => 'Zone A',
+        'tariffs' => [
+            'mini' => 0,
+            'roll:1-3' => 100,
+        ],
+    ]);
+
+    $carrierB = Carrier::create([
+        'name' => 'Carrier B',
+        'country' => 'FR',
+        'days' => 2,
+        'minimum' => 0,
+        'taxgo' => 0,
+    ]);
+
+    $zoneB = CarrierZone::create([
+        'carrier_id' => $carrierB->id,
+        'name' => 'Zone B',
+        'tariffs' => [
+            'mini' => 0,
+            'roll:1-3' => 200,
+        ],
+    ]);
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-selection',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'country' => 'FR',
+        'mod_liv' => 'roll',
+        'mini' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $user->id,
+        'attributes' => json_encode([
+            't' => [
+                ['carrier_id' => $carrierA->id, 'zone_id' => $zoneA->id],
+                ['carrier_id' => $carrierB->id, 'zone_id' => $zoneB->id],
+            ],
+            'p' => 0,
+        ]),
+    ]);
+
+    $product = Product::create([
+        'sku' => 'selection-product',
+        'name' => 'Selection product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => [],
+        'category_products_id' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'selection-product',
+        'ean13' => '0000000000001',
+        'pot' => null,
+        'height' => null,
+        'price_floor' => 8,
+        'price_roll' => 7,
+        'price_promo' => 0,
+        'producer_id' => null,
+        'tva_id' => null,
+        'cond' => 2,
+        'floor' => 2,
+        'roll' => 3,
+        'unite' => null,
+    ]);
+
+    $payload = cartControllerBuildPdfPayload(
+        [
+            ['id' => $product->id, 'quantity' => 24],
+        ],
+        $user,
+        0.0,
+        [
+            $dbProductId => [
+                'carrier_id' => $carrierB->id,
+                'zone_id' => $zoneB->id,
+            ],
+        ],
+    );
+
+    expect($payload['shipping_total'] ?? null)->toBe(400.0);
+});
+
+/**
+ * Business Rules:
+ * BR-045
+ */
+it('includes custom minimum lm and tvat in cart payload shipping', function (): void {
+    $user = User::factory()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-custom-minimum-shipping',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'country' => 'FR',
+        'mod_liv' => 'roll',
+        'mini' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_user')->insert([
+        'db_product_id' => $dbProductId,
+        'user_id' => $user->id,
+        'attributes' => json_encode([
+            'p' => 'price_depart',
+            'l' => 100,
+            'lm' => 300,
+            'tvat' => 10,
+        ]),
+    ]);
+
+    $product = Product::create([
+        'sku' => 'custom-minimum-shipping-product',
+        'name' => 'Custom minimum shipping product',
+        'description' => null,
+        'img_link' => null,
+        'price' => 10,
+        'active' => true,
+        'attributes' => [],
+        'category_products_id' => null,
+        'db_products_id' => $dbProductId,
+        'ref' => 'custom-minimum-shipping-product',
+        'ean13' => '0000000000002',
+        'pot' => null,
+        'height' => null,
+        'price_floor' => 8,
+        'price_roll' => 7,
+        'price_promo' => 0,
+        'producer_id' => null,
+        'tva_id' => null,
+        'cond' => 2,
+        'floor' => 2,
+        'roll' => 3,
+        'unite' => null,
+    ]);
+
+    $payload = cartControllerBuildPdfPayload([
+        ['id' => $product->id, 'quantity' => 24],
+    ], $user, 0.0);
+
+    expect($payload['shipping_total'] ?? null)->toBe(330.0)
+        ->and($payload['total'] ?? null)->toBe(($payload['items_total'] ?? 0) + 330.0);
 });

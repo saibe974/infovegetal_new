@@ -58,6 +58,15 @@ class PriceCalculatorService
     }
 
     /**
+     * Expose les attributs utilisateur resolves (legacy + sales conditions)
+     * pour les ecrans qui doivent afficher un contexte coherent (panier, show produit).
+     */
+    public function resolveUserAttributes(User $user, int $dbProductId): ?array
+    {
+        return $this->getUserAttributes($user, $dbProductId);
+    }
+
+    /**
      * Récupère les attributs de l'utilisateur pour un db_product.
      */
     protected function getUserAttributes(User $user, int $dbProductId): ?array

@@ -247,8 +247,9 @@ class ProductController extends Controller
             $carrierIds = [];
             $zoneIds = [];
             foreach ($dbUserAttributesByDbId as $attrs) {
-                $carrierId = (int) ($attrs['t'] ?? 0);
-                $zoneId = (int) ($attrs['z'] ?? 0);
+                $transportChoice = ProductResource::resolveTransportChoiceFromAttributes($attrs);
+                $carrierId = $transportChoice['carrier_id'];
+                $zoneId = $transportChoice['zone_id'];
 
                 if ($carrierId > 0 && $zoneId > 0) {
                     $carrierIds[] = $carrierId;
@@ -283,8 +284,9 @@ class ProductController extends Controller
                 }
 
                 foreach ($dbUserAttributesByDbId as $dbId => $attrs) {
-                    $carrierId = (int) ($attrs['t'] ?? 0);
-                    $zoneId = (int) ($attrs['z'] ?? 0);
+                    $transportChoice = ProductResource::resolveTransportChoiceFromAttributes($attrs);
+                    $carrierId = $transportChoice['carrier_id'];
+                    $zoneId = $transportChoice['zone_id'];
 
                     if ($carrierId <= 0 || $zoneId <= 0) {
                         continue;

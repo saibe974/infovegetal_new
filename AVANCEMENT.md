@@ -4,6 +4,26 @@ Date de reference: 2026-07-16
 
 ### Session du 2026-07-28
 
+- Prise en compte du nouveau format transport multi-options: `t` peut maintenant etre un JSON (liste de couples `carrier_id`/`zone_id`, `tva` optionnelle) en plus du format historique entier.
+- Compatibilite runtime commande: `TransportDeparturePricingService` selectionne une option valide (priorite a `z` si present, sinon premiere option valide) et conserve le fallback legacy.
+- Compatibilite front panier: `ProductResource::resolveDbUserTransport` et le prechargement transport dans `ProductController` supportent aussi `t` JSON pour exposer `db_user_transport`.
+- Extension commande: `CartController` accepte un payload optionnel `transport_selection` (par `db_product_id`) pour appliquer un choix transport specifique a la commande sans ecraser les conditions persistantes.
+- Branchement front commande: `resources/js/components/cart/cart-order.context.tsx` envoie maintenant `transport_selection` avec `shipping_total` pour aligner le calcul serveur transport sur la selection active du panier.
+- Test de verrouillage commande: `tests/Unit/Http/Controllers/CartControllerTransportPricingTest.php` couvre explicitement la priorite de `transport_selection` sur les options transport disponibles.
+- Diagnostic runtime panier: `resources/js/pages/products/cart.tsx` affiche un panneau "Debug transport" par groupe (attributs `t`/`z`, transport resolu, mini, TVA, cout calcule) et un bouton "Rafraichir" pour forcer la recharge des produits depuis l'API auth.
+- Correction source attributs panier/show: `ProductResource::resolveDbUserAttributes` utilise maintenant `PriceCalculatorService::resolveUserAttributes` (fusion legacy + sales conditions) avant fallback pivot legacy, afin de recuperer `l/lm/tvat` meme quand `t` est vide.
+- Exposition service: `PriceCalculatorService::resolveUserAttributes` ajoutee pour partager la resolution d attributs utilisateur entre calcul prix et projection front.
+- Test ajoute: `tests/Unit/Services/PriceCalculatorServiceTest.php` couvre le cas transport sans pivot (`l/lm/tvat` venant de `client_sales_conditions`).
+- Correction endpoint panier auth: `routes/products.php` (GET `/api/auth/products/{product}`) precharge maintenant les attributs resolves via `PriceCalculatorService` au lieu du pivot brut, ce qui aligne le panier avec `products/show`.
+- Test HTTP ajoute: `tests/Feature/Http/AuthProductApiResolvedAttributesTest.php` valide que `db_user_attributes` expose bien `l/lm/p/t/z` depuis `conditions_override`.
+- Correction calcul front transport rendu: `resources/js/components/cart/cart-shipping.ts` applique maintenant le minimum transport (`mini`) meme si aucun tarif par roll n est applicable, au lieu de retourner 0 en mode `price_render`.
+- Clarification fiscale transport: la majoration transport appliquee dans les calculs panier/commande vient strictement de `carrier.taxgo`; les champs `tva/tvat` portes par les options/conditions ne remplacent plus `taxgo`.
+- Clarification calcul custom transport:
+	- mode prix depart: transport HT = `max(l * nb_rolls, lm)` puis application de `tvat`.
+	- mode prix rendu: transport HT = part residuelle via taux de remplissage avec plancher `lm`, puis application de `tvat`.
+	- ces regles ne s appliquent qu en custom (sans transporteur/zone valide); en mode transporteur, le calcul reste base sur tarifs zone + minimum zone + `carrier.taxgo`.
+- Validation ciblee: `tests/Unit/Domain/Sales/TransportDeparturePricingServiceTest.php`, `tests/Unit/Http/Resources/ProductResourceTransportTest.php`, `tests/Unit/Http/Controllers/CartControllerTransportPricingTest.php` (13 tests passes).
+
 - Ajustement de la semantique runtime de `m` en contexte commercial dans `SalesConditionSnapshotResolver`.
 - Extension de la semantique additive commerciale aux marges par palier `mc`, `me`, `mr` pour couvrir le cas facturant en marges detaillees.
 - Regle appliquee: marge totale client = marge facturant + marge commerciale active.

@@ -44,6 +44,7 @@ class CartController extends Controller
             'items.*.id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'shipping_total' => 'nullable|numeric|min:0',
+            'transport_selection' => 'nullable|array',
             'choice' => 'nullable|in:append,new',
         ]);
 
@@ -103,6 +104,7 @@ class CartController extends Controller
         $cart->touch();
 
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+        $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
 
         $pdfPayload = $this->buildPdfPayload(
             array_values(array_map(
@@ -113,6 +115,7 @@ class CartController extends Controller
             $user,
             $shippingTotal,
             false,
+            $transportSelection,
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
@@ -144,7 +147,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -295,6 +298,7 @@ class CartController extends Controller
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
             'shipping_total' => 'nullable|numeric|min:0',
+            'transport_selection' => 'nullable|array',
         ]);
 
         /** @var \App\Models\User $user */
@@ -325,6 +329,7 @@ class CartController extends Controller
         $cart->touch();
 
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+        $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
         $result = $this->generateAndStorePdfForCart(
             $cart,
             $data['items'],
@@ -332,6 +337,7 @@ class CartController extends Controller
             $shippingTotal,
             $cartTcpdfService,
             false,
+            $transportSelection,
         );
 
         $request->session()->forget('cart_filter_ids');
@@ -542,6 +548,7 @@ class CartController extends Controller
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
             'shipping_total' => 'nullable|numeric|min:0',
+            'transport_selection' => 'nullable|array',
             'group_label' => 'nullable|string|max:190',
             'group_key' => 'nullable|integer|min:0',
         ]);
@@ -549,6 +556,7 @@ class CartController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
+        $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
 
         $requestedByProductId = [];
         foreach ($data['items'] as $item) {
@@ -584,6 +592,7 @@ class CartController extends Controller
             $shippingTotal,
             $cartTcpdfService,
             true,
+            $transportSelection,
         );
 
         $existingSnapshot = \App\Models\OrderHeader::query()
@@ -592,7 +601,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -660,7 +669,13 @@ class CartController extends Controller
         );
     }
 
-    private function buildPdfPayload(array $itemsInput, \App\Models\User $user, float $shippingTotal, bool $preferInputPrices = false): array
+    private function buildPdfPayload(
+        array $itemsInput,
+        \App\Models\User $user,
+        float $shippingTotal,
+        bool $preferInputPrices = false,
+        array $transportSelection = [],
+    ): array
     {
         $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $products = Product::with(['category', 'tags', 'media', 'dbProduct'])
@@ -744,6 +759,24 @@ class CartController extends Controller
             $attrs = is_array($pivot) ? $pivot : json_decode($pivot, true);
             if (!is_array($attrs)) {
                 continue;
+            }
+
+            $selection = $transportSelection[$dbProductId] ?? null;
+            if (is_array($selection)) {
+                $carrierId = isset($selection['carrier_id']) ? (int) $selection['carrier_id'] : 0;
+                $zoneId = isset($selection['zone_id']) ? (int) $selection['zone_id'] : 0;
+                if ($carrierId > 0 && $zoneId > 0) {
+                    $attrs['transport_selection'] = [
+                        [
+                            'carrier_id' => $carrierId,
+                            'zone_id' => $zoneId,
+                            'tva' => isset($selection['tva']) && is_numeric($selection['tva'])
+                                ? (float) $selection['tva']
+                                : null,
+                        ],
+                    ];
+                    $attrs['z'] = $zoneId;
+                }
             }
 
             $pivotsByDbProductId[(int) $dbProductId] = $attrs;
@@ -833,8 +866,9 @@ class CartController extends Controller
         float $shippingTotal,
         CartTcpdfService $cartTcpdfService,
         bool $sendEmails,
+        array $transportSelection = [],
     ): array {
-        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, false);
+        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, false, $transportSelection);
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $payload['order_number'] = $orderNumber;
 
@@ -960,6 +994,44 @@ class CartController extends Controller
         }
 
         return 0;
+    }
+
+    /**
+     * @param mixed $rawSelection
+     * @return array<int, array{carrier_id:int, zone_id:int, tva?:float}>
+     */
+    private function normalizeTransportSelection(mixed $rawSelection): array
+    {
+        if (!is_array($rawSelection)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($rawSelection as $dbProductId => $choice) {
+            $dbId = (int) $dbProductId;
+            if ($dbId <= 0 || !is_array($choice)) {
+                continue;
+            }
+
+            $carrierId = isset($choice['carrier_id']) ? (int) $choice['carrier_id'] : 0;
+            $zoneId = isset($choice['zone_id']) ? (int) $choice['zone_id'] : 0;
+            if ($carrierId <= 0 || $zoneId <= 0) {
+                continue;
+            }
+
+            $entry = [
+                'carrier_id' => $carrierId,
+                'zone_id' => $zoneId,
+            ];
+
+            if (isset($choice['tva']) && is_numeric($choice['tva'])) {
+                $entry['tva'] = (float) $choice['tva'];
+            }
+
+            $normalized[$dbId] = $entry;
+        }
+
+        return $normalized;
     }
 
     private function formatOrderNumber(int $cartId): string

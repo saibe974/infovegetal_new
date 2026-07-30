@@ -27,16 +27,11 @@ Route::middleware(['auth'])->get('/api/auth/products/{product}', function (Reque
     $dbProductId = (int) ($product->db_products_id ?? 0);
 
     if ($user && $dbProductId > 0) {
-        $dbProduct = $user->dbProducts()->where('db_products.id', $dbProductId)->first();
-        $pivotAttributes = $dbProduct?->pivot?->attributes;
+        $resolvedAttributes = app(\App\Services\PriceCalculatorService::class)
+            ->resolveUserAttributes($user, $dbProductId);
 
-        if ($pivotAttributes) {
-            $decoded = is_string($pivotAttributes)
-                ? json_decode($pivotAttributes, true)
-                : $pivotAttributes;
-            if (is_array($decoded)) {
-                $product->setAttribute('db_user_attributes', $decoded);
-            }
+        if (is_array($resolvedAttributes) && $resolvedAttributes !== []) {
+            $product->setAttribute('db_user_attributes', $resolvedAttributes);
         }
     }
 

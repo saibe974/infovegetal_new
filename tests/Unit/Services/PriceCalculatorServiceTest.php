@@ -384,3 +384,54 @@ it('applies billing mc me mr margins when a commercial relation exists', functio
 
     expect($prices)->toBe([11.0, 9.6, 9.1, 0.0]);
 });
+
+it('resolves transport attrs from client sales conditions when pivot attrs are missing', function (): void {
+    $client = User::factory()->withoutTwoFactor()->create();
+    $billingUser = User::factory()->withoutTwoFactor()->create();
+
+    $dbProductId = DB::table('db_products')->insertGetId([
+        'name' => 'db-product-price-calculator-transport-attrs',
+        'description' => null,
+        'champs' => null,
+        'categories' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => json_encode([
+            'default_profile_id' => 'base',
+            'profiles' => [
+                ['id' => 'base', 'conditions' => ['m' => 5]],
+            ],
+        ]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('client_sales_conditions')->insert([
+        'client_user_id' => $client->id,
+        'db_product_id' => $dbProductId,
+        'billing_user_id' => $billingUser->id,
+        'seller_user_id' => null,
+        'conditions_override' => json_encode([
+            'l' => 171.25,
+            'lm' => 342.5,
+            'tvat' => null,
+            'p' => 'price_depart',
+        ]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $attrs = (new PriceCalculatorService())->resolveUserAttributes($client, $dbProductId);
+
+    expect($attrs)->not->toBeNull()
+        ->and((float) ($attrs['l'] ?? 0))->toBe(171.25)
+        ->and((float) ($attrs['lm'] ?? 0))->toBe(342.5)
+        ->and($attrs['tvat'] ?? null)->toBeNull();
+});

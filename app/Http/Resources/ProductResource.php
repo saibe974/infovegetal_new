@@ -43,6 +43,11 @@ class ProductResource extends JsonResource
             return null;
         }
 
+        $resolved = app(PriceCalculatorService::class)->resolveUserAttributes($user, $dbProductId);
+        if (is_array($resolved) && $resolved !== []) {
+            return $resolved;
+        }
+
         $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
         $pivotAttributes = $dbProduct?->pivot?->attributes;
 
@@ -71,8 +76,9 @@ class ProductResource extends JsonResource
             return null;
         }
 
-        $carrierId = (int) ($attrs['t'] ?? 0);
-        $zoneId = (int) ($attrs['z'] ?? 0);
+        $transportChoice = self::resolveTransportChoiceFromAttributes($attrs);
+        $carrierId = $transportChoice['carrier_id'];
+        $zoneId = $transportChoice['zone_id'];
 
         if ($carrierId <= 0 || $zoneId <= 0) {
             return null;
@@ -98,6 +104,68 @@ class ProductResource extends JsonResource
             'zone_name' => (string) ($zone->name ?? ''),
             'taxgo' => (float) ($carrier->taxgo ?? 0),
             'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $attrs
+     * @return array{carrier_id:int,zone_id:int}
+     */
+    public static function resolveTransportChoiceFromAttributes(array $attrs): array
+    {
+        $legacyCarrierId = (int) ($attrs['t'] ?? 0);
+        $legacyZoneId = (int) ($attrs['z'] ?? 0);
+
+        if ($legacyCarrierId > 0 && $legacyZoneId > 0) {
+            return [
+                'carrier_id' => $legacyCarrierId,
+                'zone_id' => $legacyZoneId,
+            ];
+        }
+
+        $raw = $attrs['t'] ?? null;
+        $parsed = is_string($raw) ? json_decode($raw, true) : $raw;
+        if (!is_array($parsed) || empty($parsed)) {
+            return [
+                'carrier_id' => 0,
+                'zone_id' => 0,
+            ];
+        }
+
+        $preferredZoneId = (int) ($attrs['z'] ?? 0);
+        $selected = null;
+
+        foreach ($parsed as $option) {
+            if (!is_array($option)) {
+                continue;
+            }
+
+            $carrierId = (int) ($option['carrier_id'] ?? 0);
+            $zoneId = (int) ($option['zone_id'] ?? 0);
+            if ($carrierId <= 0 || $zoneId <= 0) {
+                continue;
+            }
+
+            if ($preferredZoneId > 0 && $zoneId === $preferredZoneId) {
+                $selected = $option;
+                break;
+            }
+
+            if ($selected === null) {
+                $selected = $option;
+            }
+        }
+
+        if (!is_array($selected)) {
+            return [
+                'carrier_id' => 0,
+                'zone_id' => 0,
+            ];
+        }
+
+        return [
+            'carrier_id' => (int) ($selected['carrier_id'] ?? 0),
+            'zone_id' => (int) ($selected['zone_id'] ?? 0),
         ];
     }
 

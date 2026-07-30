@@ -3,6 +3,8 @@ import { CartContext } from './cart.context';
 import { getCartPricing } from './cart-pricing';
 import { calculateCartShipping } from './cart-shipping';
 
+type TransportSelection = Record<number, { carrier_id: number; zone_id: number; tva?: number }>;
+
 export type PdfResult = {
     url: string;
     filename: string;
@@ -62,6 +64,37 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     const [orderConflict, setOrderConflict] = useState<OrderConflict | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+    const buildTransportSelection = useCallback((): TransportSelection => {
+        const selection: TransportSelection = {};
+
+        items.forEach(({ product }) => {
+            const dbProductId = Number(product.db_products_id ?? product.dbProduct?.id ?? 0);
+            if (!Number.isFinite(dbProductId) || dbProductId <= 0 || selection[dbProductId]) {
+                return;
+            }
+
+            const transport = product.db_user_transport;
+            if (!transport || typeof transport !== 'object' || Array.isArray(transport)) {
+                return;
+            }
+
+            const carrierId = Number((transport as { carrier_id?: unknown }).carrier_id ?? 0);
+            const zoneId = Number((transport as { zone_id?: unknown }).zone_id ?? 0);
+            if (!Number.isFinite(carrierId) || !Number.isFinite(zoneId) || carrierId <= 0 || zoneId <= 0) {
+                return;
+            }
+
+            const taxgo = Number((transport as { taxgo?: unknown }).taxgo ?? 0);
+            selection[dbProductId] = {
+                carrier_id: carrierId,
+                zone_id: zoneId,
+                ...(Number.isFinite(taxgo) ? { tva: taxgo } : {}),
+            };
+        });
+
+        return selection;
+    }, [items]);
+
     const buildPayload = useCallback(() => {
         const itemsPricing = items.map(({ product, quantity }) => ({
             product,
@@ -82,11 +115,12 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                     line_total: pricing.lineTotal,
                 })),
                 shipping_total: deliveryTotal,
+                transport_selection: buildTransportSelection(),
             },
             itemsTotal: itemsPricing.reduce((sum, { pricing }) => sum + pricing.lineTotal, 0),
             deliveryTotal,
         };
-    }, [items]);
+    }, [items, buildTransportSelection]);
 
     const closePdfModal = useCallback(() => {
         if (isPdfGenerating) return;

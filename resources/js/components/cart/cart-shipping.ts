@@ -20,6 +20,11 @@ export type CartTransportContext = {
     transportBySupplier: Record<number, DbUserTransport>;
 };
 
+type TransportChoice = {
+    carrierId: number;
+    zoneId: number;
+};
+
 const toNumber = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (typeof value === 'string') {
@@ -49,6 +54,58 @@ const normalizePriceMode = (value: unknown): number => {
 const toFillRatio = (coef: number): number => {
     const normalized = coef > 1 ? coef / 100 : coef;
     return Math.max(0, Math.min(1, normalized));
+};
+
+const resolveTransportChoice = (
+    supplierAttributes: DbUserAttributes | null | undefined,
+    supplierTransport: DbUserTransport | null | undefined,
+): TransportChoice => {
+    const fallbackCarrierId = toNumber(supplierTransport?.carrier_id);
+    const fallbackZoneId = toNumber(supplierTransport?.zone_id);
+    const legacyCarrierId = toNumber(supplierAttributes?.t);
+    const legacyZoneId = toNumber(supplierAttributes?.z);
+
+    if (legacyCarrierId > 0 && legacyZoneId > 0) {
+        return { carrierId: legacyCarrierId, zoneId: legacyZoneId };
+    }
+
+    const rawT = supplierAttributes?.t;
+    let parsed: unknown = rawT;
+    if (typeof rawT === 'string') {
+        try {
+            parsed = JSON.parse(rawT);
+        } catch {
+            parsed = rawT;
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        const preferredZoneId = legacyZoneId > 0 ? legacyZoneId : fallbackZoneId;
+        const options = parsed
+            .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && !Array.isArray(entry))
+            .map((entry) => ({
+                carrierId: toNumber(entry.carrier_id),
+                zoneId: toNumber(entry.zone_id),
+            }))
+            .filter((entry) => entry.carrierId > 0 && entry.zoneId > 0);
+
+        if (options.length > 0) {
+            if (preferredZoneId > 0) {
+                const preferred = options.find((entry) => entry.zoneId === preferredZoneId);
+                if (preferred) {
+                    return preferred;
+                }
+            }
+
+            return options[0] ?? { carrierId: 0, zoneId: 0 };
+        }
+    }
+
+    if (fallbackCarrierId > 0 && fallbackZoneId > 0) {
+        return { carrierId: fallbackCarrierId, zoneId: fallbackZoneId };
+    }
+
+    return { carrierId: 0, zoneId: 0 };
 };
 
 const extractSupplierAttributes = (items: CartItem[]): Record<number, DbUserAttributes> => {
@@ -168,8 +225,12 @@ export const calculateRenderedTransportCost = (
     pricePerRoll: number,
     carrierMinimum: number,
 ): number => {
-    if (rollFillRates.length === 0 || pricePerRoll <= 0) {
+    if (rollFillRates.length === 0) {
         return 0;
+    }
+
+    if (pricePerRoll <= 0) {
+        return Math.max(0, carrierMinimum);
     }
 
     const theoreticalTotal = pricePerRoll * rollFillRates.length;
@@ -186,8 +247,14 @@ const calculateRenderedTransportPerRoll = (
     pricePerRoll: number,
     carrierMinimum: number,
 ): number[] => {
-    if (rollFillRates.length === 0 || pricePerRoll <= 0) {
+    if (rollFillRates.length === 0) {
         return [];
+    }
+
+    if (pricePerRoll <= 0) {
+        const minimum = Math.max(0, carrierMinimum);
+        const perRoll = minimum / rollFillRates.length;
+        return rollFillRates.map(() => perRoll);
     }
 
     const normalizedFillRates = rollFillRates.map((fillRate) => Math.max(0, Math.min(1, fillRate)));
@@ -208,8 +275,7 @@ export const getSupplierTransportCost = (
         return 0;
     }
 
-    const carrierId = toNumber(supplierAttributes.t);
-    const zoneId = toNumber(supplierAttributes.z);
+    const { carrierId, zoneId } = resolveTransportChoice(supplierAttributes, supplierTransport);
 
     const priceMode = normalizePriceMode(supplierAttributes.p);
 
@@ -234,24 +300,22 @@ export const getSupplierTransportCost = (
         return roundCurrency(totalWithTaxgo);
     }
 
-    const rollPrice = toNumber(supplierAttributes.l);
-
-    if (rollPrice <= 0) {
-        return 0;
-    }
+    const rollPrice = Math.max(0, toNumber(supplierAttributes.l));
+    const customMinimum = Math.max(0, toNumber(supplierAttributes.lm));
+    const customTaxRate = Math.max(0, toNumber(supplierAttributes.tvat));
 
     if (priceMode === 0) {
-        return roundCurrency(supplier.rolls.length * rollPrice);
+        const baseTotal = supplier.rolls.length * rollPrice;
+        const adjustedTotal = customMinimum > 0 && baseTotal < customMinimum
+            ? customMinimum
+            : baseTotal;
+        return roundCurrency(adjustedTotal * (1 + customTaxRate / 100));
     }
 
     if (priceMode === 1) {
-        const total = supplier.rolls.reduce((sum, roll) => {
-            const coef = Math.max(0, Math.min(100, toNumber(roll.coef)));
-            const ratioToPay = 1 - coef / 100;
-            return sum + rollPrice * ratioToPay;
-        }, 0);
-
-        return roundCurrency(total);
+        const fillRates = supplier.rolls.map((roll) => toFillRatio(toNumber(roll.coef)));
+        const adjustedTotal = calculateRenderedTransportCost(fillRates, rollPrice, customMinimum);
+        return roundCurrency(adjustedTotal * (1 + customTaxRate / 100));
     }
 
     return 0;
@@ -293,8 +357,7 @@ export const getSupplierRollPrices = (
 
     const priceMode = normalizePriceMode(supplierAttributes.p);
     const rollCount = supplier.rolls.length;
-    const carrierId = toNumber(supplierAttributes.t);
-    const zoneId = toNumber(supplierAttributes.z);
+    const { carrierId, zoneId } = resolveTransportChoice(supplierAttributes, supplierTransport);
 
     if (carrierId > 0 && zoneId > 0 && supplierTransport) {
         const baseTariffPerRoll = pickZoneTariff(rollCount, supplierTransport.tariffs ?? {});
@@ -326,20 +389,39 @@ export const getSupplierRollPrices = (
         return rawRollPrices.map((price) => roundCurrency(price * scale * (1 + taxgoRate / 100)));
     }
 
-    const rollPrice = toNumber(supplierAttributes.l);
-    if (rollPrice <= 0) {
+    const rollPrice = Math.max(0, toNumber(supplierAttributes.l));
+    const customMinimum = Math.max(0, toNumber(supplierAttributes.lm));
+    const customTaxRate = Math.max(0, toNumber(supplierAttributes.tvat));
+    if (rollPrice <= 0 && customMinimum <= 0) {
         return null;
     }
 
     if (priceMode === 0) {
-        return supplier.rolls.map(() => roundCurrency(rollPrice));
+        const rollCount = supplier.rolls.length;
+        if (rollCount <= 0) {
+            return null;
+        }
+
+        const rawRollPrices = supplier.rolls.map(() => rollPrice);
+        const rawTotal = rawRollPrices.reduce((sum, price) => sum + price, 0);
+
+        if (rawTotal <= 0) {
+            const perRoll = customMinimum / rollCount;
+            return supplier.rolls.map(() => roundCurrency(perRoll * (1 + customTaxRate / 100)));
+        }
+
+        let scale = 1;
+        if (customMinimum > 0 && rawTotal < customMinimum) {
+            scale = customMinimum / rawTotal;
+        }
+
+        return rawRollPrices.map((price) => roundCurrency(price * scale * (1 + customTaxRate / 100)));
     }
 
     if (priceMode === 1) {
-        return supplier.rolls.map((roll) => {
-            const ratioToPay = 1 - toFillRatio(toNumber(roll.coef));
-            return roundCurrency(rollPrice * ratioToPay);
-        });
+        const fillRates = supplier.rolls.map((roll) => toFillRatio(toNumber(roll.coef)));
+        const renderedByRoll = calculateRenderedTransportPerRoll(fillRates, rollPrice, customMinimum);
+        return renderedByRoll.map((price) => roundCurrency(price * (1 + customTaxRate / 100)));
     }
 
     return null;
