@@ -33,11 +33,13 @@ const syncCartToServer = (cartIds: number[]): void => {
 export type CartItem = {
     product: Product;
     quantity: number;
+    comment: string;
 };
 
 type StoredCartItem = {
     product: Product;
     quantity: number;
+    comment?: string;
 };
 
 
@@ -46,6 +48,9 @@ export type CartContextType = {
     addToCart: (product: Product, quantity?: number) => void;
     removeFromCart: (productId: number) => void;
     updateQuantity: (productId: number, quantity: number) => void;
+    updateComment: (productId: number, comment: string) => void;
+    orderComment: string;
+    setOrderComment: (comment: string) => void;
     clearCart: () => void;
     refreshCart: () => Promise<void>;
 };
@@ -55,6 +60,9 @@ export const CartContext = createContext<CartContextType>({
     addToCart: () => { },
     removeFromCart: () => { },
     updateQuantity: () => { },
+    updateComment: () => { },
+    orderComment: '',
+    setOrderComment: () => { },
     clearCart: () => { },
     refreshCart: async () => { },
 });
@@ -114,6 +122,7 @@ const parseStoredCart = (raw: string | null): CartItem[] => {
             .map((entry) => ({
                 product: entry.product,
                 quantity: Math.max(1, Math.floor(entry.quantity)),
+                comment: typeof entry.comment === 'string' ? entry.comment : '',
             }));
     } catch {
         return [];
@@ -124,13 +133,22 @@ const serializeCart = (items: CartItem[]): string => {
     const compact = items.map((item) => ({
         product: sanitizeProductForStorage(item.product),
         quantity: item.quantity,
+        comment: item.comment,
     }));
 
     return JSON.stringify(compact);
 };
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const { auth, cart_refresh_token } = usePage<SharedData & { cart_refresh_token?: number | string | null }>().props;
+    const { auth, cart, cart_refresh_token } = usePage<SharedData & {
+        cart?: {
+            id: number;
+            status: string;
+            comment?: string;
+            item_comments?: Record<string, string>;
+        } | null;
+        cart_refresh_token?: number | string | null;
+    }>().props;
     const userId = auth?.user?.id;
 
     const getCartKey = useCallback(() => {
@@ -140,15 +158,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>(() => {
         if (typeof window !== 'undefined') {
             const stored = localStorage.getItem(getCartKey());
-            return parseStoredCart(stored);
+            return parseStoredCart(stored).map((item) => ({
+                ...item,
+                comment: item.comment || cart?.item_comments?.[String(item.product.id)] || '',
+            }));
         }
         return [];
     });
+    const [orderComment, setOrderCommentState] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return localStorage.getItem(`${getCartKey()}:comment`) ?? cart?.comment ?? '';
+    });
 
     const itemsRef = useRef<CartItem[]>(items);
+    const restoredCartIdRef = useRef<number | null>(null);
     useEffect(() => {
         itemsRef.current = items;
     }, [items]);
+
+    useEffect(() => {
+        if (!cart || restoredCartIdRef.current === cart.id) {
+            return;
+        }
+
+        const serverComments = cart.item_comments ?? {};
+        setItems((current) => current.map((item) => ({
+            ...item,
+            comment: item.comment || serverComments[String(item.product.id)] || '',
+        })));
+        setOrderCommentState((current) => current || cart.comment || '');
+        restoredCartIdRef.current = cart.id;
+    }, [cart]);
 
     const [pendingProductId, setPendingProductId] = useState<number | null>(null);
 
@@ -299,13 +339,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         localStorage.setItem(getCartKey(), serializeCart(items));
+        localStorage.setItem(`${getCartKey()}:comment`, orderComment);
 
         // Synchroniser les IDs du panier avec le serveur si l'utilisateur est authentifié
         if (userId && typeof window !== 'undefined') {
             const cartIds = items.map(item => item.product.id);
             syncCartToServer(cartIds);
         }
-    }, [items, userId, getCartKey]);
+    }, [items, orderComment, userId, getCartKey]);
 
     const addToCart = (product: Product, quantity: number = 1) => {
         setItems((prev) => {
@@ -321,7 +362,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 );
             }
 
-            return [...prev, { product, quantity: Math.max(unite, quantityToAdd) }];
+            return [...prev, { product, quantity: Math.max(unite, quantityToAdd), comment: '' }];
         });
     };
 
@@ -344,10 +385,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }));
     };
 
-    const clearCart = () => setItems([]);
+    const updateComment = (productId: number, comment: string) => {
+        setItems((prev) => prev.map((item) =>
+            item.product.id === productId ? { ...item, comment: comment.slice(0, 2000) } : item
+        ));
+    };
+
+    const setOrderComment = (comment: string) => setOrderCommentState(comment.slice(0, 2000));
+
+    const clearCart = () => {
+        setItems([]);
+        setOrderCommentState('');
+    };
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, refreshCart }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart }}>
             {children}
         </CartContext.Provider>
     );

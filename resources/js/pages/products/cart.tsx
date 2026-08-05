@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Flower2Icon, Minus, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
+import { ArrowLeftCircle, Flower2Icon, Minus, Pencil, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/datePicker';
 import { useI18n } from '@/lib/i18n';
@@ -201,10 +201,29 @@ export default withAppLayout<Props>(
         const cartId = cart?.id;
         const carrierOverridesStorageKey = getCarrierOverridesStorageKey(auth?.user?.id, cartId);
         const discountsStorageKey = getCartDiscountsStorageKey(auth?.user?.id, cartId);
-        const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
+        const {
+            items,
+            updateQuantity,
+            updateComment,
+            orderComment,
+            setOrderComment,
+            removeFromCart,
+            clearCart,
+            refreshCart,
+        } = useContext(CartContext);
 
         const [deliveryDate, setDeliveryDate] = useState('');
+        const [openCommentProductIds, setOpenCommentProductIds] = useState<Set<number>>(() => new Set());
         const [isRefreshingCart, setIsRefreshingCart] = useState(false);
+
+        const toggleProductComment = useCallback((productId: number) => {
+            setOpenCommentProductIds((current) => {
+                const next = new Set(current);
+                if (next.has(productId)) next.delete(productId);
+                else next.add(productId);
+                return next;
+            });
+        }, []);
         const getStoredDiscounts = useCallback((): Record<number, DbDiscountDraft> =>
             Object.fromEntries(
                 Object.entries(storedDiscounts).map(([dbId, discount]) => [
@@ -215,7 +234,7 @@ export default withAppLayout<Props>(
                     },
                 ]),
             ),
-        [storedDiscounts]);
+            [storedDiscounts]);
         const [discountsByDb, setDiscountsByDb] = useState<Record<number, DbDiscountDraft>>(() =>
             readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts(),
         );
@@ -318,6 +337,7 @@ export default withAppLayout<Props>(
             items.map((item) => ({
                 product: item.product,
                 quantity: item.quantity,
+                comment: item.comment,
                 pricing: getCartPricing(item.product, item.quantity),
             })),
             [items],
@@ -347,7 +367,7 @@ export default withAppLayout<Props>(
             });
 
             return Array.from(groups.values()).map((group) => {
-                const cartItems = group.items.map(({ product, quantity }) => ({ product, quantity }));
+                const cartItems = group.items.map(({ product, quantity, comment }) => ({ product, quantity, comment }));
                 const transport = buildCartTransportContext(cartItems);
                 const shippingSummary = calculateCartShipping(cartItems, carrierOverrides, cartTransportOptions);
                 const override = carrierOverrides[group.id];
@@ -552,7 +572,7 @@ export default withAppLayout<Props>(
                                 <ArrowLeftCircle size={32} />
                             </Link>
                             <h1 className="text-3xl font-bold">
-                                {t('Panier')}
+                                {t('Order')}
                                 {cartId ? (
                                     <>
                                         &nbsp;<button
@@ -620,20 +640,30 @@ export default withAppLayout<Props>(
 
                                     <CardContent className="space-y-6">
                                         {/* Produits */}
-                                        <div className="space-y-4">
-                                            {group.items.map(({ product, quantity, pricing }) => {
+                                        <div className="overflow-hidden rounded-lg border">
+                                            <div className="hidden grid-cols-[5rem_minmax(0,1fr)_7rem_11rem_7rem_5rem] items-center gap-3 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground md:grid">
+                                                <span>{t('Photo')}</span>
+                                                <span>{t('Désignation')}</span>
+                                                <span className="text-right">{t('Prix')}</span>
+                                                <span className="text-center">{t('Quantité')}</span>
+                                                <span className="text-right">{t('Total')}</span>
+                                                <span className="text-center">{t('Actions')}</span>
+                                            </div>
+                                            {group.items.map(({ product, quantity, comment, pricing }) => {
                                                 const unitPrice = pricing.unitPrice;
                                                 const lineTotal = pricing.lineTotal;
                                                 const unite = getUniteQuantity(product);
                                                 const step = getQuantityStep(product, quantity);
+                                                const isCommentOpen = openCommentProductIds.has(product.id);
+                                                const hasComment = comment.trim() !== '';
 
                                                 return (
                                                     <div
                                                         key={product.id}
-                                                        className="flex flex-col gap-4 rounded-lg border p-4 md:flex-row md:items-center"
+                                                        className="border-b last:border-b-0"
                                                     >
-                                                        <div className="flex items-center gap-4 md:w-1/2">
-                                                            <div className="relative h-20 w-20 shrink-0 rounded">
+                                                        <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 p-3 md:grid-cols-[5rem_minmax(0,1fr)_7rem_11rem_7rem_5rem]">
+                                                            <div className="relative row-span-5 h-20 w-20 shrink-0 overflow-hidden rounded md:row-span-1">
                                                                 <img
                                                                     src={getProductCartImage(product)}
                                                                     alt={product.name}
@@ -649,7 +679,7 @@ export default withAppLayout<Props>(
                                                                 </Badge>
                                                             </div>
 
-                                                            <div className="space-y-1">
+                                                            <div className="min-w-0 space-y-1">
                                                                 <p className="line-clamp-2 text-sm font-semibold leading-tight capitalize">
                                                                     {product.name}
                                                                 </p>
@@ -663,15 +693,14 @@ export default withAppLayout<Props>(
                                                                 <p className="text-xs text-muted-foreground">
                                                                     {product.description}
                                                                 </p>
-
-                                                                <p className="text-base font-semibold">
-                                                                    {formatCurrency(unitPrice)}
-                                                                </p>
                                                             </div>
-                                                        </div>
 
-                                                        <div className="flex flex-1 flex-wrap items-center justify-between gap-4 md:justify-end">
-                                                            <div className="flex items-center gap-3 rounded-lg bg-muted p-2">
+                                                            <div className="text-sm font-medium md:text-right">
+                                                                <span className="mr-2 text-xs text-muted-foreground md:hidden">{t('Prix')} :</span>
+                                                                {formatCurrency(unitPrice)}
+                                                            </div>
+
+                                                            <div className="flex w-fit items-center gap-2 rounded-lg bg-muted p-1 md:justify-self-center">
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
@@ -708,20 +737,62 @@ export default withAppLayout<Props>(
                                                                 </Button>
                                                             </div>
 
-                                                            <div className="text-right">
-                                                                <p className="text-lg font-semibold">
-                                                                    {formatCurrency(lineTotal)}
-                                                                </p>
+                                                            <div className="text-sm font-semibold md:text-right">
+                                                                <span className="mr-2 text-xs font-normal text-muted-foreground md:hidden">{t('Total')} :</span>
+                                                                {formatCurrency(lineTotal)}
                                                             </div>
 
-                                                            <Button
-                                                                variant="ghost"
-                                                                className="text-destructive"
-                                                                onClick={() => removeFromCart(product.id)}
-                                                            >
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                            </Button>
+                                                            <div className="flex items-center md:justify-center">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className={cn('h-8 w-8', (hasComment || isCommentOpen) && 'text-primary')}
+                                                                    onClick={() => toggleProductComment(product.id)}
+                                                                    aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                                                    title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                    onClick={() => removeFromCart(product.id)}
+                                                                    aria-label={t('Retirer du panier')}
+                                                                    title={t('Retirer du panier')}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
                                                         </div>
+
+                                                        {(hasComment || isCommentOpen) && (
+                                                            <div className="border-t bg-muted/20 px-3 py-2 md:pl-[6.75rem]">
+                                                                {isCommentOpen ? (
+                                                                    <textarea
+                                                                        id={`product-comment-${product.id}`}
+                                                                        value={comment}
+                                                                        autoFocus
+                                                                        maxLength={2000}
+                                                                        rows={2}
+                                                                        onChange={(event) => updateComment(product.id, event.target.value)}
+                                                                        placeholder={t('Ex. couleur souhaitée, consigne de préparation…')}
+                                                                        aria-label={t('Commentaire pour ce produit')}
+                                                                        className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                                    />
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => toggleProductComment(product.id)}
+                                                                        className="flex w-full items-start gap-2 text-left text-sm text-muted-foreground hover:text-foreground"
+                                                                        title={t('Modifier le commentaire')}
+                                                                    >
+                                                                        <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                                                        <span className="whitespace-pre-wrap">{comment}</span>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -762,7 +833,7 @@ export default withAppLayout<Props>(
                         stickyStyle={{ top: 0, zIndex: 30 }}
                     >
                         <Card
-                            className="sidebar max-h-screen overflow-y-auto overscroll-contain"
+                            className="sidebar max-h-screen overflow-y-auto overscroll-auto"
                         >
                             <CardHeader>
                                 <CardTitle>{t('Récapitulatif')}</CardTitle>
@@ -938,6 +1009,24 @@ export default withAppLayout<Props>(
                                     cartCarriers={cartCarriers}
                                     t={t}
                                 />
+
+                                <div className="space-y-2">
+                                    <label htmlFor="order-comment" className="text-sm font-medium">
+                                        {t('Commentaire général de la commande')}
+                                    </label>
+                                    <textarea
+                                        id="order-comment"
+                                        value={orderComment}
+                                        maxLength={2000}
+                                        rows={4}
+                                        onChange={(event) => setOrderComment(event.target.value)}
+                                        placeholder={t('Ajoutez une consigne valable pour toute la commande…')}
+                                        className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    />
+                                    <p className="text-right text-xs text-muted-foreground">
+                                        {orderComment.length}/2000
+                                    </p>
+                                </div>
 
                                 <div className="rounded-lg border p-3 space-y-2">
                                     <div className="flex items-center justify-between text-sm">

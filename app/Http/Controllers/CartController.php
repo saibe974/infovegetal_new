@@ -43,6 +43,8 @@ class CartController extends Controller
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.comment' => 'nullable|string|max:2000',
+            'comment' => 'nullable|string|max:2000',
             'shipping_total' => 'nullable|numeric|min:0',
             'shipping_by_db' => 'nullable|array',
             'shipping_by_db.*' => 'nullable|numeric|min:0',
@@ -108,9 +110,14 @@ class CartController extends Controller
 
         $syncData = [];
         foreach ($requestedByProductId as $productId => $qty) {
-            $syncData[(int) $productId] = ['quantity' => (int) $qty];
+            $matchingItem = collect($data['items'])->firstWhere('id', (int) $productId);
+            $syncData[(int) $productId] = [
+                'quantity' => (int) $qty,
+                'comment' => $matchingItem['comment'] ?? null,
+            ];
         }
         $cart->products()->sync($syncData);
+        $cart->comment = $data['comment'] ?? null;
         $cart->touch();
 
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
@@ -120,7 +127,11 @@ class CartController extends Controller
 
         $pdfPayload = $this->buildPdfPayload(
             array_values(array_map(
-                fn ($productId, $qty) => ['id' => (int) $productId, 'quantity' => (int) $qty],
+                fn ($productId, $qty) => [
+                    'id' => (int) $productId,
+                    'quantity' => (int) $qty,
+                    'comment' => collect($data['items'])->firstWhere('id', (int) $productId)['comment'] ?? '',
+                ],
                 array_keys($requestedByProductId),
                 array_values($requestedByProductId),
             )),
@@ -130,6 +141,7 @@ class CartController extends Controller
             $transportSelection,
             $discounts,
             $shippingByDb,
+            $data['comment'] ?? null,
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
@@ -161,7 +173,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb, $data['comment'] ?? null);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -423,6 +435,8 @@ class CartController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
+            'items.*.comment' => 'nullable|string|max:2000',
+            'comment' => 'nullable|string|max:2000',
             'shipping_total' => 'nullable|numeric|min:0',
             'shipping_by_db' => 'nullable|array',
             'shipping_by_db.*' => 'nullable|numeric|min:0',
@@ -455,10 +469,14 @@ class CartController extends Controller
             : (is_array($cart->discounts) ? $cart->discounts : []);
 
         $cart->status = 'current';
+        $cart->comment = $data['comment'] ?? null;
 
         $syncData = [];
         foreach ($data['items'] as $item) {
-            $syncData[$item['id']] = ['quantity' => $item['quantity']];
+            $syncData[$item['id']] = [
+                'quantity' => $item['quantity'],
+                'comment' => $item['comment'] ?? null,
+            ];
         }
 
         $cart->products()->sync($syncData);
@@ -570,6 +588,8 @@ class CartController extends Controller
             'items' => 'required|array',
             'items.*.id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.comment' => 'nullable|string|max:2000',
+            'comment' => 'nullable|string|max:2000',
             'shipping_total' => 'nullable|numeric|min:0',
             'group_label' => 'nullable|string|max:190',
             'group_key' => 'nullable|integer|min:0',
@@ -619,6 +639,7 @@ class CartController extends Controller
             return [
                 'product' => $product,
                 'quantity' => (int) $item['quantity'],
+                'comment' => trim((string) ($item['comment'] ?? '')),
                 'unit_price' => $unitPrice,
                 'line_total' => $lineTotal,
             ];
@@ -687,6 +708,7 @@ class CartController extends Controller
             'user' => $user,
             'facturant' => $facturant,
             'commercial' => $commercial,
+            'comment' => trim((string) ($data['comment'] ?? '')),
         ])
             ->format('a4')
             ->name($safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '.pdf')
@@ -704,6 +726,8 @@ class CartController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
+            'items.*.comment' => 'nullable|string|max:2000',
+            'comment' => 'nullable|string|max:2000',
             'shipping_total' => 'nullable|numeric|min:0',
             'shipping_by_db' => 'nullable|array',
             'shipping_by_db.*' => 'nullable|numeric|min:0',
@@ -757,9 +781,14 @@ class CartController extends Controller
 
         $syncData = [];
         foreach ($requestedByProductId as $productId => $qty) {
-            $syncData[(int) $productId] = ['quantity' => (int) $qty];
+            $matchingItem = collect($data['items'])->firstWhere('id', (int) $productId);
+            $syncData[(int) $productId] = [
+                'quantity' => (int) $qty,
+                'comment' => $matchingItem['comment'] ?? null,
+            ];
         }
         $cart->products()->sync($syncData);
+        $cart->comment = $data['comment'] ?? null;
         $cart->touch();
 
         $result = $this->generateAndStorePdfForCart(
@@ -780,7 +809,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb, $data['comment'] ?? null);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -856,6 +885,7 @@ class CartController extends Controller
         array $transportSelection = [],
         array $discountSelections = [],
         array $shippingByDb = [],
+        ?string $comment = null,
     ): array
     {
         $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
@@ -909,6 +939,7 @@ class CartController extends Controller
                 return [
                     'product' => $product,
                     'quantity' => $quantity,
+                    'comment' => trim((string) ($item['comment'] ?? '')),
                     'unit_price' => $unitPrice,
                     'line_total' => $lineTotal,
                 ];
@@ -1025,6 +1056,7 @@ class CartController extends Controller
             'facturant' => $facturantUsers->first(),
             'commercial' => $commercialUsers->first(),
             'mail_recipients' => $mailRecipients,
+            'comment' => trim((string) ($comment ?? '')),
         ];
     }
 
@@ -1088,6 +1120,7 @@ class CartController extends Controller
             $transportSelection,
             $discountSelections,
             $shippingByDb,
+            $cart->comment,
         );
         $cart->transport_selection = $transportSelection;
         $cart->discounts = $discountSelections;

@@ -122,8 +122,10 @@ it('stores resolved actors in the order snapshot metadata', function (): void {
                 'quantity' => 2,
                 'unit_price' => 10,
                 'line_total' => 20,
+                'comment' => 'Garder les pots bien droits.',
             ],
         ],
+        'comment' => 'Livrer avant midi.',
         'items_total' => 20,
         'shipping_total' => 0,
         'total' => 20,
@@ -132,6 +134,8 @@ it('stores resolved actors in the order snapshot metadata', function (): void {
     ]);
 
     expect($orderHeader)->toBeInstanceOf(OrderHeader::class)
+        ->and($orderHeader->comment)->toBe('Livrer avant midi.')
+        ->and($orderHeader->lines->first()->comment)->toBe('Garder les pots bien droits.')
         ->and($orderHeader->meta)->toMatchArray([
             'source' => 'unit-test',
             'resolved_actors' => [

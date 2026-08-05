@@ -113,6 +113,7 @@ class HandleInertiaRequests extends Middleware
             $activeCart = Cart::query()
                 ->where('user_id', $user->id)
                 ->where('status', 'current')
+                ->with(['products' => fn ($query) => $query->select('products.id')])
                 ->latest('updated_at')
                 ->first();
         }
@@ -130,7 +131,15 @@ class HandleInertiaRequests extends Middleware
                 'impersonator' => $impersonatorArray,
                 'impersonation_strict_mode' => $impersonationStrictMode,
             ],
-            'cart' => $activeCart ? $activeCart->only(['id', 'status']) : null,
+            'cart' => $activeCart ? [
+                ...$activeCart->only(['id', 'status']),
+                'comment' => (string) ($activeCart->comment ?? ''),
+                'item_comments' => $activeCart->products
+                    ->mapWithKeys(fn ($product) => [
+                        (string) $product->id => (string) ($product->pivot->comment ?? ''),
+                    ])
+                    ->all(),
+            ] : null,
             'cart_refresh_token' => $user ? Cache::get('cart:refresh:' . $user->id) : null,
             'users' => $users,
             'flash' => [

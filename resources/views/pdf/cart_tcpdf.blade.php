@@ -373,6 +373,13 @@
                     <td class="num">{{ (int) $item['quantity'] }}</td>
                     <td class="num">{{ number_format((float) $item['line_total'], 2, ',', ' ') }} EUR</td>
                 </tr>
+                @if(!empty($item['comment']))
+                <tr>
+                    <td colspan="7" style="padding: 5px 8px; background-color: #f9fafb; color: #4b5563; font-size: 8px;">
+                        <strong>Commentaire produit :</strong> {!! nl2br(e($item['comment'])) !!}
+                    </td>
+                </tr>
+                @endif
             @endforeach
             <tr class="totals-row">
                 <td colspan="5" class="num">Total produits</td>
@@ -388,6 +395,12 @@
             </tr>
         </tbody>
     </table>
+
+    @if(!empty($comment))
+        <table cellpadding="5" style="margin-top: 8px; border: 1px solid #d1d5db;">
+            <tr><td><strong>Commentaire général de la commande :</strong><br>{!! nl2br(e($comment)) !!}</td></tr>
+        </table>
+    @endif
 
     @if(!empty($roll_distribution['suppliers']))
         <div class="page-break"></div>

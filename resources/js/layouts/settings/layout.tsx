@@ -43,6 +43,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             href: isSelf ? editProfile() : editAdminUser(userId),
             icon: InfoIcon,
         },
+        {
+            title: 'Contract',
+            href: ,
+            icon: ,
+        },
     ];
 
     const isDirectParentOfEditingUser = Boolean(
@@ -136,9 +141,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 {currentPath === `/admin/users/${userId}/db` ? `Manage database access` :
                                     currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :
                                         currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
-                                                currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
-                                                    currentPath === `/admin/users/${userId}/edit` ? `Edit user information` :
-                                                        ``}
+                                            currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
+                                                currentPath === `/admin/users/${userId}/edit` ? `Edit user information` :
+                                                    ``}
                             </p>
                         </div>
                     </div>

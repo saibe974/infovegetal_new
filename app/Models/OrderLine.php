@@ -32,6 +32,7 @@ class OrderLine extends Model
         'tva_rate',
         'product_snapshot',
         'meta',
+        'comment',
     ];
 
     protected $casts = [

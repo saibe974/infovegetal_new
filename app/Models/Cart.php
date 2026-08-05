@@ -14,6 +14,7 @@ class Cart extends Model
         'shipping_total',
         'transport_selection',
         'discounts',
+        'comment',
     ];
 
     protected $casts = [
@@ -31,7 +32,7 @@ class Cart extends Model
     public function products()
     {
         return $this->belongsToMany(Product::class, 'cart_product')
-            ->withPivot('quantity')
+            ->withPivot('quantity', 'comment')
             ->withTimestamps();
     }
 

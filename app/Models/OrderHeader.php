@@ -27,6 +27,7 @@ class OrderHeader extends Model
         'total_ttc',
         'conditions_snapshot',
         'meta',
+        'comment',
     ];
 
     protected $casts = [

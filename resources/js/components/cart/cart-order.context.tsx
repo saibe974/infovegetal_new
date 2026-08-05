@@ -63,7 +63,7 @@ function getCsrfToken(): string {
 }
 
 export function CartOrderProvider({ children }: { children: React.ReactNode }) {
-    const { items, clearCart } = useContext(CartContext);
+    const { items, orderComment, clearCart } = useContext(CartContext);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
@@ -105,9 +105,10 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     }, [items]);
 
     const buildPayload = useCallback((overrides: CartOrderOverrides = {}) => {
-        const itemsPricing = items.map(({ product, quantity }) => ({
+        const itemsPricing = items.map(({ product, quantity, comment }) => ({
             product,
             quantity,
+            comment,
             pricing: overrides.pricingByProductId?.[product.id] ?? getCartPricing(product, quantity),
         }));
         const shippingSummary = calculateCartShipping(items);
@@ -118,12 +119,14 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
 
         return {
             payload: {
-                items: itemsPricing.map(({ product, quantity, pricing }) => ({
+                items: itemsPricing.map(({ product, quantity, comment, pricing }) => ({
                     id: product.id,
                     quantity,
+                    comment,
                     unit_price: pricing.unitPrice,
                     line_total: pricing.lineTotal,
                 })),
+                comment: orderComment,
                 shipping_total: deliveryTotal,
                 ...(overrides.shippingByDb !== undefined ? { shipping_by_db: overrides.shippingByDb } : {}),
                 ...(overrides.discounts !== undefined ? { discounts: overrides.discounts } : {}),
@@ -132,7 +135,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
             itemsTotal: itemsPricing.reduce((sum, { pricing }) => sum + pricing.lineTotal, 0),
             deliveryTotal,
         };
-    }, [items, buildTransportSelection]);
+    }, [items, orderComment, buildTransportSelection]);
 
     const closePdfModal = useCallback(() => {
         if (isPdfGenerating) return;

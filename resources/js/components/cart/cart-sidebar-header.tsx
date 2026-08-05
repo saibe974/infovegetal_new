@@ -354,6 +354,7 @@ export function CartSidebarHeader() {
                                     key={item.product.id}
                                     product={item.product}
                                     quantity={item.quantity}
+                                    comment={item.comment}
                                     pricingOverride={pricingByProductId[item.product.id]}
                                 />
                             ))}

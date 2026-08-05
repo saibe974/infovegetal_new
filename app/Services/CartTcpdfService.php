@@ -60,6 +60,7 @@ class CartTcpdfService
         $y = $this->renderContacts($pdf, $payload, $y + 2.0);
         $y = $this->renderClientBox($pdf, $payload, $y + 2.0);
         $y = $this->renderProductsTable($pdf, $payload, $y + 3.0);
+        $y = $this->renderComments($pdf, $payload, $y + 4.0);
         $this->renderRollSummary($pdf, $payload, $y + 4.0);
     }
 
@@ -212,7 +213,12 @@ class CartTcpdfService
 
         $i = 0;
         foreach (($payload['items'] ?? []) as $item) {
-            if ($y + $rowH > $bottom) {
+            $productComment = trim((string) ($item['comment'] ?? ''));
+            $commentH = $productComment !== ''
+                ? max(8.0, $pdf->getStringHeight(array_sum($cols) - 4.0, $productComment) + 5.0)
+                : 0.0;
+
+            if ($y + $rowH + $commentH > $bottom) {
                 $pdf->AddPage('P', 'A4');
                 $y = 10.0;
                 $y = $this->drawProductsHeader($pdf, $x, $y, $cols, $header);
@@ -311,6 +317,34 @@ class CartTcpdfService
             $pdf->Cell($cols[6] - 1.2, 4.2, $this->eur($lineTotal), 0, 0, 'R');
 
             $y += $rowH;
+
+            if ($productComment !== '') {
+                $tableWidth = array_sum($cols);
+                $pdf->SetFillColor(249, 250, 251);
+                $pdf->SetDrawColor(229, 231, 235);
+                $pdf->SetTextColor(75, 85, 99);
+                $pdf->SetFont('dejavusans', '', 7.8);
+                $pdf->MultiCell(
+                    $tableWidth,
+                    $commentH,
+                    'Commentaire produit : ' . $productComment,
+                    1,
+                    'L',
+                    true,
+                    1,
+                    $x,
+                    $y,
+                    true,
+                    0,
+                    false,
+                    true,
+                    $commentH,
+                    'M',
+                    true,
+                );
+                $y = $pdf->GetY();
+            }
+
             $i++;
         }
 
@@ -343,6 +377,49 @@ class CartTcpdfService
         }
 
         return $y + $h;
+    }
+
+    private function renderComments($pdf, array $payload, float $y): float
+    {
+        $comments = [];
+        $generalComment = trim((string) ($payload['comment'] ?? ''));
+        if ($generalComment !== '') {
+            $comments[] = ['label' => 'Commentaire general de la commande', 'text' => $generalComment];
+        }
+
+        foreach ($comments as $comment) {
+            $estimatedHeight = 9.0 + $pdf->getStringHeight(190.0, $comment['text']);
+            if ($y + $estimatedHeight > $pdf->getPageHeight() - 16.0) {
+                $pdf->AddPage('P', 'A4');
+                $y = 10.0;
+            }
+
+            $pdf->SetFillColor(249, 250, 251);
+            $pdf->SetDrawColor(209, 213, 219);
+            $pdf->SetTextColor(31, 41, 55);
+            $pdf->SetFont('dejavusans', '', 8.2);
+            $pdf->MultiCell(
+                194.0,
+                0,
+                $comment['label'] . "\n" . $comment['text'],
+                1,
+                'L',
+                true,
+                1,
+                8.0,
+                $y,
+                true,
+                0,
+                false,
+                true,
+                0,
+                'T',
+                true,
+            );
+            $y = $pdf->GetY() + 2.0;
+        }
+
+        return $y;
     }
 
     private function drawTotalRow($pdf, float $x, float $y, float $labelW, float $valueW, string $label, float $value, bool $grand): float

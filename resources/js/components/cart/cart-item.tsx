@@ -1,7 +1,7 @@
-import React, { ComponentType, useContext } from 'react';
+import React, { ComponentType, useContext, useState } from 'react';
 import { type Product } from '@/types';
 import { CartContext } from './cart.context';
-import { Trash2, Minus, Plus } from 'lucide-react';
+import { Trash2, Minus, Pencil, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -14,12 +14,15 @@ import * as Flags from "country-flag-icons/react/3x2";
 export type CartItemProps = {
     product: Product;
     quantity: number;
+    comment?: string;
     pricingOverride?: CartPricing;
 };
 
-export function CartItem({ product, quantity, pricingOverride }: CartItemProps) {
+export function CartItem({ product, quantity, comment = '', pricingOverride }: CartItemProps) {
     const { t } = useI18n();
-    const { removeFromCart, updateQuantity } = useContext(CartContext);
+    const { removeFromCart, updateQuantity, updateComment } = useContext(CartContext);
+    const [isCommentOpen, setIsCommentOpen] = useState(false);
+    const hasComment = comment.trim() !== '';
 
     const pricing = pricingOverride ?? getCartPricing(product, quantity);
     const total = pricing.lineTotal.toFixed(2);
@@ -38,6 +41,19 @@ export function CartItem({ product, quantity, pricingOverride }: CartItemProps) 
 
     return (
         <div className="group relative border-b pb-3 last:border-b-0">
+            <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                    'absolute top-0 right-7 size-6',
+                    (hasComment || isCommentOpen) && 'text-primary',
+                )}
+                aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                onClick={() => setIsCommentOpen((open) => !open)}
+            >
+                <Pencil className="size-3.5" />
+            </Button>
             {/* Bouton supprimer en haut à droite */}
             <Button
                 variant="ghost"
@@ -71,7 +87,7 @@ export function CartItem({ product, quantity, pricingOverride }: CartItemProps) 
                 </div>
 
                 {/* Infos produit */}
-                <div className="flex-1 min-w-0 pr-6">
+                <div className="flex-1 min-w-0 pr-12">
                     <h4 className="font-medium text-sm leading-tight line-clamp-2">
                         {product.name}
                     </h4>
@@ -124,6 +140,28 @@ export function CartItem({ product, quantity, pricingOverride }: CartItemProps) 
                     </div>
                 </div>
             </div>
+            {isCommentOpen ? (
+                <textarea
+                    value={comment}
+                    autoFocus
+                    maxLength={2000}
+                    rows={2}
+                    onChange={(event) => updateComment(product.id, event.target.value)}
+                    placeholder={t('Commentaire pour ce produit')}
+                    aria-label={t('Commentaire pour ce produit')}
+                    className="mt-2 w-full resize-y rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+            ) : hasComment ? (
+                <button
+                    type="button"
+                    className="mt-2 flex w-full items-start gap-1.5 text-left text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsCommentOpen(true)}
+                    title={t('Modifier le commentaire')}
+                >
+                    <Pencil className="mt-0.5 size-3 shrink-0" />
+                    <span className="whitespace-pre-wrap">{comment}</span>
+                </button>
+            ) : null}
         </div>
     );
 }

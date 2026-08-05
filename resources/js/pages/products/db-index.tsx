@@ -126,7 +126,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                             <SortableTableHead field="country">{t('Country')}</SortableTableHead>
                             <SortableTableHead field="name">{t('Name')}</SortableTableHead>
                             <TableHead>{t('Description')}</TableHead>
-                            <TableHead>{t('Treatment')}</TableHead>
+                            {/* <TableHead>{t('Treatment')}</TableHead> */}
                             <TableHead>{t('maj')}</TableHead>
                             <TableHead className='text-end'>{t('Actions')}</TableHead>
                         </TableRow>
@@ -152,9 +152,9 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                 <TableCell className="text-muted-foreground text-sm">
                                     {item.description || '-'}
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                {/* <TableCell className="text-sm">
                                     {item.traitement || '-'}
-                                </TableCell>
+                                </TableCell> */}
                                 <TableCell className="text-sm">
                                     {new Date(item.updated_at).toLocaleDateString()}
                                 </TableCell>

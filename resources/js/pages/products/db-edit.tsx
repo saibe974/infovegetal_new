@@ -15,6 +15,7 @@ import products from '@/routes/products';
 import dbProducts from '@/routes/db-products';
 import { ArrowLeftCircle, InfoIcon, RowsIcon, SaveIcon, ShellIcon } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
+import { SelectLang } from '@/components/ui/selectLang';
 
 type Props = {
     dbProduct: dbProduct;
@@ -164,8 +165,17 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, categoryOpt
 
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <FormField label={t('Country')} htmlFor="db-country">
-                                        <Input id="db-country" maxLength={2} placeholder="fr" value={data.country} onChange={(e) => setData('country', e.target.value.toLowerCase())} />
-                                        <InputError message={errors.country} />
+                                        {/* <Input id="db-country" maxLength={2} placeholder="fr" value={data.country} onChange={(e) => setData('country', e.target.value.toLowerCase())} /> */}
+                                        <SelectLang
+                                            mode="country"
+                                            id="db-country"
+                                            name="country"
+                                            value={data.country}
+                                            onValueChange={(country) => setData('country', country)}
+                                            className="w-full"
+                                            aria-invalid={!!errors.country}
+                                        />
+                                        {/* <InputError message={errors.country} /> */}
                                     </FormField>
 
                                     <FormField label={t('Delivery mode')} htmlFor="db-mod-liv">
