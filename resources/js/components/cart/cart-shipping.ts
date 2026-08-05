@@ -2,13 +2,15 @@ import type { CartItem } from './cart.context';
 import { buildRollDistribution, type SupplierDistribution } from '@/components/products/product-roll';
 
 type DbUserAttributes = Record<string, unknown>;
-type DbUserTransport = {
+export type CartTransportOption = {
     carrier_id: number;
     zone_id: number;
     zone_name: string;
     taxgo: number;
     tariffs: Record<string, number | string | null>;
 };
+
+type DbUserTransport = CartTransportOption;
 
 export type CartShippingSummary = {
     bySupplier: Record<number, number>;

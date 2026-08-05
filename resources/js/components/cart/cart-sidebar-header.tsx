@@ -1,5 +1,5 @@
-import React, { useContext, useMemo, useState } from "react";
-import { CheckCircleIcon, EyeIcon, Flower2Icon, FlowerIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { CheckCircleIcon, EyeIcon, Flower2Icon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -7,7 +7,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    useSidebar,
 } from "../ui/sidebar";
 import { CartContext } from "./cart.context";
 import { useCartOrder } from "./cart-order.context";
@@ -19,15 +18,15 @@ import { SharedData } from "@/types";
 import { Button } from "../ui/button";
 import HeadingSmall from "../heading-small";
 import { ProductRollMini } from "@/components/products/product-roll-mini";
-import { calculateCartShipping } from "./cart-shipping";
+import { buildCartTransportContext, calculateCartShipping, getRenderedProductDeliveryPerRoll, type CartTransportOption } from "./cart-shipping";
 import { Badge } from "../ui/badge";
+import { buildRollDistribution } from '@/components/products/product-roll';
+import { getCarrierOverridesStorageKey, readCarrierOverrides, subscribeToCarrierOverrides, type CarrierOverrides } from './cart-carrier-storage';
 
 const validateCartButtonClassName = "bg-brand-main text-black hover:bg-brand-main-hover disabled:opacity-50";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
-
-    const { toggleSidebar } = useSidebar();
 
     const { auth, cart } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -35,18 +34,93 @@ export function CartSidebarHeader() {
     const cartId = cart?.id;
 
     const { items, clearCart } = useContext(CartContext);
-    const { isSaving, saveMessage, handleSaveCart, handleGenerateTcpdf } = useCartOrder();
+    const { isSaving, saveMessage, handleSaveCart } = useCartOrder();
     const [isPreparingNewCart, setIsPreparingNewCart] = useState(false);
     const [newCartMessage, setNewCartMessage] = useState<string | null>(null);
     const isBusy = isSaving || isPreparingNewCart;
     const feedbackMessage = newCartMessage ?? saveMessage;
 
-    const total = items.reduce((sum, item) => {
-        const pricing = getCartPricing(item.product, item.quantity);
-        return sum + pricing.lineTotal;
-    }, 0);
-    const shipping = useMemo(() => calculateCartShipping(items), [items]);
+    const carrierStorageKey = getCarrierOverridesStorageKey(user?.id, cartId);
+    const [carrierOverrides, setCarrierOverrides] = useState<CarrierOverrides>(() =>
+        readCarrierOverrides(carrierStorageKey) ?? {},
+    );
+
+    useEffect(() => {
+        setCarrierOverrides(readCarrierOverrides(carrierStorageKey) ?? {});
+        return subscribeToCarrierOverrides(carrierStorageKey, setCarrierOverrides);
+    }, [carrierStorageKey]);
+
+    const transportOptions = useMemo(() => Object.fromEntries(
+        Object.values(carrierOverrides)
+            .filter((choice): choice is typeof choice & { transport: CartTransportOption } => !!choice.transport)
+            .map((choice) => [`${choice.carrierId}:${choice.zoneId}`, choice.transport]),
+    ), [carrierOverrides]);
+
+    const pricingByProductId = useMemo(() => {
+        const result: Record<number, ReturnType<typeof getCartPricing>> = {};
+        const itemsBySupplier = new Map<number, typeof items>();
+
+        items.forEach((item) => {
+            const supplierId = Number(item.product.db_products_id ?? item.product.dbProduct?.id ?? 0);
+            const group = itemsBySupplier.get(supplierId) ?? [];
+            group.push(item);
+            itemsBySupplier.set(supplierId, group);
+        });
+
+        itemsBySupplier.forEach((supplierItems, supplierId) => {
+            const transportContext = buildCartTransportContext(supplierItems);
+            const attributes = transportContext.attrsBySupplier[supplierId];
+            const originalTransport = transportContext.transportBySupplier[supplierId];
+            const override = carrierOverrides[supplierId];
+            const selectedAttributes = override && attributes
+                ? { ...attributes, t: override.carrierId, z: override.zoneId }
+                : attributes;
+            const selectedTransport = override?.transport
+                ?? (override
+                    && originalTransport?.carrier_id === override.carrierId
+                    && originalTransport.zone_id === override.zoneId
+                    ? originalTransport
+                    : !override ? originalTransport : undefined);
+            const supplier = buildRollDistribution(supplierItems).suppliers[supplierId];
+            const renderedDeliveryPerRoll = override && supplier
+                ? getRenderedProductDeliveryPerRoll(supplier, selectedAttributes, selectedTransport)
+                : null;
+
+            supplierItems.forEach((item) => {
+                result[item.product.id] = getCartPricing(
+                    item.product,
+                    item.quantity,
+                    renderedDeliveryPerRoll === null ? {} : { renderedDeliveryPerRoll },
+                );
+            });
+        });
+
+        return result;
+    }, [carrierOverrides, items]);
+
+    const total = items.reduce((sum, item) =>
+        sum + (pricingByProductId[item.product.id] ?? getCartPricing(item.product, item.quantity)).lineTotal,
+    0);
+    const shipping = useMemo(
+        () => calculateCartShipping(items, carrierOverrides, transportOptions),
+        [carrierOverrides, items, transportOptions],
+    );
     const orderTotal = total + shipping.total;
+    const orderOverrides = useMemo(() => ({
+        transportSelection: Object.fromEntries(
+            Object.entries(carrierOverrides).map(([supplierId, choice]) => [
+                Number(supplierId),
+                { carrier_id: choice.carrierId, zone_id: choice.zoneId },
+            ]),
+        ),
+        pricingByProductId: Object.fromEntries(
+            Object.entries(pricingByProductId).map(([productId, pricing]) => [
+                Number(productId),
+                { unitPrice: pricing.unitPrice, lineTotal: pricing.lineTotal },
+            ]),
+        ),
+        shippingTotal: shipping.total,
+    }), [carrierOverrides, pricingByProductId, shipping.total]);
 
     const getFiltersUrl = () => {
         const location =
@@ -195,7 +269,7 @@ export function CartSidebarHeader() {
                                             <button
                                                 type="button"
                                                 className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                                                onClick={() => void handleSaveCart()}
+                                                onClick={() => void handleSaveCart(orderOverrides)}
                                                 disabled={isBusy}
                                             >
                                                 <SaveIcon className="size-5 text-primary" />
@@ -280,6 +354,7 @@ export function CartSidebarHeader() {
                                     key={item.product.id}
                                     product={item.product}
                                     quantity={item.quantity}
+                                    pricingOverride={pricingByProductId[item.product.id]}
                                 />
                             ))}
 

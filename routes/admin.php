@@ -14,6 +14,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereNumber('carrier')
         ->name('carriers.zones.import')
         ->middleware(['role_or_impersonator:admin']);
+    Route::patch('carriers/{carrier}/taxgo', [CarrierController::class, 'updateTaxgo'])
+        ->whereNumber('carrier')
+        ->name('carriers.taxgo.update')
+        ->middleware(['role_or_impersonator:admin']);
     Route::resource('carriers', CarrierController::class)->middleware(['role_or_impersonator:admin']);
 });
 

@@ -15,12 +15,15 @@ class Carrier extends Model
         'name',
         'country',
         'days',
+        'minimum_delay_hours',
+        'order_cutoff_time',
         'minimum',
         'taxgo',
     ];
 
     protected $casts = [
         'days' => DaysMask::class,
+        'minimum_delay_hours' => 'integer',
         'minimum' => 'integer',
         'taxgo' => 'decimal:2',
     ];
@@ -30,6 +33,8 @@ class Carrier extends Model
         'name',
         'country',
         'days',
+        'minimum_delay_hours',
+        'order_cutoff_time',
         'minimum',
         'taxgo',
         'zones_count',

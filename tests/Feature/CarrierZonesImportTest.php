@@ -64,3 +64,76 @@ CSV);
     ]);
     expect(CarrierZone::where('name', 'Old zone')->exists())->toBeFalse();
 });
+
+test('an admin can update carrier taxgo inline', function () {
+    $adminRole = Role::firstOrCreate([
+        'name' => 'admin',
+        'guard_name' => 'web',
+    ]);
+    $admin = User::factory()->withoutTwoFactor()->create();
+    $admin->assignRole($adminRole);
+    $carrier = Carrier::create([
+        'name' => 'Inline taxgo carrier',
+        'country' => 'FR',
+        'taxgo' => 5,
+    ]);
+
+    $this->actingAs($admin)
+        ->patchJson(route('carriers.taxgo.update', ['carrier' => $carrier->id], false), [
+            'taxgo' => 12.5,
+        ])
+        ->assertOk()
+        ->assertJsonPath('taxgo', 12.5);
+
+    expect((float) $carrier->refresh()->taxgo)->toBe(12.5);
+});
+
+test('inline carrier taxgo cannot be negative', function () {
+    $adminRole = Role::firstOrCreate([
+        'name' => 'admin',
+        'guard_name' => 'web',
+    ]);
+    $admin = User::factory()->withoutTwoFactor()->create();
+    $admin->assignRole($adminRole);
+    $carrier = Carrier::create([
+        'name' => 'Validated taxgo carrier',
+        'country' => 'FR',
+        'taxgo' => 5,
+    ]);
+
+    $this->actingAs($admin)
+        ->patchJson(route('carriers.taxgo.update', ['carrier' => $carrier->id], false), [
+            'taxgo' => -1,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('taxgo');
+
+    expect((float) $carrier->refresh()->taxgo)->toBe(5.0);
+});
+
+test('an admin can configure carrier delivery timing', function () {
+    $adminRole = Role::firstOrCreate([
+        'name' => 'admin',
+        'guard_name' => 'web',
+    ]);
+    $admin = User::factory()->withoutTwoFactor()->create();
+    $admin->assignRole($adminRole);
+
+    $this->actingAs($admin)
+        ->post(route('carriers.store', absolute: false), [
+            'name' => 'Timed carrier',
+            'country' => 'FR',
+            'days' => ['1', '2', '3', '4', '5'],
+            'minimum_delay_hours' => 48,
+            'order_cutoff_time' => '17:00',
+            'minimum' => 0,
+            'taxgo' => 5,
+            'zones' => [],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $carrier = Carrier::where('name', 'Timed carrier')->firstOrFail();
+    expect($carrier->minimum_delay_hours)->toBe(48)
+        ->and(substr((string) $carrier->order_cutoff_time, 0, 5))->toBe('17:00');
+});

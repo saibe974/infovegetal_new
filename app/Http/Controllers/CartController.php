@@ -283,11 +283,13 @@ class CartController extends Controller
         }
 
         $carriers = \App\Models\Carrier::query()
-            ->get(['id', 'name', 'days', 'minimum'])
+            ->get(['id', 'name', 'days', 'minimum', 'minimum_delay_hours', 'order_cutoff_time'])
             ->mapWithKeys(fn ($carrier) => [
                 (int) $carrier->id => [
                     'name' => (string) $carrier->name,
                     'days' => $carrier->days,
+                    'minimum_delay_hours' => (int) ($carrier->minimum_delay_hours ?? 24),
+                    'order_cutoff_time' => substr((string) ($carrier->order_cutoff_time ?? '12:00'), 0, 5),
                 ],
             ])
             ->toArray();

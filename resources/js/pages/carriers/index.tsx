@@ -6,6 +6,8 @@ import { useRef, useState } from 'react';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import CountryFlag from '@/components/ui/country-flag';
 import { EditIcon, TrashIcon } from 'lucide-react';
 import SearchSelect from '@/components/app/search-select';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -45,6 +47,78 @@ type Props = {
     collection: PaginatedCollection<Carrier>;
     q?: string | null;
 };
+
+const getCsrfToken = (): string =>
+    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
+function TaxgoInput({ carrier }: { carrier: Carrier }) {
+    const initialValue = carrier.taxgo === null || carrier.taxgo === undefined ? '' : String(carrier.taxgo);
+    const [value, setValue] = useState(initialValue);
+    const [savedValue, setSavedValue] = useState(initialValue);
+    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+    const save = async () => {
+        if (status === 'saving' || value === savedValue) {
+            return;
+        }
+
+        setStatus('saving');
+        try {
+            const response = await fetch(`/carriers/${carrier.id}/taxgo`, {
+                method: 'PATCH',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ taxgo: value === '' ? null : Number(value) }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Taxgo update failed');
+            }
+
+            const result = await response.json() as { taxgo: number | null };
+            const normalizedValue = result.taxgo === null ? '' : String(result.taxgo);
+            setValue(normalizedValue);
+            setSavedValue(normalizedValue);
+            setStatus('saved');
+            setTimeout(() => setStatus('idle'), 1200);
+        } catch {
+            setStatus('error');
+        }
+    };
+
+    return (
+        <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={value}
+            onChange={(event) => {
+                setValue(event.target.value);
+                setStatus('idle');
+            }}
+            onBlur={() => void save()}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                }
+                if (event.key === 'Escape') {
+                    setValue(savedValue);
+                    setStatus('idle');
+                    event.currentTarget.blur();
+                }
+            }}
+            disabled={status === 'saving'}
+            aria-label={`Taxgo ${carrier.name}`}
+            aria-invalid={status === 'error'}
+            title={status === 'error' ? 'Erreur lors de la mise à jour' : undefined}
+            className={`h-8 w-24 text-right ${status === 'saved' ? 'border-green-600' : ''}`}
+        />
+    );
+}
 
 export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const { t } = useI18n();
@@ -128,10 +202,12 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                         {item.name}
                                     </Link>
                                 </TableCell>
-                                <TableCell>{item.country ?? '-'}</TableCell>
+                                <TableCell>
+                                    <CountryFlag countryCode={item.country} className="w-6" title={item.country ?? undefined} />
+                                </TableCell>
                                 <TableCell>{formatDays(item.days)}</TableCell>
                                 <TableCell>{item.minimum ?? '-'}</TableCell>
-                                <TableCell>{item.taxgo ?? '-'}</TableCell>
+                                <TableCell><TaxgoInput carrier={item} /></TableCell>
                                 <TableCell>{item.zones_count ?? 0}</TableCell>
                                 <TableCell>
                                     <div className="flex gap-2 justify-end">

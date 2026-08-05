@@ -3,10 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
+import { SelectLang } from '@/components/ui/selectLang';
 import InputError from '@/components/ui/input-error';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { withAppLayout } from '@/layouts/app-layout';
 import carriers from '@/routes/carriers';
 import carrierZones from '@/routes/carriers/zones';
@@ -166,6 +168,8 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
         name: carrier?.name ?? '',
         country: carrier?.country ?? '',
         days: parseDays(carrier?.days),
+        minimum_delay_hours: String(carrier?.minimum_delay_hours ?? 24),
+        order_cutoff_time: String(carrier?.order_cutoff_time ?? '12:00').slice(0, 5),
         minimum: carrier?.minimum !== null && carrier?.minimum !== undefined ? String(carrier.minimum) : '',
         taxgo: carrier?.taxgo !== null && carrier?.taxgo !== undefined ? String(carrier.taxgo) : '',
         zones: mapZones(carrier?.zones),
@@ -544,11 +548,13 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
                                 />
                             </FormField>
                             <FormField label={t('Country')} htmlFor="country" error={errors.country}>
-                                <Input
+                                <SelectLang
+                                    mode="country"
                                     id="country"
                                     name="country"
                                     value={data.country}
-                                    onChange={(e) => setData('country', e.target.value)}
+                                    onValueChange={(country) => setData('country', country)}
+                                    className="w-full"
                                     aria-invalid={!!errors.country}
                                 />
                             </FormField>
@@ -565,38 +571,69 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
                             </FormField>
 
                         </div>
-                        <div className='grid gap-4 md:grid-cols-2'>
-                            <FormField label={t('Delivery days')} htmlFor="days" error={daysError}>
-                                <div className="flex flex-wrap gap-3">
-                                    {WEEKDAYS.map((day) => (
-                                        <div key={day.value} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`day-${day.value}`}
-                                                checked={data.days.includes(day.value)}
-                                                onCheckedChange={() => toggleDay(day.value)}
-                                            />
-                                            <Label
-                                                htmlFor={`day-${day.value}`}
-                                                className="text-sm font-normal cursor-pointer"
-                                            >
-                                                {day.label}
-                                            </Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </FormField>
-                            <FormField label={t('Taxgo')} htmlFor="taxgo" error={errors.taxgo}>
-                                <Input
-                                    id="taxgo"
-                                    name="taxgo"
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={data.taxgo}
-                                    onChange={(e) => setData('taxgo', e.target.value.replace(',', '.'))}
-                                    aria-invalid={!!errors.taxgo}
-                                />
-                            </FormField>
+                        <div className="grid gap-4 md:grid-cols-4">
+                            <div className="md:col-span-2">
+                                <FormField label={t('Delivery days')} htmlFor="days" error={daysError}>
+                                    <div className="flex flex-wrap gap-3">
+                                        {WEEKDAYS.map((day) => (
+                                            <div key={day.value} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`day-${day.value}`}
+                                                    checked={data.days.includes(day.value)}
+                                                    onCheckedChange={() => toggleDay(day.value)}
+                                                />
+                                                <Label
+                                                    htmlFor={`day-${day.value}`}
+                                                    className="text-sm font-normal cursor-pointer"
+                                                >
+                                                    {day.label}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </FormField>
+                            </div>
 
+                            <div>
+                                <FormField
+                                    label={t('Minimum delivery delay')}
+                                    htmlFor="minimum_delay_hours"
+                                    error={errors.minimum_delay_hours}
+                                >
+                                    <Select
+                                        value={data.minimum_delay_hours}
+                                        onValueChange={(value) => setData('minimum_delay_hours', value)}
+                                    >
+                                        <SelectTrigger id="minimum_delay_hours" aria-invalid={!!errors.minimum_delay_hours}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[24, 48, 72, 96, 120, 168].map((hours) => (
+                                                <SelectItem key={hours} value={String(hours)}>
+                                                    {hours}h
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </FormField>
+                            </div>
+
+                            <div>
+                                <FormField
+                                    label={t('Order cutoff time')}
+                                    htmlFor="order_cutoff_time"
+                                    error={errors.order_cutoff_time}
+                                >
+                                    <Input
+                                        id="order_cutoff_time"
+                                        name="order_cutoff_time"
+                                        type="time"
+                                        value={data.order_cutoff_time}
+                                        onChange={(event) => setData('order_cutoff_time', event.target.value)}
+                                        aria-invalid={!!errors.order_cutoff_time}
+                                    />
+                                </FormField>
+                            </div>
                         </div>
 
                     </Card>
@@ -616,8 +653,23 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
                                 {importZonesError}
                             </div>
                         )}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <h3 className="text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                            <div className="flex flex-wrap items-end gap-6">
+                                <h3 className="pb-2 text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
+                                <div className="w-40">
+                                    <FormField label={t('Taxgo')} htmlFor="taxgo" error={errors.taxgo}>
+                                        <Input
+                                            id="taxgo"
+                                            name="taxgo"
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={data.taxgo}
+                                            onChange={(e) => setData('taxgo', e.target.value.replace(',', '.'))}
+                                            aria-invalid={!!errors.taxgo}
+                                        />
+                                    </FormField>
+                                </div>
+                            </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-2">
                                     {!isNew && (

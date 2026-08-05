@@ -3,7 +3,7 @@ import { resolveProductPrices } from '@/lib/resolve-product-prices';
 
 type PricingTier = 'roll' | 'floor' | 'tray' | 'unit';
 
-type CartPricing = {
+export type CartPricing = {
     unitPrice: number;
     lineTotal: number;
     tier: PricingTier;

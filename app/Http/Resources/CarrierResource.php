@@ -21,6 +21,8 @@ class CarrierResource extends JsonResource
             'name' => $this->name,
             'country' => $this->country,
             'days' => $this->days,
+            'minimum_delay_hours' => (int) ($this->minimum_delay_hours ?? 24),
+            'order_cutoff_time' => substr((string) ($this->order_cutoff_time ?? '12:00'), 0, 5),
             'minimum' => $this->minimum,
             'taxgo' => $this->taxgo,
             'zones_count' => $this->whenCounted('zones'),

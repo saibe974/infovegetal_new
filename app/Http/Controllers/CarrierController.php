@@ -231,6 +231,21 @@ class CarrierController extends Controller
         }
     }
 
+    public function updateTaxgo(Request $request, Carrier $carrier)
+    {
+        $validated = $request->validate([
+            'taxgo' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $carrier->update([
+            'taxgo' => $validated['taxgo'] ?? null,
+        ]);
+
+        return response()->json([
+            'taxgo' => $carrier->taxgo !== null ? (float) $carrier->taxgo : null,
+        ]);
+    }
+
     /**
      * Remove the specified resource from storage.
      */
@@ -250,6 +265,8 @@ class CarrierController extends Controller
             'country' => ['nullable', 'string', 'max:255'],
             'days' => ['nullable', 'array'],
             'days.*' => ['string', 'in:1,2,3,4,5,6,7'],
+            'minimum_delay_hours' => ['required', 'integer', 'min:0', 'max:720'],
+            'order_cutoff_time' => ['required', 'date_format:H:i'],
             'minimum' => ['nullable', 'integer', 'min:0'],
             'taxgo' => ['nullable', 'numeric', 'min:0'],
             'zones' => ['nullable', 'array'],

@@ -145,6 +145,8 @@ export interface Carrier {
     name: string;
     country?: string | null;
     days?: string[] | null;
+    minimum_delay_hours?: number | null;
+    order_cutoff_time?: string | null;
     minimum?: number | null;
     taxgo?: number | null;
     zones?: CarrierZone[];

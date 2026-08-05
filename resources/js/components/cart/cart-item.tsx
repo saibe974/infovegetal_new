@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
-import { getCartPricing } from './cart-pricing';
+import { getCartPricing, type CartPricing } from './cart-pricing';
 import { getProductCartImage } from '@/components/products/product-cart-image';
 import { getCondQuantity, getQuantityStep, getUniteQuantity, isProductMultiple } from './cart-quantity-rules';
 import * as Flags from "country-flag-icons/react/3x2";
@@ -14,13 +14,14 @@ import * as Flags from "country-flag-icons/react/3x2";
 export type CartItemProps = {
     product: Product;
     quantity: number;
+    pricingOverride?: CartPricing;
 };
 
-export function CartItem({ product, quantity }: CartItemProps) {
+export function CartItem({ product, quantity, pricingOverride }: CartItemProps) {
     const { t } = useI18n();
     const { removeFromCart, updateQuantity } = useContext(CartContext);
 
-    const pricing = getCartPricing(product, quantity);
+    const pricing = pricingOverride ?? getCartPricing(product, quantity);
     const total = pricing.lineTotal.toFixed(2);
 
     const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();

@@ -18,6 +18,7 @@ export type DatePickerProps = {
     value: string;
     onChange: (date: string) => void;
     allowedDays?: Set<number>;
+    minDate?: string;
     placeholder?: string;
     locale?: string;
 };
@@ -26,6 +27,7 @@ export const DatePicker = ({
     value,
     onChange,
     allowedDays,
+    minDate,
     placeholder = 'Choisir une date',
 }: DatePickerProps) => {
     const today = getToday();
@@ -33,7 +35,8 @@ export const DatePicker = ({
     const [viewMonth, setViewMonth] = useState(() => todayDate.getMonth());
     const [viewYear, setViewYear] = useState(() => todayDate.getFullYear());
 
-    const isPast = (dateStr: string) => dateStr < today;
+    const earliestDate = minDate && minDate > today ? minDate : today;
+    const isPast = (dateStr: string) => dateStr < earliestDate;
     const isValidDay = (dateStr: string) => {
         if (!allowedDays || allowedDays.size === 0) return true;
         return allowedDays.has(getDayOfWeek(dateStr));

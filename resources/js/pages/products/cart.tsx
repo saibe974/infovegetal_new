@@ -26,10 +26,9 @@ import { useCartOrder } from '@/components/cart/cart-order.context';
 import { SharedData } from '@/types';
 import { Separator } from '@/components/ui/separator';
 import CountryFlag from '@/components/ui/country-flag';
+import { getCarrierOverridesStorageKey, readCarrierOverrides, writeCarrierOverrides, type CarrierOverrides } from '@/components/cart/cart-carrier-storage';
 
 type Props = Record<string, never>;
-
-type CarrierOverrides = Record<number, { carrierId: number; zoneId: number }>;
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -40,35 +39,46 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const toText = (value: unknown): string => (value === undefined || value === null ? '' : String(value));
 
-const parseCarrierOverrides = (raw: string | null): CarrierOverrides | null => {
-    if (!raw) {
-        return null;
-    }
+type CartCarrierTiming = {
+    name: string;
+    days: string[] | null;
+    minimum_delay_hours: number;
+    order_cutoff_time: string;
+};
 
-    try {
-        const parsed: unknown = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            return null;
+const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getDayOfWeek = (dateStr: string): number => {
+    const date = new Date(`${dateStr}T00:00:00`);
+    return ((date.getDay() + 6) % 7) + 1;
+};
+
+const getCarrierMinimumDeliveryDate = (carrier: CartCarrierTiming, now = new Date()): string => {
+    const delayHours = Math.max(0, Number(carrier.minimum_delay_hours ?? 24));
+    const cutoffMatch = String(carrier.order_cutoff_time ?? '12:00').match(/^(\d{1,2}):(\d{2})/);
+    const cutoffMinutes = cutoffMatch
+        ? Number(cutoffMatch[1]) * 60 + Number(cutoffMatch[2])
+        : 12 * 60;
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const cutoffPenaltyHours = currentMinutes >= cutoffMinutes ? 24 : 0;
+    const candidate = new Date(now.getTime() + (delayHours + cutoffPenaltyHours) * 60 * 60 * 1000);
+    const allowedDays = new Set((carrier.days ?? []).map(Number));
+
+    if (allowedDays.size > 0) {
+        for (let offset = 0; offset < 14; offset += 1) {
+            const weekday = ((candidate.getDay() + 6) % 7) + 1;
+            if (allowedDays.has(weekday)) break;
+            candidate.setDate(candidate.getDate() + 1);
+            candidate.setHours(0, 0, 0, 0);
         }
-
-        const overrides: CarrierOverrides = {};
-        Object.entries(parsed).forEach(([supplierId, value]) => {
-            if (!value || typeof value !== 'object' || Array.isArray(value)) {
-                return;
-            }
-
-            const carrierId = Number((value as Record<string, unknown>).carrierId);
-            const zoneId = Number((value as Record<string, unknown>).zoneId);
-            const normalizedSupplierId = Number(supplierId);
-            if (normalizedSupplierId > 0 && carrierId > 0 && zoneId > 0) {
-                overrides[normalizedSupplierId] = { carrierId, zoneId };
-            }
-        });
-
-        return overrides;
-    } catch {
-        return null;
     }
+
+    return formatLocalDate(candidate);
 };
 
 const getAllowedDays = (
@@ -100,10 +110,28 @@ const CarrierAwareDatePicker = ({
     setDeliveryDate: (v: string) => void;
     groupedItems: Array<{ id: number; carrierOptions?: Array<{ carrierId: number }> }>;
     carrierOverrides: Record<number, { carrierId: number }>;
-    cartCarriers: Record<string, { days: string[] | null }>;
+    cartCarriers: Record<string, CartCarrierTiming>;
     t: (key: string) => string;
 }) => {
     const allowedDays = getAllowedDays(groupedItems, carrierOverrides, cartCarriers);
+    const minimumDate = groupedItems.reduce((latestDate, group) => {
+        const carrierId = carrierOverrides[group.id]?.carrierId ?? group.carrierOptions?.[0]?.carrierId;
+        const carrier = carrierId ? cartCarriers[String(carrierId)] : undefined;
+        if (!carrier) return latestDate;
+        const carrierDate = getCarrierMinimumDeliveryDate(carrier);
+        return carrierDate > latestDate ? carrierDate : latestDate;
+    }, '');
+
+    useEffect(() => {
+        if (!minimumDate) return;
+
+        const deliveryWeekday = deliveryDate ? getDayOfWeek(deliveryDate) : null;
+        const invalidWeekday = deliveryWeekday !== null && allowedDays.size > 0 && !allowedDays.has(deliveryWeekday);
+        if (!deliveryDate || deliveryDate < minimumDate || invalidWeekday) {
+            setDeliveryDate(minimumDate);
+        }
+    }, [allowedDays, deliveryDate, minimumDate, setDeliveryDate]);
+
     return (
         <div className="space-y-2">
             <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
@@ -111,6 +139,7 @@ const CarrierAwareDatePicker = ({
                 value={deliveryDate}
                 onChange={setDeliveryDate}
                 allowedDays={allowedDays}
+                minDate={minimumDate}
                 placeholder={t('Choisir une date')}
             />
         </div>
@@ -128,7 +157,7 @@ export default withAppLayout<Props>(
                 com?: { id: number; name: string; email: string } | null;
             }>;
             cart_db_countries?: Record<string, string | null>;
-            cart_carriers?: Record<string, { name: string; days: string[] | null }>;
+            cart_carriers?: Record<string, CartCarrierTiming>;
             cart_transport_options?: Record<string, {
                 carrier_id: number;
                 zone_id: number;
@@ -142,7 +171,7 @@ export default withAppLayout<Props>(
             }>;
         }>().props;
         const cartId = cart?.id;
-        const carrierOverridesStorageKey = `cart:carrier-overrides:${auth?.user?.id ?? 'guest'}:${cartId ?? 'draft'}`;
+        const carrierOverridesStorageKey = getCarrierOverridesStorageKey(auth?.user?.id, cartId);
         const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
         const [deliveryDate, setDeliveryDate] = useState('');
@@ -155,9 +184,7 @@ export default withAppLayout<Props>(
                 ]),
             ), [storedTransportSelection]);
         const [carrierOverrides, setCarrierOverrides] = useState<CarrierOverrides>(() => {
-            const localOverrides = typeof window !== 'undefined'
-                ? parseCarrierOverrides(localStorage.getItem(carrierOverridesStorageKey))
-                : null;
+            const localOverrides = readCarrierOverrides(carrierOverridesStorageKey);
 
             return localOverrides ?? getStoredTransportSelection();
         });
@@ -171,14 +198,24 @@ export default withAppLayout<Props>(
             if (carrierStorageKeyRef.current !== carrierOverridesStorageKey) {
                 carrierStorageKeyRef.current = carrierOverridesStorageKey;
                 setCarrierOverrides(
-                    parseCarrierOverrides(localStorage.getItem(carrierOverridesStorageKey))
+                    readCarrierOverrides(carrierOverridesStorageKey)
                     ?? getStoredTransportSelection(),
                 );
                 return;
             }
 
-            localStorage.setItem(carrierOverridesStorageKey, JSON.stringify(carrierOverrides));
-        }, [carrierOverrides, carrierOverridesStorageKey, getStoredTransportSelection]);
+            const overridesWithTransport = Object.fromEntries(
+                Object.entries(carrierOverrides).map(([supplierId, choice]) => [
+                    Number(supplierId),
+                    {
+                        ...choice,
+                        transport: choice.transport
+                            ?? cartTransportOptions[`${choice.carrierId}:${choice.zoneId}`],
+                    },
+                ]),
+            );
+            writeCarrierOverrides(carrierOverridesStorageKey, overridesWithTransport);
+        }, [carrierOverrides, carrierOverridesStorageKey, cartTransportOptions, getStoredTransportSelection]);
 
         // const [isRefreshingCart, setIsRefreshingCart] = useState(false);
         const {
@@ -346,7 +383,11 @@ export default withAppLayout<Props>(
             setPageMessage(null);
             setCarrierOverrides((previous) => ({
                 ...previous,
-                [supplierId]: { carrierId: option.carrierId, zoneId: option.zoneId },
+                [supplierId]: {
+                    carrierId: option.carrierId,
+                    zoneId: option.zoneId,
+                    transport: cartTransportOptions[transportKey],
+                },
             }));
         }, [cartTransportOptions, t]);
 
