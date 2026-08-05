@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Flower2Icon, FlowerIcon, Minus, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
+import { ArrowLeftCircle, Flower2Icon, Minus, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/datePicker';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,8 +16,8 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { ProductRoll } from '@/components/products/product-roll';
-import { buildCartTransportContext, calculateCartShipping, getSupplierRollPrices } from '@/components/cart/cart-shipping';
+import { buildRollDistribution, ProductRoll } from '@/components/products/product-roll';
+import { buildCartTransportContext, calculateCartShipping, getCarrierOptions, getRenderedProductDeliveryPerRoll, getSupplierRollPrices } from '@/components/cart/cart-shipping';
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { getQuantityStep, getUniteQuantity } from '@/components/cart/cart-quantity-rules';
 import { getProductCartImage } from '@/components/products/product-cart-image';
@@ -27,6 +29,8 @@ import CountryFlag from '@/components/ui/country-flag';
 
 type Props = Record<string, never>;
 
+type CarrierOverrides = Record<number, { carrierId: number; zoneId: number }>;
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Products',
@@ -36,23 +40,145 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const toText = (value: unknown): string => (value === undefined || value === null ? '' : String(value));
 
+const parseCarrierOverrides = (raw: string | null): CarrierOverrides | null => {
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+
+        const overrides: CarrierOverrides = {};
+        Object.entries(parsed).forEach(([supplierId, value]) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                return;
+            }
+
+            const carrierId = Number((value as Record<string, unknown>).carrierId);
+            const zoneId = Number((value as Record<string, unknown>).zoneId);
+            const normalizedSupplierId = Number(supplierId);
+            if (normalizedSupplierId > 0 && carrierId > 0 && zoneId > 0) {
+                overrides[normalizedSupplierId] = { carrierId, zoneId };
+            }
+        });
+
+        return overrides;
+    } catch {
+        return null;
+    }
+};
+
+const getAllowedDays = (
+    groupedItems: Array<{ id: number; carrierOptions?: Array<{ carrierId: number }> }>,
+    carrierOverrides: Record<number, { carrierId: number }>,
+    cartCarriers: Record<string, { days: string[] | null }>,
+): Set<number> => {
+    const days = new Set<number>();
+    for (const g of groupedItems) {
+        const override = carrierOverrides[g.id];
+        const cid = override?.carrierId ?? g.carrierOptions?.[0]?.carrierId;
+        if (!cid) continue;
+        const carrierDays = cartCarriers[String(cid)]?.days;
+        if (!carrierDays) return new Set();
+        carrierDays.forEach((d) => days.add(Number(d)));
+    }
+    return days;
+};
+
+const CarrierAwareDatePicker = ({
+    deliveryDate,
+    setDeliveryDate,
+    groupedItems,
+    carrierOverrides,
+    cartCarriers,
+    t,
+}: {
+    deliveryDate: string;
+    setDeliveryDate: (v: string) => void;
+    groupedItems: Array<{ id: number; carrierOptions?: Array<{ carrierId: number }> }>;
+    carrierOverrides: Record<number, { carrierId: number }>;
+    cartCarriers: Record<string, { days: string[] | null }>;
+    t: (key: string) => string;
+}) => {
+    const allowedDays = getAllowedDays(groupedItems, carrierOverrides, cartCarriers);
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
+            <DatePicker
+                value={deliveryDate}
+                onChange={setDeliveryDate}
+                allowedDays={allowedDays}
+                placeholder={t('Choisir une date')}
+            />
+        </div>
+    );
+};
+
 export default withAppLayout<Props>(
     breadcrumbs,
     false,
     () => {
         const { t } = useI18n();
-        const { cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {} } = usePage<SharedData & {
+        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {} } = usePage<SharedData & {
             cart_contacts?: Record<string, {
                 fact?: { id: number; name: string; email: string } | null;
                 com?: { id: number; name: string; email: string } | null;
             }>;
             cart_db_countries?: Record<string, string | null>;
+            cart_carriers?: Record<string, { name: string; days: string[] | null }>;
+            cart_transport_options?: Record<string, {
+                carrier_id: number;
+                zone_id: number;
+                zone_name: string;
+                taxgo: number;
+                tariffs: Record<string, number | string | null>;
+            }>;
+            cart_transport_selection?: Record<string, {
+                carrier_id: number;
+                zone_id: number;
+            }>;
         }>().props;
         const cartId = cart?.id;
+        const carrierOverridesStorageKey = `cart:carrier-overrides:${auth?.user?.id ?? 'guest'}:${cartId ?? 'draft'}`;
         const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
         const [deliveryDate, setDeliveryDate] = useState('');
         const [isRefreshingCart, setIsRefreshingCart] = useState(false);
+        const getStoredTransportSelection = useCallback((): CarrierOverrides =>
+            Object.fromEntries(
+                Object.entries(storedTransportSelection).map(([supplierId, choice]) => [
+                    Number(supplierId),
+                    { carrierId: Number(choice.carrier_id), zoneId: Number(choice.zone_id) },
+                ]),
+            ), [storedTransportSelection]);
+        const [carrierOverrides, setCarrierOverrides] = useState<CarrierOverrides>(() => {
+            const localOverrides = typeof window !== 'undefined'
+                ? parseCarrierOverrides(localStorage.getItem(carrierOverridesStorageKey))
+                : null;
+
+            return localOverrides ?? getStoredTransportSelection();
+        });
+        const carrierStorageKeyRef = useRef(carrierOverridesStorageKey);
+
+        useEffect(() => {
+            if (typeof window === 'undefined') {
+                return;
+            }
+
+            if (carrierStorageKeyRef.current !== carrierOverridesStorageKey) {
+                carrierStorageKeyRef.current = carrierOverridesStorageKey;
+                setCarrierOverrides(
+                    parseCarrierOverrides(localStorage.getItem(carrierOverridesStorageKey))
+                    ?? getStoredTransportSelection(),
+                );
+                return;
+            }
+
+            localStorage.setItem(carrierOverridesStorageKey, JSON.stringify(carrierOverrides));
+        }, [carrierOverrides, carrierOverridesStorageKey, getStoredTransportSelection]);
 
         // const [isRefreshingCart, setIsRefreshingCart] = useState(false);
         const {
@@ -73,7 +199,7 @@ export default withAppLayout<Props>(
             void refreshCart().catch(() => {
                 setPageMessage(t('Erreur lors du rafraichissement des prix transport'));
             });
-        }, [items.length, refreshCart]);
+        }, [items.length, refreshCart, t]);
 
         const handleRefreshCart = useCallback(async () => {
             if (items.length === 0 || isRefreshingCart) {
@@ -128,61 +254,101 @@ export default withAppLayout<Props>(
 
             return Array.from(groups.values()).map((group) => {
                 const cartItems = group.items.map(({ product, quantity }) => ({ product, quantity }));
-                const shippingSummary = calculateCartShipping(cartItems);
                 const transport = buildCartTransportContext(cartItems);
-                const itemsTotal = group.items.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
+                const shippingSummary = calculateCartShipping(cartItems, carrierOverrides, cartTransportOptions);
+                const override = carrierOverrides[group.id];
+                const originalAttributes = transport.attrsBySupplier[group.id];
+                const selectedAttributes = override && originalAttributes
+                    ? { ...originalAttributes, t: override.carrierId, z: override.zoneId }
+                    : originalAttributes;
+                const selectedTransport = override
+                    ? cartTransportOptions[`${override.carrierId}:${override.zoneId}`]
+                    : transport.transportBySupplier[group.id];
+                const supplier = buildRollDistribution(cartItems).suppliers[group.id];
+                const renderedDeliveryPerRoll = override && supplier
+                    ? getRenderedProductDeliveryPerRoll(supplier, selectedAttributes, selectedTransport)
+                    : null;
+                const pricedItems = renderedDeliveryPerRoll === null
+                    ? group.items
+                    : group.items.map((item) => ({
+                        ...item,
+                        pricing: getCartPricing(item.product, item.quantity, { renderedDeliveryPerRoll }),
+                    }));
+                const itemsTotal = pricedItems.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
                 const deliveryTotal = shippingSummary.total;
                 const orderTotal = itemsTotal + deliveryTotal;
                 const country = String(cartDbCountries[String(group.id)] ?? '').trim().toUpperCase();
                 const contacts = cartContacts[String(group.id)] ?? null;
                 const facturant = contacts?.fact ?? null;
                 const commercial = contacts?.com ?? null;
+                const attrs = transport.attrsBySupplier[group.id];
+                const carrierOptions = getCarrierOptions(attrs);
 
                 return {
                     ...group,
+                    items: pricedItems,
                     cartItems,
                     itemsTotal,
                     shipping: shippingSummary,
                     transportContext: transport,
-                    transportDebugRows: Object.keys({
-                        ...transport.attrsBySupplier,
-                        ...transport.transportBySupplier,
-                        ...shippingSummary.bySupplier,
-                    })
-                        .map((rawSupplierId) => Number(rawSupplierId))
-                        .filter((supplierId) => Number.isFinite(supplierId) && supplierId > 0)
-                        .sort((a, b) => a - b)
-                        .map((supplierId) => {
-                            const attrs = transport.attrsBySupplier[supplierId] ?? null;
-                            const resolved = transport.transportBySupplier[supplierId] ?? null;
-                            return {
-                                supplierId,
-                                rawT: attrs?.t ?? null,
-                                rawZ: attrs?.z ?? null,
-                                carrierId: resolved?.carrier_id ?? null,
-                                zoneId: resolved?.zone_id ?? null,
-                                zoneName: resolved?.zone_name ?? null,
-                                taxgo: resolved?.taxgo ?? null,
-                                mini: resolved?.tariffs?.mini ?? null,
-                                shipping: shippingSummary.bySupplier[supplierId] ?? 0,
-                            };
-                        }),
                     deliveryTotal,
                     orderTotal,
                     country,
                     facturant,
                     commercial,
+                    carrierOptions,
+                    selectedAttributes,
+                    selectedTransport,
                 };
             });
-        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries]);
+        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries, carrierOverrides, cartTransportOptions]);
 
         const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
         const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
         const orderTotal = itemsTotal + deliveryTotal;
 
+        const orderOverrides = useMemo(() => ({
+            transportSelection: Object.fromEntries(
+                Object.entries(carrierOverrides).map(([supplierId, choice]) => [
+                    Number(supplierId),
+                    { carrier_id: choice.carrierId, zone_id: choice.zoneId },
+                ]),
+            ),
+            pricingByProductId: Object.fromEntries(
+                groupedItems.flatMap((group) => group.items.map((item) => [
+                    item.product.id,
+                    { unitPrice: item.pricing.unitPrice, lineTotal: item.pricing.lineTotal },
+                ])),
+            ),
+            shippingTotal: deliveryTotal,
+        }), [carrierOverrides, groupedItems, deliveryTotal]);
+
         const handleQuantityChange = (productId: number, next: number) => {
             updateQuantity(productId, next);
         };
+
+        const handleCarrierChange = useCallback((
+            supplierId: number,
+            carrierOptions: Array<{ carrierId: number; zoneId: number }>,
+            selectedIndex: string,
+        ) => {
+            const option = carrierOptions[Number(selectedIndex)];
+            if (!option) {
+                return;
+            }
+
+            const transportKey = `${option.carrierId}:${option.zoneId}`;
+            if (!cartTransportOptions[transportKey]) {
+                setPageMessage(t('Tarifs indisponibles pour le transporteur sélectionné'));
+                return;
+            }
+
+            setPageMessage(null);
+            setCarrierOverrides((previous) => ({
+                ...previous,
+                [supplierId]: { carrierId: option.carrierId, zoneId: option.zoneId },
+            }));
+        }, [cartTransportOptions, t]);
 
         // const handleRefreshCart = async () => {
         //     if (items.length === 0 || isRefreshingCart) {
@@ -245,7 +411,6 @@ export default withAppLayout<Props>(
             } catch (error) {
                 console.error('Error creating new cart:', error);
                 setPageMessage(t('Erreur lors de la preparation du nouveau panier'));
-            } finally {
             }
         };
 
@@ -345,7 +510,7 @@ export default withAppLayout<Props>(
                                     {t('Rafraichir')}
                                 </Button>
                                 <ButtonsActions
-                                    save={handleSaveCart}
+                                    save={() => void handleSaveCart(orderOverrides)}
                                     delete={clearCart}
                                     saving={isSaving}
                                 />
@@ -505,8 +670,8 @@ export default withAppLayout<Props>(
                                                 getRollPrice={(supplier, roll, rollIndex) => {
                                                     const prices = getSupplierRollPrices(
                                                         supplier,
-                                                        group.transportContext.attrsBySupplier[supplier.supplierId],
-                                                        group.transportContext.transportBySupplier[supplier.supplierId],
+                                                        group.selectedAttributes,
+                                                        group.selectedTransport,
                                                     );
 
                                                     return prices ? prices[rollIndex] ?? null : null;
@@ -555,10 +720,49 @@ export default withAppLayout<Props>(
                                                 <span>{t('Total produits')}</span>
                                                 <span className="font-semibold">{formatCurrency(group.itemsTotal)}</span>
                                             </div>
+                                            {group.carrierOptions && group.carrierOptions.length > 1 ? (() => {
+                                                const override = carrierOverrides[group.id];
+                                                const currentIdx = override
+                                                    ? group.carrierOptions!.findIndex(
+                                                        (o) => o.carrierId === override.carrierId && o.zoneId === override.zoneId
+                                                      )
+                                                    : 0;
+                                                const value = String(currentIdx >= 0 ? currentIdx : 0);
+                                                return (
+                                                    <div className="flex items-center justify-between gap-2 text-sm">
+                                                        <span>{t('Transporteur')}</span>
+                                                        <Select
+                                                            value={value}
+                                                            onValueChange={(value) =>
+                                                                handleCarrierChange(group.id, group.carrierOptions!, value)
+                                                            }
+                                                        >
+                                                            <SelectTrigger className="h-7 w-48 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {group.carrierOptions.map((option, idx) => (
+                                                                    <SelectItem key={`${option.carrierId}-${option.zoneId}`} value={String(idx)}>
+                                                                        {cartCarriers[String(option.carrierId)]?.name ?? `#${option.carrierId}`}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                );
+                                            })() : group.carrierOptions && group.carrierOptions.length === 1 ? (
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span>{t('Transporteur')}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {cartCarriers[String(group.carrierOptions[0].carrierId)]?.name ?? `#${group.carrierOptions[0].carrierId}`}
+                                                    </span>
+                                                </div>
+                                            ) : null}
                                             <div className="flex items-center justify-between text-sm">
                                                 <span>{t('Frais de transport')}</span>
                                                 <span className="font-semibold">{formatCurrency(group.deliveryTotal)}</span>
                                             </div>
+
                                             <div className="flex items-center justify-between text-sm font-semibold">
                                                 <span>{t('Total')}</span>
                                                 <span>{formatCurrency(group.orderTotal)}</span>
@@ -567,55 +771,46 @@ export default withAppLayout<Props>(
                                             <div className="flex flex-col text-sm font-semibold">
                                                 <span>{t('Facturant')} : </span>
                                                 <span className="text-right">
-                                                    {group.facturant?.email ? (
+                                                    {!group.facturant ? (
+                                                        '-'
+                                                    ) : group.facturant.email ? (
                                                         <a
                                                             href={`mailto:${group.facturant.email}`}
                                                             className="text-primary hover:underline"
                                                         >
-                                                            {group.facturant.email}
+                                                            {group.facturant.name || group.facturant.email}
                                                         </a>
-                                                    ) : '-'}
+                                                    ) : (
+                                                        group.facturant.name || '-'
+                                                    )}
                                                 </span>
                                             </div>
                                             <div className="flex flex-col text-sm font-semibold">
                                                 <span>{t('Commercial')} : </span>
                                                 <span className="text-right">
-                                                    {group.commercial?.email ? (
+                                                    {!group.commercial ? (
+                                                        '-'
+                                                    ) : group.commercial.email ? (
                                                         <a href={`mailto:${group.commercial.email}`} className="text-primary hover:underline">
-                                                            {group.commercial.email}
+                                                            {group.commercial.name || group.commercial.email}
                                                         </a>
-                                                    ) : '-'}
+                                                    ) : (
+                                                        group.commercial.name || '-'
+                                                    )}
                                                 </span>
-                                            </div>
-                                            <Separator className="my-2" />
-                                            <div className="text-xs text-muted-foreground space-y-1">
-                                                <div className="font-semibold text-foreground">Debug transport</div>
-                                                {group.transportDebugRows.length === 0 ? (
-                                                    <div>Aucune donnee transport</div>
-                                                ) : (
-                                                    group.transportDebugRows.map((row) => (
-                                                        <div key={`${group.id}-${row.supplierId}`} className="rounded border px-2 py-1">
-                                                            <div>DB {row.supplierId} - cout {formatCurrency(row.shipping)}</div>
-                                                            <div>t={typeof row.rawT === 'string' ? row.rawT : JSON.stringify(row.rawT)}</div>
-                                                            <div>z={String(row.rawZ ?? '')}</div>
-                                                            <div>carrier={String(row.carrierId ?? '')} zone={String(row.zoneId ?? '')} ({row.zoneName ?? ''})</div>
-                                                            <div>mini={String(row.mini ?? '')} tva={String(row.taxgo ?? '')}</div>
-                                                        </div>
-                                                    ))
-                                                )}
                                             </div>
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
-                                    <Input
-                                        type="date"
-                                        value={deliveryDate}
-                                        onChange={(e) => setDeliveryDate(e.target.value)}
-                                    />
-                                </div>
+                                <CarrierAwareDatePicker
+                                    deliveryDate={deliveryDate}
+                                    setDeliveryDate={setDeliveryDate}
+                                    groupedItems={groupedItems}
+                                    carrierOverrides={carrierOverrides}
+                                    cartCarriers={cartCarriers}
+                                    t={t}
+                                />
 
                                 <div className="rounded-lg border p-3 space-y-2">
                                     <div className="flex items-center justify-between text-sm">
@@ -639,7 +834,7 @@ export default withAppLayout<Props>(
                                         className="w-full bg-brand-main hover:bg-brand-main-hover"
                                         size="lg"
                                         disabled={items.length === 0 || isSaving}
-                                        onClick={handleGenerateTcpdf}
+                                        onClick={() => void handleGenerateTcpdf(orderOverrides)}
                                     >
                                         {t('Commander')}
                                     </Button>

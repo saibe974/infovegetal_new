@@ -195,7 +195,7 @@ export function CartSidebarHeader() {
                                             <button
                                                 type="button"
                                                 className="p-2 rounded hover:bg-muted disabled:opacity-50"
-                                                onClick={handleSaveCart}
+                                                onClick={() => void handleSaveCart()}
                                                 disabled={isBusy}
                                             >
                                                 <SaveIcon className="size-5 text-primary" />

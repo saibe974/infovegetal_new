@@ -3,7 +3,13 @@ import { CartContext } from './cart.context';
 import { getCartPricing } from './cart-pricing';
 import { calculateCartShipping } from './cart-shipping';
 
-type TransportSelection = Record<number, { carrier_id: number; zone_id: number; tva?: number }>;
+export type TransportSelection = Record<number, { carrier_id: number; zone_id: number; tva?: number }>;
+
+export type CartOrderOverrides = {
+    transportSelection?: TransportSelection;
+    pricingByProductId?: Record<number, { unitPrice: number; lineTotal: number }>;
+    shippingTotal?: number;
+};
 
 export type PdfResult = {
     url: string;
@@ -27,8 +33,8 @@ export type CartOrderContextType = {
     pdfResult: PdfResult | null;
     orderConflict: OrderConflict | null;
     saveMessage: string | null;
-    handleSaveCart: () => Promise<void>;
-    handleGenerateTcpdf: () => Promise<void>;
+    handleSaveCart: (overrides?: CartOrderOverrides) => Promise<void>;
+    handleGenerateTcpdf: (overrides?: CartOrderOverrides) => Promise<void>;
     closePdfModal: () => void;
     handleDownloadGeneratedPdf: () => void;
     handleClearCartFromModal: () => void;
@@ -64,7 +70,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     const [orderConflict, setOrderConflict] = useState<OrderConflict | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-    const buildTransportSelection = useCallback((): TransportSelection => {
+    const buildTransportSelection = useCallback((selected?: TransportSelection): TransportSelection => {
         const selection: TransportSelection = {};
 
         items.forEach(({ product }) => {
@@ -92,18 +98,19 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
             };
         });
 
-        return selection;
+        return { ...selection, ...selected };
     }, [items]);
 
-    const buildPayload = useCallback(() => {
+    const buildPayload = useCallback((overrides: CartOrderOverrides = {}) => {
         const itemsPricing = items.map(({ product, quantity }) => ({
             product,
             quantity,
-            pricing: getCartPricing(product, quantity),
+            pricing: overrides.pricingByProductId?.[product.id] ?? getCartPricing(product, quantity),
         }));
         const shippingSummary = calculateCartShipping(items);
-        const deliveryTotal = Number.isFinite(shippingSummary.total)
-            ? Math.round(shippingSummary.total * 100) / 100
+        const requestedShippingTotal = overrides.shippingTotal ?? shippingSummary.total;
+        const deliveryTotal = Number.isFinite(requestedShippingTotal)
+            ? Math.round(requestedShippingTotal * 100) / 100
             : 0;
 
         return {
@@ -115,7 +122,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                     line_total: pricing.lineTotal,
                 })),
                 shipping_total: deliveryTotal,
-                transport_selection: buildTransportSelection(),
+                transport_selection: buildTransportSelection(overrides.transportSelection),
             },
             itemsTotal: itemsPricing.reduce((sum, { pricing }) => sum + pricing.lineTotal, 0),
             deliveryTotal,
@@ -149,7 +156,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => setSaveMessage(null), 3000);
     }, [clearCart, closePdfModal]);
 
-    const handleSaveCart = useCallback(async () => {
+    const handleSaveCart = useCallback(async (overrides: CartOrderOverrides = {}) => {
         if (items.length === 0) {
             setSaveMessage('Le panier est vide');
             setTimeout(() => setSaveMessage(null), 3000);
@@ -160,7 +167,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
         setSaveMessage(null);
 
         try {
-            const { payload, itemsTotal, deliveryTotal } = buildPayload();
+            const { payload, itemsTotal, deliveryTotal } = buildPayload(overrides);
             const response = await fetch('/cart/save', {
                 method: 'POST',
                 headers: {
@@ -195,7 +202,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
         }
     }, [items, buildPayload]);
 
-    const handleGenerateTcpdf = useCallback(async () => {
+    const handleGenerateTcpdf = useCallback(async (overrides: CartOrderOverrides = {}) => {
         if (items.length === 0) {
             setSaveMessage('Le panier est vide');
             setTimeout(() => setSaveMessage(null), 3000);
@@ -213,7 +220,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
         setSaveMessage(null);
 
         try {
-            const { payload, itemsTotal, deliveryTotal } = buildPayload();
+            const { payload, itemsTotal, deliveryTotal } = buildPayload(overrides);
             const response = await fetch('/cart/generate-pdf-tcpdf', {
                 method: 'POST',
                 headers: {

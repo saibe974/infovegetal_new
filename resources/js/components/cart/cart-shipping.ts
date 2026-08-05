@@ -25,6 +25,14 @@ type TransportChoice = {
     zoneId: number;
 };
 
+export type CarrierOption = {
+    carrierId: number;
+    zoneId: number;
+    tva?: number;
+};
+
+export type TransportOverrides = Record<number, { carrierId: number; zoneId: number }>;
+
 const toNumber = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (typeof value === 'string') {
@@ -106,6 +114,43 @@ const resolveTransportChoice = (
     }
 
     return { carrierId: 0, zoneId: 0 };
+};
+
+export const getCarrierOptions = (supplierAttributes: DbUserAttributes | null | undefined): CarrierOption[] => {
+    if (!supplierAttributes) return [];
+
+    const rawT = supplierAttributes.t;
+    let parsed: unknown = rawT;
+    if (typeof rawT === 'string') {
+        try {
+            parsed = JSON.parse(rawT);
+        } catch {
+            if (/^\d+$/.test(rawT.trim())) {
+                return [];
+            }
+            parsed = rawT;
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        return parsed
+            .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && !Array.isArray(entry))
+            .map((entry) => ({
+                carrierId: toNumber(entry.carrier_id),
+                zoneId: toNumber(entry.zone_id),
+                tva: entry.tva !== undefined && entry.tva !== null ? toNumber(entry.tva) : undefined,
+            }))
+            .filter((entry) => entry.carrierId > 0 && entry.zoneId > 0);
+    }
+
+    if (typeof rawT === 'number' && rawT > 0) {
+        const zoneId = toNumber(supplierAttributes.z);
+        if (zoneId > 0) {
+            return [{ carrierId: rawT, zoneId }];
+        }
+    }
+
+    return [];
 };
 
 const extractSupplierAttributes = (items: CartItem[]): Record<number, DbUserAttributes> => {
@@ -324,17 +369,29 @@ export const getSupplierTransportCost = (
     return 0;
 };
 
-export const calculateCartShipping = (items: CartItem[]): CartShippingSummary => {
+export const calculateCartShipping = (
+    items: CartItem[],
+    overrides?: TransportOverrides,
+    transportOptions?: Record<string, DbUserTransport>,
+): CartShippingSummary => {
     const distribution = buildRollDistribution(items);
-    const attrsBySupplier = extractSupplierAttributes(items);
+    const rawAttrsBySupplier = extractSupplierAttributes(items);
     const transportBySupplier = extractSupplierTransport(items);
     const bySupplier: Record<number, number> = {};
 
     Object.values(distribution.suppliers).forEach((supplier) => {
+        let supplierAttrs = rawAttrsBySupplier[supplier.supplierId];
+        let supplierTransport: DbUserTransport | undefined = transportBySupplier[supplier.supplierId];
+        const override = overrides?.[supplier.supplierId];
+        if (override && supplierAttrs) {
+            supplierAttrs = { ...supplierAttrs, t: override.carrierId, z: override.zoneId };
+            const key = `${override.carrierId}:${override.zoneId}`;
+            supplierTransport = transportOptions?.[key];
+        }
         const supplierCost = getSupplierTransportCost(
             supplier,
-            attrsBySupplier[supplier.supplierId],
-            transportBySupplier[supplier.supplierId],
+            supplierAttrs,
+            supplierTransport,
         );
         bySupplier[supplier.supplierId] = supplierCost;
     });
@@ -428,4 +485,29 @@ export const getSupplierRollPrices = (
     }
 
     return null;
+};
+
+export const getRenderedProductDeliveryPerRoll = (
+    supplier: SupplierDistribution,
+    supplierAttributes: DbUserAttributes | null | undefined,
+    supplierTransport: DbUserTransport | null | undefined,
+): number | null => {
+    if (
+        supplier.mod_liv !== 'roll'
+        || supplier.rolls.length === 0
+        || !supplierAttributes
+        || normalizePriceMode(supplierAttributes.p) !== 1
+    ) {
+        return null;
+    }
+
+    const { carrierId, zoneId } = resolveTransportChoice(supplierAttributes, supplierTransport);
+    if (carrierId <= 0 || zoneId <= 0 || !supplierTransport) {
+        return null;
+    }
+
+    const tariffPerRoll = pickZoneTariff(supplier.rolls.length, supplierTransport.tariffs ?? {});
+    const taxgoRate = Math.max(0, toNumber(supplierTransport.taxgo));
+
+    return roundCurrency(tariffPerRoll * (1 + taxgoRate / 100));
 };

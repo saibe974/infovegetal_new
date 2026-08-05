@@ -12,11 +12,13 @@ class Cart extends Model
         'status',
         'items_total',
         'shipping_total',
+        'transport_selection',
     ];
 
     protected $casts = [
         'items_total' => 'decimal:2',
         'shipping_total' => 'decimal:2',
+        'transport_selection' => 'array',
     ];
 
     public function user()

@@ -105,6 +105,7 @@ class CartController extends Controller
 
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
         $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
+        $cart->transport_selection = $transportSelection;
 
         $pdfPayload = $this->buildPdfPayload(
             array_values(array_map(
@@ -211,6 +212,32 @@ class CartController extends Controller
             }
         }
 
+        $clientConditions = \App\Models\ClientSalesCondition::query()
+            ->where('client_user_id', $user->id)
+            ->where('active', true)
+            ->get(['db_product_id', 'billing_user_id', 'seller_user_id']);
+
+        foreach ($clientConditions as $condition) {
+            $dbProductId = (int) $condition->db_product_id;
+            if ($dbProductId <= 0) {
+                continue;
+            }
+
+            $existing = $contactIdsByDbProductId[$dbProductId] ?? ['fact' => null, 'com' => null];
+
+            if ($existing['fact'] === null && $condition->billing_user_id) {
+                $existing['fact'] = (int) $condition->billing_user_id;
+                $contactIds[] = (int) $condition->billing_user_id;
+            }
+
+            if ($existing['com'] === null && $condition->seller_user_id) {
+                $existing['com'] = (int) $condition->seller_user_id;
+                $contactIds[] = (int) $condition->seller_user_id;
+            }
+
+            $contactIdsByDbProductId[$dbProductId] = $existing;
+        }
+
         $usersById = \App\Models\User::query()
             ->whereIn('id', array_values(array_unique($contactIds)))
             ->get(['id', 'name', 'email'])
@@ -255,9 +282,92 @@ class CartController extends Controller
             ];
         }
 
+        $carriers = \App\Models\Carrier::query()
+            ->get(['id', 'name', 'days', 'minimum'])
+            ->mapWithKeys(fn ($carrier) => [
+                (int) $carrier->id => [
+                    'name' => (string) $carrier->name,
+                    'days' => $carrier->days,
+                ],
+            ])
+            ->toArray();
+
+        $transportAttributeSets = [];
+        $transportDbProductIds = collect($rows)->pluck('db_product_id')
+            ->merge($clientConditions->pluck('db_product_id'))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique();
+        $priceCalculator = app(PriceCalculatorService::class);
+        foreach ($transportDbProductIds as $dbProductId) {
+            $resolvedAttributes = $priceCalculator->resolveUserAttributes($user, $dbProductId);
+            if (is_array($resolvedAttributes)) {
+                $transportAttributeSets[] = $resolvedAttributes;
+            }
+        }
+
+        $carrierZonePairs = [];
+        $seenPairs = [];
+        foreach ($transportAttributeSets as $attrs) {
+            $parsed = isset($attrs['t']) && is_string($attrs['t'])
+                ? json_decode($attrs['t'], true)
+                : ($attrs['t'] ?? null);
+            $options = is_array($parsed) ? $parsed : [];
+            if (!is_array($parsed) && !empty($attrs['t']) && is_numeric($attrs['t']) && !empty($attrs['z'])) {
+                $options[] = ['carrier_id' => (int) $attrs['t'], 'zone_id' => (int) $attrs['z']];
+            }
+            foreach ($options as $option) {
+                if (!is_array($option)) continue;
+                $cid = (int) ($option['carrier_id'] ?? 0);
+                $zid = (int) ($option['zone_id'] ?? 0);
+                if ($cid <= 0 || $zid <= 0) continue;
+                $key = $cid . ':' . $zid;
+                if (!isset($seenPairs[$key])) {
+                    $seenPairs[$key] = true;
+                    $carrierZonePairs[] = ['carrier_id' => $cid, 'zone_id' => $zid];
+                }
+            }
+        }
+
+        $transportOptions = [];
+        if (!empty($carrierZonePairs)) {
+            $carrierIds = array_unique(array_map(fn ($p) => $p['carrier_id'], $carrierZonePairs));
+            $zoneIds = array_unique(array_map(fn ($p) => $p['zone_id'], $carrierZonePairs));
+            $carriersData = \App\Models\Carrier::query()
+                ->whereIn('id', $carrierIds)
+                ->get(['id', 'taxgo'])
+                ->keyBy('id');
+            $zonesData = \App\Models\CarrierZone::query()
+                ->whereIn('id', $zoneIds)
+                ->get(['id', 'carrier_id', 'name', 'tariffs'])
+                ->groupBy('carrier_id');
+            foreach ($carrierZonePairs as $pair) {
+                $carrier = $carriersData->get($pair['carrier_id']);
+                $zone = $zonesData->get($pair['carrier_id'])?->firstWhere('id', $pair['zone_id']);
+                if (!$carrier || !$zone) continue;
+                $key = $pair['carrier_id'] . ':' . $pair['zone_id'];
+                $transportOptions[$key] = [
+                    'carrier_id' => (int) $carrier->id,
+                    'zone_id' => (int) $zone->id,
+                    'zone_name' => (string) ($zone->name ?? ''),
+                    'taxgo' => (float) ($carrier->taxgo ?? 0),
+                    'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
+                ];
+            }
+        }
+
+        $activeCart = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'current')
+            ->latest('updated_at')
+            ->first();
+
         return Inertia::render('products/cart', [
             'cart_contacts' => $cartContacts,
             'cart_db_countries' => $dbProductCountries,
+            'cart_carriers' => $carriers,
+            'cart_transport_options' => $transportOptions,
+            'cart_transport_selection' => $activeCart?->transport_selection ?? [],
         ]);
     }
 
@@ -494,7 +604,7 @@ class CartController extends Controller
         $total = $itemsTotal + $shippingTotal;
         $rollDistribution = app(PdfRollDistributionService::class)->build($items);
 
-        // Récupérer le facturant et le commercial via le pivot db_product_user
+        // Récupérer le facturant et le commercial via le pivot db_product_user ou ClientSalesCondition
         $facturant = null;
         $commercial = null;
         $dbProductId = isset($data['group_key']) ? (int) $data['group_key'] : 0;
@@ -503,16 +613,35 @@ class CartController extends Controller
                 ->where('user_id', $user->id)
                 ->where('db_product_id', $dbProductId)
                 ->value('attributes');
-            if ($pivot) {
-                $attrs = is_array($pivot) ? $pivot : json_decode($pivot, true);
-                $factId = isset($attrs['fact']) ? (int) $attrs['fact'] : null;
-                $comId  = isset($attrs['com'])  ? (int) $attrs['com']  : null;
-                if ($factId) {
-                    $facturant  = \App\Models\User::with('usersMeta')->find($factId);
+            $attrs = is_string($pivot) ? json_decode($pivot, true) : (is_array($pivot) ? $pivot : []);
+
+            if (!is_array($attrs)) {
+                $attrs = [];
+            }
+
+            if (empty($attrs['fact']) || empty($attrs['com'])) {
+                $condition = \App\Models\ClientSalesCondition::query()
+                    ->where('client_user_id', $user->id)
+                    ->where('db_product_id', $dbProductId)
+                    ->where('active', true)
+                    ->first(['billing_user_id', 'seller_user_id']);
+                if ($condition) {
+                    if (empty($attrs['fact']) && $condition->billing_user_id) {
+                        $attrs['fact'] = (int) $condition->billing_user_id;
+                    }
+                    if (empty($attrs['com']) && $condition->seller_user_id) {
+                        $attrs['com'] = (int) $condition->seller_user_id;
+                    }
                 }
-                if ($comId) {
-                    $commercial = \App\Models\User::with('usersMeta')->find($comId);
-                }
+            }
+
+            $factId = isset($attrs['fact']) ? (int) $attrs['fact'] : null;
+            $comId  = isset($attrs['com'])  ? (int) $attrs['com']  : null;
+            if ($factId) {
+                $facturant  = \App\Models\User::with('usersMeta')->find($factId);
+            }
+            if ($comId) {
+                $commercial = \App\Models\User::with('usersMeta')->find($comId);
             }
         }
 
@@ -746,18 +875,38 @@ class CartController extends Controller
         $facturantIds = [];
         $commercialIds = [];
         $pivotsByDbProductId = [];
+
+        $clientConditions = \App\Models\ClientSalesCondition::query()
+            ->where('client_user_id', $user->id)
+            ->where('active', true)
+            ->get(['db_product_id', 'billing_user_id', 'seller_user_id'])
+            ->keyBy('db_product_id');
+
         foreach ($dbProductIds as $dbProductId) {
             $pivot = DB::table('db_product_user')
                 ->where('user_id', $user->id)
                 ->where('db_product_id', $dbProductId)
                 ->value('attributes');
 
-            if (!$pivot) {
-                continue;
+            $attrs = is_string($pivot) ? json_decode($pivot, true) : (is_array($pivot) ? $pivot : []);
+
+            if (!is_array($attrs)) {
+                $attrs = [];
             }
 
-            $attrs = is_array($pivot) ? $pivot : json_decode($pivot, true);
-            if (!is_array($attrs)) {
+            if (empty($attrs['fact']) || empty($attrs['com'])) {
+                $condition = $clientConditions->get($dbProductId);
+                if ($condition) {
+                    if (empty($attrs['fact']) && $condition->billing_user_id) {
+                        $attrs['fact'] = (int) $condition->billing_user_id;
+                    }
+                    if (empty($attrs['com']) && $condition->seller_user_id) {
+                        $attrs['com'] = (int) $condition->seller_user_id;
+                    }
+                }
+            }
+
+            if ($attrs === []) {
                 continue;
             }
 
@@ -869,6 +1018,7 @@ class CartController extends Controller
         array $transportSelection = [],
     ): array {
         $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, false, $transportSelection);
+        $cart->transport_selection = $transportSelection;
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $payload['order_number'] = $orderNumber;
 

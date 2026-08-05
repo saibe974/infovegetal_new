@@ -9,6 +9,10 @@ type CartPricing = {
     tier: PricingTier;
 };
 
+type CartPricingOptions = {
+    renderedDeliveryPerRoll?: number | null;
+};
+
 const toNumber = (value: unknown): number => {
     if (typeof value === 'number') return value;
     if (value === null || value === undefined) return 0;
@@ -17,7 +21,21 @@ const toNumber = (value: unknown): number => {
     return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export const getCartPricing = (product: Product, quantity: number): CartPricing => {
+const isRenderedPriceMode = (value: unknown): boolean => {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    return normalized === '1'
+        || normalized === 'price_render'
+        || normalized === 'price_rendu'
+        || normalized === 'render'
+        || normalized === 'rendered'
+        || normalized === 'rendu';
+};
+
+export const getCartPricing = (
+    product: Product,
+    quantity: number,
+    options: CartPricingOptions = {},
+): CartPricing => {
     const qty = Math.max(0, Math.floor(quantity));
     const cond = Math.max(0, Math.floor(toNumber(product.cond)));
     const floor = Math.max(0, Math.floor(toNumber(product.floor)));
@@ -46,6 +64,31 @@ export const getCartPricing = (product: Product, quantity: number): CartPricing 
     } else if (traySize > 0 && price > 0 && qty >= traySize) {
         tier = 'tray';
         unitPrice = price;
+    }
+
+    const attributes = product.db_user_attributes;
+    if (
+        options.renderedDeliveryPerRoll !== undefined
+        && options.renderedDeliveryPerRoll !== null
+        && attributes
+        && typeof attributes === 'object'
+        && !Array.isArray(attributes)
+        && isRenderedPriceMode((attributes as Record<string, unknown>).p)
+        && rollSize > 0
+    ) {
+        const oldDeliveryPerRoll = Math.max(0, toNumber((attributes as Record<string, unknown>).l));
+        const newDeliveryPerRoll = Math.max(0, options.renderedDeliveryPerRoll);
+        const weighting = toNumber((attributes as Record<string, unknown>).pd);
+        const weightingFactor = 1 - weighting / 100;
+        const deliveryDeltaPerUnit = (newDeliveryPerRoll - oldDeliveryPerRoll) / rollSize;
+
+        // PriceCalculatorService applies delivery before weighting, so the replacement
+        // must follow the same order to stay aligned with server-side product pricing.
+        unitPrice = Math.max(
+            0,
+            unitPrice + (weightingFactor > 0 ? deliveryDeltaPerUnit / weightingFactor : deliveryDeltaPerUnit),
+        );
+        unitPrice = Math.round(unitPrice * 100) / 100;
     }
 
     const lineTotal = unitPrice * qty;
