@@ -224,6 +224,7 @@ export interface NavItemExtended extends NavItem {
 
 export interface Auth {
     user?: User | null;
+    can_access_contracts?: boolean;
     impersonate_from?: number | null;
     impersonator?: User | null;
     impersonation_strict_mode?: boolean;

@@ -1632,6 +1632,7 @@ class UserManagementController extends Controller
             'move' => $request->user()->can('move', $user),
             'impersonate' => $request->user()->can('impersonate', $user),
             'manage_db' => $this->authorization()->canManageClientDatabase($request->user(), $user),
+            'can_access_contracts' => $user->canInvoiceAnyDbProduct(),
         ];
     }
 

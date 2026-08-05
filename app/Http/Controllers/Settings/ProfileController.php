@@ -48,6 +48,7 @@ class ProfileController extends Controller
                 'impersonate' => $request->user()->can('impersonate', $target),
                 'delete' => $request->user()->can('delete', $target),
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
+                'can_access_contracts' => $target->canInvoiceAnyDbProduct(),
             ],
             'userMeta' => $target->usersMeta()
                 ->orderBy('sort_order')
@@ -65,6 +66,25 @@ class ProfileController extends Controller
                 ->values()
                 ->all(),
             'metaKeyConfig' => $this->metaKeyConfig(),
+        ]);
+    }
+
+    /**
+     * Show the contract settings page for the authenticated or managed user.
+     */
+    public function editContracts(Request $request, ?User $user = null): Response
+    {
+        $target = $user ?? $request->user();
+
+        $this->authorize('update', $target);
+        abort_unless($target->canInvoiceAnyDbProduct(), 403);
+
+        return Inertia::render('settings/contracts', [
+            'editingUser' => $target->loadMissing(['roles', 'permissions']),
+            'userAbilities' => [
+                'can_access_contracts' => true,
+                'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
+            ],
         ]);
     }
 
@@ -94,6 +114,7 @@ class ProfileController extends Controller
                 'impersonate' => $request->user()->can('impersonate', $target),
                 'delete' => $request->user()->can('delete', $target),
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
+                'can_access_contracts' => $target->canInvoiceAnyDbProduct(),
             ],
         ]);
     }

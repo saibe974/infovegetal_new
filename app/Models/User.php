@@ -123,6 +123,13 @@ class User extends Authenticatable implements HasMedia
             ->withPivot(['defaults', 'active']);
     }
 
+    public function canInvoiceAnyDbProduct(): bool
+    {
+        return $this->billingDbProducts()
+            ->wherePivot('active', true)
+            ->exists();
+    }
+
     public function sellerDbProducts(): BelongsToMany
     {
         return $this->belongsToMany(

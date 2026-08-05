@@ -45,6 +45,7 @@ class TwoFactorAuthenticationController extends Controller implements HasMiddlew
             'requiresConfirmation' => Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm'),
             'userAbilities' => [
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $targetUser),
+                'can_access_contracts' => $targetUser->canInvoiceAnyDbProduct(),
             ],
         ]);
     }

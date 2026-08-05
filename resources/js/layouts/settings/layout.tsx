@@ -12,7 +12,7 @@ import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
-import { ArrowLeftCircle, InfoIcon, Menu, ServerIcon, UserIcon } from 'lucide-react';
+import { ArrowLeftCircle, FileSignature, InfoIcon, Menu, ServerIcon, UserIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -25,7 +25,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const effectiveUser = getEffectiveUser(auth);
     const isStrictImpersonation = Boolean(auth?.impersonation_strict_mode);
     const privilegedUser = isStrictImpersonation ? effectiveUser : (auth?.impersonator ?? effectiveUser);
-    const userAbilities = (pageProps.userAbilities as { manage_db?: boolean } | undefined) ?? {};
+    const userAbilities = (pageProps.userAbilities as { manage_db?: boolean; can_access_contracts?: boolean } | undefined) ?? {};
     useIsMobile();
 
     // When server-side rendering, we only render the layout on the client...
@@ -43,12 +43,19 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             href: isSelf ? editProfile() : editAdminUser(userId),
             icon: InfoIcon,
         },
-        {
-            title: 'Contract',
-            href: ,
-            icon: ,
-        },
     ];
+
+    const canAccessContracts = isSelf
+        ? Boolean(auth.can_access_contracts)
+        : Boolean(userAbilities.can_access_contracts);
+
+    if (canAccessContracts) {
+        sidebarNavItems.push({
+            title: 'Contract',
+            href: isSelf ? `/settings/contracts` : `/admin/users/${userId}/contracts`,
+            icon: FileSignature,
+        });
+    }
 
     const isDirectParentOfEditingUser = Boolean(
         editingUser && auth.user && editingUser.parent_id === auth.user.id,

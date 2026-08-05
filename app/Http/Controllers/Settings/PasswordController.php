@@ -29,6 +29,7 @@ class PasswordController extends Controller
             'editingUser' => $targetUser->load(['roles', 'permissions']),
             'userAbilities' => [
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $targetUser),
+                'can_access_contracts' => $targetUser->canInvoiceAnyDbProduct(),
             ],
         ]);
     }

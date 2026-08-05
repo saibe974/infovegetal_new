@@ -127,6 +127,7 @@ class HandleInertiaRequests extends Middleware
             // 'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $user ? $userArray : null,
+                'can_access_contracts' => $user?->canInvoiceAnyDbProduct() ?? false,
                 'impersonate_from' => $impersonatorId,
                 'impersonator' => $impersonatorArray,
                 'impersonation_strict_mode' => $impersonationStrictMode,

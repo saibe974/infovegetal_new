@@ -40,6 +40,9 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:6,1')
             ->name('password.update');
 
+    Route::get('settings/contracts', [ProfileController::class, 'editContracts'])
+        ->name('settings.contracts.edit');
+
     Route::get('settings/appearance', function (Request $request) {
         $user = $request->user();
         return Inertia::render('settings/appearance', [
@@ -67,6 +70,10 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/users/{user}/permissions', [ProfileController::class, 'editPermissions'])
         ->name('permissions.edit');
 
+    Route::get('admin/users/{user}/contracts', [ProfileController::class, 'editContracts'])
+        ->whereNumber('user')
+        ->name('admin.contracts.edit');
+
     Route::patch('admin/users/{user}/permissions', [ProfileController::class, 'updatePermissions'])
         ->name('permissions.update');
 
@@ -83,6 +90,7 @@ Route::middleware('auth')->group(function () {
             'editingUser' => $user->load(['roles', 'permissions']),
             'userAbilities' => [
                 'manage_db' => $authorization->canManageClientDatabase($request->user(), $user),
+                'can_access_contracts' => $user->canInvoiceAnyDbProduct(),
             ],
         ]);
     })->name('appearance.edit');
