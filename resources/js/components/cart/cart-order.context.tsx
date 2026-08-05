@@ -4,11 +4,14 @@ import { getCartPricing } from './cart-pricing';
 import { calculateCartShipping } from './cart-shipping';
 
 export type TransportSelection = Record<number, { carrier_id: number; zone_id: number; tva?: number }>;
+export type DiscountSelection = Record<number, { type: 'fixed' | 'percent'; value: number }>;
 
 export type CartOrderOverrides = {
     transportSelection?: TransportSelection;
     pricingByProductId?: Record<number, { unitPrice: number; lineTotal: number }>;
     shippingTotal?: number;
+    shippingByDb?: Record<number, number>;
+    discounts?: DiscountSelection;
 };
 
 export type PdfResult = {
@@ -67,7 +70,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     const [pdfPhaseIndex, setPdfPhaseIndex] = useState(0);
     const [pdfCurrentGroup, setPdfCurrentGroup] = useState<{ index: number; total: number; label: string } | null>(null);
     const [pdfResult, setPdfResult] = useState<PdfResult | null>(null);
-    const [orderConflict, setOrderConflict] = useState<OrderConflict | null>(null);
+    const [orderConflict] = useState<OrderConflict | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
     const buildTransportSelection = useCallback((selected?: TransportSelection): TransportSelection => {
@@ -122,6 +125,8 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                     line_total: pricing.lineTotal,
                 })),
                 shipping_total: deliveryTotal,
+                ...(overrides.shippingByDb !== undefined ? { shipping_by_db: overrides.shippingByDb } : {}),
+                ...(overrides.discounts !== undefined ? { discounts: overrides.discounts } : {}),
                 transport_selection: buildTransportSelection(overrides.transportSelection),
             },
             itemsTotal: itemsPricing.reduce((sum, { pricing }) => sum + pricing.lineTotal, 0),

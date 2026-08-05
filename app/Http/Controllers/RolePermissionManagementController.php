@@ -61,6 +61,7 @@ class RolePermissionManagementController extends Controller
         'orders.export.branch',
         'orders.export.all',
         'orders.invoice',
+        'order.remise',
 
         // carriers
         'carriers.view',

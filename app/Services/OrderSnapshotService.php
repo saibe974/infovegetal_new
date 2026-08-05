@@ -49,7 +49,7 @@ use Illuminate\Support\Str;
 class OrderSnapshotService
 {
     /**
-     * @param array{items: Collection<int, array{product: Product, quantity: int, unit_price: float|int, line_total: float|int}>, items_total: float|int, shipping_total: float|int, total: float|int} $payload
+     * @param array{items: Collection<int, array{product: Product, quantity: int, unit_price: float|int, line_total: float|int}>, items_total: float|int, shipping_total: float|int, discount_total?: float|int, discounts?: array, total: float|int} $payload
      */
     public function createFromPayload(
         Cart $cart,
@@ -60,6 +60,10 @@ class OrderSnapshotService
         $items = collect($payload['items'] ?? []);
         $itemsTotal = round((float) ($payload['items_total'] ?? 0), 2);
         $shippingTotal = round((float) ($payload['shipping_total'] ?? 0), 2);
+        $discountTotal = min(
+            max(0, round((float) ($payload['discount_total'] ?? 0), 2)),
+            max(0, round($itemsTotal + $shippingTotal, 2)),
+        );
 
         $actors = $this->resolveActors($client, $items);
         $conditionsSnapshot = $this->resolveConditionsSnapshot(
@@ -78,11 +82,13 @@ class OrderSnapshotService
             $items,
             $itemsTotal,
             $shippingTotal,
+            $discountTotal,
             $actors,
             $conditionsSnapshot,
             $orderDate,
             $status,
             $options,
+            $payload,
         ) {
             $lineBreakdowns = [];
             $billingGainTotal = 0.0;
@@ -98,13 +104,15 @@ class OrderSnapshotService
                 'currency' => 'EUR',
                 'items_total_ht' => $itemsTotal,
                 'shipping_total_ht' => $shippingTotal,
-                'total_ht' => round($itemsTotal + $shippingTotal, 2),
+                'discount_total_ht' => $discountTotal,
+                'total_ht' => round($itemsTotal + $shippingTotal - $discountTotal, 2),
                 'total_tva' => 0,
                 'total_ttc' => 0,
                 'conditions_snapshot' => $conditionsSnapshot,
                 'meta' => [
                     'source' => $options['source'] ?? 'cart_validation',
                     'cart_status' => (string) ($cart->status ?? ''),
+                    'discounts' => $payload['discounts'] ?? [],
                     'resolved_actors' => [
                         'db_product_id' => $actors['db_product_id'],
                         'client_user_id' => $actors['client_user_id'],
@@ -219,15 +227,21 @@ class OrderSnapshotService
                     'seller_user_id' => $actors['seller_user_id'],
                     'items_total_ht' => $itemsTotal,
                     'shipping_total_ht' => $shippingTotal,
+                    'discount_total_ht' => $discountTotal,
                     'source' => $options['source'] ?? 'cart_validation',
                 ],
                 generatedAtUtc: $orderDate->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             );
 
+            $invoiceTotalHt = round($invoice->totalHt->minorAmount / 100, 2);
+            $discountedTotalHt = max(0, round($invoiceTotalHt - $discountTotal, 2));
+            $vatRatio = $invoiceTotalHt > 0 ? $discountedTotalHt / $invoiceTotalHt : 1.0;
+            $discountedTotalVat = round(($invoice->totalVat->minorAmount / 100) * $vatRatio, 2);
+
             $order->update([
-                'total_ht' => round($invoice->totalHt->minorAmount / 100, 2),
-                'total_tva' => round($invoice->totalVat->minorAmount / 100, 2),
-                'total_ttc' => round($invoice->totalTtc->minorAmount / 100, 2),
+                'total_ht' => $discountedTotalHt,
+                'total_tva' => $discountedTotalVat,
+                'total_ttc' => round($discountedTotalHt + $discountedTotalVat, 2),
                 'meta' => array_merge($order->meta ?? [], [
                     'billing_gain_total_ht' => round($billingGainTotal, 4),
                     'sales_calculation_snapshot' => $snapshot->toArray(),

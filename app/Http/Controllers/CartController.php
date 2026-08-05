@@ -44,12 +44,18 @@ class CartController extends Controller
             'items.*.id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'shipping_total' => 'nullable|numeric|min:0',
+            'shipping_by_db' => 'nullable|array',
+            'shipping_by_db.*' => 'nullable|numeric|min:0',
+            'discounts' => 'nullable|array',
+            'discounts.*.type' => 'required|in:fixed,percent',
+            'discounts.*.value' => 'required|numeric|min:0',
             'transport_selection' => 'nullable|array',
             'choice' => 'nullable|in:append,new',
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        $shippingByDb = $this->normalizeShippingByDb($data['shipping_by_db'] ?? null);
 
         $existingProcessing = Cart::query()
             ->where('user_id', $user->id)
@@ -82,6 +88,10 @@ class CartController extends Controller
             $cart = $existingProcessing;
         }
 
+        $discounts = array_key_exists('discounts', $data)
+            ? $this->normalizeDiscounts($data['discounts'], $user)
+            : (is_array($cart->discounts) ? $cart->discounts : []);
+
         $requestedByProductId = [];
         foreach ($data['items'] as $item) {
             $productId = (int) $item['id'];
@@ -106,6 +116,7 @@ class CartController extends Controller
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
         $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
         $cart->transport_selection = $transportSelection;
+        $cart->discounts = $discounts;
 
         $pdfPayload = $this->buildPdfPayload(
             array_values(array_map(
@@ -117,6 +128,8 @@ class CartController extends Controller
             $shippingTotal,
             false,
             $transportSelection,
+            $discounts,
+            $shippingByDb,
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
@@ -148,7 +161,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -370,6 +383,7 @@ class CartController extends Controller
             'cart_carriers' => $carriers,
             'cart_transport_options' => $transportOptions,
             'cart_transport_selection' => $activeCart?->transport_selection ?? [],
+            'cart_discounts' => $activeCart?->discounts ?? [],
         ]);
     }
 
@@ -410,11 +424,17 @@ class CartController extends Controller
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
             'shipping_total' => 'nullable|numeric|min:0',
+            'shipping_by_db' => 'nullable|array',
+            'shipping_by_db.*' => 'nullable|numeric|min:0',
+            'discounts' => 'nullable|array',
+            'discounts.*.type' => 'required|in:fixed,percent',
+            'discounts.*.value' => 'required|numeric|min:0',
             'transport_selection' => 'nullable|array',
         ]);
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        $shippingByDb = $this->normalizeShippingByDb($data['shipping_by_db'] ?? null);
 
         // Le panier sauvegardé est un brouillon courant distinct des commandes processées.
         $cart = Cart::query()
@@ -429,6 +449,10 @@ class CartController extends Controller
                 'status' => 'current',
             ]);
         }
+
+        $discounts = array_key_exists('discounts', $data)
+            ? $this->normalizeDiscounts($data['discounts'], $user)
+            : (is_array($cart->discounts) ? $cart->discounts : []);
 
         $cart->status = 'current';
 
@@ -450,6 +474,8 @@ class CartController extends Controller
             $cartTcpdfService,
             false,
             $transportSelection,
+            $discounts,
+            $shippingByDb,
         );
 
         $request->session()->forget('cart_filter_ids');
@@ -679,6 +705,11 @@ class CartController extends Controller
             'items.*.unit_price' => 'nullable|numeric|min:0',
             'items.*.line_total' => 'nullable|numeric|min:0',
             'shipping_total' => 'nullable|numeric|min:0',
+            'shipping_by_db' => 'nullable|array',
+            'shipping_by_db.*' => 'nullable|numeric|min:0',
+            'discounts' => 'nullable|array',
+            'discounts.*.type' => 'required|in:fixed,percent',
+            'discounts.*.value' => 'required|numeric|min:0',
             'transport_selection' => 'nullable|array',
             'group_label' => 'nullable|string|max:190',
             'group_key' => 'nullable|integer|min:0',
@@ -686,6 +717,7 @@ class CartController extends Controller
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
+        $shippingByDb = $this->normalizeShippingByDb($data['shipping_by_db'] ?? null);
         $shippingTotal = round((float) ($data['shipping_total'] ?? 0) * 100) / 100;
         $transportSelection = $this->normalizeTransportSelection($data['transport_selection'] ?? null);
 
@@ -709,6 +741,20 @@ class CartController extends Controller
             ]);
         }
 
+        $storedCurrentDiscounts = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'current')
+            ->latest('updated_at')
+            ->value('discounts');
+        if (is_string($storedCurrentDiscounts)) {
+            $storedCurrentDiscounts = json_decode($storedCurrentDiscounts, true);
+        }
+        $discounts = array_key_exists('discounts', $data)
+            ? $this->normalizeDiscounts($data['discounts'], $user)
+            : (is_array($storedCurrentDiscounts)
+                ? $storedCurrentDiscounts
+                : (is_array($cart->discounts) ? $cart->discounts : []));
+
         $syncData = [];
         foreach ($requestedByProductId as $productId => $qty) {
             $syncData[(int) $productId] = ['quantity' => (int) $qty];
@@ -724,6 +770,8 @@ class CartController extends Controller
             $cartTcpdfService,
             true,
             $transportSelection,
+            $discounts,
+            $shippingByDb,
         );
 
         $existingSnapshot = \App\Models\OrderHeader::query()
@@ -732,7 +780,7 @@ class CartController extends Controller
             ->first();
 
         if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection);
+            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb);
             $orderSnapshotService->createFromPayload(
                 $cart,
                 $user,
@@ -806,6 +854,8 @@ class CartController extends Controller
         float $shippingTotal,
         bool $preferInputPrices = false,
         array $transportSelection = [],
+        array $discountSelections = [],
+        array $shippingByDb = [],
     ): array
     {
         $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
@@ -954,12 +1004,21 @@ class CartController extends Controller
             ->unique(fn ($u) => strtolower((string) $u->email))
             ->values();
 
-        $total = $itemsTotal + $effectiveShipping;
+        $discountSummary = $this->calculateDiscountSummary(
+            $items,
+            $effectiveShipping,
+            $discountSelections,
+            $shippingByDb,
+        );
+        $discountTotal = $discountSummary['total'];
+        $total = max(0, round($itemsTotal + $effectiveShipping - $discountTotal, 2));
 
         return [
             'items' => $items,
             'items_total' => $itemsTotal,
             'shipping_total' => $effectiveShipping,
+            'discounts' => $discountSummary['by_db'],
+            'discount_total' => $discountTotal,
             'total' => $total,
             'roll_distribution' => $rollDistribution,
             'user' => $user,
@@ -1018,9 +1077,20 @@ class CartController extends Controller
         CartTcpdfService $cartTcpdfService,
         bool $sendEmails,
         array $transportSelection = [],
+        array $discountSelections = [],
+        array $shippingByDb = [],
     ): array {
-        $payload = $this->buildPdfPayload($itemsInput, $user, $shippingTotal, false, $transportSelection);
+        $payload = $this->buildPdfPayload(
+            $itemsInput,
+            $user,
+            $shippingTotal,
+            false,
+            $transportSelection,
+            $discountSelections,
+            $shippingByDb,
+        );
         $cart->transport_selection = $transportSelection;
+        $cart->discounts = $discountSelections;
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $payload['order_number'] = $orderNumber;
 
@@ -1077,6 +1147,7 @@ class CartController extends Controller
             'pdf_download_url' => asset('storage/' . $pdfRelativePath),
             'items_total' => $cart->items_total,
             'shipping_total' => $cart->shipping_total,
+            'discount_total' => $payload['discount_total'] ?? 0,
             'mail_recipients_count' => $mailCount,
             'pdf_binary' => $pdfBinary,
         ];
@@ -1146,6 +1217,137 @@ class CartController extends Controller
         }
 
         return 0;
+    }
+
+    /**
+     * @return array<int, float>
+     */
+    private function normalizeShippingByDb(mixed $rawShipping): array
+    {
+        if (!is_array($rawShipping)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($rawShipping as $dbProductId => $amount) {
+            $dbId = (int) $dbProductId;
+            $value = is_numeric($amount) ? (float) $amount : 0.0;
+            if ($dbId > 0 && is_finite($value) && $value >= 0) {
+                $normalized[$dbId] = round($value, 2);
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array<int, array{type:string, value:float}>
+     */
+    private function normalizeDiscounts(mixed $rawDiscounts, \App\Models\User $user): array
+    {
+        if (!is_array($rawDiscounts) || $rawDiscounts === []) {
+            return [];
+        }
+
+        if (!$user->hasAnyRole(['dev', 'admin', 'commercial']) && !$user->can('order.remise')) {
+            abort(403, 'Vous n’êtes pas autorisé à appliquer une remise.');
+        }
+
+        $normalized = [];
+        foreach ($rawDiscounts as $dbProductId => $discount) {
+            $dbId = (int) $dbProductId;
+            if ($dbId <= 0 || !is_array($discount)) {
+                continue;
+            }
+
+            $type = ($discount['type'] ?? null) === 'percent' ? 'percent' : 'fixed';
+            $value = isset($discount['value']) && is_numeric($discount['value'])
+                ? (float) $discount['value']
+                : 0.0;
+            if (!is_finite($value)) {
+                $value = 0.0;
+            }
+
+            $normalized[$dbId] = [
+                'type' => $type,
+                'value' => round($type === 'percent' ? min(100, max(0, $value)) : max(0, $value), 2),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, array{product:Product, line_total:float|int}> $items
+     * @param array<int, array{type:string, value:float}> $discountSelections
+     * @param array<int, float> $shippingByDb
+     * @return array{total:float, by_db:array<int, array{type:string, value:float, base:float, amount:float}>}
+     */
+    private function calculateDiscountSummary(
+        $items,
+        float $shippingTotal,
+        array $discountSelections,
+        array $shippingByDb,
+    ): array {
+        if ($discountSelections === []) {
+            return ['total' => 0.0, 'by_db' => []];
+        }
+
+        $productTotals = $items
+            ->groupBy(fn ($item) => (int) ($item['product']->db_products_id ?? 0))
+            ->map(fn ($group) => round((float) $group->sum(fn ($item) => (float) ($item['line_total'] ?? 0)), 2))
+            ->filter(fn ($total, $dbId) => (int) $dbId > 0 && $total >= 0);
+
+        if ($productTotals->isEmpty()) {
+            return ['total' => 0.0, 'by_db' => []];
+        }
+
+        $requestedShippingTotal = array_sum(array_intersect_key($shippingByDb, $productTotals->all()));
+        $productGrandTotal = max(0.0, (float) $productTotals->sum());
+        $shippingShares = [];
+        $allocatedShipping = 0.0;
+        $dbIds = $productTotals->keys()->map(fn ($id) => (int) $id)->values()->all();
+        $lastDbId = end($dbIds);
+
+        foreach ($dbIds as $dbId) {
+            if ($dbId === $lastDbId) {
+                $share = max(0, round($shippingTotal - $allocatedShipping, 2));
+            } elseif ($requestedShippingTotal > 0) {
+                $share = round($shippingTotal * (($shippingByDb[$dbId] ?? 0) / $requestedShippingTotal), 2);
+            } elseif ($productGrandTotal > 0) {
+                $share = round($shippingTotal * (((float) $productTotals[$dbId]) / $productGrandTotal), 2);
+            } else {
+                $share = round($shippingTotal / max(1, count($dbIds)), 2);
+            }
+            $shippingShares[$dbId] = $share;
+            $allocatedShipping += $share;
+        }
+
+        $byDb = [];
+        foreach ($discountSelections as $dbId => $discount) {
+            if (!$productTotals->has($dbId)) {
+                continue;
+            }
+
+            $base = round((float) $productTotals[$dbId] + ($shippingShares[$dbId] ?? 0), 2);
+            $value = max(0, (float) ($discount['value'] ?? 0));
+            $type = ($discount['type'] ?? null) === 'percent' ? 'percent' : 'fixed';
+            $amount = $type === 'percent'
+                ? round($base * min(100, $value) / 100, 2)
+                : round(min($base, $value), 2);
+
+            $byDb[$dbId] = [
+                'type' => $type,
+                'value' => $value,
+                'base' => $base,
+                'amount' => $amount,
+            ];
+        }
+
+        return [
+            'total' => round(array_sum(array_column($byDb, 'amount')), 2),
+            'by_db' => $byDb,
+        ];
     }
 
     /**

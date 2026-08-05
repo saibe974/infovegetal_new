@@ -27,8 +27,32 @@ import { SharedData } from '@/types';
 import { Separator } from '@/components/ui/separator';
 import CountryFlag from '@/components/ui/country-flag';
 import { getCarrierOverridesStorageKey, readCarrierOverrides, writeCarrierOverrides, type CarrierOverrides } from '@/components/cart/cart-carrier-storage';
+import { getEffectiveUser, hasAnyRole, hasPermission } from '@/lib/roles';
+import {
+    getCartDiscountsStorageKey,
+    readCartDiscounts,
+    writeCartDiscounts,
+    type CartDiscountDraft as DbDiscountDraft,
+    type CartDiscountType as DiscountType,
+} from '@/components/cart/cart-discount-storage';
 
 type Props = Record<string, never>;
+
+const parseDiscountValue = (value: string): number => {
+    const parsed = Number(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+};
+
+const calculateDiscountAmount = (grossTotal: number, discount?: DbDiscountDraft): number => {
+    if (!discount || grossTotal <= 0) return 0;
+
+    const value = parseDiscountValue(discount.value);
+    const amount = discount.type === 'percent'
+        ? grossTotal * Math.min(100, value) / 100
+        : Math.min(grossTotal, value);
+
+    return Math.round(amount * 100) / 100;
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -151,7 +175,7 @@ export default withAppLayout<Props>(
     false,
     () => {
         const { t } = useI18n();
-        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {} } = usePage<SharedData & {
+        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {}, cart_discounts: storedDiscounts = {} } = usePage<SharedData & {
             cart_contacts?: Record<string, {
                 fact?: { id: number; name: string; email: string } | null;
                 com?: { id: number; name: string; email: string } | null;
@@ -169,13 +193,46 @@ export default withAppLayout<Props>(
                 carrier_id: number;
                 zone_id: number;
             }>;
+            cart_discounts?: Record<string, {
+                type: DiscountType;
+                value: number;
+            }>;
         }>().props;
         const cartId = cart?.id;
         const carrierOverridesStorageKey = getCarrierOverridesStorageKey(auth?.user?.id, cartId);
+        const discountsStorageKey = getCartDiscountsStorageKey(auth?.user?.id, cartId);
         const { items, updateQuantity, removeFromCart, clearCart, refreshCart } = useContext(CartContext);
 
         const [deliveryDate, setDeliveryDate] = useState('');
         const [isRefreshingCart, setIsRefreshingCart] = useState(false);
+        const getStoredDiscounts = useCallback((): Record<number, DbDiscountDraft> =>
+            Object.fromEntries(
+                Object.entries(storedDiscounts).map(([dbId, discount]) => [
+                    Number(dbId),
+                    {
+                        type: discount.type === 'percent' ? 'percent' : 'fixed',
+                        value: String(discount.value ?? 0),
+                    },
+                ]),
+            ),
+        [storedDiscounts]);
+        const [discountsByDb, setDiscountsByDb] = useState<Record<number, DbDiscountDraft>>(() =>
+            readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts(),
+        );
+        const discountsStorageKeyRef = useRef(discountsStorageKey);
+        const effectiveUser = getEffectiveUser(auth);
+        const canEditDiscount = hasAnyRole(effectiveUser, ['dev', 'admin', 'commercial'])
+            || hasPermission(effectiveUser, 'order.remise');
+
+        useEffect(() => {
+            if (discountsStorageKeyRef.current !== discountsStorageKey) {
+                discountsStorageKeyRef.current = discountsStorageKey;
+                setDiscountsByDb(readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts());
+                return;
+            }
+
+            writeCartDiscounts(discountsStorageKey, discountsByDb);
+        }, [discountsByDb, discountsStorageKey, getStoredDiscounts]);
         const getStoredTransportSelection = useCallback((): CarrierOverrides =>
             Object.fromEntries(
                 Object.entries(storedTransportSelection).map(([supplierId, choice]) => [
@@ -313,7 +370,9 @@ export default withAppLayout<Props>(
                     }));
                 const itemsTotal = pricedItems.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
                 const deliveryTotal = shippingSummary.total;
-                const orderTotal = itemsTotal + deliveryTotal;
+                const grossTotal = itemsTotal + deliveryTotal;
+                const discountAmount = calculateDiscountAmount(grossTotal, discountsByDb[group.id]);
+                const orderTotal = Math.max(0, grossTotal - discountAmount);
                 const country = String(cartDbCountries[String(group.id)] ?? '').trim().toUpperCase();
                 const contacts = cartContacts[String(group.id)] ?? null;
                 const facturant = contacts?.fact ?? null;
@@ -329,6 +388,7 @@ export default withAppLayout<Props>(
                     shipping: shippingSummary,
                     transportContext: transport,
                     deliveryTotal,
+                    discountAmount,
                     orderTotal,
                     country,
                     facturant,
@@ -338,11 +398,12 @@ export default withAppLayout<Props>(
                     selectedTransport,
                 };
             });
-        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries, carrierOverrides, cartTransportOptions]);
+        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries, carrierOverrides, cartTransportOptions, discountsByDb]);
 
         const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
         const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
-        const orderTotal = itemsTotal + deliveryTotal;
+        const discountTotal = groupedItems.reduce((sum, group) => sum + group.discountAmount, 0);
+        const orderTotal = Math.max(0, itemsTotal + deliveryTotal - discountTotal);
 
         const orderOverrides = useMemo(() => ({
             transportSelection: Object.fromEntries(
@@ -358,7 +419,22 @@ export default withAppLayout<Props>(
                 ])),
             ),
             shippingTotal: deliveryTotal,
-        }), [carrierOverrides, groupedItems, deliveryTotal]);
+            shippingByDb: Object.fromEntries(
+                groupedItems.map((group) => [group.id, group.deliveryTotal]),
+            ),
+            discounts: canEditDiscount
+                ? Object.fromEntries(
+                    groupedItems
+                        .map((group) => {
+                            const discount = discountsByDb[group.id];
+                            return discount
+                                ? [group.id, { type: discount.type, value: parseDiscountValue(discount.value) }]
+                                : null;
+                        })
+                        .filter((entry): entry is [number, { type: DiscountType; value: number }] => entry !== null),
+                )
+                : undefined,
+        }), [carrierOverrides, groupedItems, deliveryTotal, canEditDiscount, discountsByDb]);
 
         const handleQuantityChange = (productId: number, next: number) => {
             updateQuantity(productId, next);
@@ -454,52 +530,6 @@ export default withAppLayout<Props>(
                 setPageMessage(t('Erreur lors de la preparation du nouveau panier'));
             }
         };
-
-        const [topOffset, setTopOffset] = useState<number>(0);
-
-        useEffect(() => {
-            const getHeight = () => {
-                const header = document.querySelector('.top-sticky') as HTMLElement | null;
-                const stickyBar = document.querySelector('.sticky-bar-cart') as HTMLElement | null;
-
-                if (!header || !stickyBar) return 0;
-
-                const headerHeight = header.getBoundingClientRect().height;
-                const barHeight = stickyBar.getBoundingClientRect().height;
-                const total = headerHeight + barHeight;
-
-                // console.log('header height:', headerHeight, 'bar height:', barHeight, 'total:', total);
-                return total;
-            };
-
-            const update = () => {
-                const height = getHeight();
-                if (height > 0) {
-                    setTopOffset(height);
-                }
-            };
-
-            // Attendre que le rendu soit complet et que le layout soit stable
-            requestAnimationFrame(() => {
-                setTimeout(() => {
-                    update();
-                    // Vérifier à nouveau après un délai
-                    setTimeout(update, 200);
-                }, 50);
-            });
-
-            // Mettre à jour sur resize
-            const handleResize = () => {
-                requestAnimationFrame(update);
-            };
-            window.addEventListener('resize', handleResize);
-
-
-
-            return () => {
-                window.removeEventListener('resize', handleResize);
-            };
-        }, []);
 
         return (
             <div className="">
@@ -726,11 +756,13 @@ export default withAppLayout<Props>(
                     </div>
 
                     <BasicSticky
-                        topOffset={-topOffset}
-                        stickyStyle={{ top: topOffset, }}
+                        topOffset={0}
+                        wrapperClassName="relative z-30"
+                        stickyClassName="z-30"
+                        stickyStyle={{ top: 0, zIndex: 30 }}
                     >
                         <Card
-                            className="h-fit sidebar"
+                            className="sidebar max-h-screen overflow-y-auto overscroll-contain"
                         >
                             <CardHeader>
                                 <CardTitle>{t('Récapitulatif')}</CardTitle>
@@ -766,7 +798,7 @@ export default withAppLayout<Props>(
                                                 const currentIdx = override
                                                     ? group.carrierOptions!.findIndex(
                                                         (o) => o.carrierId === override.carrierId && o.zoneId === override.zoneId
-                                                      )
+                                                    )
                                                     : 0;
                                                 const value = String(currentIdx >= 0 ? currentIdx : 0);
                                                 return (
@@ -803,6 +835,60 @@ export default withAppLayout<Props>(
                                                 <span>{t('Frais de transport')}</span>
                                                 <span className="font-semibold">{formatCurrency(group.deliveryTotal)}</span>
                                             </div>
+
+                                            {canEditDiscount && (
+                                                <div className="flex items-center justify-between gap-2 text-sm">
+                                                    <span>{t('Remise')}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={discountsByDb[group.id]?.value ?? ''}
+                                                            onChange={(event) => setDiscountsByDb((previous) => ({
+                                                                ...previous,
+                                                                [group.id]: {
+                                                                    type: previous[group.id]?.type ?? 'percent',
+                                                                    value: event.target.value,
+                                                                },
+                                                            }))}
+                                                            className="h-7 w-20 text-right text-xs"
+                                                            aria-label={t('Valeur de la remise')}
+                                                        />
+                                                        <Select
+                                                            value={discountsByDb[group.id]?.type ?? 'percent'}
+                                                            onValueChange={(value: DiscountType) => setDiscountsByDb((previous) => ({
+                                                                ...previous,
+                                                                [group.id]: {
+                                                                    type: value,
+                                                                    value: previous[group.id]?.value ?? '',
+                                                                },
+                                                            }))}
+                                                        >
+                                                            <SelectTrigger className="h-7 w-16 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="fixed">€</SelectItem>
+                                                                <SelectItem value="percent">%</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {!canEditDiscount && group.discountAmount > 0 && (
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span>
+                                                        {t('Remise')} ({discountsByDb[group.id]?.value}{discountsByDb[group.id]?.type === 'percent' ? ' %' : ' €'})
+                                                    </span>
+                                                    <span className="font-semibold">- {formatCurrency(group.discountAmount)}</span>
+                                                </div>
+                                            )}
+                                            {canEditDiscount && group.discountAmount > 0 && (
+                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                    <span>{t('Montant de la remise')}</span>
+                                                    <span>- {formatCurrency(group.discountAmount)}</span>
+                                                </div>
+                                            )}
 
                                             <div className="flex items-center justify-between text-sm font-semibold">
                                                 <span>{t('Total')}</span>
@@ -862,6 +948,12 @@ export default withAppLayout<Props>(
                                         <span>{t('Frais de transport')}</span>
                                         <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
                                     </div>
+                                    {discountTotal > 0 && (
+                                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                            <span>{t('Remise')}</span>
+                                            <span className="font-semibold">- {formatCurrency(discountTotal)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between text-base font-semibold">
                                         <span>{t('Total')}</span>
                                         <span>{formatCurrency(orderTotal)}</span>

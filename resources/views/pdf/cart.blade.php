@@ -491,6 +491,12 @@
                 <td colspan="5" class="text-right">Frais de transport :</td>
                 <td class="text-right">{{ number_format($shipping_total ?? 0, 2, ',', ' ') }} €</td>
             </tr>
+            @if(($discount_total ?? 0) > 0)
+            <tr>
+                <td colspan="5" class="text-right">Remise :</td>
+                <td class="text-right">- {{ number_format($discount_total, 2, ',', ' ') }} €</td>
+            </tr>
+            @endif
             <tr class="total-row">
                 <td colspan="5" class="text-right">Total général :</td>
                 <td class="text-right">{{ number_format($total, 2, ',', ' ') }} €</td>

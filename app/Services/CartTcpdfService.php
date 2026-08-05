@@ -318,6 +318,9 @@ class CartTcpdfService
         $totalW = array_sum(array_slice($cols, 4, 3));
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Total produits', (float) ($payload['items_total'] ?? 0.0), false);
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Frais de transport', (float) ($payload['shipping_total'] ?? 0.0), false);
+        if ((float) ($payload['discount_total'] ?? 0.0) > 0) {
+            $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Remise', -(float) $payload['discount_total'], false);
+        }
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Total general', (float) ($payload['total'] ?? 0.0), true);
 
         return $y;

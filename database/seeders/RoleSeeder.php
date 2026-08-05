@@ -44,6 +44,7 @@ class RoleSeeder extends Seeder
             'export/import own products only',
             'place orders',
             'register orders',
+            'order.remise',
             'invoice orders',
             'view all orders',
             'view own orders', 
