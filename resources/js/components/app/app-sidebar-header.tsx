@@ -22,6 +22,7 @@ import { type Option as SearchOption } from '@/components/app/search-select';
 
 
 type FilterActive = 'all' | 'active' | 'inactive';
+type ImageFilter = 'all' | 'with' | 'without';
 
 type FiltersState = {
     active: FilterActive;
@@ -29,6 +30,7 @@ type FiltersState = {
     country: string | null;
     pot: string | null;
     height: string | null;
+    image: ImageFilter;
 };
 
 type HomeFilterProps = {
@@ -37,6 +39,7 @@ type HomeFilterProps = {
     country?: string | null;
     pot?: string | null;
     height?: string | null;
+    image?: string | null;
 };
 
 const normalizeFilters = (raw?: HomeFilterProps): FiltersState => ({
@@ -45,6 +48,7 @@ const normalizeFilters = (raw?: HomeFilterProps): FiltersState => ({
     country: raw?.country ?? null,
     pot: raw?.pot ?? null,
     height: raw?.height ?? null,
+    image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
 });
 
 export function AppSidebarHeader({
@@ -127,6 +131,7 @@ export function AppSidebarHeader({
             : null,
         filtersState.pot !== null ? { name: 'pot', label: `${t('Pot')}: ${filtersState.pot}` } : null,
         filtersState.height !== null ? { name: 'height', label: `${t('Height')}: ${filtersState.height}` } : null,
+        filtersState.image !== 'all' ? { name: 'image', label: t(filtersState.image === 'with' ? 'With image' : 'Without image') } : null,
     ].filter((item): item is { name: string; label: string; value?: string } => Boolean(item && item.label));
 
     const buildQueryParams = (nextFilters: FiltersState, searchOverride: string | null = '') => {
@@ -159,6 +164,10 @@ export function AppSidebarHeader({
             params.height = nextFilters.height;
         }
 
+        if (nextFilters.image !== 'all') {
+            params.image = nextFilters.image;
+        }
+
         return params;
     };
 
@@ -175,7 +184,7 @@ export function AppSidebarHeader({
         navigateWithFilters(nextFilters);
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image') => {
         const nextFilters = { ...filtersState };
 
         if (key === 'active') {
@@ -188,9 +197,26 @@ export function AppSidebarHeader({
             nextFilters.pot = null;
         } else if (key === 'height') {
             nextFilters.height = null;
+        } else if (key === 'image') {
+            nextFilters.image = 'all';
         }
 
         applyFiltersAndNavigate(nextFilters);
+    };
+
+    const clearAllFilters = () => {
+        const nextFilters: FiltersState = {
+            active: 'all',
+            category: null,
+            country: null,
+            pot: null,
+            height: null,
+            image: 'all',
+        };
+
+        setSearch('');
+        setFiltersState(nextFilters);
+        navigateWithFilters(nextFilters, null);
     };
 
     const handleSearch = (s: string) => {
@@ -290,13 +316,15 @@ export function AppSidebarHeader({
                                     country={filtersState.country}
                                     pot={filtersState.pot}
                                     height={filtersState.height}
+                                    image={filtersState.image}
                                     onChange={setFiltersState}
                                     onApply={applyFiltersAndNavigate}
                                     autoApply={false}
                                 />
                             )}
                             filtersActive={filtersActive}
-                            removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height')}
+                            removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image')}
+                            clearAll={clearAllFilters}
                         />
                     </div>
                 )}

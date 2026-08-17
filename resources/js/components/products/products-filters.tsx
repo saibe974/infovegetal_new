@@ -14,8 +14,11 @@ import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { type ProductCategory } from "@/types";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { Checkbox } from "../ui/checkbox";
 
 type FilterActive = 'all' | 'active' | 'inactive';
+type ImageFilter = 'all' | 'with' | 'without';
 
 type ProductsFiltersProps = {
     categories: ProductCategory[];
@@ -28,8 +31,9 @@ type ProductsFiltersProps = {
     country?: string | null;
     pot?: string | null;
     height?: string | null;
-    onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
-    onChange?: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null }) => void;
+    image?: ImageFilter | null;
+    onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null; image: ImageFilter }) => void;
+    onChange?: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null; image: ImageFilter }) => void;
     closeFilters?: () => void;
     autoApply?: boolean;
 };
@@ -45,6 +49,7 @@ export function ProductsFilters({
     country,
     pot,
     height,
+    image,
     onApply,
     onChange,
     closeFilters,
@@ -61,26 +66,11 @@ export function ProductsFilters({
     const [localPot, setLocalPot] = useState<string>(pot ? String(pot) : ALL_POTS);
     const ALL_HEIGHTS = "all";
     const [localHeight, setLocalHeight] = useState<string>(height ? String(height) : ALL_HEIGHTS);
-    const [openCategoryMenuId, setOpenCategoryMenuId] = useState<number | null>(null);
+    const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
     const didInitRef = useRef(false);
-    const closeCategoryMenuTimeoutRef = useRef<number | null>(null);
     const lastAppliedRef = useRef<string>(
-        `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}`
+        `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}|${localImage}`
     );
-
-    const clearCategoryMenuClose = () => {
-        if (closeCategoryMenuTimeoutRef.current !== null) {
-            window.clearTimeout(closeCategoryMenuTimeoutRef.current);
-            closeCategoryMenuTimeoutRef.current = null;
-        }
-    };
-
-    const scheduleCategoryMenuClose = () => {
-        clearCategoryMenuClose();
-        closeCategoryMenuTimeoutRef.current = window.setTimeout(() => {
-            setOpenCategoryMenuId(null);
-        }, 120);
-    };
 
     useEffect(() => {
         setLocalActive(active);
@@ -88,7 +78,8 @@ export function ProductsFilters({
         setLocalCountry(country ? String(country) : ALL_COUNTRIES);
         setLocalPot(pot ? String(pot) : ALL_POTS);
         setLocalHeight(height ? String(height) : ALL_HEIGHTS);
-    }, [active, categoryId, country, pot, height]);
+        setLocalImage(image === 'with' || image === 'without' ? image : 'all');
+    }, [active, categoryId, country, pot, height, image]);
 
     useEffect(() => {
         onChange?.({
@@ -97,8 +88,9 @@ export function ProductsFilters({
             country: localCountry !== ALL_COUNTRIES ? localCountry : null,
             pot: localPot !== ALL_POTS ? localPot : null,
             height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            image: localImage,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, onChange]);
+    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onChange]);
 
     useEffect(() => {
         if (!autoApply) {
@@ -110,7 +102,7 @@ export function ProductsFilters({
             return;
         }
 
-        const nextKey = `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}`;
+        const nextKey = `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}|${localImage}`;
         if (nextKey === lastAppliedRef.current) {
             return;
         }
@@ -122,20 +114,16 @@ export function ProductsFilters({
             country: localCountry !== ALL_COUNTRIES ? localCountry : null,
             pot: localPot !== ALL_POTS ? localPot : null,
             height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            image: localImage,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, onApply, autoApply]);
-
-    useEffect(() => {
-        return () => {
-            clearCategoryMenuClose();
-        };
-    }, []);
+    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onApply, autoApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
         || localCountry !== ALL_COUNTRIES
         || localPot !== ALL_POTS
-        || localHeight !== ALL_HEIGHTS;
+        || localHeight !== ALL_HEIGHTS
+        || localImage !== 'all';
 
 
     const apply = () => {
@@ -145,6 +133,7 @@ export function ProductsFilters({
             country: localCountry !== ALL_COUNTRIES ? localCountry : null,
             pot: localPot !== ALL_POTS ? localPot : null,
             height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            image: localImage,
         });
         closeFilters?.();
     };
@@ -155,7 +144,8 @@ export function ProductsFilters({
         setLocalCountry(ALL_COUNTRIES);
         setLocalPot(ALL_POTS);
         setLocalHeight(ALL_HEIGHTS);
-        onApply({ active: 'all', category: null, country: null, pot: null, height: null });
+        setLocalImage('all');
+        onApply({ active: 'all', category: null, country: null, pot: null, height: null, image: 'all' });
         closeFilters?.();
     };
 
@@ -273,7 +263,7 @@ export function ProductsFilters({
     ].filter((item): item is { key: string; label: string; value: string } => Boolean(item));
 
     return (
-        <div className="w-full space-y-4 text-left ">
+        <div className="w-full space-y-4 text-left">
             {singleFilters.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                     {singleFilters.map((filter) => (
@@ -291,258 +281,261 @@ export function ProductsFilters({
                 </div>
             )}
 
-
-            {!singleCategory && (
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
-                    <div className="space-y-2 grid gap-3 lg:grid-cols-3">
-                        {/* <Button
-                            type="button"
-                            variant={localCategory === ALL_CATEGORIES ? 'default' : 'ghost'}
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => setLocalCategory(ALL_CATEGORIES)}
-                        >
-                            {t('All categories')}
-                        </Button> */}
-
-                        {rootCategories.map((parent) => {
-                            const descendants = getDescendants(parent.id);
-                            const hasChildren = descendants.length > 0;
-                            const isSelected = localCategory === String(parent.id);
-
-                            if (!hasChildren) {
-                                return (
-                                    <Button
-                                        key={parent.id}
-                                        type="button"
-                                        variant={'ghost'}
-                                        size="sm"
-                                        className={cn(
-                                            "w-full justify-start border border-input rounded-md",
-                                            isSelected ? "bg-accent" : undefined
-                                        )}
-                                        onClick={() => setLocalCategory(String(parent.id))}
-                                    >
-                                        {parent.name.charAt(0).toUpperCase() + parent.name.slice(1)}
-                                    </Button>
-                                );
-                            }
-
-                            const isBranchSelected = isCategoryInBranch(localCategory, parent.id);
-
-                            return (
-                                <DropdownMenu
-                                    key={parent.id}
-                                    modal={false}
-                                    open={openCategoryMenuId === parent.id}
-                                    onOpenChange={(open) => {
-                                        if (!open && openCategoryMenuId === parent.id) {
-                                            setOpenCategoryMenuId(null);
-                                        }
-                                    }}
+            <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2 md:border-r md:pr-6">
+                    {!singleCategory && (
+                        <>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
+                            <div className="space-y-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className={cn(
+                                        "w-full justify-start rounded-md border border-input",
+                                        localCategory === ALL_CATEGORIES ? "bg-accent" : undefined
+                                    )}
+                                    onClick={() => setLocalCategory(ALL_CATEGORIES)}
                                 >
-                                    <div
-                                        onMouseEnter={() => {
-                                            clearCategoryMenuClose();
-                                            setOpenCategoryMenuId(parent.id);
-                                        }}
-                                        onMouseLeave={scheduleCategoryMenuClose}
-                                    >
-                                        <DropdownMenuTrigger asChild>
+                                    {t('All categories')}
+                                </Button>
+
+                                {rootCategories.map((parent) => {
+                                    const descendants = getDescendants(parent.id);
+                                    const hasChildren = descendants.length > 0;
+                                    const isSelected = localCategory === String(parent.id);
+                                    const isBranchSelected = isCategoryInBranch(localCategory, parent.id);
+                                    const parentLabel = parent.name.charAt(0).toUpperCase() + parent.name.slice(1);
+
+                                    if (!hasChildren) {
+                                        return (
                                             <Button
+                                                key={parent.id}
                                                 type="button"
-                                                variant={'ghost'}
+                                                variant="ghost"
                                                 size="sm"
                                                 className={cn(
-                                                    "w-full justify-between border border-input rounded-md ",
-                                                    isBranchSelected ? "bg-accent" : undefined
+                                                    "w-full justify-start rounded-md border border-input",
+                                                    isSelected ? "bg-accent" : undefined
                                                 )}
-                                                onPointerDown={(event) => event.preventDefault()}
-                                                onClick={() => {
-                                                    clearCategoryMenuClose();
-                                                    setLocalCategory(String(parent.id));
-                                                }}
+                                                onClick={() => setLocalCategory(String(parent.id))}
                                             >
-                                                <span className="truncate">{parent.name.charAt(0).toUpperCase() + parent.name.slice(1)}</span>
-                                                {/* <span className="text-xs text-muted-foreground">{descendants.length}</span> */}
-                                                <ChevronDown className="size-5" />
+                                                {parentLabel}
                                             </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            align="start"
-                                            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]"
-                                            onPointerEnter={clearCategoryMenuClose}
-                                            onPointerLeave={scheduleCategoryMenuClose}
-                                        >
-                                            {descendants.map((child) => {
-                                                const childSelected = localCategory === String(child.id);
+                                        );
+                                    }
 
-                                                return (
-                                                    <DropdownMenuItem
-                                                        key={child.id}
-                                                        onSelect={() => {
-                                                            setLocalCategory(String(child.id));
-                                                            setOpenCategoryMenuId(null);
-                                                        }}
-                                                        className={childSelected ? "bg-accent" : undefined}
+                                    return (
+                                        <Collapsible key={parent.id} defaultOpen={isBranchSelected} className="rounded-md border border-input">
+                                            <CollapsibleTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className={cn(
+                                                        "group w-full justify-between rounded-md",
+                                                        isBranchSelected ? "bg-accent" : undefined
+                                                    )}
+                                                >
+                                                    <span className="truncate">{parentLabel}</span>
+                                                    <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                                                </Button>
+                                            </CollapsibleTrigger>
+                                            <CollapsibleContent className="border-t border-border p-1">
+                                                <div className="space-y-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={cn(
+                                                            "w-full justify-start font-medium",
+                                                            isSelected ? "bg-accent" : undefined
+                                                        )}
+                                                        onClick={() => setLocalCategory(String(parent.id))}
                                                     >
-                                                        {child.name.charAt(0).toUpperCase() + child.name.slice(1)}
-                                                    </DropdownMenuItem>
-                                                );
-                                            })}
-                                        </DropdownMenuContent>
-                                    </div>
-                                </DropdownMenu>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
+                                                        <span className="truncate">{parentLabel}</span>
+                                                    </Button>
+                                                    {descendants.map((child) => {
+                                                        const childSelected = localCategory === String(child.id);
+                                                        const relativeDepth = Math.max(
+                                                            0,
+                                                            (child.depth ?? 0) - (parent.depth ?? 0) - 1
+                                                        );
 
-            {!singleCountry && (
-                <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
-                    <ToggleGroup
-                        type="single"
-                        variant="outline"
-                        size="sm"
-                        className="w-full flex flex-wrap"
-                        spacing={2}
-                        value={localCountry}
-                        onValueChange={(val) => setLocalCountry(val || ALL_COUNTRIES)}
-                    >
-                        <ToggleGroupItem value={ALL_COUNTRIES} className="">
-                            {t('All countries')}
-                        </ToggleGroupItem>
-                        {countries.map((code) => {
-                            const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
-                            return (
-                                <ToggleGroupItem key={code} value={code} className="">
-                                    {Flag && <Flag title={getCountryLabel(code)} className="w-4 mr-1" />}
-                                    {getCountryLabel(code)}
+                                                        return (
+                                                            <Button
+                                                                key={child.id}
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={cn(
+                                                                    "w-full justify-start",
+                                                                    childSelected ? "bg-accent" : undefined
+                                                                )}
+                                                                style={{ paddingLeft: `${0.75 + relativeDepth * 0.75}rem` }}
+                                                                onClick={() => setLocalCategory(String(child.id))}
+                                                            >
+                                                                <span className="truncate">
+                                                                    {child.name.charAt(0).toUpperCase() + child.name.slice(1)}
+                                                                </span>
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </CollapsibleContent>
+                                        </Collapsible>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Image')}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={localImage === 'with'}
+                                    onCheckedChange={(checked) => {
+                                        setLocalImage(checked ? 'with' : localImage === 'with' ? 'all' : localImage);
+                                    }}
+                                />
+                                <span>{t('With image')}</span>
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <Checkbox
+                                    checked={localImage === 'without'}
+                                    onCheckedChange={(checked) => {
+                                        setLocalImage(checked ? 'without' : localImage === 'without' ? 'all' : localImage);
+                                    }}
+                                />
+                                <span>{t('Without image')}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {!singleCountry && (
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
+                            <ToggleGroup
+                                type="single"
+                                variant="outline"
+                                size="sm"
+                                className="flex w-full flex-wrap"
+                                spacing={2}
+                                value={localCountry}
+                                onValueChange={(val) => setLocalCountry(val || ALL_COUNTRIES)}
+                            >
+                                <ToggleGroupItem value={ALL_COUNTRIES}>
+                                    {t('All countries')}
                                 </ToggleGroupItem>
-                            );
-                        })}
-                    </ToggleGroup>
+                                {countries.map((code) => {
+                                    const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
+                                    return (
+                                        <ToggleGroupItem key={code} value={code}>
+                                            {Flag && <Flag title={getCountryLabel(code)} className="mr-1 w-4" />}
+                                            {getCountryLabel(code)}
+                                        </ToggleGroupItem>
+                                    );
+                                })}
+                            </ToggleGroup>
+                        </div>
+                    )}
+
+                    {!singlePot && (
+                        <div className="w-full space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
+
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
+                                        <span className="truncate">
+                                            {localPot === ALL_POTS ? t('All pot diameters') : localPot}
+                                        </span>
+                                        <ChevronDown className="size-5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="start"
+                                    className="max-h-75 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto md:max-h-80"
+                                >
+                                    <DropdownMenuItem
+                                        onSelect={() => setLocalPot(ALL_POTS)}
+                                        className={localPot === ALL_POTS ? "bg-accent" : undefined}
+                                    >
+                                        {t('All pot diameters')}
+                                    </DropdownMenuItem>
+                                    {(potOptions || []).map((value) => {
+                                        const option = String(value);
+                                        const isSelected = localPot === option;
+
+                                        return (
+                                            <DropdownMenuItem
+                                                key={option}
+                                                onSelect={() => setLocalPot(option)}
+                                                className={isSelected ? "bg-accent" : undefined}
+                                            >
+                                                {option}
+                                            </DropdownMenuItem>
+                                        );
+                                    })}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    )}
+
+                    {!singleHeight && (
+                        <div className="w-full space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
+                                        <span className="truncate">
+                                            {localHeight === ALL_HEIGHTS ? t('All heights') : localHeight}
+                                        </span>
+                                        <ChevronDown className="size-5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="start"
+                                    className="max-h-75 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto md:max-h-80"
+                                >
+                                    <DropdownMenuItem
+                                        onSelect={() => setLocalHeight(ALL_HEIGHTS)}
+                                        className={localHeight === ALL_HEIGHTS ? "bg-accent" : undefined}
+                                    >
+                                        {t('All heights')}
+                                    </DropdownMenuItem>
+                                    {(heightOptions || []).map((value) => {
+                                        const option = String(value);
+                                        const isSelected = localHeight === option;
+
+                                        return (
+                                            <DropdownMenuItem
+                                                key={option}
+                                                onSelect={() => setLocalHeight(option)}
+                                                className={isSelected ? "bg-accent" : undefined}
+                                            >
+                                                {option}
+                                            </DropdownMenuItem>
+                                        );
+                                    })}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>
+                            {t('Reset')}
+                        </Button>
+                        <Button size="sm" onClick={apply}>
+                            {t('Apply filters')}
+                        </Button>
+                    </div>
                 </div>
-            )}
-
-            <div className="w-full flex flex-col gap-2 lg:flex-row">
-                {!singlePot && (
-                    <div className="space-y-2 w-full lg:w-1/2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
-
-                        <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm" className="w-full justify-between border border-input rounded-md">
-                                    <span className="truncate">
-                                        {localPot === ALL_POTS ? t('All pot diameters') : localPot}
-                                    </span>
-                                    <ChevronDown className="size-5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                align="start"
-                                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-75 md:max-h-80 overflow-auto"
-                            >
-                                <DropdownMenuItem
-                                    onSelect={() => setLocalPot(ALL_POTS)}
-                                    className={localPot === ALL_POTS ? "bg-accent" : undefined}
-                                >
-                                    {t('All pot diameters')}
-                                </DropdownMenuItem>
-                                {(potOptions || []).map((value) => {
-                                    const option = String(value);
-                                    const isSelected = localPot === option;
-
-                                    return (
-                                        <DropdownMenuItem
-                                            key={option}
-                                            onSelect={() => setLocalPot(option)}
-                                            className={isSelected ? "bg-accent" : undefined}
-                                        >
-                                            {option}
-                                        </DropdownMenuItem>
-                                    );
-                                })}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                )}
-
-                {!singleHeight && (
-                    <div className="space-y-2 w-full lg:w-1/2">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
-                        <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm" className="w-full justify-between border border-input rounded-md">
-                                    <span className="truncate">
-                                        {localHeight === ALL_HEIGHTS ? t('All heights') : localHeight}
-                                    </span>
-                                    <ChevronDown className="size-5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                align="start"
-                                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-h-75 md:max-h-80 overflow-auto"
-                            >
-                                <DropdownMenuItem
-                                    onSelect={() => setLocalHeight(ALL_HEIGHTS)}
-                                    className={localHeight === ALL_HEIGHTS ? "bg-accent" : undefined}
-                                >
-                                    {t('All heights')}
-                                </DropdownMenuItem>
-                                {(heightOptions || []).map((value) => {
-                                    const option = String(value);
-                                    const isSelected = localHeight === option;
-
-                                    return (
-                                        <DropdownMenuItem
-                                            key={option}
-                                            onSelect={() => setLocalHeight(option)}
-                                            className={isSelected ? "bg-accent" : undefined}
-                                        >
-                                            {option}
-                                        </DropdownMenuItem>
-                                    );
-                                })}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                )}
-            </div>
-
-            {/* <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Status')}</p>
-                <ToggleGroup
-                    type="single"
-                    variant="outline"
-                    size="sm"
-                    className="w-full flex flex-wrap"
-                    spacing={2}
-                    value={localActive}
-                    onValueChange={(val) => setLocalActive((val as FilterActive) || 'all')}
-                >
-                    <ToggleGroupItem value="all" className="lg:flex-1">
-                        {t('All')}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="active" className="lg:flex-1">
-                        <CheckIcon className="w-4 h-4 text-green-600 dark:text-main-green" /> {t('Active')}
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="inactive" className="lg:flex-1">
-                        <XIcon className="w-4 h-4 text-destructive" /> {t('Inactive')}
-                    </ToggleGroupItem>
-                </ToggleGroup>
-            </div> */}
-
-            <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>
-                    {t('Reset')}
-                </Button>
-                <Button size="sm" onClick={apply}>
-                    {t('Apply filters')}
-                </Button>
             </div>
         </div>
     );

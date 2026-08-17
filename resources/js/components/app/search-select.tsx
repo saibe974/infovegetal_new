@@ -21,6 +21,7 @@ interface SearchBarProps {
     selection?: (string | Option)[]
     filtersActive?: { name: string; label: string; value?: string }[];
     removeFilter?: (filterName: string) => void;
+    clearAll?: () => void;
     // Minimum characters required to show propositions (default: 3). Set to 0 to show on focus.
     minQueryLength?: number;
 }
@@ -62,6 +63,7 @@ export default function SearchSelect({
     selection = undefined,
     filtersActive = undefined,
     removeFilter = undefined,
+    clearAll = undefined,
     minQueryLength = 3,
 }: SearchBarProps) {
     const { t } = useI18n();
@@ -134,6 +136,10 @@ export default function SearchSelect({
         // }
         setSelected([]);
         onChange("");
+        if (clearAll) {
+            clearAll();
+            return;
+        }
         onSubmit("", { force: true });
     };
 
@@ -349,7 +355,7 @@ export default function SearchSelect({
                 />
 
                 {/* Bouton clear */}
-                {(selected.length > 0 || value) && (
+                {((filtersActive?.length ?? 0) > 0 || selected.length > 0 || value) && (
                     <button
                         type="button"
                         onClick={handleClear}

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Sales\Services\ProductPriceFallbackResolver;
 use App\Models\CategoryProducts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
@@ -123,6 +124,29 @@ class Product extends Model implements HasMedia
         }
 
         return $this->attributes['img_link'] ?? null;
+    }
+
+    public function scopeImageAvailability(Builder $query, ?string $image): Builder
+    {
+        if ($image === 'with') {
+            return $query->where(function (Builder $imageQuery) {
+                $imageQuery
+                    ->whereHas('media', fn (Builder $media) => $media->where('collection_name', 'images'))
+                    ->orWhere(function (Builder $linkQuery) {
+                        $linkQuery->whereNotNull('img_link')->where('img_link', '<>', '');
+                    });
+            });
+        }
+
+        if ($image === 'without') {
+            return $query
+                ->whereDoesntHave('media', fn (Builder $media) => $media->where('collection_name', 'images'))
+                ->where(function (Builder $linkQuery) {
+                    $linkQuery->whereNull('img_link')->orWhere('img_link', '');
+                });
+        }
+
+        return $query;
     }
 
 

@@ -130,6 +130,9 @@ class ProductController extends Controller
         $country = $request->filled('country') ? trim((string) $request->input('country')) : null;
         $pot = $request->filled('pot') ? trim((string) $request->input('pot')) : null;
         $height = $request->filled('height') ? trim((string) $request->input('height')) : null;
+        $image = in_array($request->input('image'), ['with', 'without'], true)
+            ? (string) $request->input('image')
+            : null;
         $categoryBranchIds = $categoryId
             ? CategoryProducts::descendantsAndSelf($categoryId)->pluck('id')->map(fn ($id) => (int) $id)->all()
             : [];
@@ -140,6 +143,7 @@ class ProductController extends Controller
             'country' => $country,
             'pot' => $pot,
             'height' => $height,
+            'image' => $image,
         ];
 
         $applyFilters = function ($q, array $filters, array $skip = []) {
@@ -159,6 +163,10 @@ class ProductController extends Controller
 
             if (!in_array('height', $skip, true) && $filters['height'] !== null && $filters['height'] !== '') {
                 $q->where('height', $filters['height']);
+            }
+
+            if (!in_array('image', $skip, true)) {
+                $q->imageAvailability($filters['image']);
             }
         };
         
@@ -322,6 +330,7 @@ class ProductController extends Controller
                 'country' => $country,
                 'pot' => $pot,
                 'height' => $height,
+                'image' => $image,
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()

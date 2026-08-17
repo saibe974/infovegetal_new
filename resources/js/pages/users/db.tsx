@@ -424,7 +424,7 @@ export default function UserDbPage() {
     const mergedSource = selectedProfileKey === '__custom__'
         ? normalizeConditions({ ...inheritedConditions, ...(activeRow?.conditions_override ?? {}) })
         : selectedProfile
-            ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions })
+            ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions, ...(activeRow?.conditions_override ?? {}) })
             : inheritedConditions;
 
 
@@ -447,7 +447,16 @@ export default function UserDbPage() {
 
     const updateCarrierAssignments = (next: CarrierAssignment[]) => {
         const json = next.length === 0 ? null : JSON.stringify(next);
-        update({ t: json as unknown as SalesConditions['t'] });
+        updateTransport({ t: json as unknown as SalesConditions['t'] });
+    };
+
+    const updateTransport = (patch: Partial<SalesConditions>) => {
+        const nextResolved = normalizeConditions({ ...merged, ...patch });
+
+        updateRow(activeIndex, {
+            profile_selection_key: selectedProfileKey,
+            conditions_override: diffConditions(inheritedConditions, nextResolved),
+        });
     };
 
     const update = (patch: Partial<SalesConditions>) => {
@@ -519,6 +528,7 @@ export default function UserDbPage() {
         const selectedResolved = normalizeConditions({
             ...rowBase,
             ...selected.conditions,
+            ...row.conditions_override,
         });
 
         return diffConditions(rowBase, selectedResolved);

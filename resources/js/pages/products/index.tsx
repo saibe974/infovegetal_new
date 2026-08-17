@@ -32,6 +32,7 @@ type FiltersState = {
     country: string | null;
     pot: string | null;
     height: string | null;
+    image: 'all' | 'with' | 'without';
 };
 
 type RawFilters = {
@@ -40,6 +41,7 @@ type RawFilters = {
     country?: string | null;
     pot?: string | null;
     height?: string | null;
+    image?: string | null;
 };
 
 type CartFilter = { cart?: string };
@@ -64,6 +66,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
     country: raw?.country ?? null,
     pot: raw?.pot ?? null,
     height: raw?.height ?? null,
+    image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
     cart: cartFilter?.cart,
 });
 
@@ -133,6 +136,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             : null,
         filtersState.pot !== null ? { name: 'pot', label: `${t('Pot')}: ${filtersState.pot}` } : null,
         filtersState.height !== null ? { name: 'height', label: `${t('Height')}: ${filtersState.height}` } : null,
+        filtersState.image !== 'all' ? { name: 'image', label: t(filtersState.image === 'with' ? 'With image' : 'Without image') } : null,
         filtersState.cart ? { name: 'cart', label: `Panier (${cartItems.length})` } : null,
     ].filter((item): item is { name: string; label: string } => Boolean(item && item.label));
 
@@ -172,6 +176,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.height = nextFilters.height;
         }
 
+        if (nextFilters.image !== 'all') {
+            params.image = nextFilters.image;
+        }
+
         if (nextFilters.cart) {
             params.cart = 1;
         }
@@ -193,7 +201,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'cart') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'cart') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
@@ -205,6 +213,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             nextFilters.pot = null;
         } else if (key === 'height') {
             nextFilters.height = null;
+        } else if (key === 'image') {
+            nextFilters.image = 'all';
         } else if (key === 'cart') {
             nextFilters.cart = undefined;
             // Seulement effacer le filtre session, pas le panier lui-même
@@ -220,6 +230,39 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         }
         applyFilters(nextFilters);
     }
+
+    const clearAllFilters = () => {
+        const nextFilters: FiltersState & CartFilter = {
+            active: 'all',
+            category: null,
+            country: null,
+            pot: null,
+            height: null,
+            image: 'all',
+            cart: undefined,
+        };
+
+        setSearch('');
+        setFiltersState(nextFilters);
+
+        if (filtersState.cart) {
+            fetch('/products/save-cart-filter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ cart_ids: [] }),
+            }).catch(err => console.error('Erreur clear cart:', err));
+        }
+
+        router.get(window.location.pathname, buildQueryParams(nextFilters, null), {
+            preserveState: false,
+            replace: true,
+            preserveScroll: false,
+        });
+    };
 
     // Local state for client-fetched propositions to avoid Inertia refresh
     const [searchPropositionsState, setSearchPropositions] = useState<Array<string | SearchOption>>(searchPropositions ?? []);
@@ -319,12 +362,13 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                             country={filtersState.country}
                             pot={filtersState.pot}
                             height={filtersState.height}
+                            image={filtersState.image}
                             onApply={applyFilters}
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height')}
-                // clearAllFilters={clearAllFilters}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'cart')}
+                    clearAll={clearAllFilters}
                 />
                 {/* </div> */}
 
@@ -400,4 +444,3 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
 
     )
 })
-
