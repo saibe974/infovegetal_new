@@ -106,6 +106,8 @@ class UserManagementController extends Controller
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'q' => ['nullable', 'string', 'max:255'],
+            'sort' => ['nullable', 'in:name,email,roles,created_at'],
+            'dir' => ['nullable', 'in:asc,desc'],
         ]);
 
         $treeRootParentId = $this->authorization()->treeRootParentId($request->user());
@@ -121,20 +123,30 @@ class UserManagementController extends Controller
         $offset = (int) ($validated['offset'] ?? 0);
         $limit = (int) ($validated['limit'] ?? 30);
         $search = trim((string) ($validated['q'] ?? ''));
+        $sort = $validated['sort'] ?? null;
+        $dir = $validated['dir'] ?? 'desc';
 
         $query = User::query()
             ->select([
                 'id',
                 'name',
                 'email',
+                'created_at',
                 'active',
                 'parent_id',
                 '_lft',
                 '_rgt',
             ])
             ->with(['roles:id,name', 'usersMeta' => fn ($q) => $q->where('key', 'logo')->select(['id', 'user_id', 'key', 'value'])])
-            ->where('parent_id', $parentId)
-            ->orderBy('_lft', 'asc');
+            ->where('parent_id', $parentId);
+
+        if ($sort && in_array($sort, ['name', 'email', 'created_at'], true)) {
+            $query->orderBy($sort, $dir);
+        } elseif ($sort === 'roles') {
+            $query->withCount('roles')->orderBy('roles_count', $dir);
+        }
+
+        $query->orderBy('_lft', 'asc');
 
         $this->authorization()->scopeManageableUsers($request->user(), $query);
 
@@ -185,6 +197,7 @@ class UserManagementController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'created_at' => $user->created_at?->toISOString(),
                 'active' => (bool) $user->active,
                 'parent_id' => $user->parent_id,
                 '_lft' => $user->_lft,
@@ -266,7 +279,7 @@ class UserManagementController extends Controller
         }
 
         $allUsersQuery = User::query()
-            ->select(['id', 'name', 'email', 'active', 'parent_id', '_lft', '_rgt'])
+            ->select(['id', 'name', 'email', 'created_at', 'active', 'parent_id', '_lft', '_rgt'])
             ->with(['roles:id,name', 'usersMeta' => fn ($q) => $q->where('key', 'logo')->select(['id', 'user_id', 'key', 'value'])])
             ->orderBy('_lft', 'asc');
 
@@ -330,6 +343,7 @@ class UserManagementController extends Controller
                 'id' => (int) $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'created_at' => $user->created_at?->toISOString(),
                 'active' => (bool) $user->active,
                 'parent_id' => $user->parent_id,
                 '_lft' => $user->_lft,

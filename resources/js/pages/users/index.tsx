@@ -16,6 +16,7 @@ import { canAccessUsers, canCreateUsers, getEffectiveUser, isDev, isAdmin, hasPe
 import usersRoutes from '@/routes/users';
 import UsersTable from '@/components/users/users-table';
 import UsersCardsList from '@/components/users/users-cards-list';
+import UsersAccordion from '@/components/users/users-accordion';
 import UsersImportTreatment from '@/components/users/import';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
@@ -63,6 +64,48 @@ const dedupeUsersById = (users: User[]): User[] => {
     }
 
     return unique;
+};
+
+const sortUserHierarchy = <T extends User & { parent_id: number | null }>(
+    items: T[],
+    sort: string | null,
+    direction: string | null,
+): T[] => {
+    if (!sort || !['name', 'email', 'roles', 'created_at'].includes(sort)) return items;
+
+    const ids = new Set(items.map((item) => item.id));
+    const children = new Map<number | null, T[]>();
+    const value = (item: T) => {
+        if (sort === 'roles') return (item.roles ?? []).map((role) => role.name).sort().join(' ');
+        return String(item[sort] ?? '');
+    };
+    const multiplier = direction === 'asc' ? 1 : -1;
+    const compare = (a: T, b: T) => value(a).localeCompare(value(b), undefined, { numeric: true }) * multiplier;
+
+    for (const item of items) {
+        const parentId = item.parent_id !== null && ids.has(item.parent_id) ? item.parent_id : null;
+        children.set(parentId, [...(children.get(parentId) ?? []), item]);
+    }
+
+    children.forEach((siblings) => siblings.sort(compare));
+
+    const sorted: T[] = [];
+    const visited = new Set<number>();
+    const append = (parentId: number | null) => {
+        for (const item of children.get(parentId) ?? []) {
+            if (visited.has(item.id)) continue;
+            visited.add(item.id);
+            sorted.push(item);
+            append(item.id);
+        }
+    };
+
+    append(null);
+    items.forEach((item) => {
+        if (!visited.has(item.id)) sorted.push(item);
+    });
+
+    return sorted;
 };
 
 
@@ -147,7 +190,8 @@ export default withAppLayout<UsersPageProps>(
         });
 
         const treeSearchQuery = (q ?? '').trim();
-        const isTreeSearchMode = viewMode === 'tree' && treeSearchQuery.length > 0;
+        const isHierarchyView = viewMode === 'tree' || viewMode === 'accordion';
+        const isTreeSearchMode = isHierarchyView && treeSearchQuery.length > 0;
 
         const handleSearch = (s: string) => {
             setSearch(s);
@@ -247,6 +291,7 @@ export default withAppLayout<UsersPageProps>(
                     return response.json();
                 })
                 .then((payload) => {
+                    const currentUrl = new URL(window.location.href);
                     const nextItems = ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
                         ...item,
                         parent_id: (item.parent_id as number | null | undefined) ?? null,
@@ -254,7 +299,11 @@ export default withAppLayout<UsersPageProps>(
                         has_children: Boolean(item.has_children),
                     })) as TreeUser[];
 
-                    setTreeSearchItems(nextItems);
+                    setTreeSearchItems(sortUserHierarchy(
+                        nextItems,
+                        currentUrl.searchParams.get('sort'),
+                        currentUrl.searchParams.get('dir'),
+                    ));
                     setTreeSearchExpandedIds(
                         (payload.expanded_ids || [])
                             .map((id: unknown) => Number(id))
@@ -295,6 +344,12 @@ export default withAppLayout<UsersPageProps>(
             if (currentSearch.length >= 2) {
                 params.set('q', currentSearch);
             }
+
+            const currentUrl = new URL(window.location.href);
+            const currentSort = currentUrl.searchParams.get('sort');
+            const currentDirection = currentUrl.searchParams.get('dir');
+            if (currentSort) params.set('sort', currentSort);
+            if (currentDirection) params.set('dir', currentDirection);
 
             const response = await fetch(`/admin/users/tree-children?${params.toString()}`, {
                 headers: {
@@ -424,7 +479,6 @@ export default withAppLayout<UsersPageProps>(
                 onEdit={(item) => handleEdit(item.id)}
                 onDelete={(item) => handleDelete(item.id)}
                 renderName={(item, name, loading) => {
-                    const isGroup = (item.roles ?? []).some((r) => r.name === 'group');
                     return (
                         <Link href={'/admin/users/' + item.id} className="truncate font-medium flex-1 flex items-center gap-2 hover:underline">
                             {item.logo_url ? (
@@ -492,13 +546,13 @@ export default withAppLayout<UsersPageProps>(
                 <StickyBar
                     zIndex={20}
                     borderBottom={false}
-                    className='mb-4'
+                    className='mb-4 users-search-sticky'
                 >
                     <ViewModeToggle
                         viewMode={viewMode}
                         onViewModeChange={setViewMode}
                         pageKey="users"
-                        modes={['table', 'grid', 'tree']}
+                        modes={['table', /*'tree',*/ 'accordion', 'grid']}
                     />
                     <div className="w-200 left-0 top-1 mr-2">
                         <SearchSelect
@@ -569,7 +623,7 @@ export default withAppLayout<UsersPageProps>(
                             impersonateUser={handleImpersonate}
                         />
                     </InfiniteScroll>
-                ) : (
+                ) : viewMode === 'tree' ? (
                     <div className="space-y-2">
                         {isTreeSearchMode && treeSearchLoading && (
                             <div className="text-sm text-muted-foreground px-1">Chargement du fragment...</div>
@@ -591,6 +645,28 @@ export default withAppLayout<UsersPageProps>(
                                 renderItem={renderItem}
                             />
                         </div>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {isTreeSearchMode && treeSearchLoading && (
+                            <div className="px-1 text-sm text-muted-foreground">Chargement du fragment...</div>
+                        )}
+                        <UsersAccordion
+                            items={isTreeSearchMode ? (treeSearchItems ?? emptyTreeItems) : (pending ?? emptyTreeItems)}
+                            forcedExpandedIds={isTreeSearchMode ? treeSearchExpandedIds : undefined}
+                            lazy={isTreeSearchMode ? undefined : {
+                                pageSize: 30,
+                                loadPage: loadTreePage,
+                            }}
+                            onChange={handleTreeChange}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            canImpersonate={canImpersonateUsers}
+                            effectiveUserId={effectiveUser?.id}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            onImpersonate={handleImpersonate}
+                        />
                     </div>
                 )}
 

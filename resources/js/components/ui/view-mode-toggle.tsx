@@ -1,9 +1,9 @@
-import { List, LayoutGrid, Network, LucideIcon } from 'lucide-react';
+import { List, LayoutGrid, ListCollapse, Network, LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { Button } from './button';
 import { useI18n } from '@/lib/i18n';
 
-export type ViewMode = 'table' | 'grid' | 'tree';
+export type ViewMode = 'table' | 'grid' | 'tree' | 'accordion';
 
 interface ViewModeConfig {
     mode: ViewMode;
@@ -13,8 +13,9 @@ interface ViewModeConfig {
 
 const defaultViewModes: ViewModeConfig[] = [
     { mode: 'table', icon: List, title: 'Afficher en tableau' },
-    { mode: 'grid', icon: LayoutGrid, title: 'Afficher en grille' },
     { mode: 'tree', icon: Network, title: 'Afficher en arbre' },
+    { mode: 'accordion', icon: ListCollapse, title: 'Afficher en accordéon' },
+    { mode: 'grid', icon: LayoutGrid, title: 'Afficher en grille' },
 ];
 
 interface ViewModeToggleProps {
