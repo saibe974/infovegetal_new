@@ -1,40 +1,45 @@
 <?php
+
 /*----------------------------------*\
 
-	traitement spécifique DB eurofleurs
+    traitement spécifique DB eurofleurs
 
 \*----------------------------------*/
 
-use Symfony\Component\String\Slugger\SluggerInterface;
-
-function importProducts_eurofleurs($params = array(), $resolve)
+function importProducts_eurofleurs(array $params, callable $resolve)
 {
-   $params = array_merge([
-       'mapped' => [],
-       'defaultsMap' => [],
-       'processed' => 0,
-       'errors' => 0,
-       'reportHandle' => null,
-       'updateProgress' => function () {},
-       'currentIndex' => 0,
-       'validCategoryIds' => [],
-       'defaultsMapCategories' => [],
+    $params = array_merge([
+        'mapped' => [],
+        'defaultsMap' => [],
+        'processed' => 0,
+        'errors' => 0,
+        'reportHandle' => null,
+        'updateProgress' => function () {},
+        'currentIndex' => 0,
+        'validCategoryIds' => [],
+        'defaultsMapCategories' => [],
     ], $params);
 
     extract($params);
 
     // Helpers
     $parsePrice = function ($value) {
-        $search = array(',', ' ', '€', "\xc2\xa0");
-        $replace = array('.', '', '', '');
+        $search = [',', ' ', '€', "\xc2\xa0"];
+        $replace = ['.', '', '', ''];
         $val = str_replace($search, $replace, (string) ($value ?? ''));
+
         return (isset($val) && is_numeric($val)) ? (float) $val : null;
     };
+
+    // ref (depuis id, mappé vers la cible "sku")
+    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
 
     // EAN13 (générer si manquant)
     $ean13 = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
     if ($ean13 === '' || $ean13 === '-') {
-        $idVal = $resolve($mapped, $defaultsMap, 'id');
+        // La configuration Eurofleurs mappe la colonne source "id" vers "sku".
+        // Utiliser la référence résolue plutôt qu'une cible "id" inexistante.
+        $idVal = $ref;
         if ($idVal !== null) {
             $generatedEan = generateEAN13FromId($idVal);
             if ($generatedEan !== null) {
@@ -43,14 +48,11 @@ function importProducts_eurofleurs($params = array(), $resolve)
         }
     }
 
-    // ref (depuis id)
-    $ref = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
-
     // SKU = ean13_ref
     if ($ean13 === '' || $ref === '') {
         return ['error' => 'Missing ean13 or ref', 'row' => $mapped];
     }
-    $sku = $ean13 . '_' . $ref;
+    $sku = $ean13.'_'.$ref;
 
     // Texte
     $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
@@ -66,10 +68,10 @@ function importProducts_eurofleurs($params = array(), $resolve)
 
     // Catégorie
     $catVal = $resolve($mapped, $defaultsMap, 'category_products_name');
-    $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger();
-    $catSlug = $slugger->slug((string)$catVal)->lower()->toString();
+    $slugger = new \Symfony\Component\String\Slugger\AsciiSlugger;
+    $catSlug = $slugger->slug((string) $catVal)->lower()->toString();
     $productCategoryId = isset($defaultsMapCategories[$catSlug]) ? (int) $defaultsMapCategories[$catSlug] : 51;
-    if (!in_array($productCategoryId, $validCategoryIds, true)) {
+    if (! in_array($productCategoryId, $validCategoryIds, true)) {
         $productCategoryId = 51;
     }
 
@@ -111,7 +113,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
     if ($height !== null) {
         $height = trim((string) $height);
         // Si c'est juste des chiffres et tirets, c'est bon
-        if (!preg_match('/^\d+(-\d+)?$/', $height)) {
+        if (! preg_match('/^\d+(-\d+)?$/', $height)) {
             // Sinon essayer d'extraire
             if (preg_match('/(\d+(?:-\d+)?)/', $height, $m)) {
                 $height = $m[1];
@@ -137,7 +139,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
         'price' => $price,
         'active' => $active,
         'category_products_id' => $productCategoryId,
-        'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
+        'db_products_id' => isset($params['db_products_id']) ? (int) $params['db_products_id'] : null,
         'ref' => $ref,
         'ean13' => $ean13,
         'pot' => $pot,
@@ -151,6 +153,7 @@ function importProducts_eurofleurs($params = array(), $resolve)
         'floor' => $floor,
         'roll' => $roll,
     ];
+
     return $newRow;
 }
 
@@ -158,8 +161,8 @@ function importProducts_eurofleurs($params = array(), $resolve)
  * Génère un EAN-13 basé sur l'ID produit.
  * Format : 40 00627 + ID (complété à 5 chiffres) + clé de contrôle
  *
- * @param string|int $id
- * @return string|null  EAN complet ou null si ID invalide
+ * @param  string|int  $id
+ * @return string|null EAN complet ou null si ID invalide
  */
 function generateEAN13FromId($id): ?string
 {
@@ -167,7 +170,7 @@ function generateEAN13FromId($id): ?string
     $id = trim((string) $id);
 
     // ID doit être numérique
-    if ($id === '' || !ctype_digit($id)) {
+    if ($id === '' || ! ctype_digit($id)) {
         return null;
     }
 
@@ -175,7 +178,7 @@ function generateEAN13FromId($id): ?string
     $idPadded = str_pad($id, 5, '0', STR_PAD_LEFT);
 
     // 12 premiers chiffres
-    $ean12 = '40' . '00627' . $idPadded; // 40 00627 XXXXX
+    $ean12 = '40'.'00627'.$idPadded; // 40 00627 XXXXX
 
     // Calcul de la clé de contrôle EAN-13
     $sum = 0;
@@ -188,5 +191,5 @@ function generateEAN13FromId($id): ?string
 
     $check = (10 - ($sum % 10)) % 10;
 
-    return $ean12 . $check;
+    return $ean12.$check;
 }

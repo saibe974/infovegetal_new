@@ -6,6 +6,7 @@ import * as Flags from "country-flag-icons/react/3x2";
 import CountryFlag from "../ui/country-flag";
 
 interface SearchBarProps {
+    className?: string;
     value: string;
     onChange: (val: string) => void;
     onSubmit: (val: string, options?: { force?: boolean }) => void;
@@ -19,6 +20,7 @@ interface SearchBarProps {
     filters?: ReactNode,
     search?: boolean,
     selection?: (string | Option)[]
+    multiple?: boolean;
     filtersActive?: { name: string; label: string; value?: string }[];
     removeFilter?: (filterName: string) => void;
     clearAll?: () => void;
@@ -50,6 +52,7 @@ const areOptionsEqual = (a: Option[], b: Option[]): boolean => {
 };
 
 export default function SearchSelect({
+    className,
     value,
     onChange,
     onSubmit,
@@ -61,6 +64,7 @@ export default function SearchSelect({
     filters = undefined,
     search = true,
     selection = undefined,
+    multiple = true,
     filtersActive = undefined,
     removeFilter = undefined,
     clearAll = undefined,
@@ -104,9 +108,12 @@ export default function SearchSelect({
 
     const handleSelectOption = (option: Option) => {
         const selection = { value: option.value, label: option.label };
-        if (!selected.some((s) => s.value === selection.value)) {
-            const newSelected = [...selected, selection];
-            setSelected(newSelected);
+        if (multiple) {
+            if (!selected.some((s) => s.value === selection.value)) {
+                setSelected([...selected, selection]);
+            }
+        } else {
+            setSelected([selection]);
             // const query = newSelected.map((s) => s.value).join(" ");
             // onSubmit(query);
         }
@@ -246,7 +253,7 @@ export default function SearchSelect({
 
 
     return (
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className={cn("relative w-full", className)}>
 
             <div
                 className={cn(
@@ -408,6 +415,7 @@ export default function SearchSelect({
                                 ) : listOptions.length > 0 ? (
                                     listOptions.map((option, i: number) => (
                                         <button
+                                            type="button"
                                             key={`${option.value}-${i}`}
                                             onClick={() => handleSelectOption(option)}
                                             className={cn(

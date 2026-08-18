@@ -43,6 +43,10 @@ export interface dbProduct {
     country?: string;
     description: string | null;
     champs: Record<string, unknown> | null;
+    update_fields?: string[] | null;
+    category_mode?: 'column' | 'block';
+    category_block_prefix?: string | null;
+    category_block_column?: number | null;
     categories: Record<string, unknown> | null;
     traitement: string | null;
     header_row_index?: number | null;

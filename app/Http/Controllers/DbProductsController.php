@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\DbProductsResource;
 use App\Models\CategoryProducts;
 use App\Models\DbProductBillingUser;
-use App\Models\DbProductSellerUser;
 use App\Models\DbProducts;
-use App\Http\Resources\DbProductsResource;
+use App\Models\DbProductSellerUser;
 use App\Models\User;
 use App\Services\ProductImportPreAnalyzer;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Inertia\Inertia;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 class DbProductsController extends Controller
 {
@@ -41,7 +41,7 @@ class DbProductsController extends Controller
 
         $canManageAll = $this->canManageAll($user);
 
-        if ($user && !$canManageAll) {
+        if ($user && ! $canManageAll) {
             $query->whereHas('users', function ($q) use ($user, $hasCanAccessColumn, $hasCanSellColumn, $hasCanManageColumn) {
                 $q->where('users.id', (int) $user->id)
                     ->where(function ($scope) use ($hasCanAccessColumn, $hasCanSellColumn, $hasCanManageColumn) {
@@ -61,15 +61,15 @@ class DbProductsController extends Controller
         }
 
         if ($search) {
-            $query->where('name', 'like', '%' . $search . '%');
+            $query->where('name', 'like', '%'.$search.'%');
         }
 
         return Inertia::render('products/db-index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => DbProductsResource::collection(
+            'collection' => Inertia::scroll(fn () => DbProductsResource::collection(
                 $query->paginate(12)
             )),
-            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
+            'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions($query, $search)),
         ]);
     }
 
@@ -84,6 +84,10 @@ class DbProductsController extends Controller
                 'name' => '',
                 'description' => null,
                 'champs' => [],
+                'update_fields' => null,
+                'category_mode' => 'column',
+                'category_block_prefix' => null,
+                'category_block_column' => null,
                 'categories' => [],
                 'traitement' => null,
                 'header_row_index' => null,
@@ -138,13 +142,13 @@ class DbProductsController extends Controller
     public function billing(Request $request, DbProducts $db_product)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Unauthorized');
         }
 
         $permissions = $this->resolveBillingPermissions($user, $db_product);
 
-        if (!$permissions['can_view']) {
+        if (! $permissions['can_view']) {
             abort(403, 'Unauthorized');
         }
 
@@ -161,17 +165,17 @@ class DbProductsController extends Controller
                                 ->wherePivot('active', true),
                         ]),
                 ]),
-                        'sellerRules' => fn ($query) => $query
-                        ->where('active', true)
-                        ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
+            'sellerRules' => fn ($query) => $query
+                ->where('active', true)
+                ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
         ]);
 
-                if (!$permissions['can_manage_all'] && !$permissions['is_db_manager']) {
+        if (! $permissions['can_manage_all'] && ! $permissions['is_db_manager']) {
             $filteredRules = $db_product->billingRules
-                    ->filter(function (DbProductBillingUser $rule) use ($user) {
+                ->filter(function (DbProductBillingUser $rule) use ($user) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
-                    if (!$billingUser) {
+                    if (! $billingUser) {
                         return false;
                     }
 
@@ -179,7 +183,7 @@ class DbProductsController extends Controller
                         return true;
                     }
 
-                    if (!$billingUser->relationLoaded('sellers')) {
+                    if (! $billingUser->relationLoaded('sellers')) {
                         return false;
                     }
 
@@ -226,13 +230,13 @@ class DbProductsController extends Controller
     public function updateBilling(Request $request, DbProducts $db_product)
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Unauthorized');
         }
 
         $permissions = $this->resolveBillingPermissions($user, $db_product);
 
-        if (!$permissions['can_view']) {
+        if (! $permissions['can_view']) {
             abort(403, 'Unauthorized');
         }
 
@@ -276,13 +280,13 @@ class DbProductsController extends Controller
             'source_delimiter' => ['nullable', 'string', 'max:8'],
         ]);
 
-        $state = Cache::get('import:' . $data['id'], []);
-        if (!$state || empty($state['path'])) {
+        $state = Cache::get('import:'.$data['id'], []);
+        if (! $state || empty($state['path'])) {
             return response()->json(['message' => 'Fichier exemple introuvable.'], 404);
         }
 
         $fullPath = Storage::path((string) $state['path']);
-        if (!is_file($fullPath)) {
+        if (! is_file($fullPath)) {
             return response()->json(['message' => 'Impossible d’accéder au fichier exemple.'], 400);
         }
 
@@ -319,7 +323,7 @@ class DbProductsController extends Controller
     /**
      * Génère les propositions triées selon la logique de recherche.
      *
-     * @param Builder<DbProducts> $query
+     * @param  Builder<DbProducts>  $query
      */
     private function getSearchPropositions(Builder $query, ?string $search): array
     {
@@ -334,8 +338,7 @@ class DbProductsController extends Controller
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
             ->pluck('name');
-            // ->get();
-
+        // ->get();
 
         // --- 🧹 Nettoyage et déduplication ---
         $clean = function (string $str): string {
@@ -344,13 +347,14 @@ class DbProductsController extends Controller
             $str = preg_replace('/[^\p{L}\s-]/u', ' ', $str);
             // espaces multiples → un seul
             $str = trim(preg_replace('/\s+/', ' ', $str));
+
             return $str;
         };
 
         // Applique le nettoyage
         $cleaned = $suggestions
-            ->map(fn($name) => $clean($name))
-            ->filter(fn($name) => !empty($name))
+            ->map(fn ($name) => $clean($name))
+            ->filter(fn ($name) => ! empty($name))
             ->unique()
             ->values();
 
@@ -364,25 +368,29 @@ class DbProductsController extends Controller
             // 3 = contient le terme ailleurs
             // 4 = autres
             $pa = (
-                !preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
+                ! preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($a, $lowerSearch) ? 2 : (
-                str_contains($a, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($a, $lowerSearch) ? 3 : 4
+                ));
 
             $pb = (
-                !preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
+                ! preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($b, $lowerSearch) ? 2 : (
-                str_contains($b, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($b, $lowerSearch) ? 3 : 4
+                ));
 
-            if ($pa !== $pb) return $pa <=> $pb;
+            if ($pa !== $pb) {
+                return $pa <=> $pb;
+            }
 
             // Second critère : longueur
             $la = mb_strlen($a);
             $lb = mb_strlen($b);
-            if ($la !== $lb) return $la <=> $lb;
+            if ($la !== $lb) {
+                return $la <=> $lb;
+            }
 
             // Troisième : ordre alphabétique
             return strnatcmp($a, $b);
@@ -405,6 +413,26 @@ class DbProductsController extends Controller
             'description' => ['nullable', 'string', 'max:500'],
             'champs' => ['nullable', 'array'],
             'champs.*' => ['nullable', 'string'],
+            'update_fields' => ['nullable', 'array'],
+            'update_fields.*' => ['string', 'max:255'],
+            'category_mode' => ['required', Rule::in(['column', 'block'])],
+            'category_block_prefix' => [
+                'exclude_unless:category_mode,block',
+                'nullable',
+                'string',
+                'max:255',
+                'required_without:category_block_column',
+                'prohibits:category_block_column',
+            ],
+            'category_block_column' => [
+                'exclude_unless:category_mode,block',
+                'nullable',
+                'integer',
+                'min:1',
+                'max:1000',
+                'required_without:category_block_prefix',
+                'prohibits:category_block_prefix',
+            ],
             'categories' => ['nullable', 'array'],
             'categories.*' => ['nullable', 'string'],
             'traitement' => ['nullable', 'string', 'max:255'],
@@ -500,7 +528,7 @@ class DbProductsController extends Controller
             ->values()
             ->all();
 
-        if (!empty($selectedIds)) {
+        if (! empty($selectedIds)) {
             $attachPayload = [];
             foreach ($selectedIds as $selectedId) {
                 $attachPayload[$selectedId] = [
@@ -531,7 +559,7 @@ class DbProductsController extends Controller
 
     private function normalizeSalesConditions(?array $value): array
     {
-        if (!$value) {
+        if (! $value) {
             return [];
         }
 
@@ -539,6 +567,7 @@ class DbProductsController extends Controller
         foreach ($value as $key => $item) {
             if (is_array($item)) {
                 $normalized[$key] = $this->normalizeSalesConditions($item);
+
                 continue;
             }
 
@@ -552,7 +581,7 @@ class DbProductsController extends Controller
 
     private function syncDbProductBillingRules(DbProducts $dbProduct, array $billingUsers): void
     {
-        $billingUsers = array_values(array_filter($billingUsers, fn ($rule) => is_array($rule) && !empty($rule['billing_user_id'])));
+        $billingUsers = array_values(array_filter($billingUsers, fn ($rule) => is_array($rule) && ! empty($rule['billing_user_id'])));
 
         $billingUserIds = [];
 
@@ -572,14 +601,14 @@ class DbProductsController extends Controller
             );
 
             $sellers = collect($rule['sellers'] ?? [])
-                ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
+                ->filter(fn ($seller) => is_array($seller) && ! empty($seller['seller_user_id']))
                 ->map(fn ($seller) => [
                     'seller_user_id' => (int) $seller['seller_user_id'],
                     'conditions' => $this->normalizeSalesConditions($seller['conditions'] ?? []),
                     'use_billing_profile' => array_key_exists('use_billing_profile', $seller)
                         ? (bool) $seller['use_billing_profile']
                         : true,
-                    'billing_profile_id' => !empty($seller['billing_profile_id'])
+                    'billing_profile_id' => ! empty($seller['billing_profile_id'])
                         ? (string) $seller['billing_profile_id']
                         : null,
                     'seller_defaults' => array_key_exists('seller_defaults', $seller)
@@ -593,11 +622,11 @@ class DbProductsController extends Controller
 
             $billingUser = User::query()->find($billingUserId);
 
-            if (!$billingUser) {
+            if (! $billingUser) {
                 continue;
             }
 
-            if (!empty($sellerIds)) {
+            if (! empty($sellerIds)) {
                 $activeRows = [];
                 foreach ($sellerIds as $sellerId) {
                     $activeRows[$sellerId] = [
@@ -619,14 +648,14 @@ class DbProductsController extends Controller
                     $sellerRule->use_billing_profile = array_key_exists('use_billing_profile', $sellerRulePayload)
                         ? (bool) $sellerRulePayload['use_billing_profile']
                         : true;
-                    $sellerRule->billing_profile_id = !empty($sellerRulePayload['billing_profile_id'])
+                    $sellerRule->billing_profile_id = ! empty($sellerRulePayload['billing_profile_id'])
                         ? (string) $sellerRulePayload['billing_profile_id']
                         : null;
                     $sellerRule->can_manage = (bool) ($sellerRulePayload['can_manage'] ?? false);
 
                     $incomingSellerDefaults = $sellerRulePayload['seller_defaults'] ?? null;
 
-                    if (!$sellerRule->exists) {
+                    if (! $sellerRule->exists) {
                         $sellerRule->seller_defaults = is_array($incomingSellerDefaults) ? $incomingSellerDefaults : null;
                     } elseif (is_array($incomingSellerDefaults)) {
                         $sellerRule->seller_defaults = $incomingSellerDefaults;
@@ -680,7 +709,7 @@ class DbProductsController extends Controller
             }
         }
 
-        if (!empty($billingUserIds)) {
+        if (! empty($billingUserIds)) {
             DbProductBillingUser::query()
                 ->where('db_product_id', (int) $dbProduct->id)
                 ->whereNotIn('billing_user_id', $billingUserIds)
@@ -700,6 +729,7 @@ class DbProductsController extends Controller
 
         if (is_string($value)) {
             $decoded = json_decode($value, true);
+
             return is_array($decoded) ? $decoded : [];
         }
 
@@ -710,7 +740,7 @@ class DbProductsController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Unauthorized');
         }
 
@@ -720,18 +750,18 @@ class DbProductsController extends Controller
             return;
         }
 
-        if (!$user->hasPermissionTo('users.db_products.manage.his')) {
+        if (! $user->hasPermissionTo('users.db_products.manage.his')) {
             abort(403, 'Unauthorized');
         }
 
-        if (!$this->canManageDbProduct($user, $dbProduct)) {
+        if (! $this->canManageDbProduct($user, $dbProduct)) {
             abort(403, 'Unauthorized');
         }
     }
 
     private function canManageAll(?User $user): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -770,7 +800,7 @@ class DbProductsController extends Controller
             ->where('bs.active', true)
             ->exists();
 
-        if (!$isSeller) {
+        if (! $isSeller) {
             $isSeller = DbProductSellerUser::query()
                 ->where('db_product_id', (int) $dbProduct->id)
                 ->where('seller_user_id', (int) $user->id)
@@ -835,15 +865,15 @@ class DbProductsController extends Controller
                     ->keyBy('seller_user_id');
 
                 $filteredSellers = collect($rule['sellers'] ?? [])
-                    ->filter(fn ($seller) => is_array($seller) && !empty($seller['seller_user_id']))
+                    ->filter(fn ($seller) => is_array($seller) && ! empty($seller['seller_user_id']))
                     ->map(function ($seller) use ($permissions, $actor, $existingSellers) {
                         $sellerId = (int) $seller['seller_user_id'];
 
                         // Un commercial non manager ne peut modifier que ses propres conditions.
                         // Les autres commerciaux existants sont conservés sans modification.
-                        if (!$permissions['can_manage_sellers'] && $sellerId !== (int) $actor->id) {
+                        if (! $permissions['can_manage_sellers'] && $sellerId !== (int) $actor->id) {
                             $existing = $existingSellers->get($sellerId);
-                            if (!$existing) {
+                            if (! $existing) {
                                 return null;
                             }
 
@@ -863,7 +893,7 @@ class DbProductsController extends Controller
                             'use_billing_profile' => array_key_exists('use_billing_profile', $seller)
                                 ? (bool) $seller['use_billing_profile']
                                 : true,
-                            'billing_profile_id' => !empty($seller['billing_profile_id']) ? (string) $seller['billing_profile_id'] : null,
+                            'billing_profile_id' => ! empty($seller['billing_profile_id']) ? (string) $seller['billing_profile_id'] : null,
                             'seller_defaults' => array_key_exists('seller_defaults', $seller) && is_array($seller['seller_defaults'])
                                 ? $seller['seller_defaults']
                                 : null,
@@ -878,7 +908,7 @@ class DbProductsController extends Controller
                 // pour éviter la désactivation des vendeurs que l'utilisateur ne peut pas gérer.
                 $incomingIds = collect($filteredSellers)->pluck('seller_user_id')->map(fn ($id) => (int) $id)->all();
                 foreach ($existingSellers as $sellerId => $existing) {
-                    if (!in_array($sellerId, $incomingIds, true)) {
+                    if (! in_array($sellerId, $incomingIds, true)) {
                         $filteredSellers[] = [
                             'seller_user_id' => $sellerId,
                             'conditions' => $existing->conditions ?? [],

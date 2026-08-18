@@ -3,12 +3,11 @@
 namespace App\Services;
 
 use App\Models\Product;
-use App\Services\ProductMediaService;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 use League\Csv\Writer;
 use Symfony\Component\String\Slugger\AsciiSlugger;
@@ -23,6 +22,7 @@ class ProductImportService
     {
         // Import long: avoid default 30s timeout when downloading media
         set_time_limit(300);
+        Cache::forget("import:$id:block_category");
 
         // Charger l'état pour récupérer le db_products_id
         $state = Cache::get("import:$id", []);
@@ -51,7 +51,8 @@ class ProductImportService
                 $string = (string) $value;
                 $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
                 $string = trim($string);
-                $slugger = new AsciiSlugger();
+                $slugger = new AsciiSlugger;
+
                 // Slug hyphen-case afin de rendre les en-têtes stables: ex "prix plaque" => "prix-plaque"
                 return $slugger->slug($string)->lower()->toString();
             };
@@ -62,19 +63,19 @@ class ProductImportService
             $processed = isset($state['processed']) ? (int) $state['processed'] : 0;
             $errors = isset($state['errors']) ? (int) $state['errors'] : 0;
 
-            $tempDir = Storage::path('imports/tmp/' . $id);
-            $dataFile = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $chunkIndex . '.csv';
+            $tempDir = Storage::path('imports/tmp/'.$id);
+            $dataFile = $tempDir.DIRECTORY_SEPARATOR.'data_'.$chunkIndex.'.csv';
 
-            if (!is_file($dataFile)) {
+            if (! is_file($dataFile)) {
                 // Log::info("No data file for chunk $chunkIndex, nothing to process for ID: $id");
                 return;
             }
 
             // Préparer le fichier de rapport d'erreurs
             Storage::makeDirectory('imports/reports');
-            $reportPath = Storage::path('imports/reports/' . $id . '.csv');
+            $reportPath = Storage::path('imports/reports/'.$id.'.csv');
             $reportHandle = fopen($reportPath, file_exists($reportPath) ? 'a' : 'w');
-            if ($reportHandle && !filesize($reportPath)) {
+            if ($reportHandle && ! filesize($reportPath)) {
                 fputcsv($reportHandle, ['line', 'error', 'sku', 'name', 'raw'], ';');
             }
 
@@ -132,13 +133,17 @@ class ProductImportService
                     $validCategoryIds = [];
                 }
             }
-            
+
             // Charger un éventuel mapping personnalisé (db_products_id)
             $dbProductsId = isset($state['db_products_id']) && is_numeric($state['db_products_id'])
                 ? (int) $state['db_products_id']
                 : null;
             $defaultsMap = null;
             $defaultsMapCategories = [];
+            $configuredUpdateFields = null;
+            $categoryMode = 'column';
+            $categoryBlockPrefix = null;
+            $categoryBlockColumn = null;
             $traitement = null;
             // Log::info("[Import][$id] db_products_id from state=", ['db_products_id' => $dbProductsId]);
             if ($dbProductsId) {
@@ -149,18 +154,28 @@ class ProductImportService
                     //     'id' => $dbProductsId,
                     //     'has_defaults' => $dbp && is_array($dbp->defaults),
                     // ]);
-                    if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
+                    if ($dbp && is_array($dbp->champs) && ! empty($dbp->champs)) {
                         $defaultsMap = $dbp->champs;
                         // Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
                     }
 
-                    if ($dbp && is_array($dbp->categories) && !empty($dbp->categories)) {
+                    if ($dbp && is_array($dbp->categories) && ! empty($dbp->categories)) {
                         $defaultsMapCategories = $dbp->categories;
                         // Log::info("[Import][$id] defaultsMap set", ['defaults' => $defaultsMap]);
                     }
 
+                    if ($dbp && is_array($dbp->update_fields)) {
+                        $configuredUpdateFields = $dbp->update_fields;
+                    }
+
+                    if ($dbp) {
+                        $categoryMode = $dbp->category_mode ?: 'column';
+                        $categoryBlockPrefix = $dbp->category_block_prefix;
+                        $categoryBlockColumn = $dbp->category_block_column;
+                    }
+
                     if ($dbp && $dbp->traitement) {
-                        $traitementPath = __DIR__ . '/ProductImportTraitement/' . $dbp->traitement . '.php';
+                        $traitementPath = __DIR__.'/ProductImportTraitement/'.$dbp->traitement.'.php';
                         if (file_exists($traitementPath)) {
                             $traitement = $dbp->traitement;
                             require_once $traitementPath;
@@ -170,7 +185,7 @@ class ProductImportService
                         }
                     }
                 } catch (\Throwable $e) {
-                    Log::warning('Unable to load DbProducts defaults: ' . $e->getMessage());
+                    Log::warning('Unable to load DbProducts defaults: '.$e->getMessage());
                 }
             }
 
@@ -185,8 +200,13 @@ class ProductImportService
                         }
                     }
                 }
+
                 return $mapped[$targetKey] ?? null;
             };
+
+            $currentBlockCategory = $categoryMode === 'block'
+                ? Cache::get("import:$id:block_category")
+                : null;
 
             foreach ($reader->getRecords() as $row) {
                 if (Cache::get("import:$id:cancel", false)) {
@@ -199,17 +219,44 @@ class ProductImportService
                 try {
                     $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
 
-                    if (!$this->rowHasContent($mapped)) {
+                    if (! $this->rowHasContent($mapped)) {
                         $currentIndex++;
+
                         continue;
                     }
 
+                    if ($categoryMode === 'block') {
+                        $ean13 = $resolve($mapped, $defaultsMap, 'ean13');
+                        if (! $this->isValidEan13($ean13)) {
+                            $categoryLabel = $this->extractCategoryBlockLabel(
+                                $row,
+                                $categoryBlockPrefix,
+                                $categoryBlockColumn,
+                            );
+
+                            if ($categoryLabel !== null) {
+                                $currentBlockCategory = $categoryLabel;
+                                Cache::put("import:$id:block_category", $categoryLabel, now()->addHour());
+                                $currentIndex++;
+
+                                continue;
+                            }
+                        }
+                    }
+
+                    $currentSnapshot = [
+                        'line' => $processed + $errors + 1,
+                        'sku' => $resolve($mapped, $defaultsMap, 'sku'),
+                        'name' => $resolve($mapped, $defaultsMap, 'name'),
+                    ];
+
                     $f = null;
-                    if($traitement)
+                    if ($traitement) {
                         $f = 'importProducts_'.$traitement;
-                    if(function_exists($f)):
-                        $newRow = $f(array(
-                            'mapped' => $mapped, 
+                    }
+                    if (function_exists($f)) {
+                        $newRow = $f([
+                            'mapped' => $mapped,
                             'defaultsMap' => $defaultsMap,
                             'processed' => $processed,
                             'errors' => $errors,
@@ -219,14 +266,15 @@ class ProductImportService
                             'validCategoryIds' => $validCategoryIds,
                             'defaultsMapCategories' => $defaultsMapCategories,
                             'db_products_id' => $dbProductsId,
-                        ), $resolve);
-                        
-                        if (isset($newRow['skip']) && $newRow['skip'] === true):
-                            $currentIndex++;
-                            continue;
-                        endif;
+                        ], $resolve);
 
-                        if(isset($newRow['error'])):
+                        if (isset($newRow['skip']) && $newRow['skip'] === true) {
+                            $currentIndex++;
+
+                            continue;
+                        }
+
+                        if (isset($newRow['error'])) {
                             $errors++;
                             $this->writeReportLine($reportHandle, $processed + $errors, $newRow['error'], $row, $mapped);
                             $currentSnapshot = [
@@ -236,9 +284,10 @@ class ProductImportService
                             ];
                             $updateProgress($currentSnapshot);
                             $currentIndex++;
+
                             continue;
-                        endif;
-                    else:
+                        }
+                    } else {
                         $sku = trim((string) ($resolve($mapped, $defaultsMap, 'sku') ?? ''));
                         $name = trim((string) ($resolve($mapped, $defaultsMap, 'name') ?? ''));
                         $currentSnapshot = [
@@ -252,7 +301,7 @@ class ProductImportService
                             $ref = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
 
                             if ($ean13 !== '' && $ref !== '') {
-                                $sku = $ean13 . '_' . $ref;
+                                $sku = $ean13.'_'.$ref;
                                 $currentSnapshot['sku'] = $sku;
                             }
                         }
@@ -262,6 +311,7 @@ class ProductImportService
                             $this->writeReportLine($reportHandle, $processed + $errors, 'Missing sku or name', $row, $mapped);
                             $updateProgress($currentSnapshot);
                             $currentIndex++;
+
                             continue;
                         }
 
@@ -280,7 +330,7 @@ class ProductImportService
                         $catVal = $resolve($mapped, $defaultsMap, 'category_products_id');
                         $productCategoryId = (isset($catVal) && is_numeric($catVal)) ? (int) $catVal : 51;
 
-                        if (!in_array($productCategoryId, $validCategoryIds, true)) {
+                        if (! in_array($productCategoryId, $validCategoryIds, true)) {
                             $productCategoryId = 51;
                         }
 
@@ -307,17 +357,26 @@ class ProductImportService
                             'roll' => null,
                             'unite' => null,
                         ];
-                    endif;
+                    }
+
+                    if ($categoryMode === 'block') {
+                        $newRow['category_products_id'] = is_string($currentBlockCategory) && $currentBlockCategory !== ''
+                            ? $this->resolveMappedCategoryId(
+                                $currentBlockCategory,
+                                $defaultsMapCategories,
+                                $validCategoryIds,
+                            )
+                            : 51;
+                    }
 
                     $upsertRows[] = $newRow;
-               
 
                     $processed++;
                     $currentSnapshot['line'] = $processed + $errors;
                     $updateProgress($currentSnapshot);
                     $currentIndex++;
                 } catch (\Throwable $e) {
-                    Log::error('Erreur import: ' . $e->getMessage());
+                    Log::error('Erreur import: '.$e->getMessage());
                     $errors++;
                     $this->writeReportLine($reportHandle, $processed + $errors, $e->getMessage(), $row, $mapped ?? []);
                     $currentSnapshot = [
@@ -332,10 +391,12 @@ class ProductImportService
 
             // Une fois toutes les lignes du chunk parcourues, exécuter un upsert global
             // Diagnostic FK avant l'upsert massif
-            if (!empty($upsertRows)) {
+            if (! empty($upsertRows)) {
                 $idsToCheck = array_values(array_unique(array_filter(array_map(function ($r) {
                     return $r['category_products_id'] ?? null;
-                }, $upsertRows), function ($v) { return $v !== null; })));
+                }, $upsertRows), function ($v) {
+                    return $v !== null;
+                })));
                 try {
                     $existingIds = DB::table('category_products')->whereIn('id', $idsToCheck)->pluck('id')->all();
                 } catch (\Throwable $e) {
@@ -352,20 +413,13 @@ class ProductImportService
             }
 
             // Upsert par lots de 100 pour éviter les problèmes de contraintes
-            if (!empty($upsertRows)) {
-                // Colonnes à mettre à jour selon la source (traitement)
-                $defaultUpdateColumns = ['name', 'description', 'img_link', 'price', 'active', 'category_products_id', 'db_products_id', 'ref', 'ean13', 'pot', 'height', 'price_floor', 'price_roll', 'price_promo', 'producer_id', 'tva_id', 'cond', 'floor', 'roll', 'unite'];
-                $updateColumns = $defaultUpdateColumns;
-
-                // Spécifique à infovegetal_old: n'update que category_products_id et img_link si le produit existe déjà
-                if (isset($traitement) && $traitement === 'infovegetal_old') {
-                    $updateColumns = ['name', 'description', 'category_products_id', 'img_link'];
-                }
+            if (! empty($upsertRows)) {
+                $updateColumns = $this->resolveProductUpdateColumns($configuredUpdateFields, $traitement);
 
                 $chunks = array_chunk($upsertRows, 100);
                 foreach ($chunks as $chunk) {
                     $columnsToUpdate = $updateColumns; // capturer pour la closure
-                    Product::withoutEvents(function () use ($chunk, $id, $columnsToUpdate) {
+                    Product::withoutEvents(function () use ($chunk, $columnsToUpdate) {
                         Product::upsert(
                             $chunk,
                             ['sku'],
@@ -395,7 +449,7 @@ class ProductImportService
                     : null),
                 'path' => $relativePath,
                 'next_offset' => $chunkIndex + 1,
-                'has_more' => ($chunkIndex + 1) < (int)($state['chunks_count'] ?? 1),
+                'has_more' => ($chunkIndex + 1) < (int) ($state['chunks_count'] ?? 1),
             ];
 
             if ($cancelled) {
@@ -405,6 +459,7 @@ class ProductImportService
                 ]));
 
                 Cache::forget("import:$id:cancel");
+
                 // Log::info("Import cancelled for ID $id");
                 return;
             }
@@ -417,13 +472,14 @@ class ProductImportService
                 ]));
                 // Log::info("Import chunk completed for ID $id: processed=$processed, errors=$errors, next_offset=" . $finalState['next_offset']);
             } else {
+                Cache::forget("import:$id:block_category");
                 $this->updateImportState($id, array_merge($finalState, [
                     'status' => 'done',
                     'progress' => 100,
                 ]));
 
                 // Mettre à jour le updated_at de db_products si dbProductsId est défini
-                if (!empty($dbProductsId)) {
+                if (! empty($dbProductsId)) {
                     try {
                         \App\Models\DbProducts::where('id', $dbProductsId)->update(['updated_at' => now()]);
                     } catch (\Throwable $e) {
@@ -436,7 +492,7 @@ class ProductImportService
                 // Log::info("Import completed for ID $id: processed=$processed, errors=$errors");
             }
         } catch (\Throwable $e) {
-            Log::error('Import process failed: ' . $e->getMessage());
+            Log::error('Import process failed: '.$e->getMessage());
 
             $this->updateImportState($id, [
                 'status' => 'error',
@@ -454,7 +510,8 @@ class ProductImportService
             $string = (string) $value;
             $string = preg_replace('/^\xEF\xBB\xBF/', '', $string);
             $string = trim($string);
-            $slugger = new AsciiSlugger();
+            $slugger = new AsciiSlugger;
+
             return $slugger->slug($string)->lower()->toString();
         };
 
@@ -468,8 +525,8 @@ class ProductImportService
         $chunkIndex = 0;
         $rowsInChunk = 0;
 
-        $tempDir = Storage::path('imports/tmp/' . $id);
-        if (!is_dir($tempDir)) {
+        $tempDir = Storage::path('imports/tmp/'.$id);
+        if (! is_dir($tempDir)) {
             @mkdir($tempDir, 0777, true);
         }
 
@@ -477,8 +534,8 @@ class ProductImportService
         $writer = null;
 
         $openWriter = function () use (&$writer, $tempDir, &$chunkIndex, $headers) {
-            $path = $tempDir . DIRECTORY_SEPARATOR . 'data_' . $chunkIndex . '.csv';
-                // Log::info("[Import][Split] Creating temp chunk file: {$path}");
+            $path = $tempDir.DIRECTORY_SEPARATOR.'data_'.$chunkIndex.'.csv';
+            // Log::info("[Import][Split] Creating temp chunk file: {$path}");
             $writer = Writer::from($path, 'w+');
             $writer->setDelimiter(';');
             $writer->insertOne($headers);
@@ -493,20 +550,28 @@ class ProductImportService
         // Log::info("[Import][Split][$id] db_products_id from cache: $dbProductsId");
 
         $defaultsMap = null;
+        $categoryMode = 'column';
+        $categoryBlockPrefix = null;
+        $categoryBlockColumn = null;
         $traitement = null;
         if ($dbProductsId) {
             try {
                 /** @var \App\Models\DbProducts|null $dbp */
                 $dbp = \App\Models\DbProducts::find($dbProductsId);
-                if ($dbp && is_array($dbp->champs) && !empty($dbp->champs)) {
+                if ($dbp && is_array($dbp->champs) && ! empty($dbp->champs)) {
                     $defaultsMap = $dbp->champs;
                     // Log::info("[Import][Split][$id] Loaded defaultsMap", ['map' => $defaultsMap]);
                 }
-                if ($dbp && !empty($dbp->traitement)) {
+                if ($dbp && ! empty($dbp->traitement)) {
                     $traitement = $dbp->traitement;
                 }
+                if ($dbp) {
+                    $categoryMode = $dbp->category_mode ?: 'column';
+                    $categoryBlockPrefix = $dbp->category_block_prefix;
+                    $categoryBlockColumn = $dbp->category_block_column;
+                }
             } catch (\Throwable $e) {
-                Log::warning('Unable to load DbProducts defaults in split: ' . $e->getMessage());
+                Log::warning('Unable to load DbProducts defaults in split: '.$e->getMessage());
             }
         }
 
@@ -521,6 +586,7 @@ class ProductImportService
                     }
                 }
             }
+
             return $mapped[$targetKey] ?? null;
         };
 
@@ -533,12 +599,12 @@ class ProductImportService
                 $mapped[$normalizedKey] = is_string($value) ? trim($value) : $value;
 
                 $compactKey = str_replace('-', '', $normalizedKey);
-                if ($compactKey !== $normalizedKey && !array_key_exists($compactKey, $mapped)) {
+                if ($compactKey !== $normalizedKey && ! array_key_exists($compactKey, $mapped)) {
                     $mapped[$compactKey] = $mapped[$normalizedKey];
                 }
             }
 
-            if (!$this->rowHasContent($mapped)) {
+            if (! $this->rowHasContent($mapped)) {
                 // Log::info("[Import][Split][$id] Line $lineCount: empty row, skipped");
                 continue;
             }
@@ -546,13 +612,24 @@ class ProductImportService
             // Utiliser le mapping pour déterminer la présence d'un identifiant de ligne valide.
             // Quand un traitement est défini, le SKU peut être calculé à partir d'autres champs
             // (ex. DDK: ean13 + ref), donc on accepte aussi ean13 ou ref comme fallback.
-            $skuSource  = $resolve($mapped, $defaultsMap, 'sku');
-            $sku        = trim((string) ($skuSource ?? ''));
+            $skuSource = $resolve($mapped, $defaultsMap, 'sku');
+            $sku = trim((string) ($skuSource ?? ''));
 
             if ($sku === '' && $traitement !== null) {
                 $ean13Fallback = trim((string) ($resolve($mapped, $defaultsMap, 'ean13') ?? ''));
-                $refFallback   = trim((string) ($resolve($mapped, $defaultsMap, 'ref')   ?? ''));
+                $refFallback = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
                 $sku = $ean13Fallback !== '' ? $ean13Fallback : $refFallback;
+            }
+
+            if ($categoryMode === 'block') {
+                $ean13 = $resolve($mapped, $defaultsMap, 'ean13');
+                $categoryLabel = ! $this->isValidEan13($ean13)
+                    ? $this->extractCategoryBlockLabel($row, $categoryBlockPrefix, $categoryBlockColumn)
+                    : null;
+
+                if ($categoryLabel !== null) {
+                    $sku = '__category_block__'.$lineCount;
+                }
             }
 
             if ($sku === '' && $traitement === 'ortofrutticola') {
@@ -560,8 +637,8 @@ class ProductImportService
                 $hasPrice = trim((string) ($resolve($mapped, $defaultsMap, 'price') ?? '')) !== ''
                     || trim((string) ($resolve($mapped, $defaultsMap, 'price_floor') ?? '')) !== '';
 
-                if ($blockLabel !== '' && !$hasPrice) {
-                    $sku = '__block__' . $lineCount;
+                if ($blockLabel !== '' && ! $hasPrice) {
+                    $sku = '__block__'.$lineCount;
                 }
             }
 
@@ -570,7 +647,7 @@ class ProductImportService
                 $refFallback = trim((string) ($resolve($mapped, $defaultsMap, 'ref') ?? ''));
 
                 if ($ean13Fallback !== '' && $refFallback !== '') {
-                    $sku = $ean13Fallback . '_' . $refFallback;
+                    $sku = $ean13Fallback.'_'.$refFallback;
                 }
             }
 
@@ -605,7 +682,7 @@ class ProductImportService
         }
 
         // Log::info("Split CSV for ID $id: total=$total, chunks=" . ($chunkIndex + ($rowsInChunk > 0 ? 1 : 0)));
-        
+
         // Mettre à jour l'état global (total lignes et nombre de chunks)
         $this->updateImportState($id, [
             'total' => $total,
@@ -639,6 +716,122 @@ class ProductImportService
         return $this->sourceReader->normalizeToCsv($id, $fullPath, $headerRowIndex, $delimiter);
     }
 
+    /**
+     * Resolve fields that may overwrite an existing product.
+     *
+     * A null configuration is legacy data and keeps the previous behavior.
+     * Lifecycle fields remain managed by the importer so products encountered
+     * in the current source are reactivated and remain attached to that source.
+     */
+    private function resolveProductUpdateColumns(?array $configuredFields, ?string $traitement): array
+    {
+        $importableFields = [
+            'name',
+            'description',
+            'img_link',
+            'price',
+            'active',
+            'category_products_id',
+            'db_products_id',
+            'ref',
+            'ean13',
+            'pot',
+            'height',
+            'price_floor',
+            'price_roll',
+            'price_promo',
+            'producer_id',
+            'tva_id',
+            'cond',
+            'floor',
+            'roll',
+            'unite',
+        ];
+
+        if ($configuredFields === null) {
+            if ($traitement === 'infovegetal_old') {
+                return ['name', 'description', 'category_products_id', 'img_link'];
+            }
+
+            return $importableFields;
+        }
+
+        // Some source mappings target an intermediate name consumed by a
+        // source-specific treatment. Translate it to the actual products
+        // column written by that treatment before filtering the upsert.
+        $fieldAliases = [
+            'category_products_name' => 'category_products_id',
+            'prix_etage' => 'price_floor',
+            'prix_roll' => 'price_roll',
+            'prix_promo' => 'price_promo',
+            'haut' => 'height',
+            'producteur_name' => 'producer_id',
+        ];
+        $normalizedFields = array_map(
+            static fn ($field) => $fieldAliases[$field] ?? $field,
+            $configuredFields,
+        );
+        $selectedFields = array_values(array_intersect($importableFields, $normalizedFields));
+
+        return array_values(array_unique(array_merge($selectedFields, ['active', 'db_products_id'])));
+    }
+
+    private function isValidEan13(mixed $value): bool
+    {
+        $digits = preg_replace('/\D+/', '', (string) ($value ?? ''));
+        if (strlen($digits) !== 13) {
+            return false;
+        }
+
+        $sum = 0;
+        for ($index = 0; $index < 12; $index++) {
+            $sum += (int) $digits[$index] * ($index % 2 === 0 ? 1 : 3);
+        }
+
+        return (10 - ($sum % 10)) % 10 === (int) $digits[12];
+    }
+
+    private function extractCategoryBlockLabel(array $row, ?string $prefix, ?int $column): ?string
+    {
+        $values = array_values($row);
+
+        if (is_string($prefix) && trim($prefix) !== '') {
+            $slugger = new AsciiSlugger;
+            $prefixSlug = $slugger->slug($prefix)->lower()->toString();
+
+            foreach ($values as $value) {
+                $valueSlug = $slugger->slug((string) $value)->lower()->toString();
+                $position = strpos($valueSlug, $prefixSlug);
+                if ($position === false) {
+                    continue;
+                }
+
+                $label = trim(substr($valueSlug, $position + strlen($prefixSlug)), '-');
+
+                return $label !== '' ? $label : null;
+            }
+
+            return null;
+        }
+
+        if ($column !== null && $column > 0) {
+            $label = trim((string) ($values[$column - 1] ?? ''));
+
+            return $label !== '' ? $label : null;
+        }
+
+        return null;
+    }
+
+    private function resolveMappedCategoryId(string $label, array $mapping, array $validCategoryIds): int
+    {
+        $slug = (new AsciiSlugger)->slug($label)->lower()->toString();
+        $categoryId = $mapping[$slug] ?? $mapping[str_replace('-', '_', $slug)] ?? 51;
+        $categoryId = is_numeric($categoryId) ? (int) $categoryId : 51;
+
+        return in_array($categoryId, $validCategoryIds, true) ? $categoryId : 51;
+    }
+
     private function updateImportState(string $id, array $payload): void
     {
         $existing = Cache::get("import:$id", []);
@@ -662,7 +855,7 @@ class ProductImportService
 
         foreach ($reader->getRecords() as $row) {
             $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
-            if (!$this->rowHasContent($mapped)) {
+            if (! $this->rowHasContent($mapped)) {
                 continue;
             }
 
@@ -690,7 +883,7 @@ class ProductImportService
             }
 
             $compactKey = str_replace('-', '', $normalizedKey);
-            if ($compactKey !== $normalizedKey && !array_key_exists($compactKey, $mapped)) {
+            if ($compactKey !== $normalizedKey && ! array_key_exists($compactKey, $mapped)) {
                 $mapped[$compactKey] = $mapped[$normalizedKey];
             }
         }
@@ -711,7 +904,7 @@ class ProductImportService
 
     private function writeReportLine(mixed $handle, int $line, string $message, array $rawRow, array $mapped): void
     {
-        if (!$handle) {
+        if (! $handle) {
             return;
         }
 

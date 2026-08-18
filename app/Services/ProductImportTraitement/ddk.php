@@ -7,7 +7,7 @@
 
 use Symfony\Component\String\Slugger\SluggerInterface;
 
-function importProducts_ddk($params = array(), $resolve)
+function importProducts_ddk(array $params = [], callable $resolve)
 {
    $params = array_merge([
        'mapped' => [],
@@ -231,7 +231,7 @@ function importProducts_ddk($params = array(), $resolve)
         'img_link' => $imgLink,
         'price' => $price,
         'active' => $active,
-        'category_products_id' => $productCategoryId,
+        // 'category_products_id' => $productCategoryId,
         'db_products_id' => isset($params['db_products_id']) ? (int)$params['db_products_id'] : null,
         'ref' => $ref,
         'ean13' => $ean13,

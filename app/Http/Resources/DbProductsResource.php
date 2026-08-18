@@ -42,7 +42,7 @@ class DbProductsResource extends JsonResource
         $sellerRuleByKey = [];
         if ($this->relationLoaded('sellerRules')) {
             foreach ($this->sellerRules as $sellerRule) {
-                if (!$sellerRule instanceof DbProductSellerUser || !(bool) ($sellerRule->active ?? true)) {
+                if (! $sellerRule instanceof DbProductSellerUser || ! (bool) ($sellerRule->active ?? true)) {
                     continue;
                 }
 
@@ -63,7 +63,7 @@ class DbProductsResource extends JsonResource
                 ->map(function (DbProductBillingUser $rule) use ($sellerManageById, $sellerRuleByKey) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
-                    if (!$billingUser) {
+                    if (! $billingUser) {
                         return null;
                     }
 
@@ -118,6 +118,10 @@ class DbProductsResource extends JsonResource
             'description' => $this->description,
             'defaults' => $this->defaults,
             'champs' => $this->champs,
+            'update_fields' => $this->update_fields,
+            'category_mode' => $this->category_mode,
+            'category_block_prefix' => $this->category_block_prefix,
+            'category_block_column' => $this->category_block_column,
             'categories' => $this->categories,
             'traitement' => $this->traitement,
             'header_row_index' => $this->header_row_index,
@@ -156,7 +160,7 @@ class DbProductsResource extends JsonResource
 
     private function canViewBilling(mixed $actor): bool
     {
-        if (!$actor || !isset($this->id)) {
+        if (! $actor || ! isset($this->id)) {
             return false;
         }
 
@@ -196,7 +200,7 @@ class DbProductsResource extends JsonResource
 
     private function normalizeBillingDefaults(mixed $defaults): array
     {
-        if (!is_array($defaults)) {
+        if (! is_array($defaults)) {
             return [
                 'profiles' => [],
                 'default_profile_id' => null,

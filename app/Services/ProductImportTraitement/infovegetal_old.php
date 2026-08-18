@@ -5,7 +5,7 @@
 
 \*----------------------------------*/
 
-function importProducts_infovegetal_old($params = array(), $resolve)
+function importProducts_infovegetal_old(array $params = [], callable $resolve)
 {
    $params = array_merge([
        'mapped' => [],

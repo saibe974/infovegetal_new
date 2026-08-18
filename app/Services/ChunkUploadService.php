@@ -4,13 +4,12 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\User;
-use Illuminate\Http\Request;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Contracts\Filesystem\Filesystem;
-use Illuminate\Support\Str;
 use League\Flysystem\UnableToWriteFile;
 
 class ChunkUploadService
@@ -27,19 +26,36 @@ class ChunkUploadService
         $uploadLength = (int) $request->header('Upload-Length');
         $uploadName = $request->header('Upload-Name');
         $uploadId = $request->header('Upload-Id', session()->getId());
-        
+
         // Create temp path for chunks
         $tempPath = "chunks/{$uploadId}";
 
         // Ensure chunks directory exists
         $this->disk->makeDirectory($tempPath);
 
+        $metaPath = "{$tempPath}/.upload-meta";
+
+        // FilePond n'envoie Upload-Name/Upload-Length sur toutes les requêtes de chunks
+        // (le premier POST de transfert n'inclut que Upload-Length). On les persiste
+        // dès qu'ils sont fournis pour les réutiliser lors de l'assemblage.
+        $meta = $this->readUploadMeta($tempPath, $metaPath);
+        $uploadName = $uploadName ?? ($meta['uploadName'] ?? null);
+        $uploadLength = $uploadLength > 0 ? $uploadLength : (int) ($meta['uploadLength'] ?? 0);
+
+        if ($uploadName !== null && $uploadLength > 0) {
+            $this->writeUploadMeta($tempPath, $metaPath, $uploadName, $uploadLength);
+        }
+
         // Get chunk content
         $chunkContent = $request->getContent();
         $chunkSize = strlen($chunkContent);
 
-        // Skip empty chunks (FilePond sometimes sends empty first chunk)
-        if ($chunkSize > 0) {
+        // Ne sauvegarder que les vrais chunks (présence de l'en-tête Upload-Offset,
+        // envoyé par FilePond sur PATCH). Le premier POST de transfert transporte
+        // uniquement des métadonnées et ne doit pas compter dans la taille assemblée.
+        $hasOffsetHeader = $request->hasHeader('Upload-Offset');
+
+        if ($chunkSize > 0 && $hasOffsetHeader) {
             // Save this chunk using Laravel Storage
             $chunkPath = "{$tempPath}/chunk_{$uploadOffset}";
             $this->disk->put($chunkPath, $chunkContent);
@@ -49,6 +65,16 @@ class ChunkUploadService
         $currentSize = $this->getTotalChunksSize($tempPath);
 
         if ($currentSize >= $uploadLength) {
+            if ($uploadName === null || $uploadLength <= 0) {
+                $meta = $this->readUploadMeta($tempPath, $metaPath);
+                $uploadName = $uploadName ?: ($meta['uploadName'] ?? null);
+                $uploadLength = $uploadLength > 0 ? $uploadLength : (int) ($meta['uploadLength'] ?? 0);
+            }
+
+            if ($uploadName === null) {
+                $uploadName = 'upload_'.$uploadId.'.csv';
+            }
+
             // All chunks received, assemble the file
             return $this->assembleChunks($tempPath, $uploadName, $uploadLength, $uploadId);
         }
@@ -59,13 +85,36 @@ class ChunkUploadService
         // Return progress
         return response()
             ->json([
-                'status'    => 'chunk_received',
-                'uploadId'  => $uploadId,
-                'offset'    => $currentSize,
+                'status' => 'chunk_received',
+                'uploadId' => $uploadId,
+                'offset' => $currentSize,
                 'currentSize' => $currentSize,
                 'uploadLength' => $uploadLength,
             ])
             ->header('Upload-Id', $uploadId);
+    }
+
+    private function writeUploadMeta(string $tempPath, string $metaPath, string $uploadName, int $uploadLength): void
+    {
+        $this->disk->put($metaPath, json_encode([
+            'uploadName' => $uploadName,
+            'uploadLength' => $uploadLength,
+        ]));
+    }
+
+    private function readUploadMeta(string $tempPath, string $metaPath): array
+    {
+        if (! $this->disk->exists($metaPath)) {
+            return [];
+        }
+
+        try {
+            $meta = json_decode($this->disk->get($metaPath), true);
+
+            return is_array($meta) ? $meta : [];
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function getTotalChunksSize(string $tempPath): int
@@ -80,6 +129,7 @@ class ChunkUploadService
                 }
             }
         }
+
         return $totalSize;
     }
 
@@ -97,21 +147,46 @@ class ChunkUploadService
         $chunks = collect($chunks)
             ->filter(fn ($file) => str_contains($file, 'chunk_'))
             ->sort(function ($a, $b) use ($tempPath) {
-                $offsetA = (int) str_replace($tempPath . '/chunk_', '', $a);
-                $offsetB = (int) str_replace($tempPath . '/chunk_', '', $b);
+                $offsetA = (int) str_replace($tempPath.'/chunk_', '', $a);
+                $offsetB = (int) str_replace($tempPath.'/chunk_', '', $b);
+
                 return $offsetA <=> $offsetB;
             })
             ->values()
             ->all();
 
-        // Use streaming to combine chunks efficiently
-        $assembledContent = '';
-        foreach ($chunks as $chunkFile) {
-            $assembledContent .= $this->disk->get($chunkFile);
+        // Assemble on a temporary disk stream. Concatenating chunks in a PHP
+        // string duplicates tens of MB in memory and exhausts the 128 MB limit.
+        $assembledStream = tmpfile();
+        if ($assembledStream === false) {
+            throw new UnableToWriteFile('Unable to create a temporary stream for the upload');
         }
 
-        // Store the assembled file
-        $this->disk->put($filePath, $assembledContent);
+        try {
+            foreach ($chunks as $chunkFile) {
+                $chunkStream = $this->disk->readStream($chunkFile);
+
+                if ($chunkStream === false) {
+                    throw new UnableToWriteFile("Unable to read chunk {$chunkFile}");
+                }
+
+                try {
+                    if (stream_copy_to_stream($chunkStream, $assembledStream) === false) {
+                        throw new UnableToWriteFile("Unable to assemble chunk {$chunkFile}");
+                    }
+                } finally {
+                    fclose($chunkStream);
+                }
+            }
+
+            rewind($assembledStream);
+
+            if (! $this->disk->writeStream($filePath, $assembledStream)) {
+                throw new UnableToWriteFile("Unable to write assembled file {$filePath}");
+            }
+        } finally {
+            fclose($assembledStream);
+        }
 
         // Verify file size
         $actualSize = $this->disk->size($filePath);
@@ -133,54 +208,6 @@ class ChunkUploadService
             'uploadId' => (string) $file->id,
         ]);
 
-        /*
-        // Use streaming to combine chunks efficiently without loading everything into memory
-        $tempStream = fopen('php://temp', 'w+b');
-
-        foreach ($chunks as $chunkFile) {
-            $chunkStream = $this->disk->readStream($chunkFile);
-
-            if ($chunkStream === false) {
-                fclose($tempStream);
-                $this->cleanupTempChunks($tempPath);
-                throw new UnableToWriteFile("Unable to read chunk {$chunkFile}");
-            }
-
-            stream_copy_to_stream($chunkStream, $tempStream);
-            fclose($chunkStream);
-        }
-
-        rewind($tempStream);
-
-        $written = $this->disk->writeStream($filePath, $tempStream);
-
-        fclose($tempStream);
-
-        if ($written === false) {
-            $this->cleanupTempChunks($tempPath);
-            throw new UnableToWriteFile("Unable to write assembled file {$filePath}");
-        }
-
-        // Verify file size
-        $actualSize = $this->disk->size($filePath);
-        if ($actualSize !== $expectedSize) {
-            // Clean up on error
-            $this->disk->delete($filePath);
-            $this->cleanupTempChunks($tempPath);
-            throw new UnableToWriteFile("File size mismatch: expected {$expectedSize}, got {$actualSize}");
-        }
-
-        // Save file info to database
-        $file = $this->createFileRecord($uploadName, $filePath, $actualSize);
-
-        // Clean up temp chunks
-        $this->cleanupTempChunks($tempPath);
-
-        // Return success response
-        return $this->createSuccessResponse($file, [
-            'uploadId' => $uploadId,
-        ])->header('Upload-Id', $uploadId);
-        */
     }
 
     private function cleanupEmptyChunks(string $tempPath, int $chunkSize): void
@@ -188,6 +215,7 @@ class ChunkUploadService
         // If we have no chunks and this was an empty chunk, clean up immediately
         if ($this->getTotalChunksSize($tempPath) === 0 && $chunkSize === 0) {
             $this->cleanupTempChunks($tempPath);
+
             return;
         }
 
@@ -198,7 +226,7 @@ class ChunkUploadService
                 return str_contains($file, 'chunk_') && $this->disk->size($file) > 0;
             });
 
-            if (!$hasValidChunks) {
+            if (! $hasValidChunks) {
                 $this->cleanupTempChunks($tempPath);
             }
         }
@@ -226,13 +254,13 @@ class ChunkUploadService
         }
 
         // Combine name and extension
-        $fileName = $safeName . ($extension ? '.' . $extension : '');
+        $fileName = $safeName.($extension ? '.'.$extension : '');
 
         // Check if file already exists and add counter if needed
         $counter = 1;
 
         while ($this->disk->exists("uploads/{$fileName}")) {
-            $fileName = $safeName . '_' . $counter . ($extension ? '.' . $extension : '');
+            $fileName = $safeName.'_'.$counter.($extension ? '.'.$extension : '');
             $counter++;
         }
 
@@ -243,7 +271,7 @@ class ChunkUploadService
     {
         $user = Auth::user();
 
-        if (!$user instanceof User) {
+        if (! $user instanceof User) {
             throw new \RuntimeException('Unable to save file record without an authenticated user.');
         }
 
@@ -270,7 +298,7 @@ class ChunkUploadService
     private function createSuccessResponse(File $file, array $extra = []): JsonResponse
     {
         return response()->json(array_merge([
-            'id'   => $file->id,
+            'id' => $file->id,
             'file' => $file->file_name,
             'path' => $file->file_path,
             'size' => $file->file_size,

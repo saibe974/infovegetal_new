@@ -15,6 +15,10 @@ class DbProducts extends Model
         'description',
         'defaults',
         'champs',
+        'update_fields',
+        'category_mode',
+        'category_block_prefix',
+        'category_block_column',
         'categories',
         'traitement',
         'header_row_index',
@@ -35,9 +39,11 @@ class DbProducts extends Model
     protected $casts = [
         'defaults' => 'array',
         'champs' => 'array',
+        'update_fields' => 'array',
         'categories' => 'array',
         'mergins' => 'array',
         'header_row_index' => 'integer',
+        'category_block_column' => 'integer',
         'mini' => 'integer',
     ];
 
