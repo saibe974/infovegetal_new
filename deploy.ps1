@@ -140,7 +140,7 @@ if [ -n "$dirty" ]; then
     exit 1
 fi
 
-git pull --ff-only '__REMOTE_REPOSITORY__' master
+git pull --no-edit '__REMOTE_REPOSITORY__' master
 /opt/php8.3/bin/composer install --no-dev --optimize-autoloader --no-interaction
 /opt/php8.3/bin/php artisan migrate --force
 /opt/php8.3/bin/php artisan optimize:clear
