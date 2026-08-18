@@ -12,6 +12,7 @@ import { SelectLang } from '../ui/selectLang';
 import AppearanceToggleDropdown from '../appearance-dropdown';
 import { ChevronDownIcon, EllipsisVertical, ShoppingCart, UserIcon } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useScrollHeaderVisibility } from '@/hooks/use-scroll-header-visibility';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useSidebar } from '@/components/ui/sidebar';
 import { CartContext } from '../cart/cart.context';
@@ -72,6 +73,7 @@ export function AppSidebarHeader({
     const { isOpenId } = useSidebar(); // récupère l'état du sidebar
 
     const isMobile = useIsMobile();
+    const isHeaderVisible = useScrollHeaderVisibility();
     const categories = page.props.categories ?? [];
     const categoryOptions = page.props.categoryOptions ?? [];
     const countryOptions = page.props.countryOptions ?? [];
@@ -280,13 +282,21 @@ export function AppSidebarHeader({
 
     return (
         <>
-            <header
-                className={
-                    "top-sticky z-30 flex justify-between h-16 shrink-0 items-center gap-2 " +
-                    "border-b border-sidebar-border/50 px-2 lg:px-6 transition-[width,left] ease-linear md:px-4 fixed top-0 bg-sidebar"
-                }
+            <div
+                className={cn(
+                    'top-sticky fixed top-0 z-30 overflow-visible transition-[width,left,height] duration-200 ease-out motion-reduce:transition-none',
+                    isHeaderVisible ? 'h-16' : 'h-0',
+                )}
                 style={headerStyle}
             >
+                <header
+                    className={cn(
+                        'absolute top-0 left-0 flex h-16 w-full shrink-0 items-center justify-between gap-2 border-b border-sidebar-border/50 bg-sidebar px-2 transition-transform duration-200 ease-out md:px-4 lg:px-6 motion-reduce:transition-none',
+                        isHeaderVisible
+                            ? 'translate-y-0'
+                            : '-translate-y-full',
+                    )}
+                >
 
                 <div className='flex items-center gap-2'>
                     <SidebarTrigger className="-ml-1" targetId='main' />
@@ -418,7 +428,8 @@ export function AppSidebarHeader({
                         {/* </div> */}
                     </div>
                 </div>
-            </header >
+                </header>
+            </div>
             {/* </div > */}
             {/* </BasicSticky > */}
         </>

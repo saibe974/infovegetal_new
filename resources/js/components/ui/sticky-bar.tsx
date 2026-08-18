@@ -59,9 +59,20 @@ export function StickyBar({
             mainRo.observe(mainEl);
         }
 
+        // Les éléments servant d'offset peuvent changer de hauteur (par exemple
+        // lorsque le header principal se masque au scroll).
+        let offsetRo: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            offsetRo = new ResizeObserver(update);
+            document.querySelectorAll(topOffsetElement).forEach((el) => {
+                offsetRo?.observe(el);
+            });
+        }
+
         return () => {
             window.removeEventListener('resize', update);
             if (mainRo) mainRo.disconnect();
+            if (offsetRo) offsetRo.disconnect();
         };
     }, [topOffsetElement]);
 
