@@ -27,7 +27,8 @@ function Format-Command {
         }
     }
 
-    return (($Executable, $formattedArguments) -join ' ').Trim()
+    $parts = @($Executable) + @($formattedArguments)
+    return ($parts -join ' ').Trim()
 }
 
 function Invoke-DeploymentCommand {
@@ -141,6 +142,7 @@ if [ -n "$dirty" ]; then
 fi
 
 git pull --no-edit '__REMOTE_REPOSITORY__' master
+rm -f public/hot
 /opt/php8.3/bin/composer install --no-dev --optimize-autoloader --no-interaction
 /opt/php8.3/bin/php artisan migrate --force
 /opt/php8.3/bin/php artisan optimize:clear
