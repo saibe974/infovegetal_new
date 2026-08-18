@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Product;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -13,7 +14,7 @@ class ProductMediaService
     public function syncFromImgLink(Product $product, ?string $imgLink): bool
     {
         $imgLink = is_string($imgLink) ? trim($imgLink) : null;
-        if (!$imgLink || !$this->isRemoteUrl($imgLink)) {
+        if (! $imgLink || ! $this->isRemoteUrl($imgLink)) {
             return false;
         }
 
@@ -45,8 +46,8 @@ class ProductMediaService
                 ])
                 ->get($imgLink);
 
-            if (!$response->successful()) {
-                throw new RuntimeException('HTTP ' . $response->status());
+            if (! $response->successful()) {
+                throw new RuntimeException('HTTP '.$response->status());
             }
 
             $body = $response->body();
@@ -83,7 +84,31 @@ class ProductMediaService
     {
         $imgLink = (string) $product->getRawOriginal('img_link');
 
-        if (!$this->isRemoteUrl($imgLink)) {
+        // Rend l'action idempotente : si le navigateur est rafraichi pendant
+        // une requete reussie, sa reprise peut rejouer le meme identifiant.
+        $existing = $product->getFirstMedia('images');
+        $localStatus = $this->localImageStatus($product);
+        if ($existing && $localStatus['original_exists']) {
+            return [
+                'ok' => true,
+                'message' => 'Image deja presente',
+                'downloaded' => false,
+                'has_local' => true,
+                'local_url' => $existing->getFullUrl(),
+                'thumb_url' => $existing->getFullUrl('thumb'),
+                'small_url' => $existing->getFullUrl('small'),
+                'medium_url' => $existing->getFullUrl('medium'),
+            ];
+        }
+
+        // Une ligne media sans fichier physique bloque la detection SQL des
+        // images manquantes. On la retire avant de recreer le media.
+        if ($existing) {
+            $product->clearMediaCollection('images');
+            $product->unsetRelation('media');
+        }
+
+        if (! $this->isRemoteUrl($imgLink)) {
             return [
                 'ok' => false,
                 'message' => 'URL image distante invalide',
@@ -106,10 +131,42 @@ class ProductMediaService
         ];
     }
 
+    /**
+     * @return array{has_media: bool, original_exists: bool, reason: string}
+     */
+    public function localImageStatus(Product $product): array
+    {
+        $media = $product->getFirstMedia('images');
+        if (! $media) {
+            return [
+                'has_media' => false,
+                'original_exists' => false,
+                'reason' => 'no_media',
+            ];
+        }
+
+        try {
+            $exists = Storage::disk($media->disk)->exists($media->getPathRelativeToRoot());
+        } catch (\Throwable $e) {
+            Log::warning('Product local media check failed', [
+                'product_id' => $product->id,
+                'media_id' => $media->id,
+                'error' => $e->getMessage(),
+            ]);
+            $exists = false;
+        }
+
+        return [
+            'has_media' => true,
+            'original_exists' => $exists,
+            'reason' => $exists ? 'ok' : 'missing_file',
+        ];
+    }
+
     public function compareRemoteWithLocal(Product $product): array
     {
         $imgLink = (string) $product->getRawOriginal('img_link');
-        if (!$this->isRemoteUrl($imgLink)) {
+        if (! $this->isRemoteUrl($imgLink)) {
             return [
                 'ok' => false,
                 'message' => 'URL distante invalide',
@@ -117,7 +174,7 @@ class ProductMediaService
         }
 
         $media = $product->getFirstMedia('images');
-        if (!$media) {
+        if (! $media) {
             return [
                 'ok' => false,
                 'message' => 'Aucune image locale',
@@ -126,7 +183,7 @@ class ProductMediaService
         }
 
         $response = Http::timeout(20)->get($imgLink);
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return [
                 'ok' => false,
                 'message' => 'Impossible de recuperer l\'image distante',
@@ -136,7 +193,7 @@ class ProductMediaService
         $remoteHash = md5($response->body());
         $localPath = $media->getPath();
 
-        if (!is_file($localPath)) {
+        if (! is_file($localPath)) {
             return [
                 'ok' => false,
                 'message' => 'Fichier local introuvable',
@@ -158,9 +215,9 @@ class ProductMediaService
     public function ensureThumbnail(Product $product): array
     {
         $media = $product->getFirstMedia('images');
-        if (!$media) {
+        if (! $media) {
             $download = $this->downloadMissing($product);
-            if (!$download['ok']) {
+            if (! $download['ok']) {
                 return [
                     'ok' => false,
                     'message' => 'Impossible de preparer la vignette sans image locale',
@@ -179,23 +236,34 @@ class ProductMediaService
         ];
     }
 
-    public function removeImgLinkIfMissing(Product $product): array
+    public function removeImgLinkIfMissing(Product $product, bool $force = false): array
     {
         $imgLink = (string) $product->getRawOriginal('img_link');
 
-        if (!$this->isRemoteUrl($imgLink)) {
+        $mediaRemoved = 0;
+        if ($force) {
+            $mediaRemoved = $product->media()
+                ->where('collection_name', 'images')
+                ->count();
+            $product->clearMediaCollection('images');
+        }
+
+        if (! $this->isRemoteUrl($imgLink)) {
             $product->forceFill(['img_link' => null])->save();
             $product->refresh();
 
             return [
                 'ok' => true,
                 'removed' => true,
-                'message' => 'img_link supprime: URL invalide',
+                'media_removed' => $mediaRemoved,
+                'message' => $force
+                    ? 'img_link et medias supprimes'
+                    : 'img_link supprime: URL invalide',
                 'preview_url' => $this->previewUrl($product),
             ];
         }
 
-        if ($this->remoteImageExists($imgLink)) {
+        if (! $force && $this->remoteImageExists($imgLink)) {
             return [
                 'ok' => false,
                 'removed' => false,
@@ -210,7 +278,10 @@ class ProductMediaService
         return [
             'ok' => true,
             'removed' => true,
-            'message' => 'img_link supprime: image distante introuvable',
+            'media_removed' => $mediaRemoved,
+            'message' => $force
+                ? 'img_link et medias supprimes'
+                : 'img_link supprime: image distante introuvable',
             'preview_url' => $this->previewUrl($product),
         ];
     }
@@ -227,15 +298,15 @@ class ProductMediaService
         $base = trim((string) ($product->ref ?: $product->sku ?: $product->id));
         $base = Str::slug($base);
         if ($base === '') {
-            $base = 'product-' . $product->id;
+            $base = 'product-'.$product->id;
         }
 
-        return $base . '.' . $extension;
+        return $base.'.'.$extension;
     }
 
     private function isRemoteUrl(string $value): bool
     {
-        if (!filter_var($value, FILTER_VALIDATE_URL)) {
+        if (! filter_var($value, FILTER_VALIDATE_URL)) {
             return false;
         }
 

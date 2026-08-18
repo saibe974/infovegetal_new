@@ -25,10 +25,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['role_or_impersonator:admin'])->prefix('admin/media-manager')->name('media.')->group(function () {
     Route::get('/', [MediaController::class, 'index'])->name('index');
     Route::get('/images', [MediaController::class, 'images'])->name('images');
-    Route::get('/images/frame', [MediaController::class, 'imagesFrame'])->name('images.frame');
+    Route::get('/images/items', [MediaController::class, 'imageItems'])->name('images.items');
     Route::post('/images/action/download', [MediaController::class, 'actionDownload'])->name('images.action.download');
     Route::post('/images/action/compare', [MediaController::class, 'actionCompare'])->name('images.action.compare');
     Route::post('/images/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('images.action.thumbnail');
     Route::post('/images/action/remove-missing-img-link', [MediaController::class, 'actionRemoveMissingImgLink'])->name('images.action.remove-missing-img-link');
-    Route::post('/images/action/batch-download', [MediaController::class, 'actionBatchDownload'])->name('images.action.batch-download');
 });

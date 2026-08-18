@@ -80,7 +80,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                     'X-CSRF-TOKEN': token,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-                body: JSON.stringify({ id: product.id }),
+                body: JSON.stringify({ id: product.id, force: true }),
             });
 
             const payload = await response.json().catch(() => ({ ok: false, message: 'Reponse invalide' }));
@@ -398,7 +398,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 disabled={!product.id || imgLinkRemoved || removeImgLinkProcessing}
                                                 onClick={handleRemoveMissingImgLink}
                                             >
-                                                {removeImgLinkProcessing ? 'Verification...' : 'Supprimer img_link si image absente'}
+                                                {removeImgLinkProcessing ? 'Suppression...' : 'Supprimer img_link'}
                                             </Button>
                                             {removeImgLinkStatus && (
                                                 <p className="text-xs text-muted-foreground">{removeImgLinkStatus}</p>

@@ -8,6 +8,7 @@ interface StickyBarProps {
     stickyClassName?: string;
     className?: string;
     topOffsetElement?: string;
+    onFixedToggle?: (isFixed: boolean) => void;
 }
 
 export function StickyBar({
@@ -17,6 +18,7 @@ export function StickyBar({
     stickyClassName = '',
     className = '',
     topOffsetElement = '.top-sticky',
+    onFixedToggle,
 }: StickyBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
@@ -71,6 +73,7 @@ export function StickyBar({
             stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
             wrapperClassName={`relative z-${zIndex} ${className}`}
             stickyStyle={{ top: topOffset, zIndex, ...(width && { width }) }}
+            onFixedToggle={onFixedToggle}
         >
             <div className={`z-${zIndex} flex items-center justify-between relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>
                 {children}

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CategoryProducts;
+use App\Models\DbProducts;
 use App\Models\Product;
 use App\Services\ProductMediaService;
 use Illuminate\Http\JsonResponse;
@@ -16,118 +18,88 @@ class MediaController extends Controller
         return Inertia::render('media/index');
     }
 
-    public function syncMissingImages(Request $request, ProductMediaService $mediaService): JsonResponse
+    public function images(Request $request)
     {
-        $limit = (int) $request->input('limit', 200);
-        $dbProductsId = $this->toNullableInt($request->input('db_products_id'));
-        $categoryProductsId = $this->toNullableInt($request->input('category_products_id'));
-        if ($limit < 1) {
-            $limit = 1;
-        }
-        if ($limit > 500) {
-            $limit = 500;
-        }
-
-        $baseQuery = $this->missingImagesQuery($dbProductsId, $categoryProductsId);
-
-        $totalMissing = (int) $baseQuery->count();
-        $products = $baseQuery->limit($limit)->get();
-
-        $processed = 0;
-        $downloaded = 0;
-        $skipped = 0;
-        $failed = 0;
-
-        foreach ($products as $product) {
-            $processed++;
-            $imgLink = $product->getRawOriginal('img_link');
-
-            if (!$this->isRemoteUrl($imgLink)) {
-                $skipped++;
-                continue;
-            }
-
-            $synced = $mediaService->syncFromImgLink($product, $imgLink);
-            if ($synced) {
-                $downloaded++;
-            } else {
-                $failed++;
-            }
-        }
-
-
-        $remainingMissing = (int) $this->missingImagesQuery($dbProductsId, $categoryProductsId)->count();
-
-        return response()->json([
-            'processed' => $processed,
-            'downloaded' => $downloaded,
-            'skipped' => $skipped,
-            'failed' => $failed,
-            'total_missing' => $totalMissing,
-            'remaining_missing' => $remainingMissing,
-            'limit' => $limit,
+        return Inertia::render('media/missing-images', [
+            'dbProducts' => DbProducts::query()->orderBy('name')->get(['id', 'name']),
+            'categories' => CategoryProducts::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
-    public function images(Request $request)
+    public function imageItems(Request $request, ProductMediaService $mediaService): JsonResponse
     {
-        return Inertia::render('media/missing-images');
-    }
+        $data = $request->validate([
+            'after' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'q' => ['nullable', 'string', 'max:150'],
+            'db_products_id' => ['nullable', 'integer', 'min:1'],
+            'category_products_id' => ['nullable', 'integer', 'min:1'],
+            'with_total' => ['nullable', 'boolean'],
+        ]);
 
-    public function imagesFrame(Request $request)
-    {
-        $search = trim((string) $request->query('q', ''));
-        $dbProductsId = $this->toNullableInt($request->query('db_products_id'));
-        $categoryProductsId = $this->toNullableInt($request->query('category_products_id'));
-        $sort = $request->query('sort') === 'db' ? 'db' : 'name';
-        $dir = strtolower((string) $request->query('dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $after = (int) ($data['after'] ?? 0);
+        $limit = (int) ($data['limit'] ?? 48);
+        $search = trim((string) ($data['q'] ?? ''));
+        $dbProductsId = isset($data['db_products_id']) ? (int) $data['db_products_id'] : null;
+        $categoryProductsId = isset($data['category_products_id']) ? (int) $data['category_products_id'] : null;
 
-        $query = $this->missingImagesQuery($dbProductsId, $categoryProductsId)
-            ->with('dbProduct')
-            ->reorder();
-
-        if ($sort === 'db') {
-            $query
-                ->leftJoin('db_products as dbp', 'dbp.id', '=', 'products.db_products_id')
-                ->select('products.*')
-                ->orderByRaw("CASE WHEN dbp.name IS NULL OR dbp.name = '' THEN 1 ELSE 0 END")
-                ->orderBy('dbp.name', $dir)
-                ->orderBy('products.name');
-        } else {
-            $query->orderBy('products.name', $dir);
-        }
-
+        $baseQuery = $this->imageCandidatesQuery($dbProductsId, $categoryProductsId);
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('sku', 'like', '%' . $search . '%');
+            $baseQuery->where(function ($query) use ($search) {
+                $query->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('sku', 'like', '%'.$search.'%')
+                    ->orWhere('ref', 'like', '%'.$search.'%');
             });
         }
 
-        $products = $query->paginate(60)->withQueryString();
+        $scan = $this->scanMissingImages(clone $baseQuery, $after, $limit, $mediaService);
+        $total = $request->boolean('with_total')
+            ? $this->countMissingImages(clone $baseQuery, $mediaService)
+            : null;
 
-        return view('images', [
-            'products' => $products,
-            'q' => $search,
-            'sort' => $sort,
-            'dir' => $dir,
+        return response()->json([
+            'items' => $scan['items']->map(function (array $item) {
+                /** @var Product $product */
+                $product = $item['product'];
+
+                return [
+                    'id' => (int) $product->id,
+                    'sku' => $product->sku,
+                    'ref' => $product->ref,
+                    'name' => $product->name,
+                    'source_url' => $product->getRawOriginal('img_link'),
+                    'db_name' => $product->dbProduct?->name,
+                    'category_name' => $product->category?->name,
+                    'local_url' => null,
+                    'thumb_url' => null,
+                    'missing_reason' => $item['status']['reason'],
+                ];
+            })->values(),
+            'next_cursor' => $scan['cursor'],
+            'has_more' => $scan['has_more'],
+            'total' => $total,
         ]);
     }
 
     public function actionDownload(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $product = $this->findProductForAction($request);
-        if (!$product) {
+        if (! $product) {
             return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
         }
 
-        return response()->json($mediaService->downloadMissing($product));
+        $result = $mediaService->downloadMissing($product);
+        $product->loadMissing(['dbProduct:id,name', 'category:id,name']);
+
+        return response()->json(array_merge($result, [
+            'product' => $this->imageProductPayload($product, $mediaService),
+        ]));
     }
 
     public function actionCompare(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $product = $this->findProductForAction($request);
-        if (!$product) {
+        if (! $product) {
             return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
         }
 
@@ -135,6 +107,7 @@ class MediaController extends Controller
             return response()->json($mediaService->compareRemoteWithLocal($product));
         } catch (\Throwable $e) {
             Log::warning('Media compare failed', ['product_id' => $product->id, 'error' => $e->getMessage()]);
+
             return response()->json(['ok' => false, 'message' => 'Comparaison impossible'], 500);
         }
     }
@@ -142,7 +115,7 @@ class MediaController extends Controller
     public function actionThumbnail(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $product = $this->findProductForAction($request);
-        if (!$product) {
+        if (! $product) {
             return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
         }
 
@@ -152,66 +125,21 @@ class MediaController extends Controller
     public function actionRemoveMissingImgLink(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $product = $this->findProductForAction($request);
-        if (!$product) {
+        if (! $product) {
             return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
         }
 
-        return response()->json($mediaService->removeImgLinkIfMissing($product));
+        return response()->json(
+            $mediaService->removeImgLinkIfMissing($product, $request->boolean('force'))
+        );
     }
 
-    public function actionBatchDownload(Request $request, ProductMediaService $mediaService): JsonResponse
-    {
-        $data = $request->validate([
-            'ids' => ['required', 'array'],
-            'ids.*' => ['integer', 'min:1'],
-        ]);
-
-        $ids = array_values(array_unique(array_map('intval', $data['ids'])));
-        $products = Product::query()->whereIn('id', $ids)->get()->keyBy('id');
-
-        $processed = 0;
-        $downloaded = 0;
-        $failed = 0;
-        $results = [];
-
-        foreach ($ids as $id) {
-            $product = $products->get($id);
-            if (!$product) {
-                $failed++;
-                $results[] = ['id' => $id, 'ok' => false, 'message' => 'Produit introuvable'];
-                continue;
-            }
-
-            $processed++;
-            $result = $mediaService->downloadMissing($product);
-            if (!empty($result['downloaded'])) {
-                $downloaded++;
-            }
-            if (empty($result['ok'])) {
-                $failed++;
-            }
-
-            $results[] = array_merge(['id' => $id], $result);
-        }
-
-        return response()->json([
-            'ok' => true,
-            'processed' => $processed,
-            'downloaded' => $downloaded,
-            'failed' => $failed,
-            'results' => $results,
-        ]);
-    }
-
-    private function missingImagesQuery(?int $dbProductsId, ?int $categoryProductsId)
+    private function imageCandidatesQuery(?int $dbProductsId, ?int $categoryProductsId)
     {
         $query = Product::query()
             ->where('active', true)
             ->whereNotNull('img_link')
             ->where('img_link', '!=', '')
-            ->whereDoesntHave('media', function ($q) {
-                $q->where('collection_name', 'images');
-            })
             ->orderBy('id');
 
         if ($dbProductsId) {
@@ -225,31 +153,94 @@ class MediaController extends Controller
         return $query;
     }
 
-    private function isRemoteUrl(?string $value): bool
+    private function imageProductPayload(Product $product, ProductMediaService $mediaService): array
     {
-        if (!$value) {
-            return false;
-        }
+        $status = $mediaService->localImageStatus($product);
 
-        if (!filter_var($value, FILTER_VALIDATE_URL)) {
-            return false;
-        }
-
-        return (bool) preg_match('#^https?://#i', $value);
+        return [
+            'id' => (int) $product->id,
+            'sku' => $product->sku,
+            'ref' => $product->ref,
+            'name' => $product->name,
+            'source_url' => $product->getRawOriginal('img_link'),
+            'db_name' => $product->dbProduct?->name,
+            'category_name' => $product->category?->name,
+            'local_url' => $status['original_exists'] ? $product->getFirstMediaUrl('images') : null,
+            'thumb_url' => $status['original_exists'] ? $product->getFirstMediaUrl('images', 'thumb') : null,
+            'missing_reason' => $status['reason'],
+        ];
     }
 
-    private function toNullableInt(mixed $value): ?int
+    private function scanMissingImages($query, int $after, int $limit, ProductMediaService $mediaService): array
     {
-        if ($value === null || $value === '' || $value === 'all') {
-            return null;
+        $items = collect();
+        $cursor = $after;
+        $remainingScan = 2000;
+
+        while ($items->count() < $limit && $remainingScan > 0) {
+            $chunkSize = min(200, $remainingScan);
+            $products = (clone $query)
+                ->with([
+                    'dbProduct:id,name',
+                    'category:id,name',
+                    'media' => fn ($mediaQuery) => $mediaQuery->where('collection_name', 'images'),
+                ])
+                ->where('products.id', '>', $cursor)
+                ->reorder()
+                ->orderBy('products.id')
+                ->limit($chunkSize)
+                ->get();
+
+            if ($products->isEmpty()) {
+                break;
+            }
+
+            foreach ($products as $product) {
+                $cursor = (int) $product->id;
+                $remainingScan--;
+                $status = $mediaService->localImageStatus($product);
+
+                if (! $status['original_exists']) {
+                    $items->push(['product' => $product, 'status' => $status]);
+                }
+
+                if ($items->count() >= $limit || $remainingScan <= 0) {
+                    break;
+                }
+            }
+
+            if ($products->count() < $chunkSize) {
+                break;
+            }
         }
 
-        if (!is_numeric($value)) {
-            return null;
-        }
+        $hasMore = (clone $query)
+            ->where('products.id', '>', $cursor)
+            ->exists();
 
-        $int = (int) $value;
-        return $int > 0 ? $int : null;
+        return [
+            'items' => $items,
+            'cursor' => $cursor,
+            'has_more' => $hasMore,
+        ];
+    }
+
+    private function countMissingImages($query, ProductMediaService $mediaService): int
+    {
+        $count = 0;
+
+        $query
+            ->with(['media' => fn ($mediaQuery) => $mediaQuery->where('collection_name', 'images')])
+            ->reorder()
+            ->chunkById(200, function ($products) use (&$count, $mediaService) {
+                foreach ($products as $product) {
+                    if (! $mediaService->localImageStatus($product)['original_exists']) {
+                        $count++;
+                    }
+                }
+            });
+
+        return $count;
     }
 
     private function findProductForAction(Request $request): ?Product
