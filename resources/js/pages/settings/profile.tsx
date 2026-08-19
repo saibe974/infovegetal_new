@@ -436,6 +436,7 @@ type PageProps = SharedData & {
     locale?: string;
     errors?: Record<string, string>;
     userAbilities?: { view?: boolean; delete?: boolean; move?: boolean };
+    parent?: { id: number; name: string } | null;
     userMeta?: UserMetaItem[];
     metaKeyOptions?: Array<{ value: string; label: string }>;
     metaKeyConfig?: Record<string, { input: string; fields: string[] }>;
@@ -618,14 +619,14 @@ export default function Profile({
     };
 
     // ── Parent ────────────────────────────────────────────────────────────────
-    const initialParent = targetUserWithParent.parent_id
-        ? {
-              id: targetUserWithParent.parent_id,
-              name:
-                  targetUserWithParent.parent?.name ??
-                  `#${targetUserWithParent.parent_id}`,
-          }
-        : null;
+    const initialParent =
+        pageProps.parent ??
+        (targetUserWithParent.parent_id && targetUserWithParent.parent?.name
+            ? {
+                  id: targetUserWithParent.parent_id,
+                  name: targetUserWithParent.parent.name,
+              }
+            : null);
     const [selectedParent, setSelectedParent] = useState<{
         id: number;
         name: string;

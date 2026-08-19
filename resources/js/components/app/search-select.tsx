@@ -1,9 +1,18 @@
-import { useState, useRef, useEffect, ReactNode, ReactElement, cloneElement, isValidElement, type ComponentType } from "react";
-import { Loader2, X, SearchIcon, SlidersHorizontalIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useI18n } from "@/lib/i18n";
-import * as Flags from "country-flag-icons/react/3x2";
-import CountryFlag from "../ui/country-flag";
+import { useI18n } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
+import * as Flags from 'country-flag-icons/react/3x2';
+import { Loader2, SearchIcon, SlidersHorizontalIcon, X } from 'lucide-react';
+import {
+    ReactElement,
+    ReactNode,
+    cloneElement,
+    isValidElement,
+    useEffect,
+    useRef,
+    useState,
+    type ComponentType,
+} from 'react';
+import CountryFlag from '../ui/country-flag';
 
 interface SearchBarProps {
     className?: string;
@@ -16,10 +25,10 @@ interface SearchBarProps {
     count?: number;
     // Current query string (e.g., from URL/props) to display as tags
     query?: string;
-    placeholder?: string,
-    filters?: ReactNode,
-    search?: boolean,
-    selection?: (string | Option)[]
+    placeholder?: string;
+    filters?: ReactNode;
+    search?: boolean;
+    selection?: (string | Option)[];
     multiple?: boolean;
     filtersActive?: { name: string; label: string; value?: string }[];
     removeFilter?: (filterName: string) => void;
@@ -44,9 +53,9 @@ const areOptionsEqual = (a: Option[], b: Option[]): boolean => {
     return a.every((opt, index) => {
         const other = b[index];
         return (
-            opt.value === other?.value
-            && opt.label === other?.label
-            && (opt.description ?? '') === (other?.description ?? '')
+            opt.value === other?.value &&
+            opt.label === other?.label &&
+            (opt.description ?? '') === (other?.description ?? '')
         );
     });
 };
@@ -74,17 +83,24 @@ export default function SearchSelect({
     const [open, setOpen] = useState(false);
     const [openFilters, setOpenFilters] = useState(false);
     const hasFilters = Boolean(filters);
-    const renderedFilters = hasFilters && isValidElement(filters)
-        ? cloneElement(filters as ReactElement<{ closeFilters?: () => void }>, {
-            closeFilters: () => setOpenFilters(false),
-        })
-        : filters;
+    const renderedFilters =
+        hasFilters && isValidElement(filters)
+            ? cloneElement(
+                  filters as ReactElement<{ closeFilters?: () => void }>,
+                  {
+                      closeFilters: () => setOpenFilters(false),
+                  },
+              )
+            : filters;
 
     const toOptions = (arr?: (string | Option)[]) =>
-        (arr ?? []).map((s) => (typeof s === "string" ? { value: s, label: s } : s));
+        (arr ?? []).map((s) =>
+            typeof s === 'string' ? { value: s, label: s } : s,
+        );
 
-
-    const [selected, setSelected] = useState<Option[]>(toOptions(selection) || []);
+    const [selected, setSelected] = useState<Option[]>(
+        toOptions(selection) || [],
+    );
     const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +118,7 @@ export default function SearchSelect({
         const opts = toOptions(selection);
         setSelected((prev) => (areOptionsEqual(prev, opts) ? prev : opts));
         // Prevent immediate onSubmit triggered by selected-change effect
-        lastSubmittedRef.current = opts.map((s) => s.value).join(" ");
+        lastSubmittedRef.current = opts.map((s) => s.value).join(' ');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [JSON.stringify(selection || [])]);
 
@@ -119,7 +135,7 @@ export default function SearchSelect({
         }
         setHighlightedIndex(-1);
         setOpen(false);
-        onChange("");
+        onChange('');
     };
 
     const handleRemove = (name: string) => {
@@ -129,7 +145,6 @@ export default function SearchSelect({
         if (newSelected.length === 0) {
             onSubmit('', { force: true });
         }
-
     };
 
     // console.log(filtersActive)
@@ -142,54 +157,62 @@ export default function SearchSelect({
         //     });
         // }
         setSelected([]);
-        onChange("");
+        onChange('');
         if (clearAll) {
             clearAll();
             return;
         }
-        onSubmit("", { force: true });
+        onSubmit('', { force: true });
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-
-        if (!open && e.key === "ArrowDown" && listOptions.length > 0) {
+        if (!open && e.key === 'ArrowDown' && listOptions.length > 0) {
             setOpen(true);
             setHighlightedIndex(0);
             return;
         }
 
-        if (e.key === "Backspace" && value === "" && selected.length > 0) {
+        if (e.key === 'Backspace' && value === '' && selected.length > 0) {
             e.preventDefault();
             const last = selected[selected.length - 1];
             handleRemove(last.value);
             return;
         }
 
-        if (e.key === "Backspace" && value === "" && selected.length === 0 && filtersActive && filtersActive.length > 0) {
+        if (
+            e.key === 'Backspace' &&
+            value === '' &&
+            selected.length === 0 &&
+            filtersActive &&
+            filtersActive.length > 0
+        ) {
             e.preventDefault();
             const lastFilter = filtersActive[filtersActive.length - 1];
             removeFilter?.(lastFilter.name);
             return;
         }
 
-        if (e.key === "ArrowDown") {
+        if (e.key === 'ArrowDown') {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev < listOptions.length - 1 ? prev + 1 : 0
+                prev < listOptions.length - 1 ? prev + 1 : 0,
             );
-        } else if (e.key === "ArrowUp") {
+        } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setHighlightedIndex((prev) =>
-                prev > 0 ? prev - 1 : listOptions.length - 1
+                prev > 0 ? prev - 1 : listOptions.length - 1,
             );
-        } else if (e.key === "Enter") {
+        } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (highlightedIndex >= 0 && highlightedIndex < listOptions.length) {
+            if (
+                highlightedIndex >= 0 &&
+                highlightedIndex < listOptions.length
+            ) {
                 handleSelectOption(listOptions[highlightedIndex]);
             } else if (value.trim()) {
                 handleSelectOption({ value, label: value });
             }
-        } else if (e.key === "Escape") {
+        } else if (e.key === 'Escape') {
             setOpen(false);
             setHighlightedIndex(-1);
         }
@@ -200,8 +223,8 @@ export default function SearchSelect({
     };
 
     useEffect(() => {
-        if (!value) setOpen(false);
-    }, [value]);
+        if (!value && minQueryLength > 0) setOpen(false);
+    }, [value, minQueryLength]);
 
     // Sync incoming query string into selected tags (as spans)
     useEffect(() => {
@@ -214,13 +237,13 @@ export default function SearchSelect({
         const opts = uniq.map((t) => ({ value: t, label: t }));
         setSelected((prev) => (areOptionsEqual(prev, opts) ? prev : opts));
         // Prevent immediate resubmit with the same value
-        lastSubmittedRef.current = uniq.join(" ");
+        lastSubmittedRef.current = uniq.join(' ');
     }, [query]);
 
     useEffect(() => {
         // Ne rien soumettre au montage si aucune sélection, pour ne pas envoyer q=""
         if (selected.length === 0) return;
-        const next = selected.map((s) => s.value).join(" ");
+        const next = selected.map((s) => s.value).join(' ');
         if (lastSubmittedRef.current === next) return;
         lastSubmittedRef.current = next;
         onSubmitRef.current(next);
@@ -236,7 +259,10 @@ export default function SearchSelect({
             }
 
             // Allow interactions with Radix portals opened by controls inside SearchSelect.
-            if (target instanceof Element && target.closest('[data-radix-popper-content-wrapper]')) {
+            if (
+                target instanceof Element &&
+                target.closest('[data-radix-popper-content-wrapper]')
+            ) {
                 return;
             }
 
@@ -245,31 +271,37 @@ export default function SearchSelect({
             setHighlightedIndex(-1);
         };
 
-        document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+        document.addEventListener(
+            'pointerdown',
+            handleOutsidePointerDown,
+            true,
+        );
         return () => {
-            document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+            document.removeEventListener(
+                'pointerdown',
+                handleOutsidePointerDown,
+                true,
+            );
         };
     }, []);
 
-
     return (
-        <div ref={containerRef} className={cn("relative w-full", className)}>
-
+        <div ref={containerRef} className={cn('relative w-full', className)}>
             <div
                 className={cn(
-                    "flex items-center flex-wrap gap-1 border rounded-md px-2 py-1 min-h-10 bg-background",
-                    "focus-within:ring-2 focus-within:ring-ring focus-within:border-ring transition"
+                    'flex min-h-10 flex-wrap items-center gap-1 rounded-md border bg-background px-2 py-1',
+                    'transition focus-within:border-ring focus-within:ring-2 focus-within:ring-ring',
                 )}
                 onClick={() => inputRef.current?.focus()}
             >
-
-
                 {hasFilters && (
                     <button
                         type="button"
-                        onMouseDown={() => { setOpenFilters((v) => !v); }}
+                        onMouseDown={() => {
+                            setOpenFilters((v) => !v);
+                        }}
                         // onClick={(e) => { e.stopPropagation(); }}
-                        className="text-muted-foreground hover:text-foreground px-1"
+                        className="px-1 text-muted-foreground hover:text-foreground"
                         title="Filters"
                     >
                         <SlidersHorizontalIcon size={16} />
@@ -277,23 +309,40 @@ export default function SearchSelect({
                 )}
 
                 {filtersActive?.map((filter) => {
-                    const isCountry = filter.name === "country" && typeof filter.value === "string";
-                    const countryCode = filter.name === "country" && typeof filter.value === "string"
-                        ? filter.value.toUpperCase()
-                        : null;
+                    const isCountry =
+                        filter.name === 'country' &&
+                        typeof filter.value === 'string';
+                    const countryCode =
+                        filter.name === 'country' &&
+                        typeof filter.value === 'string'
+                            ? filter.value.toUpperCase()
+                            : null;
                     const Flag = countryCode
-                        ? (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[countryCode]
+                        ? (
+                              Flags as Record<
+                                  string,
+                                  ComponentType<{
+                                      title?: string;
+                                      className?: string;
+                                  }>
+                              >
+                          )[countryCode]
                         : undefined;
 
                     return (
                         <span
                             key={filter.name}
-                            className="flex items-center gap-1 bg-brand-main text-white dark:text-black text-sm px-2 py-0.5 rounded-xl"
+                            className="flex items-center gap-1 rounded-xl bg-brand-main px-2 py-0.5 text-sm text-white dark:text-black"
                         >
                             {isCountry && Flag ? (
                                 <>
-                                    <Flag title={filter.label} className="w-4" />
-                                    <span className="sr-only">{filter.label}</span>
+                                    <Flag
+                                        title={filter.label}
+                                        className="w-4"
+                                    />
+                                    <span className="sr-only">
+                                        {filter.label}
+                                    </span>
                                 </>
                             ) : (
                                 filter.label
@@ -314,7 +363,7 @@ export default function SearchSelect({
                     <span
                         key={opt.value}
                         title={opt.description ?? undefined}
-                        className="flex items-center gap-1 bg-muted text-sm px-2 py-0.5 rounded-xl"
+                        className="flex items-center gap-1 rounded-xl bg-muted px-2 py-0.5 text-sm"
                     >
                         {opt.label}
                         <X
@@ -328,11 +377,9 @@ export default function SearchSelect({
                     </span>
                 ))}
 
-
-
                 <input
                     ref={inputRef}
-                    // value={value}
+                    value={value}
                     onChange={(e) => {
                         const v = e.target.value;
                         onChange(v);
@@ -358,15 +405,17 @@ export default function SearchSelect({
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder ?? t('Search...')}
-                    className="flex-1 bg-transparent border-0 focus:outline-none focus:ring-0 min-w-[100px] text-sm"
+                    className="min-w-[100px] flex-1 border-0 bg-transparent text-sm focus:ring-0 focus:outline-none"
                 />
 
                 {/* Bouton clear */}
-                {((filtersActive?.length ?? 0) > 0 || selected.length > 0 || value) && (
+                {((filtersActive?.length ?? 0) > 0 ||
+                    selected.length > 0 ||
+                    value) && (
                     <button
                         type="button"
                         onClick={handleClear}
-                        className="text-muted-foreground hover:text-destructive px-1"
+                        className="px-1 text-muted-foreground hover:text-destructive"
                     >
                         <X size={16} />
                     </button>
@@ -377,7 +426,7 @@ export default function SearchSelect({
                     <button
                         type="button"
                         onClick={handleSearch}
-                        className="text-muted-foreground hover:text-foreground px-1"
+                        className="px-1 text-muted-foreground hover:text-foreground"
                     >
                         <SearchIcon size={16} />
                     </button>
@@ -386,48 +435,75 @@ export default function SearchSelect({
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                        {count > 1 ? `${count} ${t('results')}` : count === 0 ? t('No results.') : ''}
+                        {count > 1
+                            ? `${count} ${t('results')}`
+                            : count === 0
+                              ? t('No results.')
+                              : ''}
                     </span>
                 )}
             </div>
 
             {/* Panneau combiné filtres + propositions */}
             {(openFilters || (open && value.length >= minQueryLength)) && (
-                <div
-                    className="absolute top-full left-0 w-full mt-1 py-4 px-2 border bg-popover rounded-md shadow-lg z-50 max-h-120 overflow-y-auto"
-                >
-                    <div className={cn(
-                        "flex flex-col md:flex-row gap-4",
-                        open && value.length >= minQueryLength ? "md:flex-row" : "flex-col"
-                    )}>
-
+                <div className="absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover px-2 py-4 shadow-lg">
+                    <div
+                        className={cn(
+                            'flex flex-col gap-4 md:flex-row',
+                            open && value.length >= minQueryLength
+                                ? 'md:flex-row'
+                                : 'flex-col',
+                        )}
+                    >
                         {/* Propositions */}
                         {open && value.length >= minQueryLength && (
-                            <div className={cn(
-                                "px-4",
-                                openFilters && renderedFilters ? "md:w-1/2 md:border-r md:border-r-accent" : "w-full"
-                            )}>
+                            <div
+                                className={cn(
+                                    'px-4',
+                                    openFilters && renderedFilters
+                                        ? 'md:w-1/2 md:border-r md:border-r-accent'
+                                        : 'w-full',
+                                )}
+                            >
                                 {/* <Heading title={t('Propositions')} /> */}
                                 {loading ? (
-                                    <div className="flex justify-center items-center py-2 text-muted-foreground">
-                                        <Loader2 className="animate-spin mr-2" size={16} /> {t('Search...')}
+                                    <div className="flex items-center justify-center py-2 text-muted-foreground">
+                                        <Loader2
+                                            className="mr-2 animate-spin"
+                                            size={16}
+                                        />{' '}
+                                        {t('Search...')}
                                     </div>
                                 ) : listOptions.length > 0 ? (
                                     listOptions.map((option, i: number) => (
                                         <button
                                             type="button"
                                             key={`${option.value}-${i}`}
-                                            onClick={() => handleSelectOption(option)}
+                                            onClick={() =>
+                                                handleSelectOption(option)
+                                            }
                                             className={cn(
-                                                "w-full text-left px-3 py-2 text-sm rounded-sm transition-colors",
+                                                'w-full rounded-sm px-3 py-2 text-left text-sm transition-colors',
                                                 highlightedIndex === i
-                                                    ? "bg-accent text-accent-foreground"
-                                                    : "hover:bg-accent/60 hover:text-accent-foreground"
+                                                    ? 'bg-accent text-accent-foreground'
+                                                    : 'hover:bg-accent/60 hover:text-accent-foreground',
                                             )}
                                         >
-                                            <span>{option.country ? (<CountryFlag countryCode={option.country} className="w-4 inline mr-2" />) : null}{option.label}</span>
+                                            <span>
+                                                {option.country ? (
+                                                    <CountryFlag
+                                                        countryCode={
+                                                            option.country
+                                                        }
+                                                        className="mr-2 inline w-4"
+                                                    />
+                                                ) : null}
+                                                {option.label}
+                                            </span>
                                             {option.description ? (
-                                                <span className="block text-xs text-muted-foreground">{option.description}</span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    {option.description}
+                                                </span>
                                             ) : null}
                                         </button>
                                     ))
@@ -441,10 +517,14 @@ export default function SearchSelect({
 
                         {/* Filtres */}
                         {openFilters && renderedFilters && (
-                            <div className={cn(
-                                "px-4",
-                                open && value.length >= minQueryLength ? "md:w-1/2" : "w-full"
-                            )}>
+                            <div
+                                className={cn(
+                                    'px-4',
+                                    open && value.length >= minQueryLength
+                                        ? 'md:w-1/2'
+                                        : 'w-full',
+                                )}
+                            >
                                 {/* <Heading title={t('Filters')} /> */}
                                 {renderedFilters}
                             </div>
@@ -452,6 +532,6 @@ export default function SearchSelect({
                     </div>
                 </div>
             )}
-        </div >
+        </div>
     );
 }

@@ -209,6 +209,10 @@ class UserManagementAuthorizationService
             return false;
         }
 
+        if ($parent?->hasRole('client')) {
+            return false;
+        }
+
         if (!$this->canAssignRequestedRoles($actor, null, $requestedRoleNames)
             && !$this->canAssignRequestedRolesForCreation($actor, $requestedRoleNames)) {
             return false;
@@ -351,6 +355,10 @@ class UserManagementAuthorizationService
 
         if ($newParent === null) {
             return $scope['all'];
+        }
+
+        if ($newParent->hasRole('client')) {
+            return false;
         }
 
         if ((int) $newParent->id === (int) $target->id) {

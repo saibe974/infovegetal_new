@@ -75,6 +75,46 @@ test('a branch manager can create allowed roles only inside its own branch', fun
     expect($commercial->can('create', [User::class, $commercial, ['admin']]))->toBeFalse();
 });
 
+test('parent options return names and exclude the edited user and its descendants', function () {
+    /** @var \Tests\TestCase $this */
+    $commercialRole = createRoleWithPermissions('commercial', [
+        'manage users',
+        'create clients',
+        'users.move.branch',
+    ]);
+    $clientRole = createRoleWithPermissions('client');
+    $supplierRole = createRoleWithPermissions('supplier');
+
+    $commercial = User::factory()->withoutTwoFactor()->create(['name' => 'Responsable']);
+    $candidate = User::factory()->withoutTwoFactor()->create(['name' => 'Parent possible']);
+    $target = User::factory()->withoutTwoFactor()->create(['name' => 'Utilisateur édité']);
+    $descendant = User::factory()->withoutTwoFactor()->create(['name' => 'Enfant interdit']);
+    $client = User::factory()->withoutTwoFactor()->create(['name' => 'Client interdit']);
+
+    $commercial->assignRole($commercialRole);
+    $candidate->assignRole($supplierRole);
+    $client->assignRole($clientRole);
+    $commercial->saveAsRoot();
+    $candidate->appendToNode($commercial)->save();
+    $target->appendToNode($commercial)->save();
+    $descendant->appendToNode($target)->save();
+    $client->appendToNode($commercial)->save();
+
+    $response = $this
+        ->actingAs($commercial)
+        ->getJson(route('users.parent-options', ['target_user_id' => $target->id], false))
+        ->assertOk();
+
+    $ids = collect($response->json('items'))->pluck('id');
+
+    expect($ids)->toContain($candidate->id)
+        ->not->toContain($target->id)
+        ->not->toContain($descendant->id)
+        ->not->toContain($client->id);
+    expect($commercial->can('move', [$target, $client]))->toBeFalse();
+    $response->assertJsonFragment(['id' => $candidate->id, 'name' => 'Parent possible']);
+});
+
 test('a dev cannot assign a protected role through the update endpoint', function () {
     /** @var \Tests\TestCase $this */
 

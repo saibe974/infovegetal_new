@@ -405,6 +405,51 @@ class UserManagementController extends Controller
         ]);
     }
 
+    public function parentOptions(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', User::class);
+
+        $validated = $request->validate([
+            'target_user_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $query = User::query()
+            ->select(['id', 'name', 'email', 'ref', '_lft', '_rgt'])
+            ->whereHas('roles', fn ($roles) => $roles->whereIn(
+                'name',
+                ['admin', 'supplier', 'commercial', 'group'],
+            ))
+            ->orderBy('_lft');
+
+        $this->authorization()->scopeManageableUsers($request->user(), $query);
+
+        $target = null;
+        if (! empty($validated['target_user_id'])) {
+            $target = User::findOrFail((int) $validated['target_user_id']);
+            $this->authorize('moveAny', User::class);
+            $query->where(function ($candidate) use ($target) {
+                $candidate
+                    ->where('_lft', '<', $target->_lft)
+                    ->orWhere('_lft', '>', $target->_rgt);
+            });
+        }
+
+        $candidates = $query->get();
+        if ($target) {
+            $candidates = $candidates
+                ->filter(fn (User $candidate) => $request->user()->can('move', [$target, $candidate]))
+                ->values();
+        }
+
+        return response()->json([
+            'items' => $candidates->map(fn (User $candidate) => [
+                'id' => (int) $candidate->id,
+                'name' => (string) $candidate->name,
+                'description' => (string) ($candidate->email ?: $candidate->ref ?: ''),
+            ])->values(),
+        ]);
+    }
+
     /**
      * Display a read-only user overview.
      */
@@ -458,6 +503,7 @@ class UserManagementController extends Controller
             // Fournir l'utilisateur à éditer (peut être différent de l'utilisateur connecté)
             'editingUser' => $user->setAttribute('permissions', $permissions),
             'isEditingOther' => $request->user()->id !== $user->id,
+            'parent' => $user->parent?->only(['id', 'name']),
             // Provide lists for roles and permissions to populate selects
             'allRoles' => $this->assignableRolesQuery($request, $user)->get(['id', 'name']),
             'allPermissions' => $request->user()->can('assignPermissions', $user)

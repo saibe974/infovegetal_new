@@ -10,6 +10,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('users', [UserManagementController::class, 'index'])->name('users.index');
     Route::get('admin/users/tree-children', [UserManagementController::class, 'treeChildren'])->name('users.tree-children');
     Route::get('admin/users/tree-search', [UserManagementController::class, 'treeSearch'])->name('users.tree-search');
+    Route::get('admin/users/parent-options', [UserManagementController::class, 'parentOptions'])->name('users.parent-options');
     Route::get('admin/users/create', [UserManagementController::class, 'create'])->name('users.create');
     Route::post('admin/users', [UserManagementController::class, 'store'])->name('users.store');
     Route::post('admin/users/reorder', [UserManagementController::class, 'reorder'])->name('users.reorder');
