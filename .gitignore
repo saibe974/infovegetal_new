@@ -29,6 +29,7 @@ yarn-error.log
 
 /storage/imports
 /storage/debugbar
+/storage/media-library/temp/
 
 .dev.json
 
