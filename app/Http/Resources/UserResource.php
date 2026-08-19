@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -56,6 +57,8 @@ class UserResource extends JsonResource
                 'assign_permissions' => $actor->can('assignPermissions', $this->resource),
                 'move' => $actor->can('move', $this->resource),
                 'impersonate' => $actor->can('impersonate', $this->resource),
+                'manage_db' => app(UserManagementAuthorizationService::class)
+                    ->canManageClientDatabase($actor, $this->resource),
             ] : null,
         ];
     }

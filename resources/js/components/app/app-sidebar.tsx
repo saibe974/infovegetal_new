@@ -12,7 +12,8 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, ServerIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
+import { BookOpen, Flower2Icon, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
+import { DatabaseAccessIcon } from '@/lib/icons';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
 import categoryProducts from '@/routes/category-products';
@@ -119,7 +120,7 @@ export function AppSidebar() {
             productsMenu.subItems.push({
                 title: t('Database'),
                 href: dbProducts.index().url,
-                icon: ServerIcon,
+                icon: DatabaseAccessIcon,
             });
         }
 

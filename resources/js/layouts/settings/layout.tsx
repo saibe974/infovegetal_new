@@ -12,7 +12,8 @@ import { type NavItem, type SharedData, type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 import { getEffectiveUser, hasPermission, isAdmin, isDev } from '@/lib/roles';
-import { ArrowLeftCircle, FileSignature, InfoIcon, Menu, ServerIcon, UserIcon } from 'lucide-react';
+import { DatabaseAccessIcon } from '@/lib/icons';
+import { ArrowLeftCircle, FileSignature, InfoIcon, Menu, UserIcon } from 'lucide-react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -118,7 +119,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         sidebarNavItems.push({
             title: 'Database access',
             href: `/admin/users/${userId}/db`,
-            icon: ServerIcon,
+            icon: DatabaseAccessIcon,
         });
 
         // sidebarNavItems.push({

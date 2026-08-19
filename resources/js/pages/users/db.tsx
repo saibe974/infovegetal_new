@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SearchSelect from '@/components/app/search-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StickyBar } from '@/components/ui/sticky-bar';
-import { TrashIcon, ServerIcon } from 'lucide-react';
+import { TrashIcon } from 'lucide-react';
+import { DatabaseAccessIcon } from '@/lib/icons';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import { Separator } from '@/components/ui/separator';
 import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
@@ -577,7 +578,7 @@ export default function UserDbPage() {
                     <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                             <Card className="p-6 space-y-4">
-                                <FormField label={<><ServerIcon className="inline mx-2" /> {t('Select DB product')}</>}>
+                                <FormField label={<><DatabaseAccessIcon className="inline mx-2" /> {t('Select DB product')}</>}>
                                     <SearchSelect
                                         value={search}
                                         onChange={setSearch}

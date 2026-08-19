@@ -128,7 +128,13 @@ class UserManagementController extends Controller
             ->select([
                 'id',
                 'name',
+                'alias',
+                'ref',
                 'email',
+                'phone',
+                'address_road',
+                'address_zip',
+                'address_town',
                 'created_at',
                 'active',
                 'parent_id',
@@ -194,7 +200,13 @@ class UserManagementController extends Controller
             return [
                 'id' => $user->id,
                 'name' => $user->name,
+                'alias' => $user->alias,
+                'ref' => $user->ref,
                 'email' => $user->email,
+                'phone' => $user->phone,
+                'address_road' => $user->address_road,
+                'address_zip' => $user->address_zip,
+                'address_town' => $user->address_town,
                 'created_at' => $user->created_at?->toISOString(),
                 'active' => (bool) $user->active,
                 'parent_id' => $user->parent_id,
@@ -206,6 +218,7 @@ class UserManagementController extends Controller
                 'logo_url' => $logoUrl,
                 'abilities' => [
                     'impersonate' => $request->user()->can('impersonate', $user),
+                    'manage_db' => $this->authorization()->canManageClientDatabase($request->user(), $user),
                 ],
             ];
         })->map(function (array $item) use ($hasChildrenLookup) {
@@ -278,7 +291,22 @@ class UserManagementController extends Controller
         }
 
         $allUsersQuery = User::query()
-            ->select(['id', 'name', 'email', 'created_at', 'active', 'parent_id', '_lft', '_rgt'])
+            ->select([
+                'id',
+                'name',
+                'alias',
+                'ref',
+                'email',
+                'phone',
+                'address_road',
+                'address_zip',
+                'address_town',
+                'created_at',
+                'active',
+                'parent_id',
+                '_lft',
+                '_rgt',
+            ])
             ->with(['roles:id,name', 'usersMeta' => fn ($q) => $q->where('key', 'logo')->select(['id', 'user_id', 'key', 'value'])])
             ->orderBy('_lft', 'asc');
 
@@ -341,7 +369,13 @@ class UserManagementController extends Controller
             return [
                 'id' => (int) $user->id,
                 'name' => $user->name,
+                'alias' => $user->alias,
+                'ref' => $user->ref,
                 'email' => $user->email,
+                'phone' => $user->phone,
+                'address_road' => $user->address_road,
+                'address_zip' => $user->address_zip,
+                'address_town' => $user->address_town,
                 'created_at' => $user->created_at?->toISOString(),
                 'active' => (bool) $user->active,
                 'parent_id' => $user->parent_id,
@@ -353,6 +387,7 @@ class UserManagementController extends Controller
                 'logo_url' => $logoUrl,
                 'abilities' => [
                     'impersonate' => $request->user()->can('impersonate', $user),
+                    'manage_db' => $this->authorization()->canManageClientDatabase($request->user(), $user),
                 ],
             ];
         })->values();
@@ -367,6 +402,24 @@ class UserManagementController extends Controller
             'items' => $items,
             'expanded_ids' => $expandedIds,
             'matched_ids' => array_values(array_unique($matchedIds)),
+        ]);
+    }
+
+    /**
+     * Display a read-only user overview.
+     */
+    public function show(Request $request, User $user): Response
+    {
+        $this->authorize('view', $user);
+
+        $user->load(['roles', 'permissions', 'usersMeta' => fn ($query) => $query->where('key', 'logo')]);
+
+        return Inertia::render('users/show', [
+            'user' => UserResource::make($user)->resolve($request),
+            'parent' => $user->parent
+                ? $user->parent->only(['id', 'name'])
+                : null,
+            'childrenCount' => $user->children()->count(),
         ]);
     }
 
