@@ -4,6 +4,7 @@ namespace App\Http\Requests\Users;
 
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UserUpdateRequest extends FormRequest
 {
@@ -33,6 +34,21 @@ class UserUpdateRequest extends FormRequest
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['integer', 'exists:permissions,id'],
             'parent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'sync_metas' => ['sometimes', 'boolean'],
+            'metas' => ['sometimes', 'array'],
+            'metas.*.id' => ['nullable', 'integer'],
+            'metas.*.key' => ['required', 'string', 'max:255', Rule::notIn(['logo'])],
+            'metas.*.title' => ['required', 'string', 'max:255'],
+            'metas.*.value' => ['nullable', 'string'],
+            'metas.*.value_json' => ['nullable', 'array'],
+            'metas.*.value_file' => [
+                'nullable',
+                'file',
+                'mimetypes:image/jpeg,image/png,image/gif,image/bmp,image/webp,application/pdf',
+                'max:10240',
+            ],
+            'metas.*.type' => ['nullable', 'string', 'max:50'],
+            'metas.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

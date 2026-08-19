@@ -9,6 +9,7 @@ use App\Models\UserOption;
 use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class UserAdditionalInfoController extends Controller
@@ -26,10 +27,16 @@ class UserAdditionalInfoController extends Controller
 
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'custom_key' => ['nullable', 'string', 'max:255', 'required_if:key,custom'],
             'value' => ['nullable', 'string'],
             'value_json' => ['nullable', 'array'],
-            'value_file' => ['nullable', 'file', 'image', 'max:5120'],
+            'value_file' => [
+                'nullable',
+                'file',
+                'mimetypes:image/jpeg,image/png,image/gif,image/bmp,image/webp,application/pdf',
+                'max:10240',
+            ],
             'type' => ['nullable', 'string', 'max:50'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
@@ -38,6 +45,7 @@ class UserAdditionalInfoController extends Controller
 
         $target->usersMeta()->create([
             'key' => $metaKey,
+            'title' => $validated['title'] ?? null,
             'value' => $metaValue,
             'type' => $metaType,
             'sort_order' => $validated['sort_order'] ?? 0,
@@ -58,10 +66,16 @@ class UserAdditionalInfoController extends Controller
 
         $validated = $request->validate([
             'key' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
             'custom_key' => ['nullable', 'string', 'max:255', 'required_if:key,custom'],
             'value' => ['nullable', 'string'],
             'value_json' => ['nullable', 'array'],
-            'value_file' => ['nullable', 'file', 'image', 'max:5120'],
+            'value_file' => [
+                'nullable',
+                'file',
+                'mimetypes:image/jpeg,image/png,image/gif,image/bmp,image/webp,application/pdf',
+                'max:10240',
+            ],
             'type' => ['nullable', 'string', 'max:50'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
@@ -70,6 +84,7 @@ class UserAdditionalInfoController extends Controller
 
         $meta->update([
             'key' => $metaKey,
+            'title' => $validated['title'] ?? $meta->title,
             'value' => $metaValue,
             'type' => $metaType,
             'sort_order' => $validated['sort_order'] ?? 0,
@@ -153,11 +168,27 @@ class UserAdditionalInfoController extends Controller
 
         $value = $validated['value'] ?? null;
 
+        if ($request->hasFile('value_file')) {
+            $mimeType = (string) $request->file('value_file')?->getMimeType();
+            $expectedType = $key === 'logo' ? 'file/image' : $inputKind;
+            $isValidFile = match ($expectedType) {
+                'file/image' => str_starts_with($mimeType, 'image/'),
+                'file/pdf' => $mimeType === 'application/pdf',
+                default => false,
+            };
+
+            if (!$isValidFile) {
+                throw ValidationException::withMessages([
+                    'value_file' => 'Le format du fichier ne correspond pas au type du champ.',
+                ]);
+            }
+        }
+
         if ($inputKind === 'json') {
             $value = !empty($validated['value_json'])
                 ? json_encode($validated['value_json'])
                 : null;
-        } elseif (($inputKind === 'file/image' || $key === 'logo') && $request->hasFile('value_file')) {
+        } elseif ((in_array($inputKind, ['file/image', 'file/pdf'], true) || $key === 'logo') && $request->hasFile('value_file')) {
             $collection = $key === 'logo' ? 'user_logos' : 'user_meta_files';
 
             $previousMediaId = $existingMeta ? $this->extractMediaId($existingMeta->value) : null;
@@ -178,6 +209,7 @@ class UserAdditionalInfoController extends Controller
                 'collection' => $collection,
                 'url' => $media->getUrl(),
                 'file_name' => $media->file_name,
+                'mime_type' => $media->mime_type,
             ]);
         }
 

@@ -2,39 +2,37 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Users\UserStoreRequest;
 use App\Http\Requests\Users\UserUpdateRequest;
 use App\Http\Resources\DbProductsResource;
 use App\Http\Resources\UserResource;
 use App\Models\Cart;
 use App\Models\ClientSalesCondition;
+use App\Models\DbProducts;
 use App\Models\User;
 use App\Models\UserOption;
 use App\Services\PriceCalculatorService;
-use App\Services\UserManagementAuthorizationService;
 use App\Services\UserImportService;
+use App\Services\UserManagementAuthorizationService;
+use App\Services\UserMetaSyncService;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate as FacadesGate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\DbProducts;
-use App\Models\DbProductBillingUser;
+use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
-use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 use function Illuminate\Log\log;
 
@@ -49,7 +47,7 @@ class UserManagementController extends Controller
 
         $query = User::with(['roles', 'permissions', 'usersMeta' => fn ($q) => $q->where('key', 'logo')]);
         $this->authorization()->scopeManageableUsers($request->user(), $query);
-        
+
         $search = $request->get('q');
         if ($search) {
             $normalized = trim($search);
@@ -65,7 +63,7 @@ class UserManagementController extends Controller
                 // Et toujours proposer une recherche sur le nom qui contient tous les termes
                 $q->orWhere(function ($qq) use ($tokens) {
                     foreach ($tokens as $t) {
-                        $qq->where('name', 'like', '%' . $t . '%');
+                        $qq->where('name', 'like', '%'.$t.'%');
                     }
                 });
             });
@@ -88,9 +86,9 @@ class UserManagementController extends Controller
 
         return Inertia::render('users/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => UserResource::collection($users)),
+            'collection' => Inertia::scroll(fn () => UserResource::collection($users)),
             'roles' => $roles,
-            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions($query, $search)),
+            'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions($query, $search)),
         ]);
     }
 
@@ -161,7 +159,7 @@ class UserManagementController extends Controller
 
                 $q->orWhere(function ($qq) use ($tokens) {
                     foreach ($tokens as $token) {
-                        $qq->where('name', 'like', '%' . $token . '%');
+                        $qq->where('name', 'like', '%'.$token.'%');
                     }
                 });
             });
@@ -173,7 +171,7 @@ class UserManagementController extends Controller
         $userIds = $users->pluck('id')->map(fn ($id) => (int) $id)->all();
         $parentsWithChildren = [];
 
-        if (!empty($userIds)) {
+        if (! empty($userIds)) {
             $parentsWithChildren = User::query()
                 ->whereIn('parent_id', $userIds)
                 ->whereNotNull('parent_id')
@@ -212,6 +210,7 @@ class UserManagementController extends Controller
             ];
         })->map(function (array $item) use ($hasChildrenLookup) {
             $item['has_children'] = isset($hasChildrenLookup[(int) $item['id']]);
+
             return $item;
         })->values();
 
@@ -262,7 +261,7 @@ class UserManagementController extends Controller
 
                 $q->orWhere(function ($qq) use ($tokens) {
                     foreach ($tokens as $token) {
-                        $qq->where('name', 'like', '%' . $token . '%');
+                        $qq->where('name', 'like', '%'.$token.'%');
                     }
                 });
             })
@@ -293,11 +292,11 @@ class UserManagementController extends Controller
         foreach ($matchedIds as $matchedId) {
             $cursor = $matchedId;
 
-            while ($cursor !== null && !isset($keepIds[$cursor])) {
+            while ($cursor !== null && ! isset($keepIds[$cursor])) {
                 $keepIds[$cursor] = true;
                 $node = $byId->get($cursor);
 
-                if (!$node) {
+                if (! $node) {
                     break;
                 }
 
@@ -326,7 +325,7 @@ class UserManagementController extends Controller
             while ($cursor !== null && isset($keepIds[$cursor])) {
                 $depth++;
                 $parent = $byId->get($cursor);
-                if (!$parent) {
+                if (! $parent) {
                     break;
                 }
                 $cursor = $parent->parent_id !== null ? (int) $parent->parent_id : null;
@@ -377,7 +376,7 @@ class UserManagementController extends Controller
 
         // Charger les rôles avec leurs permissions (role_has_permissions)
         $user->load('roles.permissions');
-        $permissions = $user->roles->flatMap(fn($role) => $role->permissions)->unique('id')->values();
+        $permissions = $user->roles->flatMap(fn ($role) => $role->permissions)->unique('id')->values();
 
         return Inertia::render('settings/profile', [
             // Indiquer si la cible supporte la vérification d'email
@@ -397,7 +396,7 @@ class UserManagementController extends Controller
             'userMeta' => $user->usersMeta()
                 ->orderBy('sort_order')
                 ->orderBy('id')
-                ->get(['id', 'user_id', 'key', 'value', 'type', 'sort_order']),
+                ->get(['id', 'user_id', 'key', 'title', 'value', 'type', 'sort_order']),
             'metaKeyOptions' => UserOption::query()
                 ->where('key', 'users_meta.allowed_key')
                 ->where('active', true)
@@ -449,17 +448,33 @@ class UserManagementController extends Controller
             // Provide lists for roles and permissions to populate selects
             'allRoles' => $this->assignableRolesQuery($request)->get(['id', 'name']),
             'allPermissions' => Permission::all(['id', 'name']),
+            'metaKeyOptions' => UserOption::query()
+                ->where('key', 'users_meta.allowed_key')
+                ->where('active', true)
+                ->orderBy('sort_order')
+                ->get(['value', 'label'])
+                ->map(fn (UserOption $row) => [
+                    'value' => (string) $row->value,
+                    'label' => (string) ($row->label ?: $row->value),
+                ])
+                ->values()
+                ->all(),
+            'metaKeyConfig' => $this->metaKeyConfig(),
         ]);
-    }   
+    }
 
     public function store(UserStoreRequest $request): HttpFoundationRedirectResponse
-    {Log::info("Creating new user by " . $request->user()->id);
+    {
+        Log::info('Creating new user by '.$request->user()->id);
         $validated = $request->validated();
+        $shouldSyncMetas = (bool) ($validated['sync_metas'] ?? false);
+        $metas = $validated['metas'] ?? [];
+        unset($validated['metas'], $validated['sync_metas']);
 
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? []);
         $requestedRoles = Role::whereIn('id', $requestedRoleIds)->get(['id', 'name']);
         $requestedRoleNames = $requestedRoles->pluck('name')->all();
-        $parent = !empty($validated['parent_id']) ? User::findOrFail((int) $validated['parent_id']) : $request->user();
+        $parent = ! empty($validated['parent_id']) ? User::findOrFail((int) $validated['parent_id']) : $request->user();
 
         $this->authorize('create', [User::class, $parent, $requestedRoleNames]);
 
@@ -467,25 +482,25 @@ class UserManagementController extends Controller
             || $request->user()->hasRole('dev')
             || $request->user()->getAllPermissions()->contains('name', 'users.create.all');
 
-        if (!$scopeAll && $parent && (int) $parent->id === (int) $request->user()->id) {
+        if (! $scopeAll && $parent && (int) $parent->id === (int) $request->user()->id) {
             abort(403, 'Unauthorized');
         }
 
         $hasGroupRole = $requestedRoles->contains(fn (Role $role) => $role->name === 'group');
 
         $email = trim((string) ($validated['email'] ?? ''));
-        if ($email === '' && !$hasGroupRole) {
+        if ($email === '' && ! $hasGroupRole) {
             throw ValidationException::withMessages([
                 'email' => 'Le champ email est obligatoire sauf pour le role group.',
             ]);
         }
         if ($email === '' && $hasGroupRole) {
             // Email technique pour respecter la contrainte NOT NULL + UNIQUE.
-            $email = 'group+' . Str::uuid() . '@local.invalid';
+            $email = 'group+'.Str::uuid().'@local.invalid';
         }
 
         $password = (string) ($validated['password'] ?? '');
-        if ($password === '' && !$hasGroupRole) {
+        if ($password === '' && ! $hasGroupRole) {
             throw ValidationException::withMessages([
                 'password' => 'Le mot de passe est obligatoire sauf pour le role group.',
             ]);
@@ -527,12 +542,16 @@ class UserManagementController extends Controller
             $this->authorize('assignPermissions', $user);
 
             $selectedPermIds = array_map('intval', $validated['permissions']);
-            if (!$this->authorization()->arePermissionIdsDelegable($request->user(), $user, $selectedPermIds)) {
+            if (! $this->authorization()->arePermissionIdsDelegable($request->user(), $user, $selectedPermIds)) {
                 abort(403, 'Unauthorized');
             }
 
             $permissionNames = $this->authorization()->explicitPermissionNames($selectedPermIds, $requestedRoleIds);
             $user->syncPermissions($permissionNames);
+        }
+
+        if ($shouldSyncMetas) {
+            app(UserMetaSyncService::class)->sync($user, $metas);
         }
 
         // Redirige vers la page d'édition du nouvel utilisateur
@@ -566,6 +585,9 @@ class UserManagementController extends Controller
         $this->authorize('update', $user);
 
         $validated = $request->validated();
+        $shouldSyncMetas = (bool) ($validated['sync_metas'] ?? false);
+        $metas = $validated['metas'] ?? [];
+        unset($validated['metas'], $validated['sync_metas']);
 
         // Détecter le rôle group pour rendre l'email optionnel
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? $user->roles()->pluck('id')->toArray());
@@ -615,7 +637,7 @@ class UserManagementController extends Controller
         if (isset($validated['permissions'])) {
             $this->authorize('assignPermissions', $user);
             $selectedPermIds = array_map('intval', $validated['permissions']);
-            if (!$this->authorization()->arePermissionIdsDelegable($me, $user, $selectedPermIds)) {
+            if (! $this->authorization()->arePermissionIdsDelegable($me, $user, $selectedPermIds)) {
                 abort(403, 'Unauthorized');
             }
 
@@ -625,11 +647,15 @@ class UserManagementController extends Controller
             if (isset($validated['roles'])) {
                 $roleIds = array_map('intval', $validated['roles']);
             } else {
-                $roleIds = $user->roles()->pluck('id')->map(fn($v) => (int)$v)->toArray();
+                $roleIds = $user->roles()->pluck('id')->map(fn ($v) => (int) $v)->toArray();
             }
 
             $permissionNames = $this->authorization()->explicitPermissionNames($selectedPermIds, $roleIds);
             $user->syncPermissions($permissionNames);
+        }
+
+        if ($shouldSyncMetas) {
+            app(UserMetaSyncService::class)->sync($user, $metas);
         }
 
         // Redirection vers la page d'édition du profil avec confirmation visuelle
@@ -655,11 +681,13 @@ class UserManagementController extends Controller
             $user->delete();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+
             return redirect('/');
         }
 
         // Suppression par un admin
         $user->delete();
+
         return to_route('users.index');
     }
 
@@ -681,10 +709,10 @@ class UserManagementController extends Controller
         ]);
 
         $validated = $request->validate([
-            'items' => ['required','array'],
-            'items.*.id' => ['required','integer','exists:users,id'],
-            'items.*.parent_id' => ['nullable','integer','exists:users,id'],
-            'items.*.position' => ['required','integer','min:0'],
+            'items' => ['required', 'array'],
+            'items.*.id' => ['required', 'integer', 'exists:users,id'],
+            'items.*.parent_id' => ['nullable', 'integer', 'exists:users,id'],
+            'items.*.position' => ['required', 'integer', 'min:0'],
         ]);
 
         $allReferencedIds = collect($validated['items'])
@@ -701,7 +729,7 @@ class UserManagementController extends Controller
         foreach ($validated['items'] as $item) {
             $target = $usersById->get((int) $item['id']);
 
-            if (!$target instanceof User) {
+            if (! $target instanceof User) {
                 abort(422, 'Invalid target user.');
             }
 
@@ -709,7 +737,7 @@ class UserManagementController extends Controller
             if ($item['parent_id'] !== null) {
                 $newParent = $usersById->get((int) $item['parent_id']);
 
-                if (!$newParent instanceof User) {
+                if (! $newParent instanceof User) {
                     abort(422, 'Invalid parent user.');
                 }
             }
@@ -728,7 +756,7 @@ class UserManagementController extends Controller
 
                 // Sécurité anti-cycles simple : parent_id != id
                 foreach ($rows as $r) {
-                    if (!is_null($r['parent_id']) && (int)$r['parent_id'] === (int)$r['id']) {
+                    if (! is_null($r['parent_id']) && (int) $r['parent_id'] === (int) $r['id']) {
                         Log::warning('users.reorder.invalid_parent', [
                             'request_id' => $requestId,
                             'id' => (int) $r['id'],
@@ -753,7 +781,9 @@ class UserManagementController extends Controller
                         $visited[] = $parentId;
                         $parent = $rows->firstWhere('id', $parentId);
                         $parentId = $parent ? $parent['parent_id'] : null;
-                        if (count($visited) > 1000) break; // garde-fou
+                        if (count($visited) > 1000) {
+                            break;
+                        } // garde-fou
                     }
                 });
 
@@ -779,7 +809,7 @@ class UserManagementController extends Controller
                     'item_count' => $rows->count(),
                 ]);
 
-                $groups = $rows->groupBy(fn($r) => $r['parent_id'] ?? null);
+                $groups = $rows->groupBy(fn ($r) => $r['parent_id'] ?? null);
 
                 // Détacher puis reconstruire l'arbre pour éviter toute corruption
                 $allIds = $rows->pluck('id')->toArray();
@@ -870,10 +900,11 @@ class UserManagementController extends Controller
 
             if ($parentId === null) {
                 $hasRoot = true;
+
                 continue;
             }
 
-            if (!isset($submittedIdSet[(int) $parentId])) {
+            if (! isset($submittedIdSet[(int) $parentId])) {
                 return false;
             }
         }
@@ -896,7 +927,7 @@ class UserManagementController extends Controller
 
     public function editDb(Request $request, User $user): RedirectResponse
     {
-        if (!$this->authorization()->canManageClientDatabase($request->user(), $user)) {
+        if (! $this->authorization()->canManageClientDatabase($request->user(), $user)) {
             abort(403, 'Unauthorized');
         }
 
@@ -934,6 +965,7 @@ class UserManagementController extends Controller
                 $attrs = $this->normalizeSalesConditions(
                     $this->decodeJsonPivotAttributes($dbProduct->pivot?->attributes)
                 );
+
                 return [(int) $dbProduct->id => $attrs];
             })
             ->toArray();
@@ -941,20 +973,21 @@ class UserManagementController extends Controller
         $editableCurrent = $allCurrent;
         if ($isSelfManagement && $hasCanAccessColumn) {
             $editableCurrent = $user->dbProducts()
-            ->where('db_product_user.can_access', true)
+                ->where('db_product_user.can_access', true)
                 ->get()
                 ->mapWithKeys(function ($dbProduct) {
                     $attrs = $this->normalizeSalesConditions(
                         $this->decodeJsonPivotAttributes($dbProduct->pivot?->attributes)
                     );
+
                     return [(int) $dbProduct->id => $attrs];
                 })
                 ->toArray();
         }
 
-        if (!$canManageAllDb && !$canSelectAnyDbProducts) {
+        if (! $canManageAllDb && ! $canSelectAnyDbProducts) {
             $unauthorizedIds = array_diff($dbIds, $allowedDbIds);
-            if (!empty($unauthorizedIds)) {
+            if (! empty($unauthorizedIds)) {
                 abort(403, 'Unauthorized');
             }
         }
@@ -973,7 +1006,7 @@ class UserManagementController extends Controller
         }
 
         foreach ($dbIds as $dbId) {
-            if (!array_key_exists($dbId, $attributes) && array_key_exists((int) $dbId, $next)) {
+            if (! array_key_exists($dbId, $attributes) && array_key_exists((int) $dbId, $next)) {
                 continue;
             }
 
@@ -983,7 +1016,7 @@ class UserManagementController extends Controller
                 $decoded = json_decode($attr, true);
                 $attr = is_array($decoded) ? $decoded : [];
             }
-            if (!is_array($attr)) {
+            if (! is_array($attr)) {
                 $attr = [];
             }
             $normalizedAttr = $this->normalizeSalesConditions($attr);
@@ -995,16 +1028,16 @@ class UserManagementController extends Controller
         }
 
         foreach (array_keys($syncData) as $dbId) {
-            if (!isset($syncData[$dbId]['can_sell'])) {
+            if (! isset($syncData[$dbId]['can_sell'])) {
                 $syncData[$dbId]['can_sell'] = false;
             }
-            if (!isset($syncData[$dbId]['can_invoice'])) {
+            if (! isset($syncData[$dbId]['can_invoice'])) {
                 $syncData[$dbId]['can_invoice'] = false;
             }
-            if (!isset($syncData[$dbId]['can_buy'])) {
+            if (! isset($syncData[$dbId]['can_buy'])) {
                 $syncData[$dbId]['can_buy'] = true;
             }
-            if (!isset($syncData[$dbId]['can_manage'])) {
+            if (! isset($syncData[$dbId]['can_manage'])) {
                 $syncData[$dbId]['can_manage'] = false;
             }
         }
@@ -1019,7 +1052,7 @@ class UserManagementController extends Controller
         sort($nextIds);
         $hasChanges = $currentIds !== $nextIds;
 
-        if (!$hasChanges) {
+        if (! $hasChanges) {
             foreach ($nextIds as $dbId) {
                 $currentJson = json_encode($allCurrent[$dbId] ?? []);
                 $nextJson = json_encode($next[$dbId] ?? []);
@@ -1036,7 +1069,7 @@ class UserManagementController extends Controller
 
         if ($hasChanges) {
             $this->recalculateActiveCartTotals($user);
-            Cache::put('cart:refresh:' . $user->id, now()->getTimestamp(), now()->addHour());
+            Cache::put('cart:refresh:'.$user->id, now()->getTimestamp(), now()->addHour());
         }
 
         return back()->with('success', 'User DB association and sales conditions updated successfully');
@@ -1049,7 +1082,7 @@ class UserManagementController extends Controller
             ->with('products')
             ->first();
 
-        if (!$cart || $cart->products->isEmpty()) {
+        if (! $cart || $cart->products->isEmpty()) {
             return;
         }
 
@@ -1082,7 +1115,7 @@ class UserManagementController extends Controller
      */
     public function export(Request $request)
     {
-        $filename = 'users_export_' . date('Ymd_His') . '.csv';
+        $filename = 'users_export_'.date('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -1116,7 +1149,7 @@ class UserManagementController extends Controller
      */
     public function db(Request $request, User $user): Response
     {
-        if (!$this->authorization()->canManageClientDatabase($request->user(), $user)) {
+        if (! $this->authorization()->canManageClientDatabase($request->user(), $user)) {
             abort(403, 'Unauthorized');
         }
 
@@ -1148,9 +1181,9 @@ class UserManagementController extends Controller
                                     ->wherePivot('active', true),
                             ]),
                     ]),
-                    'sellerRules' => fn ($query) => $query
-                        ->where('active', true)
-                                ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
+                'sellerRules' => fn ($query) => $query
+                    ->where('active', true)
+                    ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
             ])
             ->get(['id', 'name', 'description', 'country']);
 
@@ -1245,11 +1278,9 @@ class UserManagementController extends Controller
     public function process(Request $request, UserImportService $importService)
     {
         // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (! $request->user()->hasRole('admin')) {
             abort(403, 'Unauthorized');
         }
-        
-        
 
         $data = $request->validate([
             'id' => 'required|string',
@@ -1258,11 +1289,9 @@ class UserManagementController extends Controller
         $id = $data['id'];
         $strategy = $data['strategy'] ?? null;
 
-        
-
         $state = Cache::get("import:$id", []);
-        Log::info("ok " . json_encode($state));
-        if (!$state || empty($state['path'])) {
+        Log::info('ok '.json_encode($state));
+        if (! $state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
@@ -1270,7 +1299,7 @@ class UserManagementController extends Controller
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
-        if (!is_string($fullPath) || !is_file($fullPath)) {
+        if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
@@ -1296,8 +1325,8 @@ class UserManagementController extends Controller
         $importService->run($id, $fullPath, $relativePath);
 
         // Vérifier la présence du premier chunk et ajuster l'état initial
-        $tmpDir = Storage::path('imports/tmp/' . $id);
-        $firstChunk = $tmpDir . DIRECTORY_SEPARATOR . 'data_0.csv';
+        $tmpDir = Storage::path('imports/tmp/'.$id);
+        $firstChunk = $tmpDir.DIRECTORY_SEPARATOR.'data_0.csv';
         $hasFirst = is_file($firstChunk);
         $this->updateImportState($id, [
             'next_offset' => 0,
@@ -1322,7 +1351,7 @@ class UserManagementController extends Controller
     public function processChunk(Request $request, UserImportService $importService)
     {
         // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (! $request->user()->hasRole('admin')) {
             abort(403, 'Unauthorized');
         }
 
@@ -1333,14 +1362,14 @@ class UserManagementController extends Controller
         $id = $data['id'];
 
         $state = Cache::get("import:$id");
-        if (!$state || empty($state['path'])) {
+        if (! $state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
-        if (!is_string($fullPath) || !is_file($fullPath)) {
+        if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
@@ -1369,7 +1398,7 @@ class UserManagementController extends Controller
     {
         $progress = Cache::get("import:$id");
 
-        if (!$progress) {
+        if (! $progress) {
             return response()->json(['status' => 'waiting', 'progress' => 0]);
         }
 
@@ -1392,7 +1421,7 @@ class UserManagementController extends Controller
     public function cancel(Request $request)
     {
         // Vérifier que l'utilisateur est admin
-        if (!$request->user()->hasRole('admin')) {
+        if (! $request->user()->hasRole('admin')) {
             abort(403, 'Unauthorized');
         }
 
@@ -1402,7 +1431,8 @@ class UserManagementController extends Controller
         $id = $data['id'];
         Cache::put("import:$id:cancel", true, now()->addHour());
         $state = Cache::get("import:$id", []);
-        Cache::put("import:$id", array_merge($state, [ 'status' => 'cancelling' ]), now()->addHour());
+        Cache::put("import:$id", array_merge($state, ['status' => 'cancelling']), now()->addHour());
+
         return response()->json(['status' => 'cancelling']);
     }
 
@@ -1411,13 +1441,13 @@ class UserManagementController extends Controller
      */
     public function report(string $id)
     {
-        $reportPath = 'imports/reports/' . $id . '.csv';
-        if (!Storage::exists($reportPath)) {
+        $reportPath = 'imports/reports/'.$id.'.csv';
+        if (! Storage::exists($reportPath)) {
             return response()->json(['message' => 'Rapport introuvable'], 404);
         }
 
         $full = Storage::path($reportPath);
-        $filename = 'users_import_report_' . $id . '.csv';
+        $filename = 'users_import_report_'.$id.'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -1425,7 +1455,7 @@ class UserManagementController extends Controller
 
         $callback = function () use ($full) {
             $h = fopen($full, 'r');
-            while (!feof($h)) {
+            while (! feof($h)) {
                 echo fread($h, 8192);
             }
             fclose($h);
@@ -1454,7 +1484,7 @@ class UserManagementController extends Controller
 
         $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
 
-        if (!$sourceUser) {
+        if (! $sourceUser) {
             return DbProducts::query()->whereRaw('1 = 0');
         }
 
@@ -1478,7 +1508,7 @@ class UserManagementController extends Controller
 
         $sourceUser = $target->parent_id ? User::find((int) $target->parent_id) : $target;
 
-        if (!$sourceUser) {
+        if (! $sourceUser) {
             return [];
         }
 
@@ -1496,7 +1526,7 @@ class UserManagementController extends Controller
 
     private function normalizeSalesConditions(?array $value): array
     {
-        if (!$value) {
+        if (! $value) {
             return [];
         }
 
@@ -1504,6 +1534,7 @@ class UserManagementController extends Controller
         foreach ($value as $key => $item) {
             if (is_array($item)) {
                 $normalized[$key] = $this->normalizeSalesConditions($item);
+
                 continue;
             }
 
@@ -1523,6 +1554,7 @@ class UserManagementController extends Controller
 
         if (is_string($value)) {
             $decoded = json_decode($value, true);
+
             return is_array($decoded) ? $decoded : [];
         }
 
@@ -1532,7 +1564,7 @@ class UserManagementController extends Controller
     private function syncClientSalesConditions(User $user, array $salesConditions): bool
     {
         $rows = collect($salesConditions)
-            ->filter(fn ($row) => is_array($row) && !empty($row['db_product_id']) && !empty($row['billing_user_id']))
+            ->filter(fn ($row) => is_array($row) && ! empty($row['db_product_id']) && ! empty($row['billing_user_id']))
             ->map(function (array $row) {
                 return [
                     'client_user_id' => (int) ($row['client_user_id'] ?? 0),
@@ -1615,7 +1647,7 @@ class UserManagementController extends Controller
                     $condition->seller_user_id !== null ? (int) $condition->seller_user_id : 'null',
                 ]);
 
-                if (!isset($activeMap[$key])) {
+                if (! isset($activeMap[$key])) {
                     $condition->update(['active' => false]);
                 }
             });
@@ -1658,13 +1690,13 @@ class UserManagementController extends Controller
         if (empty($search)) {
             return [];
         }
-        
+
         $lowerSearch = mb_strtolower($search);
 
         // Récupération des noms distincts - réinitialiser le ORDER BY pour éviter les conflits
         $clonedQuery = clone $query;
         $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
-        
+
         $propositions = $clonedQuery
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
@@ -1677,13 +1709,14 @@ class UserManagementController extends Controller
             $str = preg_replace('/[^\p{L}\s-]/u', ' ', $str);
             // espaces multiples → un seul
             $str = trim(preg_replace('/\s+/', ' ', $str));
+
             return $str;
         };
 
         // Applique le nettoyage
         $cleaned = $propositions
-            ->map(fn($name) => $clean($name))
-            ->filter(fn($name) => !empty($name))
+            ->map(fn ($name) => $clean($name))
+            ->filter(fn ($name) => ! empty($name))
             ->unique()
             ->values();
 
@@ -1697,25 +1730,29 @@ class UserManagementController extends Controller
             // 3 = contient le terme ailleurs
             // 4 = autres
             $pa = (
-                !preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
+                ! preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($a, $lowerSearch) ? 2 : (
-                str_contains($a, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($a, $lowerSearch) ? 3 : 4
+                ));
 
             $pb = (
-                !preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
+                ! preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($b, $lowerSearch) ? 2 : (
-                str_contains($b, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($b, $lowerSearch) ? 3 : 4
+                ));
 
-            if ($pa !== $pb) return $pa <=> $pb;
+            if ($pa !== $pb) {
+                return $pa <=> $pb;
+            }
 
             // Second critère : longueur
             $la = mb_strlen($a);
             $lb = mb_strlen($b);
-            if ($la !== $lb) return $la <=> $lb;
+            if ($la !== $lb) {
+                return $la <=> $lb;
+            }
 
             // Troisième : ordre alphabétique
             return strnatcmp($a, $b);

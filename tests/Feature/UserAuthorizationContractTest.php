@@ -40,7 +40,6 @@ function updatePayload(User $user, array $extra = []): array
 
 test('users.update.branch authorizes descendants only', function () {
     /** @var \Tests\TestCase $this */
-
     $managerRole = contractRole('manager-update-branch', ['users.view.branch', 'users.update.branch']);
 
     $manager = User::factory()->withoutTwoFactor()->create();
@@ -64,7 +63,6 @@ test('users.update.branch authorizes descendants only', function () {
 
 test('users.update.all does not allow updating an ancestor', function () {
     /** @var \Tests\TestCase $this */
-
     $allRole = contractRole('manager-update-all', ['users.update.all']);
 
     $ancestor = User::factory()->withoutTwoFactor()->create();
@@ -82,7 +80,6 @@ test('users.update.all does not allow updating an ancestor', function () {
 
 test('users.assign_permissions cannot delegate non delegable permissions', function () {
     /** @var \Tests\TestCase $this */
-
     $managerRole = contractRole('manager-assign-perms', ['users.assign_permissions.all']);
 
     $manager = User::factory()->withoutTwoFactor()->create();
@@ -106,7 +103,6 @@ test('users.assign_permissions cannot delegate non delegable permissions', funct
 
 test('users.create.branch requires a strict descendant parent', function () {
     /** @var \Tests\TestCase $this */
-
     $creatorRole = contractRole('creator-branch', ['users.create.branch']);
     $clientRole = contractRole('client-contract');
 
@@ -139,9 +135,45 @@ test('users.create.branch requires a strict descendant parent', function () {
         ->assertForbidden();
 });
 
+test('new user creation saves additional information with the user', function () {
+    /** @var \Tests\TestCase $this */
+    $creatorRole = contractRole('creator-with-metas', ['users.create.all']);
+    $clientRole = contractRole('client-with-metas');
+    $actor = User::factory()->withoutTwoFactor()->create();
+    $actor->assignRole($creatorRole);
+    $actor->saveAsRoot();
+
+    $response = $this->actingAs($actor)->post(route('users.store', [], false), [
+        'name' => 'User with information',
+        'email' => 'user-with-information@example.test',
+        'password' => 'password123',
+        'roles' => [$clientRole->id],
+        'parent_id' => $actor->id,
+        'sync_metas' => true,
+        'metas' => [[
+            'id' => -1,
+            'key' => 'phone.secondary',
+            'title' => 'Téléphone secondaire',
+            'value' => '+230 5555 1234',
+            'value_json' => [],
+            'type' => 'input',
+            'sort_order' => 0,
+        ]],
+    ]);
+
+    $response->assertSessionHasNoErrors()->assertRedirect();
+    $createdUser = User::query()->where('email', 'user-with-information@example.test')->firstOrFail();
+
+    $this->assertDatabaseHas('users_meta', [
+        'user_id' => $createdUser->id,
+        'key' => 'phone.secondary',
+        'title' => 'Téléphone secondaire',
+        'value' => '+230 5555 1234',
+    ]);
+});
+
 test('impersonation cannot target protected accounts', function () {
     /** @var \Tests\TestCase $this */
-
     $impersonatorRole = contractRole('impersonator-all', ['users.impersonate.all']);
     $adminRole = contractRole('admin');
 
@@ -163,7 +195,6 @@ test('impersonation cannot target protected accounts', function () {
 
 test('impersonated effective user remains bounded by real actor scope', function () {
     /** @var \Tests\TestCase $this */
-
     $realActorRole = contractRole('real-actor-impersonate-branch', ['users.impersonate.branch', 'users.update.branch']);
     $targetRole = contractRole('target-update-all', ['users.update.all']);
 

@@ -15,6 +15,7 @@ use Inertia\Response;
 use App\Models\User;
 use App\Models\UserOption;
 use App\Services\UserManagementAuthorizationService;
+use App\Services\UserMetaSyncService;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -22,6 +23,7 @@ class ProfileController extends Controller
 {
     public function __construct(
         private readonly UserManagementAuthorizationService $authorization,
+        private readonly UserMetaSyncService $userMetaSync,
     ) {
     }
 
@@ -53,7 +55,7 @@ class ProfileController extends Controller
             'userMeta' => $target->usersMeta()
                 ->orderBy('sort_order')
                 ->orderBy('id')
-                ->get(['id', 'user_id', 'key', 'value', 'type', 'sort_order']),
+                ->get(['id', 'user_id', 'key', 'title', 'value', 'type', 'sort_order']),
             'metaKeyOptions' => UserOption::query()
                 ->where('key', 'users_meta.allowed_key')
                 ->where('active', true)
@@ -133,13 +135,22 @@ class ProfileController extends Controller
 
         $this->authorize('update', $target);
 
-        $target->fill($request->validated());
+        $validated = $request->validated();
+        $shouldSyncMetas = (bool) ($validated['sync_metas'] ?? false);
+        $metas = $validated['metas'] ?? [];
+        unset($validated['metas'], $validated['sync_metas']);
+
+        $target->fill($validated);
 
         if ($target->isDirty('email')) {
             $target->email_verified_at = null;
         }
 
         $target->save();
+
+        if ($shouldSyncMetas) {
+            $this->userMetaSync->sync($target, $metas);
+        }
 
         // Redirect back to the same edit page (preserve route name)
         return to_route('profile.edit')

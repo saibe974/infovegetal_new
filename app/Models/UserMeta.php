@@ -15,6 +15,7 @@ class UserMeta extends Model
     protected $fillable = [
         'user_id',
         'key',
+        'title',
         'value',
         'type',
         'sort_order',

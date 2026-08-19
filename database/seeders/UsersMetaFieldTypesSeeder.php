@@ -19,7 +19,8 @@ class UsersMetaFieldTypesSeeder extends Seeder
             ['value' => 'phone', 'label' => 'phone', 'type' => 'phone', 'sort_order' => 40],
             ['value' => 'mobile', 'label' => 'mobile', 'type' => 'phone', 'sort_order' => 50],
             ['value' => 'adress', 'label' => 'json', 'type' => 'address', 'sort_order' => 60],
-            ['value' => 'sales_conditions', 'label' => 'textarea', 'type' => 'text', 'sort_order' => 70],
+            ['value' => 'sales_conditions', 'label' => 'file/pdf', 'type' => 'pdf', 'sort_order' => 70],
+            ['value' => 'pdf', 'label' => 'file/pdf', 'type' => 'pdf', 'sort_order' => 80],
         ];
 
         foreach ($kinds as $item) {

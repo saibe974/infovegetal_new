@@ -1,30 +1,53 @@
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { StickyBar } from '@/components/ui/sticky-bar';
+import {
+    AlertCircle,
+    ImageIcon,
+    Mail,
+    Save,
+    Trash2,
+    Upload,
+    Users2Icon,
+} from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ImageIcon, Mail, Plus, Save, Trash2, Upload, Users2Icon } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import DeleteUser from '@/components/users/delete-user';
-import InputError from '@/components/ui/input-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
+import { ButtonsActions } from '@/components/buttons-actions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import InputError from '@/components/ui/input-error';
+import { Label } from '@/components/ui/label';
+import { PdfFileIcon } from '@/components/ui/pdf-file-icon';
+import DeleteUser from '@/components/users/delete-user';
+import {
+    UserMetaFields,
+    type UserMetaDraft,
+} from '@/components/users/user-meta-fields';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit as editAdminUser, update as updateAdminUser } from '@/routes/users';
-import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import { edit as editProfile, update as updateProfile } from '@/routes/profile';
+import {
+    edit as editAdminUser,
+    update as updateAdminUser,
+} from '@/routes/users';
 
 export type UserMetaItem = {
     id: number;
     user_id: number;
     key: string;
+    title: string | null;
     value: string | null;
     type: string | null;
     sort_order: number;
@@ -32,6 +55,7 @@ export type UserMetaItem = {
 
 export type MetaFormPayload = {
     key: string;
+    title: string;
     custom_key: string;
     value: string;
     value_json: Record<string, string>;
@@ -44,7 +68,10 @@ export function resolveActualKey(key: string, customKey: string): string {
     return key === 'custom' ? customKey.trim() : key;
 }
 
-export function resolveInputKind(key: string, config: Record<string, { input: string; fields: string[] }>): string {
+export function resolveInputKind(
+    key: string,
+    config: Record<string, { input: string; fields: string[] }>,
+): string {
     if (!key || key === 'custom') {
         return 'input';
     }
@@ -92,6 +119,19 @@ export function resolvePersistedFileValue(raw: string | null): string {
     return raw;
 }
 
+function resolveMetaDisplayValue(value: string, file: File | null): string {
+    if (file) {
+        return file.name;
+    }
+
+    const decoded = safeJson(value);
+    if (decoded && typeof decoded.file_name === 'string' && decoded.file_name) {
+        return decoded.file_name;
+    }
+
+    return value || '—';
+}
+
 export function resolveImagePreview(raw: string): string | null {
     const decoded = safeJson(raw);
     if (decoded) {
@@ -105,7 +145,11 @@ export function resolveImagePreview(raw: string): string | null {
         return null;
     }
 
-    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
+    if (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:')
+    ) {
         return value;
     }
 
@@ -162,9 +206,10 @@ export function DynamicValueInput({
     }
 
     if (inputKind === 'json') {
-        const jsonFields = fields.length > 0 ? fields : ['number', 'road', 'zip', 'town'];
+        const jsonFields =
+            fields.length > 0 ? fields : ['number', 'road', 'zip', 'town'];
         return (
-            <div className='grid gap-3 md:grid-cols-2'>
+            <div className="grid gap-3 md:grid-cols-2">
                 {jsonFields.map((field) => (
                     <Input
                         key={field}
@@ -194,19 +239,42 @@ export function DynamicValueInput({
                     <Input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => setData('value_file', e.target.files?.[0] ?? null)}
+                        onChange={(e) =>
+                            setData('value_file', e.target.files?.[0] ?? null)
+                        }
                     />
                 </div>
 
                 {(selectedPreview || persistedPreview) && (
                     <div className="rounded-md border p-3">
-                        <p className="mb-2 text-sm text-muted-foreground">Apercu</p>
+                        <p className="mb-2 text-sm text-muted-foreground">
+                            Apercu
+                        </p>
                         <img
                             src={selectedPreview ?? persistedPreview ?? ''}
                             alt="Apercu image"
                             className="max-h-52 rounded-md border object-contain"
                         />
                     </div>
+                )}
+            </div>
+        );
+    }
+
+    if (inputKind === 'file/pdf') {
+        return (
+            <div className="space-y-2">
+                <Input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) =>
+                        setData('value_file', e.target.files?.[0] ?? null)
+                    }
+                />
+                {(data.value_file || data.value) && (
+                    <p className="text-sm text-muted-foreground">
+                        {resolveMetaDisplayValue(data.value, data.value_file)}
+                    </p>
                 )}
             </div>
         );
@@ -244,11 +312,15 @@ export function MetaRow({
     metaKeyOptions: Array<{ value: string; label: string }>;
     metaKeyConfig: Record<string, { input: string; fields: string[] }>;
 }) {
-    const knownKeys = useMemo(() => new Set(metaKeyOptions.map((x) => x.value)), [metaKeyOptions]);
+    const knownKeys = useMemo(
+        () => new Set(metaKeyOptions.map((x) => x.value)),
+        [metaKeyOptions],
+    );
     const startsAsCustom = !knownKeys.has(item.key);
 
     const form = useForm<MetaFormPayload>({
         key: startsAsCustom ? 'custom' : item.key,
+        title: item.title ?? item.key,
         custom_key: startsAsCustom ? item.key : '',
         value: resolvePersistedFileValue(item.value),
         value_json: parseJsonValue(item.value),
@@ -302,7 +374,12 @@ export function MetaRow({
                     <Input
                         type="number"
                         value={String(form.data.sort_order)}
-                        onChange={(e) => form.setData('sort_order', Number(e.target.value || 0))}
+                        onChange={(e) =>
+                            form.setData(
+                                'sort_order',
+                                Number(e.target.value || 0),
+                            )
+                        }
                     />
                 </div>
 
@@ -313,7 +390,9 @@ export function MetaRow({
                             <Input
                                 placeholder="Nom de la cle custom"
                                 value={form.data.custom_key}
-                                onChange={(e) => form.setData('custom_key', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('custom_key', e.target.value)
+                                }
                             />
                         </div>
 
@@ -341,16 +420,82 @@ export function MetaRow({
 
             <div className="pt-2">
                 <div className="flex items-center justify-between gap-2">
-                    <Button type="button" onClick={save} disabled={form.processing}>
+                    <Button
+                        type="button"
+                        onClick={save}
+                        disabled={form.processing}
+                    >
                         <Save className="mr-2 h-4 w-4" />
                         Sauver
                     </Button>
-                    <Button type="button" variant="destructive-outline" size="icon" onClick={remove} disabled={form.processing}>
+                    <Button
+                        type="button"
+                        variant="destructive-outline"
+                        size="icon"
+                        onClick={remove}
+                        disabled={form.processing}
+                    >
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </div>
             </div>
         </div>
+    );
+}
+
+function MetaCard({
+    item,
+    title,
+    onEdit,
+    onDelete,
+    onPreview,
+}: {
+    item: ProfileFormPayload['metas'][number];
+    title: string;
+    onEdit: () => void;
+    onDelete: () => void;
+    onPreview: (url: string) => void;
+}) {
+    const isPdf = item.type === 'file/pdf' || item.key === 'pdf';
+    const selectedPdfUrl = useSelectedFilePreview(
+        isPdf ? item.value_file : null,
+    );
+    const persistedPdfUrl = isPdf ? resolvePersistedFileValue(item.value) : '';
+    const pdfUrl = selectedPdfUrl ?? persistedPdfUrl;
+
+    return (
+        <Card className="gap-2 py-4 shadow-none">
+            <CardContent className="flex items-start gap-3 px-4">
+                <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                        {title}
+                    </p>
+                    {pdfUrl ? (
+                        <button
+                            type="button"
+                            className="flex max-w-full items-center gap-2 text-left hover:underline"
+                            onClick={() => onPreview(pdfUrl)}
+                        >
+                            <PdfFileIcon />
+                            <span className="break-words whitespace-pre-wrap">
+                                {resolveMetaDisplayValue(
+                                    item.value,
+                                    item.value_file,
+                                )}
+                            </span>
+                        </button>
+                    ) : (
+                        <p className="break-words whitespace-pre-wrap">
+                            {resolveMetaDisplayValue(
+                                item.value,
+                                item.value_file,
+                            )}
+                        </p>
+                    )}
+                </div>
+                <ButtonsActions edit={onEdit} delete={onDelete} />
+            </CardContent>
+        </Card>
     );
 }
 
@@ -375,7 +520,30 @@ type ProfileFormPayload = {
     active: boolean;
     mailing: boolean;
     parent_id: number | null;
+    sync_metas: boolean;
+    metas: UserMetaDraft[];
 };
+
+function mapUserMetas(
+    items: UserMetaItem[],
+    options: Array<{ value: string; label: string }>,
+): ProfileFormPayload['metas'] {
+    return items
+        .filter((item) => item.key !== 'logo')
+        .map((item) => ({
+            id: item.id,
+            key: item.key,
+            title:
+                item.title ??
+                options.find((option) => option.value === item.key)?.label ??
+                item.key,
+            value: item.value ?? '',
+            value_json: parseJsonValue(item.value),
+            value_file: null,
+            type: item.type ?? '',
+            sort_order: item.sort_order ?? 0,
+        }));
+}
 
 export default function Profile({
     mustVerifyEmail,
@@ -409,7 +577,8 @@ export default function Profile({
     const isAdminUser = isAdmin(effectiveUser);
     const userAbilities = pageProps.userAbilities ?? {};
     const canManageParent = !!userAbilities.move;
-    const isAdminEditContext = page.url.startsWith('/admin/users/') || isAdminUser;
+    const isAdminEditContext =
+        page.url.startsWith('/admin/users/') || isAdminUser;
 
     const isGroup = useMemo(
         () => (targetUser?.roles ?? []).some((role) => role?.name === 'group'),
@@ -438,23 +607,45 @@ export default function Profile({
         active: Boolean(targetUser?.active ?? true),
         mailing: Boolean(targetUser?.mailing ?? false),
         parent_id: initialParentId,
+        sync_metas: true,
+        metas: mapUserMetas(userMeta, metaKeyOptions),
     });
 
     const updateUrl = isAdminEditContext
         ? updateAdminUser({ user: targetUser!.id }).url
         : updateProfile().url;
 
+    const saveProfile = () => {
+        profileForm.transform((data) => ({
+            ...data,
+            _method: isAdminEditContext ? 'put' : 'patch',
+        }));
+        profileForm.post(updateUrl, {
+            preserveScroll: true,
+            preserveState: true,
+            forceFormData: true,
+            onSuccess: (page) => {
+                const savedMetas = mapUserMetas(
+                    (page.props as unknown as { userMeta?: UserMetaItem[] })
+                        .userMeta ?? [],
+                    metaKeyOptions,
+                );
+                profileForm.setDefaults('metas', savedMetas);
+                profileForm.setData('metas', savedMetas);
+            },
+        });
+    };
+
     const submitProfile = (e: FormEvent) => {
         e.preventDefault();
-        if (isAdminEditContext) {
-            profileForm.put(updateUrl, { preserveScroll: true });
-        } else {
-            profileForm.patch(updateUrl, { preserveScroll: true });
-        }
+        saveProfile();
     };
 
     // ── Logo ─────────────────────────────────────────────────────────────────
-    const logoMeta = useMemo(() => userMeta.find((m) => m.key === 'logo'), [userMeta]);
+    const logoMeta = useMemo(
+        () => userMeta.find((m) => m.key === 'logo'),
+        [userMeta],
+    );
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const selectedLogoPreview = useSelectedFilePreview(logoFile);
     const persistedLogoPreview = useMemo(
@@ -469,6 +660,7 @@ export default function Profile({
 
     const logoForm = useForm({
         key: 'logo' as string,
+        title: 'Logo',
         custom_key: '',
         value: '',
         value_json: { number: '', road: '', zip: '', town: '' },
@@ -495,34 +687,60 @@ export default function Profile({
     // ── Parent ────────────────────────────────────────────────────────────────
     const [parentModalOpen, setParentModalOpen] = useState(false);
     const [parentSearch, setParentSearch] = useState('');
-    const [parentSearchItems, setParentSearchItems] = useState<{ id: number; name: string; email: string; depth: number }[]>([]);
+    const [parentSearchItems, setParentSearchItems] = useState<
+        { id: number; name: string; email: string; depth: number }[]
+    >([]);
     const [parentSearchLoading, setParentSearchLoading] = useState(false);
     const initialParent = targetUserWithParent.parent_id
-        ? { id: targetUserWithParent.parent_id, name: targetUserWithParent.parent?.name ?? `#${targetUserWithParent.parent_id}` }
+        ? {
+              id: targetUserWithParent.parent_id,
+              name:
+                  targetUserWithParent.parent?.name ??
+                  `#${targetUserWithParent.parent_id}`,
+          }
         : null;
-    const [selectedParent, setSelectedParent] = useState<{ id: number; name: string } | null>(initialParent);
+    const [selectedParent, setSelectedParent] = useState<{
+        id: number;
+        name: string;
+    } | null>(initialParent);
 
-    const handleSelectParent = (parent: { id: number; name: string } | null) => {
+    const handleSelectParent = (
+        parent: { id: number; name: string } | null,
+    ) => {
         setSelectedParent(parent);
         profileForm.setData('parent_id', parent?.id ?? null);
     };
-    const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
 
     const searchParents = (q: string) => {
         setParentSearch(q);
         if (parentSearchTimer.current) clearTimeout(parentSearchTimer.current);
-        if (!q || q.trim().length < 2) { setParentSearchItems([]); return; }
+        if (!q || q.trim().length < 2) {
+            setParentSearchItems([]);
+            return;
+        }
         parentSearchTimer.current = setTimeout(async () => {
             setParentSearchLoading(true);
             try {
                 const res = await fetch(
                     `/admin/users/tree-search?q=${encodeURIComponent(q.trim())}`,
-                    { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } },
+                    {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    },
                 );
                 if (res.ok) {
                     const payload = await res.json();
                     setParentSearchItems(
-                        ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
+                        (
+                            (payload.items || []) as Array<
+                                Record<string, unknown>
+                            >
+                        ).map((item) => ({
                             id: Number(item.id),
                             name: String(item.name ?? ''),
                             email: String(item.email ?? ''),
@@ -536,42 +754,6 @@ export default function Profile({
         }, 300);
     };
 
-    // ── Meta creation form (from additional-info.tsx#200-287) ────────────────
-    const metaForm = useForm<MetaFormPayload>({
-        key: metaKeyOptions[0]?.value ?? 'custom',
-        custom_key: '',
-        value: '',
-        value_json: { number: '', road: '', zip: '', town: '' },
-        value_file: null,
-        type: '',
-        sort_order: 0,
-    });
-
-    const selectedNewMetaInput = resolveInputKind(metaForm.data.key, metaKeyConfig);
-
-    const addMeta = () => {
-        const actualKey = resolveActualKey(metaForm.data.key, metaForm.data.custom_key);
-        const mappedType = metaKeyConfig[actualKey]?.input ?? selectedNewMetaInput;
-
-        metaForm.transform((payload) => ({
-            ...payload,
-            key: actualKey,
-            type: mappedType,
-        }));
-
-        metaForm.post(metaBaseUrl, {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                metaForm.reset('custom_key', 'value', 'type', 'sort_order', 'value_file');
-                metaForm.setData('value_json', { number: '', road: '', zip: '', town: '' });
-            },
-        });
-    };
-
-    // ── Non-logo metas for display ───────────────────────────────────────────
-    const nonLogoMetas = useMemo(() => userMeta.filter((m) => m.key !== 'logo'), [userMeta]);
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('Profile settings')} />
@@ -580,48 +762,61 @@ export default function Profile({
                 <div className="space-y-6">
                     <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
                         <div className="ml-auto">
-                            <Button type="submit" form="profile-form" disabled={profileForm.processing}>
-                                <Save className="mr-2 h-4 w-4" />
-                                {t('Save')}
-                            </Button>
+                            <ButtonsActions
+                                save={saveProfile}
+                                saving={profileForm.processing}
+                            />
                         </div>
                     </StickyBar>
 
-                    <form id="profile-form" onSubmit={submitProfile} className="space-y-6">
+                    <form
+                        id="profile-form"
+                        onSubmit={submitProfile}
+                        className="space-y-6"
+                    >
                         {/* Vérification d'email non vérifiée */}
                         {mustVerifyEmail &&
                             targetUserWithParent.email_verified_at === null && (
                                 <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                                    <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600 flex-shrink-0" />
+                                    <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
                                     <div className="flex-1">
                                         <p className="text-sm text-amber-900">
-                                            {t('The user email address is unverified.')}{' '}
+                                            {t(
+                                                'The user email address is unverified.',
+                                            )}{' '}
                                             {!editingUser && (
                                                 <Link
                                                     href={send()}
                                                     as="button"
                                                     className="font-medium underline hover:no-underline"
                                                 >
-                                                    {t('Click here to resend the verification email.')}
+                                                    {t(
+                                                        'Click here to resend the verification email.',
+                                                    )}
                                                 </Link>
                                             )}
                                         </p>
-                                        {status === 'verification-link-sent' && (
-                                            <div className="mt-2 text-sm font-medium text-green-600">{t('A new verification link has been sent to the email address.')}</div>
+                                        {status ===
+                                            'verification-link-sent' && (
+                                            <div className="mt-2 text-sm font-medium text-green-600">
+                                                {t(
+                                                    'A new verification link has been sent to the email address.',
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             )}
 
-                        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
                             {/* ────── COLONNE 1 ────── */}
-                            <div className="xl:col-span-5 space-y-6">
-
+                            <div className="space-y-6 xl:col-span-5">
                                 {/* Logo */}
                                 <Card>
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-lg">{t('Logo')}</CardTitle>
+                                        <CardTitle className="text-lg">
+                                            {t('Logo')}
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
                                         <div className="flex flex-col items-center gap-3">
@@ -634,7 +829,9 @@ export default function Profile({
                                             ) : (
                                                 <div className="flex h-40 w-40 flex-col items-center justify-center gap-2 rounded-lg border bg-muted">
                                                     <ImageIcon className="size-12 text-muted-foreground/60" />
-                                                    <span className="text-sm text-muted-foreground">No image</span>
+                                                    <span className="text-sm text-muted-foreground">
+                                                        No image
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
@@ -643,18 +840,30 @@ export default function Profile({
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={(e) => {
-                                                    const file = e.target.files?.[0] ?? null;
+                                                    const file =
+                                                        e.target.files?.[0] ??
+                                                        null;
                                                     setLogoFile(file);
-                                                    logoForm.setData('value_file', file);
+                                                    logoForm.setData(
+                                                        'value_file',
+                                                        file,
+                                                    );
                                                 }}
                                             />
-                                            <InputError message={logoForm.errors.value_file} />
+                                            <InputError
+                                                message={
+                                                    logoForm.errors.value_file
+                                                }
+                                            />
                                             <Button
                                                 type="button"
                                                 variant="secondary"
                                                 size="sm"
                                                 className="w-full"
-                                                disabled={!logoFile || logoForm.processing}
+                                                disabled={
+                                                    !logoFile ||
+                                                    logoForm.processing
+                                                }
                                                 onClick={uploadLogo}
                                             >
                                                 <Upload className="mr-2 h-4 w-4" />
@@ -663,92 +872,14 @@ export default function Profile({
                                         </div>
                                     </CardContent>
                                 </Card>
-
-                                {/* Création de champs dynamiques */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-lg">{t('Dynamic fields creation')}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-3">
-                                            <div className="grid gap-3">
-                                                <div className="grid gap-2">
-                                                    <Label>Clé</Label>
-                                                    <select
-                                                        className="h-10 rounded-md border bg-card px-3"
-                                                        value={metaForm.data.key}
-                                                        onChange={(e) => metaForm.setData('key', e.target.value)}
-                                                    >
-                                                        {metaKeyOptions.map((opt) => (
-                                                            <option key={opt.value} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-
-                                                {/* <div className="grid gap-2">
-                                                    <Label>Ordre</Label>
-                                                    <Input
-                                                        type="number"
-                                                        placeholder="ordre"
-                                                        value={String(metaForm.data.sort_order)}
-                                                        onChange={(e) => metaForm.setData('sort_order', Number(e.target.value || 0))}
-                                                    />
-                                                </div> */}
-
-                                                {metaForm.data.key === 'custom' && (
-                                                    <>
-                                                        <div className="grid gap-2">
-                                                            <Label>Nom de la clé custom</Label>
-                                                            <Input
-                                                                placeholder="ex: contact.secondary_email"
-                                                                value={metaForm.data.custom_key}
-                                                                onChange={(e) => metaForm.setData('custom_key', e.target.value)}
-                                                            />
-                                                        </div>
-
-                                                        <div className="grid gap-2">
-                                                            <Label>Valeur</Label>
-                                                            <DynamicValueInput
-                                                                inputKind={selectedNewMetaInput}
-                                                                fields={metaKeyConfig[metaForm.data.key]?.fields ?? []}
-                                                                data={metaForm.data}
-                                                                setData={metaForm.setData}
-                                                            />
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-
-                                            {metaForm.data.key !== 'custom' && (
-                                                <DynamicValueInput
-                                                    inputKind={selectedNewMetaInput}
-                                                    fields={metaKeyConfig[metaForm.data.key]?.fields ?? []}
-                                                    data={metaForm.data}
-                                                    setData={metaForm.setData}
-                                                />
-                                            )}
-
-                                            <div className="pt-2">
-                                                <Button type="button" onClick={addMeta} disabled={metaForm.processing}>
-                                                    <Plus className="mr-2 h-4 w-4" />
-                                                    Ajouter
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <InputError message={metaForm.errors.key || metaForm.errors.value || metaForm.errors.type} />
-                                    </CardContent>
-                                </Card>
                             </div>
 
                             {/* ────── COLONNE 2 ────── */}
-                            <div className="xl:col-span-7 space-y-6">
-
+                            <div className="space-y-6 xl:col-span-7">
                                 {/* Informations Personnelles */}
                                 <Card>
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-lg flex items-center gap-2">
+                                        <CardTitle className="flex items-center gap-2 text-lg">
                                             <Mail size={20} />
                                             {t('Profile information')}
                                         </CardTitle>
@@ -756,92 +887,188 @@ export default function Profile({
                                     <CardContent>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="grid gap-2">
-                                                <Label htmlFor="name">{t('Name')}</Label>
+                                                <Label htmlFor="name">
+                                                    {t('Name')}
+                                                </Label>
                                                 <Input
                                                     id="name"
-                                                    value={profileForm.data.name}
-                                                    onChange={(e) => profileForm.setData('name', e.target.value)}
+                                                    value={
+                                                        profileForm.data.name
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'name',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                     required
                                                     autoComplete="name"
                                                     placeholder={t('Full name')}
                                                 />
-                                                <InputError message={errors.name} />
+                                                <InputError
+                                                    message={errors.name}
+                                                />
                                             </div>
 
                                             {!isGroup && (
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="email">{t('Email address')}</Label>
+                                                    <Label htmlFor="email">
+                                                        {t('Email address')}
+                                                    </Label>
                                                     <Input
                                                         id="email"
                                                         type="email"
-                                                        value={profileForm.data.email}
-                                                        onChange={(e) => profileForm.setData('email', e.target.value)}
+                                                        value={
+                                                            profileForm.data
+                                                                .email
+                                                        }
+                                                        onChange={(e) =>
+                                                            profileForm.setData(
+                                                                'email',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         required
                                                         autoComplete="username"
-                                                        placeholder={t('Email address')}
+                                                        placeholder={t(
+                                                            'Email address',
+                                                        )}
                                                     />
-                                                    <InputError message={errors.email} />
+                                                    <InputError
+                                                        message={errors.email}
+                                                    />
                                                 </div>
                                             )}
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="alias">Alias</Label>
+                                                <Label htmlFor="alias">
+                                                    Alias
+                                                </Label>
                                                 <Input
                                                     id="alias"
-                                                    value={profileForm.data.alias}
-                                                    onChange={(e) => profileForm.setData('alias', e.target.value)}
+                                                    value={
+                                                        profileForm.data.alias
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'alias',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.alias} />
+                                                <InputError
+                                                    message={errors.alias}
+                                                />
                                             </div>
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="ref">Référence</Label>
+                                                <Label htmlFor="ref">
+                                                    Référence
+                                                </Label>
                                                 <Input
                                                     id="ref"
                                                     value={profileForm.data.ref}
-                                                    onChange={(e) => profileForm.setData('ref', e.target.value)}
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'ref',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.ref} />
+                                                <InputError
+                                                    message={errors.ref}
+                                                />
                                             </div>
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="phone">Téléphone</Label>
+                                                <Label htmlFor="phone">
+                                                    Téléphone
+                                                </Label>
                                                 <Input
                                                     id="phone"
-                                                    value={profileForm.data.phone}
-                                                    onChange={(e) => profileForm.setData('phone', e.target.value)}
+                                                    value={
+                                                        profileForm.data.phone
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'phone',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.phone} />
+                                                <InputError
+                                                    message={errors.phone}
+                                                />
                                             </div>
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="address_road">Adresse</Label>
+                                                <Label htmlFor="address_road">
+                                                    Adresse
+                                                </Label>
                                                 <Input
                                                     id="address_road"
-                                                    value={profileForm.data.address_road}
-                                                    onChange={(e) => profileForm.setData('address_road', e.target.value)}
+                                                    value={
+                                                        profileForm.data
+                                                            .address_road
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'address_road',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.address_road} />
+                                                <InputError
+                                                    message={
+                                                        errors.address_road
+                                                    }
+                                                />
                                             </div>
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="address_zip">Code postal</Label>
+                                                <Label htmlFor="address_zip">
+                                                    Code postal
+                                                </Label>
                                                 <Input
                                                     id="address_zip"
-                                                    value={profileForm.data.address_zip}
-                                                    onChange={(e) => profileForm.setData('address_zip', e.target.value)}
+                                                    value={
+                                                        profileForm.data
+                                                            .address_zip
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'address_zip',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.address_zip} />
+                                                <InputError
+                                                    message={errors.address_zip}
+                                                />
                                             </div>
 
                                             <div className="grid gap-2">
-                                                <Label htmlFor="address_town">Ville</Label>
+                                                <Label htmlFor="address_town">
+                                                    Ville
+                                                </Label>
                                                 <Input
                                                     id="address_town"
-                                                    value={profileForm.data.address_town}
-                                                    onChange={(e) => profileForm.setData('address_town', e.target.value)}
+                                                    value={
+                                                        profileForm.data
+                                                            .address_town
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'address_town',
+                                                            e.target.value,
+                                                        )
+                                                    }
                                                 />
-                                                <InputError message={errors.address_town} />
+                                                <InputError
+                                                    message={
+                                                        errors.address_town
+                                                    }
+                                                />
                                             </div>
                                         </div>
 
@@ -850,67 +1077,93 @@ export default function Profile({
                                                 <input
                                                     id="active"
                                                     type="checkbox"
-                                                    checked={profileForm.data.active}
-                                                    onChange={(e) => profileForm.setData('active', e.target.checked)}
+                                                    checked={
+                                                        profileForm.data.active
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'active',
+                                                            e.target.checked,
+                                                        )
+                                                    }
                                                 />
-                                                <Label htmlFor="active">Actif</Label>
+                                                <Label htmlFor="active">
+                                                    Actif
+                                                </Label>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     id="mailing"
                                                     type="checkbox"
-                                                    checked={profileForm.data.mailing}
-                                                    onChange={(e) => profileForm.setData('mailing', e.target.checked)}
+                                                    checked={
+                                                        profileForm.data.mailing
+                                                    }
+                                                    onChange={(e) =>
+                                                        profileForm.setData(
+                                                            'mailing',
+                                                            e.target.checked,
+                                                        )
+                                                    }
                                                 />
-                                                <Label htmlFor="mailing">Accepte le mailing</Label>
+                                                <Label htmlFor="mailing">
+                                                    Accepte le mailing
+                                                </Label>
                                             </div>
                                         </div>
                                     </CardContent>
                                 </Card>
 
-                                {/* Champs dynamiques existants */}
-                                {nonLogoMetas.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-lg">Champs dynamiques</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            {nonLogoMetas.map((item) => (
-                                                <MetaRow
-                                                    key={item.id}
-                                                    item={item}
-                                                    metaBaseUrl={metaBaseUrl}
-                                                    metaKeyOptions={metaKeyOptions}
-                                                    metaKeyConfig={metaKeyConfig}
-                                                />
-                                            ))}
-                                        </CardContent>
-                                    </Card>
-                                )}
+                                <UserMetaFields
+                                    value={profileForm.data.metas}
+                                    onChange={(metas) =>
+                                        profileForm.setData('metas', metas)
+                                    }
+                                    metaKeyOptions={metaKeyOptions}
+                                    metaKeyConfig={metaKeyConfig}
+                                />
                             </div>
                         </div>
 
                         {/* Section Parent — visible uniquement en contexte admin */}
                         {isAdminEditContext && canManageParent && (
                             <Card className="p-6">
-                                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
                                     <Users2Icon size={20} />
                                     {t('Parent')}
                                 </h2>
                                 <div className="flex items-center gap-2">
                                     {selectedParent ? (
-                                        <Badge variant="outline" className="text-sm py-1 px-3">
+                                        <Badge
+                                            variant="outline"
+                                            className="px-3 py-1 text-sm"
+                                        >
                                             {selectedParent.name}
                                         </Badge>
                                     ) : (
-                                        <span className="text-sm text-muted-foreground">{t('No parent selected')}</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {t('No parent selected')}
+                                        </span>
                                     )}
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setParentModalOpen(true)}>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setParentModalOpen(true)}
+                                    >
                                         <Users2Icon className="mr-1 h-4 w-4" />
-                                        {selectedParent ? t('Change') : t('Select')}
+                                        {selectedParent
+                                            ? t('Change')
+                                            : t('Select')}
                                     </Button>
                                     {selectedParent && (
-                                        <Button type="button" variant="ghost" size="sm" onClick={() => handleSelectParent(null)}>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                handleSelectParent(null)
+                                            }
+                                        >
                                             {t('Remove')}
                                         </Button>
                                     )}
@@ -920,43 +1173,62 @@ export default function Profile({
                     </form>
 
                     {/* Modale sélection parent */}
-                    <Dialog open={parentModalOpen} onOpenChange={setParentModalOpen}>
+                    <Dialog
+                        open={parentModalOpen}
+                        onOpenChange={setParentModalOpen}
+                    >
                         <DialogContent className="max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>{t('Select a parent')}</DialogTitle>
+                                <DialogTitle>
+                                    {t('Select a parent')}
+                                </DialogTitle>
                             </DialogHeader>
                             <SearchSelect
                                 value={parentSearch}
                                 onChange={searchParents}
                                 onSubmit={searchParents}
-                                propositions={parentSearchItems.map((u) => ({ value: String(u.id), label: u.name }))}
+                                propositions={parentSearchItems.map((u) => ({
+                                    value: String(u.id),
+                                    label: u.name,
+                                }))}
                                 loading={parentSearchLoading}
                                 minQueryLength={2}
                                 search={true}
                             />
                             {parentSearchItems.length > 0 && (
-                                <ul className="mt-2 max-h-64 overflow-y-auto divide-y rounded-md border text-sm">
+                                <ul className="mt-2 max-h-64 divide-y overflow-y-auto rounded-md border text-sm">
                                     {parentSearchItems.map((u) => (
                                         <li
                                             key={u.id}
                                             className="flex cursor-pointer items-center justify-between px-3 py-2 hover:bg-muted"
-                                            style={{ paddingLeft: `${(u.depth ?? 0) * 16 + 12}px` }}
+                                            style={{
+                                                paddingLeft: `${(u.depth ?? 0) * 16 + 12}px`,
+                                            }}
                                             onClick={() => {
-                                                handleSelectParent({ id: u.id, name: u.name });
+                                                handleSelectParent({
+                                                    id: u.id,
+                                                    name: u.name,
+                                                });
                                                 setParentModalOpen(false);
                                                 setParentSearch('');
                                                 setParentSearchItems([]);
                                             }}
                                         >
                                             <span>{u.name}</span>
-                                            <span className="text-muted-foreground text-xs">{u.email}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {u.email}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
                             )}
-                            {parentSearch.trim().length >= 2 && !parentSearchLoading && parentSearchItems.length === 0 && (
-                                <p className="mt-2 text-sm text-muted-foreground">{t('No results.')}</p>
-                            )}
+                            {parentSearch.trim().length >= 2 &&
+                                !parentSearchLoading &&
+                                parentSearchItems.length === 0 && (
+                                    <p className="mt-2 text-sm text-muted-foreground">
+                                        {t('No results.')}
+                                    </p>
+                                )}
                         </DialogContent>
                     </Dialog>
 
