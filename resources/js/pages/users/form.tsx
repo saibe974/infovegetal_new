@@ -1,18 +1,10 @@
 import SearchSelect from '@/components/app/search-select';
-import { ButtonsActions } from '@/components/buttons-actions';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import { Label } from '@/components/ui/label';
-import { StickyBar } from '@/components/ui/sticky-bar';
+import { UserFormToolbar } from '@/components/users/user-form-toolbar';
 import {
     UserMetaFields,
     type UserMetaDraft,
@@ -21,11 +13,10 @@ import { withAppLayout } from '@/layouts/app-layout';
 import users from '@/routes/users';
 import type { BreadcrumbItem, User } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeftCircle, KeyRound, Mail, Users2Icon } from 'lucide-react';
-import { FormEvent, useMemo, useRef, useState } from 'react';
+import { ArrowLeftCircle, KeyRound, Mail } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
 
 type Role = { id: number; name: string };
-type TreeUser = { id: number; name: string; email: string; depth: number };
 type MetaOption = { value: string; label: string };
 type MetaConfig = Record<string, { input: string; fields: string[] }>;
 type Props = {
@@ -89,60 +80,10 @@ export default withAppLayout<Props>(
                 ),
             [form.data.roles, allRoles],
         );
-        const [parentModalOpen, setParentModalOpen] = useState(false);
-        const [parentSearch, setParentSearch] = useState('');
-        const [parentSearchItems, setParentSearchItems] = useState<TreeUser[]>(
-            [],
-        );
-        const [parentSearchLoading, setParentSearchLoading] = useState(false);
         const [selectedParent, setSelectedParent] = useState<{
             id: number;
             name: string;
         } | null>(null);
-        const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(
-            null,
-        );
-
-        const searchParents = (query: string) => {
-            setParentSearch(query);
-            if (parentSearchTimer.current)
-                clearTimeout(parentSearchTimer.current);
-            if (query.trim().length < 2) {
-                setParentSearchItems([]);
-                return;
-            }
-            parentSearchTimer.current = setTimeout(async () => {
-                setParentSearchLoading(true);
-                try {
-                    const response = await fetch(
-                        `/admin/users/tree-search?q=${encodeURIComponent(query.trim())}`,
-                        {
-                            headers: {
-                                Accept: 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                        },
-                    );
-                    if (response.ok) {
-                        const payload = await response.json();
-                        setParentSearchItems(
-                            (
-                                (payload.items || []) as Array<
-                                    Record<string, unknown>
-                                >
-                            ).map((item) => ({
-                                id: Number(item.id),
-                                name: String(item.name ?? ''),
-                                email: String(item.email ?? ''),
-                                depth: Number(item.depth ?? 0),
-                            })),
-                        );
-                    }
-                } finally {
-                    setParentSearchLoading(false);
-                }
-            }, 300);
-        };
 
         const save = () => {
             const url = isNew
@@ -208,9 +149,18 @@ export default withAppLayout<Props>(
                     </div>
                 </div>
 
-                <StickyBar topOffsetElement=".top-sticky">
-                    <ButtonsActions save={save} saving={form.processing} />
-                </StickyBar>
+                <UserFormToolbar
+                    parent={selectedParent}
+                    onParentChange={(parent) => {
+                        setSelectedParent(parent);
+                        form.setData('parent_id', parent?.id ?? null);
+                    }}
+                    user={user ?? null}
+                    canView={Boolean(user?.abilities?.view)}
+                    canDelete={Boolean(user?.abilities?.delete)}
+                    onSave={save}
+                    saving={form.processing}
+                />
 
                 <form onSubmit={submit} className="space-y-6">
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -556,108 +506,7 @@ export default withAppLayout<Props>(
                             />
                         </div>
                     </div>
-
-                    <Card className="p-6">
-                        <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
-                            <Users2Icon size={20} />
-                            Parent
-                        </h2>
-                        <div className="flex items-center gap-2">
-                            {selectedParent ? (
-                                <Badge
-                                    variant="outline"
-                                    className="px-3 py-1 text-sm"
-                                >
-                                    {selectedParent.name}
-                                </Badge>
-                            ) : (
-                                <span className="text-sm text-muted-foreground">
-                                    Aucun parent sélectionné
-                                </span>
-                            )}
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setParentModalOpen(true)}
-                            >
-                                <Users2Icon className="mr-1 h-4 w-4" />
-                                {selectedParent ? 'Changer' : 'Sélectionner'}
-                            </Button>
-                            {selectedParent && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        setSelectedParent(null);
-                                        form.setData('parent_id', null);
-                                    }}
-                                >
-                                    Retirer
-                                </Button>
-                            )}
-                        </div>
-                    </Card>
                 </form>
-
-                <Dialog
-                    open={parentModalOpen}
-                    onOpenChange={setParentModalOpen}
-                >
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>Sélectionner un parent</DialogTitle>
-                        </DialogHeader>
-                        <SearchSelect
-                            value={parentSearch}
-                            onChange={searchParents}
-                            onSubmit={searchParents}
-                            propositions={parentSearchItems.map((item) => ({
-                                value: String(item.id),
-                                label: item.name,
-                            }))}
-                            loading={parentSearchLoading}
-                            minQueryLength={2}
-                            search
-                        />
-                        {parentSearchItems.length > 0 && (
-                            <ul className="mt-2 max-h-64 divide-y overflow-y-auto rounded-md border text-sm">
-                                {parentSearchItems.map((item) => (
-                                    <li
-                                        key={item.id}
-                                        className="flex cursor-pointer items-center justify-between px-3 py-2 hover:bg-muted"
-                                        style={{
-                                            paddingLeft: `${item.depth * 16 + 12}px`,
-                                        }}
-                                        onClick={() => {
-                                            setSelectedParent({
-                                                id: item.id,
-                                                name: item.name,
-                                            });
-                                            form.setData('parent_id', item.id);
-                                            setParentModalOpen(false);
-                                            setParentSearch('');
-                                            setParentSearchItems([]);
-                                        }}
-                                    >
-                                        <span>{item.name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {item.email}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {parentSearch.trim().length >= 2 &&
-                            !parentSearchLoading &&
-                            parentSearchItems.length === 0 && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Aucun résultat.
-                                </p>
-                            )}
-                    </DialogContent>
-                </Dialog>
             </div>
         );
     },

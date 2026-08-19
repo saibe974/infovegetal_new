@@ -20,13 +20,28 @@ import UsersAccordion from '@/components/users/users-accordion';
 import UsersImportTreatment from '@/components/users/import';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
-import SortableTree, { type RenderItemProps } from '@/components/sortable-tree';
+import SortableTree, {
+    invalidateSortableTreeMemoryCache,
+    type RenderItemProps,
+} from '@/components/sortable-tree';
 import { SortableTreeItem } from '@/components/sortable-tree-item';
 import { toast } from 'sonner';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 
 type UsersImportTreatmentProps = ComponentProps<typeof UsersImportTreatment>;
+
+const USERS_TREE_CACHE_TTL_MS = 5 * 60 * 1000;
+const usersTreeSearchCache = new Map<
+    string,
+    { payload: Record<string, unknown>; cachedAt: number }
+>();
+
+const invalidateUsersTreeSearchCache = (prefix: string) => {
+    for (const key of usersTreeSearchCache.keys()) {
+        if (key.startsWith(prefix)) usersTreeSearchCache.delete(key);
+    }
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -143,8 +158,14 @@ export default withAppLayout<UsersPageProps>(
             });
         }, [collection?.data]);
 
-        const { auth } = usePage<SharedData>().props;
+        const { auth, query } = usePage<SharedData>().props;
         const effectiveUser = getEffectiveUser(auth);
+        const treeMemoryCachePrefix = `users:${effectiveUser?.id ?? 'anonymous'}:`;
+        const treeMemoryCacheKey = `${treeMemoryCachePrefix}${(q ?? '').trim()}:${String(query?.sort ?? '')}:${String(query?.dir ?? '')}`;
+        const invalidateUserTreeCaches = () => {
+            invalidateSortableTreeMemoryCache(treeMemoryCachePrefix);
+            invalidateUsersTreeSearchCache(treeMemoryCachePrefix);
+        };
         const canManageUsers = canAccessUsers(effectiveUser);
         const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
 
@@ -249,6 +270,7 @@ export default withAppLayout<UsersPageProps>(
                 router.delete(`/admin/users/${userId}`, {
                     preserveScroll: true,
                     preserveState: true,
+                    onSuccess: invalidateUserTreeCaches,
                     onError: () => toast.error(t('Error while deleting user')),
                 });
             }
@@ -275,6 +297,37 @@ export default withAppLayout<UsersPageProps>(
             }
 
             const controller = new AbortController();
+            const cacheKey = `${treeMemoryCachePrefix}search:${treeSearchQuery.toLocaleLowerCase()}`;
+            const applyPayload = (payload: Record<string, unknown>) => {
+                const currentUrl = new URL(window.location.href);
+                const rawItems = Array.isArray(payload.items) ? payload.items : [];
+                const nextItems = (rawItems as Array<Record<string, unknown>>).map((item) => ({
+                    ...item,
+                    parent_id: (item.parent_id as number | null | undefined) ?? null,
+                    depth: Number(item.depth ?? 0),
+                    has_children: Boolean(item.has_children),
+                })) as TreeUser[];
+
+                setTreeSearchItems(sortUserHierarchy(
+                    nextItems,
+                    currentUrl.searchParams.get('sort'),
+                    currentUrl.searchParams.get('dir'),
+                ));
+                setTreeSearchExpandedIds(
+                    (Array.isArray(payload.expanded_ids) ? payload.expanded_ids : [])
+                        .map((id: unknown) => Number(id))
+                        .filter((id: number) => Number.isFinite(id)),
+                );
+            };
+            const cached = usersTreeSearchCache.get(cacheKey);
+
+            if (cached && Date.now() - cached.cachedAt <= USERS_TREE_CACHE_TTL_MS) {
+                applyPayload(cached.payload);
+                setTreeSearchLoading(false);
+                return;
+            }
+
+            if (cached) usersTreeSearchCache.delete(cacheKey);
             setTreeSearchLoading(true);
 
             fetch(`/admin/users/tree-search?q=${encodeURIComponent(treeSearchQuery)}`, {
@@ -288,27 +341,14 @@ export default withAppLayout<UsersPageProps>(
                     if (!response.ok) {
                         throw new Error('Failed to load users tree search fragment');
                     }
-                    return response.json();
+                    return response.json() as Promise<Record<string, unknown>>;
                 })
                 .then((payload) => {
-                    const currentUrl = new URL(window.location.href);
-                    const nextItems = ((payload.items || []) as Array<Record<string, unknown>>).map((item) => ({
-                        ...item,
-                        parent_id: (item.parent_id as number | null | undefined) ?? null,
-                        depth: Number(item.depth ?? 0),
-                        has_children: Boolean(item.has_children),
-                    })) as TreeUser[];
-
-                    setTreeSearchItems(sortUserHierarchy(
-                        nextItems,
-                        currentUrl.searchParams.get('sort'),
-                        currentUrl.searchParams.get('dir'),
-                    ));
-                    setTreeSearchExpandedIds(
-                        (payload.expanded_ids || [])
-                            .map((id: unknown) => Number(id))
-                            .filter((id: number) => Number.isFinite(id)),
-                    );
+                    usersTreeSearchCache.set(cacheKey, {
+                        payload,
+                        cachedAt: Date.now(),
+                    });
+                    applyPayload(payload);
                 })
                 .catch((error) => {
                     if (error?.name === 'AbortError') {
@@ -326,7 +366,7 @@ export default withAppLayout<UsersPageProps>(
             return () => {
                 controller.abort();
             };
-        }, [isTreeSearchMode, treeSearchQuery]);
+        }, [isTreeSearchMode, treeSearchQuery, treeMemoryCachePrefix]);
 
         const loadTreePage = async (
             parent: TreeUser | null,
@@ -451,6 +491,7 @@ export default withAppLayout<UsersPageProps>(
                 if (!res.ok) throw new Error(await res.text());
 
                 toast.success(t('Hierarchy saved successfully'));
+                invalidateUserTreeCaches();
                 setPending(null);
 
                 // Refetch users to update the tree with fresh nested set values
@@ -464,6 +505,7 @@ export default withAppLayout<UsersPageProps>(
         };
 
         const cancel = () => {
+            invalidateUserTreeCaches();
             setPending(null);
             router.reload();
         };
@@ -552,7 +594,7 @@ export default withAppLayout<UsersPageProps>(
                         viewMode={viewMode}
                         onViewModeChange={setViewMode}
                         pageKey="users"
-                        modes={['table', /*'tree',*/ 'accordion', 'grid']}
+                        modes={[/*'table', 'tree',*/ 'accordion', 'grid']}
                     />
                     <div className="w-200 left-0 top-1 mr-2">
                         <SearchSelect
@@ -581,6 +623,7 @@ export default withAppLayout<UsersPageProps>(
                                     importProcessChunkUrl={usersRoutes.import.process_chunk.url()}
                                     importCancelUrl={usersRoutes.import.cancel.url()}
                                     importProgressUrl={(id) => usersRoutes.import.progress.url({ id })}
+                                    onImportQueued={invalidateUserTreeCaches}
                                     postTreatmentComponent={(props) => (
                                         <UsersImportTreatment {...(props as unknown as UsersImportTreatmentProps)} />
                                     )}
@@ -630,11 +673,13 @@ export default withAppLayout<UsersPageProps>(
                         )}
                         <div className="border rounded-md overflow-hidden">
                             <SortableTree
+                                key={isTreeSearchMode ? `users-search:${treeSearchQuery}` : treeMemoryCacheKey}
                                 items={isTreeSearchMode ? (treeSearchItems ?? emptyTreeItems) : (pending ?? emptyTreeItems)}
                                 idKey="id"
                                 parentKey="parent_id"
                                 depthKey="depth"
                                 storageKey="users"
+                                memoryCacheKey={isTreeSearchMode ? undefined : treeMemoryCacheKey}
                                 expandOnInside={false}
                                 forcedExpandedIds={isTreeSearchMode ? treeSearchExpandedIds : undefined}
                                 lazy={isTreeSearchMode ? undefined : {
@@ -652,6 +697,7 @@ export default withAppLayout<UsersPageProps>(
                             <div className="px-1 text-sm text-muted-foreground">Chargement du fragment...</div>
                         )}
                         <UsersAccordion
+                            memoryCacheKey={isTreeSearchMode ? undefined : treeMemoryCacheKey}
                             items={isTreeSearchMode ? (treeSearchItems ?? emptyTreeItems) : (pending ?? emptyTreeItems)}
                             forcedExpandedIds={isTreeSearchMode ? treeSearchExpandedIds : undefined}
                             lazy={isTreeSearchMode ? undefined : {

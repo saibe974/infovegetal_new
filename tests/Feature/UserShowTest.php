@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\UserMeta;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -28,6 +29,14 @@ test('a user with view access can open the read-only user overview', function ()
     $manager->assignRole($managerRole);
     $manager->saveAsRoot();
     $target->appendToNode($manager)->save();
+    UserMeta::create([
+        'user_id' => $target->id,
+        'key' => 'billing_address',
+        'title' => 'Adresse de facturation',
+        'value' => '{"road":"Royal Road","town":"Port-Louis"}',
+        'type' => 'json',
+        'sort_order' => 10,
+    ]);
 
     $this
         ->actingAs($manager)
@@ -41,7 +50,10 @@ test('a user with view access can open the read-only user overview', function ()
             ->where('user.abilities.update', false)
             ->where('user.abilities.manage_db', false)
             ->where('parent.id', $manager->id)
-            ->where('childrenCount', 0));
+            ->where('childrenCount', 0)
+            ->has('userMeta', 1)
+            ->where('userMeta.0.key', 'billing_address')
+            ->where('userMeta.0.title', 'Adresse de facturation'));
 
     $this
         ->actingAs($manager)

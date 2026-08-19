@@ -1,10 +1,3 @@
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { StickyBar } from '@/components/ui/sticky-bar';
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
@@ -15,20 +8,16 @@ import {
     Save,
     Trash2,
     Upload,
-    Users2Icon,
 } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
-import SearchSelect from '@/components/app/search-select';
-import { ButtonsActions } from '@/components/buttons-actions';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import { Label } from '@/components/ui/label';
-import { PdfFileIcon } from '@/components/ui/pdf-file-icon';
 import DeleteUser from '@/components/users/delete-user';
+import { UserFormToolbar } from '@/components/users/user-form-toolbar';
 import {
     UserMetaFields,
     type UserMetaDraft,
@@ -443,66 +432,10 @@ export function MetaRow({
     );
 }
 
-function MetaCard({
-    item,
-    title,
-    onEdit,
-    onDelete,
-    onPreview,
-}: {
-    item: ProfileFormPayload['metas'][number];
-    title: string;
-    onEdit: () => void;
-    onDelete: () => void;
-    onPreview: (url: string) => void;
-}) {
-    const isPdf = item.type === 'file/pdf' || item.key === 'pdf';
-    const selectedPdfUrl = useSelectedFilePreview(
-        isPdf ? item.value_file : null,
-    );
-    const persistedPdfUrl = isPdf ? resolvePersistedFileValue(item.value) : '';
-    const pdfUrl = selectedPdfUrl ?? persistedPdfUrl;
-
-    return (
-        <Card className="gap-2 py-4 shadow-none">
-            <CardContent className="flex items-start gap-3 px-4">
-                <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
-                        {title}
-                    </p>
-                    {pdfUrl ? (
-                        <button
-                            type="button"
-                            className="flex max-w-full items-center gap-2 text-left hover:underline"
-                            onClick={() => onPreview(pdfUrl)}
-                        >
-                            <PdfFileIcon />
-                            <span className="break-words whitespace-pre-wrap">
-                                {resolveMetaDisplayValue(
-                                    item.value,
-                                    item.value_file,
-                                )}
-                            </span>
-                        </button>
-                    ) : (
-                        <p className="break-words whitespace-pre-wrap">
-                            {resolveMetaDisplayValue(
-                                item.value,
-                                item.value_file,
-                            )}
-                        </p>
-                    )}
-                </div>
-                <ButtonsActions edit={onEdit} delete={onDelete} />
-            </CardContent>
-        </Card>
-    );
-}
-
 type PageProps = SharedData & {
     locale?: string;
     errors?: Record<string, string>;
-    userAbilities?: { move?: boolean };
+    userAbilities?: { view?: boolean; delete?: boolean; move?: boolean };
     userMeta?: UserMetaItem[];
     metaKeyOptions?: Array<{ value: string; label: string }>;
     metaKeyConfig?: Record<string, { input: string; fields: string[] }>;
@@ -685,12 +618,6 @@ export default function Profile({
     };
 
     // ── Parent ────────────────────────────────────────────────────────────────
-    const [parentModalOpen, setParentModalOpen] = useState(false);
-    const [parentSearch, setParentSearch] = useState('');
-    const [parentSearchItems, setParentSearchItems] = useState<
-        { id: number; name: string; email: string; depth: number }[]
-    >([]);
-    const [parentSearchLoading, setParentSearchLoading] = useState(false);
     const initialParent = targetUserWithParent.parent_id
         ? {
               id: targetUserWithParent.parent_id,
@@ -710,49 +637,6 @@ export default function Profile({
         setSelectedParent(parent);
         profileForm.setData('parent_id', parent?.id ?? null);
     };
-    const parentSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
-
-    const searchParents = (q: string) => {
-        setParentSearch(q);
-        if (parentSearchTimer.current) clearTimeout(parentSearchTimer.current);
-        if (!q || q.trim().length < 2) {
-            setParentSearchItems([]);
-            return;
-        }
-        parentSearchTimer.current = setTimeout(async () => {
-            setParentSearchLoading(true);
-            try {
-                const res = await fetch(
-                    `/admin/users/tree-search?q=${encodeURIComponent(q.trim())}`,
-                    {
-                        headers: {
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    },
-                );
-                if (res.ok) {
-                    const payload = await res.json();
-                    setParentSearchItems(
-                        (
-                            (payload.items || []) as Array<
-                                Record<string, unknown>
-                            >
-                        ).map((item) => ({
-                            id: Number(item.id),
-                            name: String(item.name ?? ''),
-                            email: String(item.email ?? ''),
-                            depth: Number(item.depth ?? 0),
-                        })),
-                    );
-                }
-            } finally {
-                setParentSearchLoading(false);
-            }
-        }, 300);
-    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -760,14 +644,21 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
-                        <div className="ml-auto">
-                            <ButtonsActions
-                                save={saveProfile}
-                                saving={profileForm.processing}
-                            />
-                        </div>
-                    </StickyBar>
+                    <UserFormToolbar
+                        parent={selectedParent}
+                        onParentChange={handleSelectParent}
+                        canManageParent={isAdminEditContext && canManageParent}
+                        user={
+                            editingUser
+                                ? { id: editingUser.id, name: editingUser.name }
+                                : null
+                        }
+                        canView={Boolean(userAbilities.view)}
+                        canDelete={Boolean(userAbilities.delete)}
+                        onSave={saveProfile}
+                        saving={profileForm.processing}
+                        topOffsetElement=".top-sticky, .settings-sticky"
+                    />
 
                     <form
                         id="profile-form"
@@ -1123,117 +1014,10 @@ export default function Profile({
                                 />
                             </div>
                         </div>
-
-                        {/* Section Parent — visible uniquement en contexte admin */}
-                        {isAdminEditContext && canManageParent && (
-                            <Card className="p-6">
-                                <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
-                                    <Users2Icon size={20} />
-                                    {t('Parent')}
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    {selectedParent ? (
-                                        <Badge
-                                            variant="outline"
-                                            className="px-3 py-1 text-sm"
-                                        >
-                                            {selectedParent.name}
-                                        </Badge>
-                                    ) : (
-                                        <span className="text-sm text-muted-foreground">
-                                            {t('No parent selected')}
-                                        </span>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setParentModalOpen(true)}
-                                    >
-                                        <Users2Icon className="mr-1 h-4 w-4" />
-                                        {selectedParent
-                                            ? t('Change')
-                                            : t('Select')}
-                                    </Button>
-                                    {selectedParent && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() =>
-                                                handleSelectParent(null)
-                                            }
-                                        >
-                                            {t('Remove')}
-                                        </Button>
-                                    )}
-                                </div>
-                            </Card>
-                        )}
                     </form>
 
-                    {/* Modale sélection parent */}
-                    <Dialog
-                        open={parentModalOpen}
-                        onOpenChange={setParentModalOpen}
-                    >
-                        <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle>
-                                    {t('Select a parent')}
-                                </DialogTitle>
-                            </DialogHeader>
-                            <SearchSelect
-                                value={parentSearch}
-                                onChange={searchParents}
-                                onSubmit={searchParents}
-                                propositions={parentSearchItems.map((u) => ({
-                                    value: String(u.id),
-                                    label: u.name,
-                                }))}
-                                loading={parentSearchLoading}
-                                minQueryLength={2}
-                                search={true}
-                            />
-                            {parentSearchItems.length > 0 && (
-                                <ul className="mt-2 max-h-64 divide-y overflow-y-auto rounded-md border text-sm">
-                                    {parentSearchItems.map((u) => (
-                                        <li
-                                            key={u.id}
-                                            className="flex cursor-pointer items-center justify-between px-3 py-2 hover:bg-muted"
-                                            style={{
-                                                paddingLeft: `${(u.depth ?? 0) * 16 + 12}px`,
-                                            }}
-                                            onClick={() => {
-                                                handleSelectParent({
-                                                    id: u.id,
-                                                    name: u.name,
-                                                });
-                                                setParentModalOpen(false);
-                                                setParentSearch('');
-                                                setParentSearchItems([]);
-                                            }}
-                                        >
-                                            <span>{u.name}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {u.email}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            {parentSearch.trim().length >= 2 &&
-                                !parentSearchLoading &&
-                                parentSearchItems.length === 0 && (
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                        {t('No results.')}
-                                    </p>
-                                )}
-                        </DialogContent>
-                    </Dialog>
-
                     {/* Delete User */}
-                    <DeleteUser />
+                    {!editingUser && <DeleteUser />}
                 </div>
             </SettingsLayout>
         </AppLayout>

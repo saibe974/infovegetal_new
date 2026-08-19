@@ -198,6 +198,7 @@ function MetaCard({
     const isPdf = item.type === 'file/pdf';
     const selectedUrl = useFilePreview(isPdf ? item.value_file : null);
     const pdfUrl = selectedUrl ?? (isPdf ? persistedFileUrl(item.value) : '');
+    const displayedValue = displayValue(item);
     return (
         <Card className="gap-2 py-4 shadow-none">
             <CardContent className="flex items-start gap-3 px-4">
@@ -208,12 +209,15 @@ function MetaCard({
                     {pdfUrl ? (
                         <button
                             type="button"
-                            className="flex max-w-full items-center gap-2 text-left hover:underline"
+                            className="flex max-w-full min-w-0 items-center gap-2 text-left hover:underline"
                             onClick={() => onPreview(pdfUrl)}
+                            title={displayedValue}
                         >
-                            <PdfFileIcon />
-                            <span className="break-words whitespace-pre-wrap">
-                                {displayValue(item)}
+                            <span className="shrink-0">
+                                <PdfFileIcon />
+                            </span>
+                            <span className="min-w-0 truncate">
+                                {displayedValue}
                             </span>
                         </button>
                     ) : (

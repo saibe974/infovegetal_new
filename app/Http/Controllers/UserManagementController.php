@@ -412,7 +412,9 @@ class UserManagementController extends Controller
     {
         $this->authorize('view', $user);
 
-        $user->load(['roles', 'permissions', 'usersMeta' => fn ($query) => $query->where('key', 'logo')]);
+        $user->load(['roles', 'permissions', 'usersMeta' => fn ($query) => $query
+            ->orderBy('sort_order')
+            ->orderBy('id')]);
 
         return Inertia::render('users/show', [
             'user' => UserResource::make($user)->resolve($request),
@@ -420,6 +422,24 @@ class UserManagementController extends Controller
                 ? $user->parent->only(['id', 'name'])
                 : null,
             'childrenCount' => $user->children()->count(),
+            'userMeta' => $user->usersMeta
+                ->where('key', '!=', 'logo')
+                ->values()
+                ->map(fn ($meta) => $meta->only([
+                    'id', 'key', 'title', 'value', 'type', 'sort_order',
+                ])),
+            'metaKeyOptions' => UserOption::query()
+                ->where('key', 'users_meta.allowed_key')
+                ->where('active', true)
+                ->orderBy('sort_order')
+                ->get(['value', 'label'])
+                ->map(fn (UserOption $row) => [
+                    'value' => (string) $row->value,
+                    'label' => (string) ($row->label ?: $row->value),
+                ])
+                ->values()
+                ->all(),
+            'metaKeyConfig' => $this->metaKeyConfig(),
         ]);
     }
 
@@ -428,7 +448,7 @@ class UserManagementController extends Controller
         $this->authorize('update', $user);
 
         // Charger les rôles avec leurs permissions (role_has_permissions)
-        $user->load('roles.permissions');
+        $user->load(['roles.permissions', 'parent']);
         $permissions = $user->roles->flatMap(fn ($role) => $role->permissions)->unique('id')->values();
 
         return Inertia::render('settings/profile', [

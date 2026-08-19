@@ -97,6 +97,7 @@ export type AccordionTreeUser = User & {
 
 interface UsersAccordionProps {
     items: AccordionTreeUser[];
+    memoryCacheKey?: string;
     forcedExpandedIds?: Id[];
     lazy?: {
         pageSize?: number;
@@ -777,6 +778,7 @@ function StickyParentRow({
 
 export default function UsersAccordion({
     items,
+    memoryCacheKey,
     forcedExpandedIds,
     lazy,
     onChange,
@@ -986,11 +988,13 @@ export default function UsersAccordion({
                 className="overflow-hidden rounded-md border bg-card"
             >
                 <SortableTree
+                    key={memoryCacheKey}
                     items={items}
                     idKey="id"
                     parentKey="parent_id"
                     depthKey="depth"
                     storageKey="users-accordion"
+                    memoryCacheKey={memoryCacheKey}
                     expandOnInside={false}
                     forcedExpandedIds={forcedExpandedIds}
                     lazy={lazy}

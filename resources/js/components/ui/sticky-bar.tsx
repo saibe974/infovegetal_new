@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import BasicSticky from 'react-sticky-el';
 
 interface StickyBarProps {
@@ -22,6 +22,7 @@ export function StickyBar({
 }: StickyBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const getHeight = () => {
@@ -34,13 +35,9 @@ export function StickyBar({
         };
 
         const getWidth = () => {
-            const el = document.querySelector('main') as HTMLElement | null;
+            const el = containerRef.current;
             if (!el) return 0;
-            const computedStyle = window.getComputedStyle(el);
-            const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-            const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-            // je ne sais pas d'où vient ce 30px (et 16 si écran moins large), mais sans ça la largeur est trop grande
-            return Math.ceil(el.clientWidth - paddingLeft - paddingRight - (window.innerWidth < 1024 ? 16 : 30));
+            return Math.max(0, Math.floor(el.getBoundingClientRect().width));
         }
 
         const update = () => {
@@ -51,12 +48,10 @@ export function StickyBar({
         update();
         window.addEventListener('resize', update);
 
-        // Observer l'élément <main> pour détecter les changements de largeur
-        let mainRo: ResizeObserver | null = null;
-        const mainEl = document.querySelector('main') as HTMLElement | null;
-        if (mainEl && typeof ResizeObserver !== 'undefined') {
-            mainRo = new ResizeObserver(update);
-            mainRo.observe(mainEl);
+        let containerRo: ResizeObserver | null = null;
+        if (containerRef.current && typeof ResizeObserver !== 'undefined') {
+            containerRo = new ResizeObserver(update);
+            containerRo.observe(containerRef.current);
         }
 
         // Les éléments servant d'offset peuvent changer de hauteur (par exemple
@@ -71,7 +66,7 @@ export function StickyBar({
 
         return () => {
             window.removeEventListener('resize', update);
-            if (mainRo) mainRo.disconnect();
+            if (containerRo) containerRo.disconnect();
             if (offsetRo) offsetRo.disconnect();
         };
     }, [topOffsetElement]);
@@ -79,16 +74,18 @@ export function StickyBar({
     // console.log(topOffset)
 
     return (
-        <BasicSticky
-            topOffset={-topOffset}
-            stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
-            wrapperClassName={`relative z-${zIndex} ${className}`}
-            stickyStyle={{ top: topOffset, zIndex, ...(width && { width }) }}
-            onFixedToggle={onFixedToggle}
-        >
-            <div className={`z-${zIndex} flex items-center justify-between relative w-full gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} py-2`}>
-                {children}
-            </div>
-        </BasicSticky>
+        <div ref={containerRef}>
+            <BasicSticky
+                topOffset={-topOffset}
+                stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
+                wrapperClassName={`relative z-${zIndex} ${className}`}
+                stickyStyle={{ top: topOffset, zIndex, ...(width && { width }) }}
+                onFixedToggle={onFixedToggle}
+            >
+                <div className={`z-${zIndex} relative flex w-full flex-wrap items-center justify-between gap-2 ${borderBottom ? 'border-b border-sidebar-border/50' : ''} bg-background py-2`}>
+                    {children}
+                </div>
+            </BasicSticky>
+        </div>
     );
 }

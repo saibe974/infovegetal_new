@@ -77,7 +77,50 @@ export type SortableTreeProps<T extends Record<string, unknown>> = {
     forcedExpandedIds?: Id[];
 
     storageKey?: string; // Clé pour le localStorage (ex: "categories", "users")
+    memoryCacheKey?: string;
+    memoryCacheTtlMs?: number;
 };
+
+type BranchState = Record<string, { offset: number; hasMore: boolean; initialized: boolean }>;
+
+type TreeMemorySnapshot = {
+    items: Record<string, unknown>[];
+    branchState: BranchState;
+    cachedAt: number;
+};
+
+const treeMemoryCache = new Map<string, TreeMemorySnapshot>();
+
+export function invalidateSortableTreeMemoryCache(prefix?: string) {
+    if (!prefix) {
+        treeMemoryCache.clear();
+        return;
+    }
+
+    for (const key of treeMemoryCache.keys()) {
+        if (key.startsWith(prefix)) treeMemoryCache.delete(key);
+    }
+}
+
+function readTreeMemorySnapshot<T extends Record<string, unknown>>(
+    key?: string,
+    ttlMs = 5 * 60 * 1000,
+): { items: T[]; branchState: BranchState } | null {
+    if (!key) return null;
+
+    const snapshot = treeMemoryCache.get(key);
+    if (!snapshot) return null;
+
+    if (Date.now() - snapshot.cachedAt > ttlMs) {
+        treeMemoryCache.delete(key);
+        return null;
+    }
+
+    return {
+        items: snapshot.items as T[],
+        branchState: snapshot.branchState,
+    };
+}
 
 type DropIntent =
     | { type: 'between'; overId: Id; where: 'before' | 'after' }
@@ -215,6 +258,8 @@ export default function SortableTree<T extends Record<string, unknown>>(props: S
     const insideDelayMs = props.insideDelayMs ?? 750;
     const expandOnInside = props.expandOnInside ?? true;
     const storageKey = props.storageKey;
+    const memoryCacheKey = props.memoryCacheKey;
+    const memoryCacheTtlMs = props.memoryCacheTtlMs ?? 5 * 60 * 1000;
     const forcedExpandedIds = props.forcedExpandedIds;
     const itemsProp = props.items;
     const lazy = props.lazy;
@@ -222,7 +267,12 @@ export default function SortableTree<T extends Record<string, unknown>>(props: S
     const loadChildrenProp = props.loadChildren;
     const onChange = props.onChange;
 
-    const [items, setItems] = useState<T[]>([]);
+    const initialMemorySnapshotRef = useRef(
+        readTreeMemorySnapshot<T>(memoryCacheKey, memoryCacheTtlMs),
+    );
+    const [items, setItems] = useState<T[]>(
+        () => initialMemorySnapshotRef.current?.items ?? [],
+    );
     const [expanded, setExpanded] = useState<Set<Id>>(() => {
         if (typeof window === 'undefined' || !storageKey) return new Set();
         try {
@@ -237,12 +287,24 @@ export default function SortableTree<T extends Record<string, unknown>>(props: S
         return new Set();
     });
     const [loading, setLoading] = useState<Set<Id>>(new Set());
-    const [branchState, setBranchState] = useState<Record<string, { offset: number; hasMore: boolean; initialized: boolean }>>({});
+    const [branchState, setBranchState] = useState<BranchState>(
+        () => initialMemorySnapshotRef.current?.branchState ?? {},
+    );
     const [branchLoading, setBranchLoading] = useState<Record<string, boolean>>({});
 
     const [activeId, setActiveId] = useState<Id | null>(null);
     const [overId, setOverId] = useState<Id | null>(null);
     const [dropIntent, setDropIntent] = useState<DropIntent>(null);
+
+    useEffect(() => {
+        if (!memoryCacheKey) return;
+
+        treeMemoryCache.set(memoryCacheKey, {
+            items,
+            branchState,
+            cachedAt: Date.now(),
+        });
+    }, [memoryCacheKey, items, branchState]);
 
     const branchKey = useCallback((parentId: Id | null) => (parentId === null ? '__root__' : String(parentId)), []);
     const pageSize = props.lazy?.pageSize ?? 30;
