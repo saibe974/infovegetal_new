@@ -9,7 +9,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Http\Controllers\ProductController;
 
-class homeController extends Controller
+class HomeController extends Controller
 {
     /**
      * Display a listing of the resource.
