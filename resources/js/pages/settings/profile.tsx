@@ -578,17 +578,16 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
+                    <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
+                        <div className="ml-auto">
+                            <Button type="submit" form="profile-form" disabled={profileForm.processing}>
+                                <Save className="mr-2 h-4 w-4" />
+                                {t('Save')}
+                            </Button>
+                        </div>
+                    </StickyBar>
 
-                    <form onSubmit={submitProfile} className="space-y-6">
-                        <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
-                            <div className="ml-auto">
-                                <Button type="submit" disabled={profileForm.processing}>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    {t('Save')}
-                                </Button>
-                            </div>
-                        </StickyBar>
-
+                    <form id="profile-form" onSubmit={submitProfile} className="space-y-6">
                         {/* Vérification d'email non vérifiée */}
                         {mustVerifyEmail &&
                             targetUserWithParent.email_verified_at === null && (

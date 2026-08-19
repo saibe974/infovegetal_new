@@ -164,7 +164,16 @@ class ProfileController extends Controller
 
             $this->authorize('assignRoles', [$target, $requestedRoleNames]);
 
-            $target->syncRoles($requestedRoleNames);
+            $assignableRoleNames = $this->authorization->assignableRoleNames($actor, $target);
+            $preservedRoleNames = $target->roles()
+                ->pluck('name')
+                ->reject(fn (string $name) => in_array($name, $assignableRoleNames, true))
+                ->all();
+
+            $target->syncRoles(array_values(array_unique([
+                ...$preservedRoleNames,
+                ...$requestedRoleNames,
+            ])));
         }
 
         if (isset($validated['permissions'])) {
@@ -174,13 +183,20 @@ class ProfileController extends Controller
                 abort(403, 'Unauthorized');
             }
 
-            $roleIds = isset($validated['roles'])
-                ? array_map('intval', $validated['roles'])
-                : $target->roles()->pluck('id')->map(fn ($v) => (int) $v)->all();
+            $roleIds = $target->roles()->pluck('id')->map(fn ($v) => (int) $v)->all();
 
             $permissionNames = $this->authorization->explicitPermissionNames($selectedPermIds, $roleIds);
 
-            $target->syncPermissions($permissionNames);
+            $assignablePermissionNames = $this->authorization->assignablePermissionNames($actor, $target);
+            $preservedPermissionNames = $target->getDirectPermissions()
+                ->pluck('name')
+                ->reject(fn (string $name) => in_array($name, $assignablePermissionNames, true))
+                ->all();
+
+            $target->syncPermissions(array_values(array_unique([
+                ...$preservedPermissionNames,
+                ...$permissionNames,
+            ])));
         }
 
         return back()->with('success', 'Roles and permissions updated successfully');

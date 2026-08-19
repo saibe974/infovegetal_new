@@ -280,3 +280,42 @@ test('a manage-users branch manager can update explicit permissions within its o
         ])
         ->assertForbidden();
 });
+
+test('the permissions settings endpoint preserves roles and permissions the actor cannot delegate', function () {
+    /** @var \Tests\TestCase $this */
+
+    $managerRole = createRoleWithPermissions('manager-settings', ['manage users', 'create clients']);
+    $manageableRole = createRoleWithPermissions('manageable-existing', ['create clients']);
+    $protectedExistingRole = createRoleWithPermissions('protected-existing', ['delete products']);
+
+    $manager = User::factory()->withoutTwoFactor()->create();
+    $target = User::factory()->withoutTwoFactor()->create();
+
+    $manager->assignRole($managerRole);
+    $target->assignRole([$manageableRole, $protectedExistingRole]);
+
+    $manager->saveAsRoot();
+    $target->appendToNode($manager)->save();
+
+    $target->givePermissionTo([
+        Permission::firstOrCreate(['name' => 'create clients', 'guard_name' => 'web']),
+        Permission::firstOrCreate(['name' => 'users.assign_roles.all', 'guard_name' => 'web']),
+    ]);
+
+    $this
+        ->actingAs($manager)
+        ->patch(route('permissions.update', ['user' => $target->id], false), [
+            'roles' => [],
+            'permissions' => [],
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($target->fresh()->roles()->pluck('name')->all())
+        ->toContain('protected-existing')
+        ->not->toContain('manageable-existing');
+
+    expect($target->fresh()->getDirectPermissions()->pluck('name')->all())
+        ->toContain('users.assign_roles.all')
+        ->not->toContain('create clients');
+});

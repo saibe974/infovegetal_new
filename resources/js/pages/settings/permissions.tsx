@@ -128,6 +128,18 @@ export default function PermissionsSettings({
         return Array.from(set);
     }, [inheritedPermissionIds, selectedPermissionIds, removedPermissionIds]);
 
+    const submittedRoleIds = useMemo(() => {
+        const assignableIds = new Set(allRoles.map((role) => role.id));
+
+        return selectedRoleIds.filter((id) => assignableIds.has(id));
+    }, [allRoles, selectedRoleIds]);
+
+    const submittedPermissionIds = useMemo(() => {
+        const assignableIds = new Set(allPermissions.map((permission) => permission.id));
+
+        return selectedPermissionIds.filter((id) => assignableIds.has(id));
+    }, [allPermissions, selectedPermissionIds]);
+
     const permissionsByDomain = useMemo(() => {
         const grouped = new Map<string, Array<{ id: number; name: string }>>();
 
@@ -170,13 +182,23 @@ export default function PermissionsSettings({
                 <div className='space-y-6'>
                     <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
                         <div className="ml-auto">
-                            <Button type="submit">
+                            <Button type="submit" form="permissions-form">
                                 {t('Save')}
                             </Button>
                         </div>
                     </StickyBar>
 
-                    <Form method='patch' action={formAction} className='space-y-6'>
+                    <Form
+                        id='permissions-form'
+                        method='patch'
+                        action={formAction}
+                        className='space-y-6'
+                        transform={(data) => ({
+                            ...data,
+                            ...(canManageRoles ? { roles: submittedRoleIds } : {}),
+                            ...(canManagePermissions ? { permissions: submittedPermissionIds } : {}),
+                        })}
+                    >
                         {canManageRoles && (
                             <Card className='p-6'>
                                 <h2 className='text-xl font-semibold mb-4 flex items-center gap-2'>
@@ -212,10 +234,6 @@ export default function PermissionsSettings({
                                     </p>
                                 )}
 
-                                {!roleManagementLocked && selectedRoleIds.map((id: number) => (
-                                    <input key={id} type='hidden' name='roles[]' value={id} />
-                                ))}
-
                                 <div className='mt-4 flex flex-wrap gap-2'>
                                     {selectedRoleIds.length > 0 ? (
                                         selectedRoleIds.map((id: number) => {
@@ -235,10 +253,6 @@ export default function PermissionsSettings({
 
                         {canManagePermissions && (
                             <>
-                                {activePermissionIds.map((id: number) => (
-                                    <input key={id} type='hidden' name='permissions[]' value={id} />
-                                ))}
-
                                 <PermissionsChecklistCard
                                     title={`${t('Permissions')} (${activePermissionIds.length || 0})`}
                                     permissionsByDomain={permissionsByDomain}
