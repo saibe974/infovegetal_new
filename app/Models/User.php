@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -25,7 +26,7 @@ class User extends Authenticatable implements HasMedia
         hasRole as protected hasRoleTrait;
         hasAnyRole as protected hasAnyRoleTrait;
     }
-    use NodeTrait, Impersonate, InteractsWithMedia, HasSortable;
+    use NodeTrait, SoftDeletes, Impersonate, InteractsWithMedia, HasSortable;
 
     protected array $sortable = ['name', 'email', 'created_at'];
 
