@@ -93,13 +93,14 @@ function AccordionVolet({
             onOpenChange={setOpen}
             className="rounded-md border border-border bg-card"
         >
-            <div className="flex items-center justify-between px-4 py-3">
-                <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                    {badge}
-                    {title}
-                    {summary ? <span className="text-xs text-muted-foreground font-normal">{summary}</span> : null}
-                </h4>
-                <CollapsibleTrigger asChild>
+            <CollapsibleTrigger asChild>
+                <div className="flex items-center justify-between px-4 py-3">
+
+                    <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                        {badge}
+                        {title}
+                        {summary ? <span className="text-xs text-muted-foreground font-normal">{summary}</span> : null}
+                    </h4>
                     <button
                         type="button"
                         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -109,8 +110,9 @@ function AccordionVolet({
                             className={`size-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
                         />
                     </button>
-                </CollapsibleTrigger>
-            </div>
+
+                </div>
+            </CollapsibleTrigger>
             <CollapsibleContent className="border-t border-border px-4 py-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1">
                 <div className={`grid grid-cols-1 md:grid-cols-${cols ?? 2} gap-4`}>
                     {children}

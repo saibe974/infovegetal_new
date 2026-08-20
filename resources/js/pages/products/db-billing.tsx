@@ -123,7 +123,7 @@ export default withAppLayout<Props>(
                         sellerProfileId: parsed.sellerProfileId ?? null,
                     };
                 }
-            } catch {}
+            } catch { }
             return {
                 billingUserId: null,
                 panelItem: null,
@@ -196,8 +196,13 @@ export default withAppLayout<Props>(
         );
 
         const userOptionById = useMemo(() => {
+            const assignedUsers = (dbProduct.billing_users ?? []).flatMap(
+                (billingUser) => [billingUser, ...(billingUser.sellers ?? [])],
+            );
+
             return new Map(
                 [
+                    ...assignedUsers,
                     ...(eligibleBillingUsers ?? []),
                     ...(eligibleSellerUsers ?? []),
                 ].map((user) => [
@@ -209,7 +214,11 @@ export default withAppLayout<Props>(
                     },
                 ]),
             );
-        }, [eligibleBillingUsers, eligibleSellerUsers]);
+        }, [
+            dbProduct.billing_users,
+            eligibleBillingUsers,
+            eligibleSellerUsers,
+        ]);
 
         const activeBillingRule = useMemo(() => {
             if (activeBillingUserId === null) {
@@ -386,7 +395,7 @@ export default withAppLayout<Props>(
             return (
                 canManageSellers ||
                 Number(activeBillingRule.billing_user_id) ===
-                    Number(currentUserId)
+                Number(currentUserId)
             );
         }, [activeBillingRule, canManageSellers, currentUserId]);
 
@@ -412,7 +421,7 @@ export default withAppLayout<Props>(
             if (
                 activePanelItem?.type !== 'seller' ||
                 Number(activePanelItem.id) !==
-                    Number(fallbackSeller.seller_user_id)
+                Number(fallbackSeller.seller_user_id)
             ) {
                 setActivePanelItem({
                     type: 'seller',
@@ -432,7 +441,7 @@ export default withAppLayout<Props>(
                         sellerProfileId: activeSellerProfileId,
                     }),
                 );
-            } catch {}
+            } catch { }
         }, [
             activeBillingUserId,
             activePanelItem,
@@ -455,7 +464,7 @@ export default withAppLayout<Props>(
 
         const billingLabel = activeBillingRule
             ? (userOptionById.get(Number(activeBillingRule.billing_user_id))
-                  ?.label ?? `#${activeBillingRule.billing_user_id}`)
+                ?.label ?? `#${activeBillingRule.billing_user_id}`)
             : '';
 
         const addBillingUser = (id: number) => {
@@ -840,16 +849,16 @@ export default withAppLayout<Props>(
                     ...rule,
                     sellers: (rule.sellers ?? []).map((seller) =>
                         Number(seller.seller_user_id) ===
-                        Number(currentSeller.seller_user_id)
+                            Number(currentSeller.seller_user_id)
                             ? {
-                                  ...seller,
-                                  use_billing_profile: useProfile,
-                                  billing_profile_id: useProfile
-                                      ? (seller.billing_profile_id ??
+                                ...seller,
+                                use_billing_profile: useProfile,
+                                billing_profile_id: useProfile
+                                    ? (seller.billing_profile_id ??
                                         currentSellerInheritedProfile?.id ??
                                         null)
-                                      : null,
-                              }
+                                    : null,
+                            }
                             : seller,
                     ),
                 }),
@@ -867,12 +876,12 @@ export default withAppLayout<Props>(
                     ...rule,
                     sellers: (rule.sellers ?? []).map((seller) =>
                         Number(seller.seller_user_id) ===
-                        Number(currentSeller.seller_user_id)
+                            Number(currentSeller.seller_user_id)
                             ? {
-                                  ...seller,
-                                  billing_profile_id: profileId,
-                                  use_billing_profile: true,
-                              }
+                                ...seller,
+                                billing_profile_id: profileId,
+                                use_billing_profile: true,
+                            }
                             : seller,
                     ),
                 }),
@@ -971,10 +980,10 @@ export default withAppLayout<Props>(
                                 profiles: defaults.profiles.map((profile) =>
                                     profile.id === currentSellerProfile.id
                                         ? {
-                                              ...profile,
-                                              conditions:
-                                                  normalizeConditions(next),
-                                          }
+                                            ...profile,
+                                            conditions:
+                                                normalizeConditions(next),
+                                        }
                                         : profile,
                                 ),
                             },
@@ -1022,20 +1031,20 @@ export default withAppLayout<Props>(
                                                 <BreadcrumbItemUI>
                                                     <BreadcrumbPage className="text-3xl font-bold">
                                                         {activePanelItem.type ===
-                                                        'profile'
+                                                            'profile'
                                                             ? (currentProfile?.name ??
-                                                              t('Profile'))
+                                                                t('Profile'))
                                                             : (userOptionById.get(
-                                                                  Number(
-                                                                      activePanelItem.id,
-                                                                  ),
-                                                              )?.label ??
-                                                              t('Commercial'))}
+                                                                Number(
+                                                                    activePanelItem.id,
+                                                                ),
+                                                            )?.label ??
+                                                                t('Commercial'))}
                                                     </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
                                             </>
                                         )}
-                                        {activeSellerProfileId &&
+                                        {/* {activeSellerProfileId &&
                                             currentSellerProfile && (
                                                 <>
                                                     <BreadcrumbSeparator />
@@ -1047,7 +1056,7 @@ export default withAppLayout<Props>(
                                                         </BreadcrumbPage>
                                                     </BreadcrumbItemUI>
                                                 </>
-                                            )}
+                                            )} */}
                                     </BreadcrumbList>
                                 </Breadcrumb>
                             }
@@ -1132,6 +1141,7 @@ export default withAppLayout<Props>(
                                 <BillingConditionsEditor
                                     className="xl:col-span-5"
                                     activeBillingRule={activeBillingRule}
+                                    activeBillingLabel={billingLabel}
                                     activePanelItem={activePanelItem}
                                     currentProfile={currentProfile}
                                     currentSeller={currentSeller}
