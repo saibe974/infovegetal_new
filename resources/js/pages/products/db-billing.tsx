@@ -1,40 +1,43 @@
-import { withAppLayout } from '@/layouts/app-layout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { leave as impersonateLeave, take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import {
-    Breadcrumb,
-    BreadcrumbList,
-    BreadcrumbItem as BreadcrumbItemUI,
-    BreadcrumbLink,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import {
-    type BreadcrumbItem,
-    type dbProduct,
-    type BillingUserRule,
-    type SalesConditions,
-} from '@/types';
-import { Button } from '@/components/ui/button';
-import { StickyBar } from '@/components/ui/sticky-bar';
-import { useI18n } from '@/lib/i18n';
-import products from '@/routes/products';
-import dbProducts from '@/routes/db-products';
-import { ArrowLeftCircle, SaveIcon } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import BillingUserSelector from '@/components/sales/BillingUserSelector';
-import BillingTreePanel from '@/components/sales/BillingTreePanel';
-import SellerProfilesPanel from '@/components/sales/SellerProfilesPanel';
+    leave as impersonateLeave,
+    take as impersonateTake,
+} from '@/actions/App/Http/Controllers/ImpersonationController';
+import { DatabaseStickyBar } from '@/components/products/database-sticky-bar';
 import BillingConditionsEditor from '@/components/sales/BillingConditionsEditor';
+import BillingTreePanel from '@/components/sales/BillingTreePanel';
+import BillingUserSelector from '@/components/sales/BillingUserSelector';
 import SellerProfileConditionsEditor from '@/components/sales/SellerProfileConditionsEditor';
-import { normalizeConditions, normalizeBillingUsers, normalizeRowToDraft } from '@/components/sales/billing-utils';
-import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
+import SellerProfilesPanel from '@/components/sales/SellerProfilesPanel';
+import {
+    normalizeBillingUsers,
+    normalizeConditions,
+    normalizeRowToDraft,
+} from '@/components/sales/billing-utils';
 import {
     type ActivePanelItem,
     type BillingDraft,
     type UserOption,
 } from '@/components/sales/types';
-import CountryFlag from '@/components/ui/country-flag';
+import {
+    Breadcrumb,
+    BreadcrumbItem as BreadcrumbItemUI,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import { withAppLayout } from '@/layouts/app-layout';
+import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
+import { useI18n } from '@/lib/i18n';
+import dbProducts from '@/routes/db-products';
+import products from '@/routes/products';
+import {
+    type BillingUserRule,
+    type BreadcrumbItem,
+    type dbProduct,
+    type SalesConditions,
+} from '@/types';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type Props = {
     dbProduct: dbProduct;
@@ -70,649 +73,946 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBillingUsers, eligibleSellerUsers, billingAbilities, currentUserId, carriers }) => {
-    // console.log(dbProduct);
-    const { t } = useI18n();
-    const auth = usePage<any>().props.auth;
-    const isGlobalManager = billingAbilities?.is_global_manager ?? false;
-    const isBillingUser = Array.isArray(dbProduct.billing_users) && dbProduct.billing_users.some((u: BillingUserRule) => Number(u.id) === Number(currentUserId));
-    const isFullAccess = isGlobalManager || isBillingUser;
-    const canManageBillingUsers = billingAbilities?.can_manage_billing_users ?? false;
-    const canManageSellers = billingAbilities?.can_manage_sellers ?? false;
-    const canDelegateManage = billingAbilities?.can_delegate_manage ?? false;
+export default withAppLayout<Props>(
+    breadcrumbs,
+    true,
+    ({
+        dbProduct,
+        eligibleBillingUsers,
+        eligibleSellerUsers,
+        billingAbilities,
+        currentUserId,
+        carriers,
+    }) => {
+        // console.log(dbProduct);
+        const { t } = useI18n();
+        const formRef = useRef<HTMLFormElement>(null);
+        const auth = usePage<any>().props.auth;
+        const isGlobalManager = billingAbilities?.is_global_manager ?? false;
+        const isBillingUser =
+            Array.isArray(dbProduct.billing_users) &&
+            dbProduct.billing_users.some(
+                (u: BillingUserRule) => Number(u.id) === Number(currentUserId),
+            );
+        const isFullAccess = isGlobalManager || isBillingUser;
+        const canManageBillingUsers =
+            billingAbilities?.can_manage_billing_users ?? false;
+        const canManageSellers = billingAbilities?.can_manage_sellers ?? false;
+        const canDelegateManage =
+            billingAbilities?.can_delegate_manage ?? false;
 
-    const [billingSearch, setBillingSearch] = useState('');
-    const [sellerSearch, setSellerSearch] = useState('');
+        const [billingSearch, setBillingSearch] = useState('');
+        const [sellerSearch, setSellerSearch] = useState('');
 
-    const STORAGE_KEY = `db-billing-view-${dbProduct.id}`;
+        const STORAGE_KEY = `db-billing-view-${dbProduct.id}`;
 
-    const loadViewPrefs = (): { billingUserId: number | null; panelItem: ActivePanelItem; openSection: 'profiles' | 'sellers' | null; sellerProfileId: string | null } => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                return {
-                    billingUserId: parsed.billingUserId ?? null,
-                    panelItem: parsed.panelItem ?? null,
-                    openSection: parsed.openSection ?? 'profiles',
-                    sellerProfileId: parsed.sellerProfileId ?? null,
-                };
+        const loadViewPrefs = (): {
+            billingUserId: number | null;
+            panelItem: ActivePanelItem;
+            openSection: 'profiles' | 'sellers' | null;
+            sellerProfileId: string | null;
+        } => {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    return {
+                        billingUserId: parsed.billingUserId ?? null,
+                        panelItem: parsed.panelItem ?? null,
+                        openSection: parsed.openSection ?? 'profiles',
+                        sellerProfileId: parsed.sellerProfileId ?? null,
+                    };
+                }
+            } catch {}
+            return {
+                billingUserId: null,
+                panelItem: null,
+                openSection: 'profiles',
+                sellerProfileId: null,
+            };
+        };
+
+        const initialBillingUsers: BillingDraft[] = useMemo(() => {
+            const rows = Array.isArray(dbProduct.billing_users)
+                ? (dbProduct.billing_users as BillingUserRule[])
+                : [];
+            return rows.map(normalizeRowToDraft);
+        }, [dbProduct.billing_users]);
+
+        const viewPrefs = useMemo(() => loadViewPrefs(), []);
+
+        const [activeBillingUserId, setActiveBillingUserId] = useState<
+            number | null
+        >(() => {
+            if (
+                viewPrefs.billingUserId !== null &&
+                initialBillingUsers.some(
+                    (u) =>
+                        Number(u.billing_user_id) ===
+                        Number(viewPrefs.billingUserId),
+                )
+            ) {
+                return viewPrefs.billingUserId;
             }
-        } catch { }
-        return { billingUserId: null, panelItem: null, openSection: 'profiles', sellerProfileId: null };
-    };
+            return initialBillingUsers.length > 0
+                ? initialBillingUsers[0].billing_user_id
+                : null;
+        });
 
-    const initialBillingUsers: BillingDraft[] = useMemo(() => {
-        const rows = Array.isArray(dbProduct.billing_users) ? (dbProduct.billing_users as BillingUserRule[]) : [];
-        return rows.map(normalizeRowToDraft);
-    }, [dbProduct.billing_users]);
+        const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(
+            () => viewPrefs.panelItem,
+        );
+        const [openSection, setOpenSection] = useState<
+            'profiles' | 'sellers' | null
+        >(() => viewPrefs.openSection);
+        const [activeSellerProfileId, setActiveSellerProfileId] = useState<
+            string | null
+        >(() => viewPrefs.sellerProfileId);
 
-    const viewPrefs = useMemo(() => loadViewPrefs(), []);
+        const { data, setData, put, processing, errors, transform } = useForm({
+            billing_users: initialBillingUsers,
+        });
 
-    const [activeBillingUserId, setActiveBillingUserId] = useState<number | null>(() => {
-        if (viewPrefs.billingUserId !== null && initialBillingUsers.some((u) => Number(u.billing_user_id) === Number(viewPrefs.billingUserId))) {
-            return viewPrefs.billingUserId;
-        }
-        return initialBillingUsers.length > 0 ? initialBillingUsers[0].billing_user_id : null;
-    });
+        const errorBag = errors as Record<string, string>;
 
-    const [activePanelItem, setActivePanelItem] = useState<ActivePanelItem>(() => viewPrefs.panelItem);
-    const [openSection, setOpenSection] = useState<'profiles' | 'sellers' | null>(() => viewPrefs.openSection);
-    const [activeSellerProfileId, setActiveSellerProfileId] = useState<string | null>(() => viewPrefs.sellerProfileId);
-
-    const { data, setData, put, processing, errors, transform } = useForm({
-        billing_users: initialBillingUsers,
-    });
-
-    const errorBag = errors as Record<string, string>;
-
-    const billingUserOptions = useMemo(
-        () => (eligibleBillingUsers ?? []).map((user) => ({
-            value: String(user.id),
-            label: user.name,
-            description: user.email
-        })),
-        [eligibleBillingUsers],
-    );
-
-    const sellerUserOptions = useMemo(
-        () => (eligibleSellerUsers ?? []).map((user) => ({
-            value: String(user.id),
-            label: user.name,
-            description: user.email
-        })),
-        [eligibleSellerUsers],
-    );
-
-    const userOptionById = useMemo(() => {
-        return new Map(
-            [...(eligibleBillingUsers ?? []), ...(eligibleSellerUsers ?? [])].map((user) => [
-                user.id,
-                {
+        const billingUserOptions = useMemo(
+            () =>
+                (eligibleBillingUsers ?? []).map((user) => ({
                     value: String(user.id),
                     label: user.name,
-                    description: user.email
-                },
-            ]),
+                    description: user.email,
+                })),
+            [eligibleBillingUsers],
         );
-    }, [eligibleBillingUsers, eligibleSellerUsers]);
 
-    const activeBillingRule = useMemo(() => {
-        if (activeBillingUserId === null) {
-            return null;
-        }
+        const sellerUserOptions = useMemo(
+            () =>
+                (eligibleSellerUsers ?? []).map((user) => ({
+                    value: String(user.id),
+                    label: user.name,
+                    description: user.email,
+                })),
+            [eligibleSellerUsers],
+        );
 
-        return (data.billing_users ?? []).find((rule) => Number(rule.billing_user_id) === Number(activeBillingUserId)) ?? null;
-    }, [activeBillingUserId, data.billing_users]);
+        const userOptionById = useMemo(() => {
+            return new Map(
+                [
+                    ...(eligibleBillingUsers ?? []),
+                    ...(eligibleSellerUsers ?? []),
+                ].map((user) => [
+                    user.id,
+                    {
+                        value: String(user.id),
+                        label: user.name,
+                        description: user.email,
+                    },
+                ]),
+            );
+        }, [eligibleBillingUsers, eligibleSellerUsers]);
 
-    const availableBillingOptions = useMemo(() => {
-        const selected = new Set((data.billing_users ?? []).map((rule) => Number(rule.billing_user_id)));
-        return billingUserOptions.filter((option) => !selected.has(Number(option.value)));
-    }, [billingUserOptions, data.billing_users]);
-
-    const availableSellerOptions = useMemo(() => {
-        const selected = new Set((activeBillingRule?.sellers ?? []).map((seller) => Number(seller.seller_user_id)));
-        return sellerUserOptions.filter((option) => !selected.has(Number(option.value)));
-    }, [activeBillingRule?.sellers, sellerUserOptions]);
-
-    const updateBillingRule = (billingUserId: number, updater: (rule: BillingDraft) => BillingDraft) => {
-        setData('billing_users', (data.billing_users ?? []).map((rule) => {
-            if (Number(rule.billing_user_id) !== Number(billingUserId)) {
-                return rule;
+        const activeBillingRule = useMemo(() => {
+            if (activeBillingUserId === null) {
+                return null;
             }
 
-            return updater(rule);
-        }));
-    };
+            return (
+                (data.billing_users ?? []).find(
+                    (rule) =>
+                        Number(rule.billing_user_id) ===
+                        Number(activeBillingUserId),
+                ) ?? null
+            );
+        }, [activeBillingUserId, data.billing_users]);
 
-    const currentProfile = useMemo(() => {
-        if (!activeBillingRule || activePanelItem?.type !== 'profile') {
-            return null;
-        }
+        const availableBillingOptions = useMemo(() => {
+            const selected = new Set(
+                (data.billing_users ?? []).map((rule) =>
+                    Number(rule.billing_user_id),
+                ),
+            );
+            return billingUserOptions.filter(
+                (option) => !selected.has(Number(option.value)),
+            );
+        }, [billingUserOptions, data.billing_users]);
 
-        return (activeBillingRule.defaults.profiles ?? []).find((profile) => profile.id === String(activePanelItem.id)) ?? null;
-    }, [activeBillingRule, activePanelItem]);
+        const availableSellerOptions = useMemo(() => {
+            const selected = new Set(
+                (activeBillingRule?.sellers ?? []).map((seller) =>
+                    Number(seller.seller_user_id),
+                ),
+            );
+            return sellerUserOptions.filter(
+                (option) => !selected.has(Number(option.value)),
+            );
+        }, [activeBillingRule?.sellers, sellerUserOptions]);
 
-    const currentSeller = useMemo(() => {
-        if (!activeBillingRule || activePanelItem?.type !== 'seller') {
-            return null;
-        }
+        const updateBillingRule = (
+            billingUserId: number,
+            updater: (rule: BillingDraft) => BillingDraft,
+        ) => {
+            setData(
+                'billing_users',
+                (data.billing_users ?? []).map((rule) => {
+                    if (
+                        Number(rule.billing_user_id) !== Number(billingUserId)
+                    ) {
+                        return rule;
+                    }
 
-        return (activeBillingRule.sellers ?? []).find((seller) => Number(seller.seller_user_id) === Number(activePanelItem.id)) ?? null;
-    }, [activeBillingRule, activePanelItem]);
+                    return updater(rule);
+                }),
+            );
+        };
 
-    const currentSellerDefaults = useMemo(() => {
-        if (!currentSeller) {
-            return null;
-        }
+        const currentProfile = useMemo(() => {
+            if (!activeBillingRule || activePanelItem?.type !== 'profile') {
+                return null;
+            }
 
-        return normalizeBillingDefaultsToProfiles(currentSeller.seller_defaults);
-    }, [currentSeller]);
+            return (
+                (activeBillingRule.defaults.profiles ?? []).find(
+                    (profile) => profile.id === String(activePanelItem.id),
+                ) ?? null
+            );
+        }, [activeBillingRule, activePanelItem]);
 
-    const currentSellerInheritedProfile = useMemo(() => {
-        if (!activeBillingRule) {
-            return null;
-        }
+        const currentSeller = useMemo(() => {
+            if (!activeBillingRule || activePanelItem?.type !== 'seller') {
+                return null;
+            }
 
-        const defaults = normalizeBillingDefaultsToProfiles(activeBillingRule.defaults);
-        const defaultProfileId = defaults.default_profile_id ?? defaults.profiles[0]?.id;
+            return (
+                (activeBillingRule.sellers ?? []).find(
+                    (seller) =>
+                        Number(seller.seller_user_id) ===
+                        Number(activePanelItem.id),
+                ) ?? null
+            );
+        }, [activeBillingRule, activePanelItem]);
 
-        return defaults.profiles.find((profile) => profile.id === defaultProfileId) ?? defaults.profiles[0] ?? null;
-    }, [activeBillingRule]);
+        const currentSellerDefaults = useMemo(() => {
+            if (!currentSeller) {
+                return null;
+            }
 
-    const currentSellerProfile = useMemo(() => {
-        if (!currentSellerDefaults) {
-            return null;
-        }
+            return normalizeBillingDefaultsToProfiles(
+                currentSeller.seller_defaults,
+            );
+        }, [currentSeller]);
 
-        const requestedId = activeSellerProfileId ?? currentSellerDefaults.default_profile_id ?? currentSellerDefaults.profiles[0]?.id ?? null;
-        if (!requestedId) {
-            return null;
-        }
+        const currentSellerInheritedProfile = useMemo(() => {
+            if (!activeBillingRule) {
+                return null;
+            }
 
-        return currentSellerDefaults.profiles.find((profile) => profile.id === requestedId) ?? currentSellerDefaults.profiles[0] ?? null;
-    }, [activeSellerProfileId, currentSellerDefaults]);
+            const defaults = normalizeBillingDefaultsToProfiles(
+                activeBillingRule.defaults,
+            );
+            const defaultProfileId =
+                defaults.default_profile_id ?? defaults.profiles[0]?.id;
 
-    const canManageSellerProfiles = useMemo(() => {
-        if (!currentSeller) {
-            return false;
-        }
+            return (
+                defaults.profiles.find(
+                    (profile) => profile.id === defaultProfileId,
+                ) ??
+                defaults.profiles[0] ??
+                null
+            );
+        }, [activeBillingRule]);
 
-        return canManageSellers || Number(currentSeller.seller_user_id) === Number(currentUserId);
-    }, [canManageSellers, currentSeller, currentUserId]);
+        const currentSellerProfile = useMemo(() => {
+            if (!currentSellerDefaults) {
+                return null;
+            }
 
-    useEffect(() => {
-        if (!currentSellerDefaults) {
-            setActiveSellerProfileId(null);
-            return;
-        }
+            const requestedId =
+                activeSellerProfileId ??
+                currentSellerDefaults.default_profile_id ??
+                currentSellerDefaults.profiles[0]?.id ??
+                null;
+            if (!requestedId) {
+                return null;
+            }
 
-        const hasActiveProfile = !!activeSellerProfileId
-            && (currentSellerDefaults.profiles ?? []).some((profile) => profile.id === activeSellerProfileId);
+            return (
+                currentSellerDefaults.profiles.find(
+                    (profile) => profile.id === requestedId,
+                ) ??
+                currentSellerDefaults.profiles[0] ??
+                null
+            );
+        }, [activeSellerProfileId, currentSellerDefaults]);
 
-        if (hasActiveProfile) {
-            return;
-        }
+        const canManageSellerProfiles = useMemo(() => {
+            if (!currentSeller) {
+                return false;
+            }
 
-        const nextId = currentSellerDefaults.default_profile_id ?? currentSellerDefaults.profiles[0]?.id ?? null;
-        setActiveSellerProfileId(nextId);
-    }, [currentSellerDefaults, activeSellerProfileId]);
+            return (
+                canManageSellers ||
+                Number(currentSeller.seller_user_id) === Number(currentUserId)
+            );
+        }, [canManageSellers, currentSeller, currentUserId]);
 
-    const canManageProfiles = useMemo(() => {
-        if (!activeBillingRule) {
-            return false;
-        }
+        useEffect(() => {
+            if (!currentSellerDefaults) {
+                setActiveSellerProfileId(null);
+                return;
+            }
 
-        return canManageSellers || Number(activeBillingRule.billing_user_id) === Number(currentUserId);
-    }, [activeBillingRule, canManageSellers, currentUserId]);
+            const hasActiveProfile =
+                !!activeSellerProfileId &&
+                (currentSellerDefaults.profiles ?? []).some(
+                    (profile) => profile.id === activeSellerProfileId,
+                );
 
-    useEffect(() => {
-        if (isFullAccess || !activeBillingRule) {
-            return;
-        }
+            if (hasActiveProfile) {
+                return;
+            }
 
-        const ownSeller = (activeBillingRule.sellers ?? []).find((seller) => Number(seller.seller_user_id) === Number(currentUserId));
-        const fallbackSeller = ownSeller ?? (activeBillingRule.sellers ?? [])[0] ?? null;
+            const nextId =
+                currentSellerDefaults.default_profile_id ??
+                currentSellerDefaults.profiles[0]?.id ??
+                null;
+            setActiveSellerProfileId(nextId);
+        }, [currentSellerDefaults, activeSellerProfileId]);
 
-        if (!fallbackSeller) {
-            if (activePanelItem !== null) {
+        const canManageProfiles = useMemo(() => {
+            if (!activeBillingRule) {
+                return false;
+            }
+
+            return (
+                canManageSellers ||
+                Number(activeBillingRule.billing_user_id) ===
+                    Number(currentUserId)
+            );
+        }, [activeBillingRule, canManageSellers, currentUserId]);
+
+        useEffect(() => {
+            if (isFullAccess || !activeBillingRule) {
+                return;
+            }
+
+            const ownSeller = (activeBillingRule.sellers ?? []).find(
+                (seller) =>
+                    Number(seller.seller_user_id) === Number(currentUserId),
+            );
+            const fallbackSeller =
+                ownSeller ?? (activeBillingRule.sellers ?? [])[0] ?? null;
+
+            if (!fallbackSeller) {
+                if (activePanelItem !== null) {
+                    setActivePanelItem(null);
+                }
+                return;
+            }
+
+            if (
+                activePanelItem?.type !== 'seller' ||
+                Number(activePanelItem.id) !==
+                    Number(fallbackSeller.seller_user_id)
+            ) {
+                setActivePanelItem({
+                    type: 'seller',
+                    id: Number(fallbackSeller.seller_user_id),
+                });
+            }
+        }, [isFullAccess, activeBillingRule, currentUserId, activePanelItem]);
+
+        useEffect(() => {
+            try {
+                localStorage.setItem(
+                    STORAGE_KEY,
+                    JSON.stringify({
+                        billingUserId: activeBillingUserId,
+                        panelItem: activePanelItem,
+                        openSection,
+                        sellerProfileId: activeSellerProfileId,
+                    }),
+                );
+            } catch {}
+        }, [
+            activeBillingUserId,
+            activePanelItem,
+            openSection,
+            activeSellerProfileId,
+        ]);
+
+        const handleSubmit = (e: FormEvent) => {
+            e.preventDefault();
+
+            transform((d) => ({
+                ...d,
+                billing_users: normalizeBillingUsers(d.billing_users ?? []),
+            }));
+
+            put(dbProducts.updateBilling(dbProduct.id as number).url, {
+                onFinish: () => transform((d) => d),
+            });
+        };
+
+        const billingLabel = activeBillingRule
+            ? (userOptionById.get(Number(activeBillingRule.billing_user_id))
+                  ?.label ?? `#${activeBillingRule.billing_user_id}`)
+            : '';
+
+        const addBillingUser = (id: number) => {
+            const exists = (data.billing_users ?? []).some(
+                (rule) => Number(rule.billing_user_id) === id,
+            );
+            if (exists) {
+                return;
+            }
+
+            const nextRules: BillingDraft[] = [
+                ...(data.billing_users ?? []),
+                {
+                    billing_user_id: id,
+                    defaults: {
+                        profiles: [
+                            {
+                                id: 'standard',
+                                name: 'Standard',
+                                conditions: {},
+                            },
+                        ],
+                        default_profile_id: 'standard',
+                    },
+                    sellers: [],
+                },
+            ];
+
+            setData('billing_users', nextRules);
+            setActiveBillingUserId(id);
+            setActivePanelItem({ type: 'profile', id: 'standard' });
+        };
+
+        const deleteBillingUser = (id: number) => {
+            const next = (data.billing_users ?? []).filter(
+                (row) => Number(row.billing_user_id) !== id,
+            );
+            setData('billing_users', next);
+
+            if (activeBillingUserId === id) {
+                const first = next[0];
+                setActiveBillingUserId(
+                    first ? Number(first.billing_user_id) : null,
+                );
                 setActivePanelItem(null);
             }
-            return;
-        }
+        };
 
-        if (activePanelItem?.type !== 'seller' || Number(activePanelItem.id) !== Number(fallbackSeller.seller_user_id)) {
-            setActivePanelItem({ type: 'seller', id: Number(fallbackSeller.seller_user_id) });
-        }
-    }, [isFullAccess, activeBillingRule, currentUserId, activePanelItem]);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ billingUserId: activeBillingUserId, panelItem: activePanelItem, openSection, sellerProfileId: activeSellerProfileId }));
-        } catch { }
-    }, [activeBillingUserId, activePanelItem, openSection, activeSellerProfileId]);
-
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-
-        transform((d) => ({
-            ...d,
-            billing_users: normalizeBillingUsers(d.billing_users ?? []),
-        }));
-
-        put(dbProducts.updateBilling(dbProduct.id as number).url, {
-            onFinish: () => transform((d) => d),
-        });
-    };
-
-    const billingLabel = activeBillingRule
-        ? (userOptionById.get(Number(activeBillingRule.billing_user_id))?.label ?? `#${activeBillingRule.billing_user_id}`)
-        : '';
-
-    const addBillingUser = (id: number) => {
-        const exists = (data.billing_users ?? []).some((rule) => Number(rule.billing_user_id) === id);
-        if (exists) {
-            return;
-        }
-
-        const nextRules: BillingDraft[] = [
-            ...(data.billing_users ?? []),
-            {
-                billing_user_id: id,
-                defaults: {
-                    profiles: [{ id: 'standard', name: 'Standard', conditions: {} }],
-                    default_profile_id: 'standard',
-                },
-                sellers: [],
-            },
-        ];
-
-        setData('billing_users', nextRules);
-        setActiveBillingUserId(id);
-        setActivePanelItem({ type: 'profile', id: 'standard' });
-    };
-
-    const deleteBillingUser = (id: number) => {
-        const next = (data.billing_users ?? []).filter((row) => Number(row.billing_user_id) !== id);
-        setData('billing_users', next);
-
-        if (activeBillingUserId === id) {
-            const first = next[0];
-            setActiveBillingUserId(first ? Number(first.billing_user_id) : null);
-            setActivePanelItem(null);
-        }
-    };
-
-    const addBillingProfile = () => {
-        if (!activeBillingRule) {
-            return;
-        }
-
-        const nextId = `profile-${Date.now()}`;
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-            const profile = {
-                id: nextId,
-                name: t('New profile'),
-                conditions: {},
-            };
-            const profiles = [...(rule.defaults.profiles ?? []), profile];
-            return {
-                ...rule,
-                defaults: {
-                    profiles,
-                    default_profile_id: rule.defaults.default_profile_id ?? profile.id,
-                },
-            };
-        });
-        setActivePanelItem({ type: 'profile', id: nextId });
-    };
-
-    const deleteBillingProfile = (profileId: string) => {
-        if (!activeBillingRule) {
-            return;
-        }
-
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-            const profiles = (rule.defaults.profiles ?? []).filter((current) => current.id !== profileId);
-            const default_profile_id =
-                rule.defaults.default_profile_id === profileId
-                    ? (profiles[0]?.id ?? null)
-                    : rule.defaults.default_profile_id;
-
-            return {
-                ...rule,
-                defaults: {
-                    profiles,
-                    default_profile_id,
-                },
-            };
-        });
-
-        if (activePanelItem?.type === 'profile' && String(activePanelItem.id) === profileId) {
-            setActivePanelItem(null);
-        }
-    };
-
-    const handleImpersonateSeller = async (sellerId: number) => {
-        const isImpersonating = !!auth?.impersonate_from;
-
-        try {
-            if (isImpersonating) {
-                const leaveRes = await fetch(impersonateLeave().url, {
-                    method: 'GET',
-                    credentials: 'include',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!leaveRes.ok) throw new Error('Unable to leave impersonation');
+        const addBillingProfile = () => {
+            if (!activeBillingRule) {
+                return;
             }
 
-            const takeRes = await fetch(impersonateTake({ id: sellerId }).url, {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-            });
-            if (!takeRes.ok) throw new Error('Impersonation failed');
+            const nextId = `profile-${Date.now()}`;
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => {
+                    const profile = {
+                        id: nextId,
+                        name: t('New profile'),
+                        conditions: {},
+                    };
+                    const profiles = [
+                        ...(rule.defaults.profiles ?? []),
+                        profile,
+                    ];
+                    return {
+                        ...rule,
+                        defaults: {
+                            profiles,
+                            default_profile_id:
+                                rule.defaults.default_profile_id ?? profile.id,
+                        },
+                    };
+                },
+            );
+            setActivePanelItem({ type: 'profile', id: nextId });
+        };
 
-            window.location.reload();
-        } catch {
-            // silently fail; impersonation errors handled server-side
-        }
-    };
-
-    const addSellerToBilling = (sellerId: number) => {
-        if (!activeBillingRule) {
-            return;
-        }
-
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => {
-            const exists = (rule.sellers ?? []).some((seller) => Number(seller.seller_user_id) === sellerId);
-            if (exists) {
-                return rule;
+        const deleteBillingProfile = (profileId: string) => {
+            if (!activeBillingRule) {
+                return;
             }
 
-            return {
-                ...rule,
-                sellers: [...(rule.sellers ?? []), { seller_user_id: sellerId, conditions: {}, use_billing_profile: true, billing_profile_id: null, can_manage: false, seller_defaults: undefined }],
-            };
-        });
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => {
+                    const profiles = (rule.defaults.profiles ?? []).filter(
+                        (current) => current.id !== profileId,
+                    );
+                    const default_profile_id =
+                        rule.defaults.default_profile_id === profileId
+                            ? (profiles[0]?.id ?? null)
+                            : rule.defaults.default_profile_id;
 
-        setActivePanelItem({ type: 'seller', id: sellerId });
-    };
+                    return {
+                        ...rule,
+                        defaults: {
+                            profiles,
+                            default_profile_id,
+                        },
+                    };
+                },
+            );
 
-    const deleteSellerFromBilling = (sellerId: number) => {
-        if (!activeBillingRule) {
-            return;
-        }
+            if (
+                activePanelItem?.type === 'profile' &&
+                String(activePanelItem.id) === profileId
+            ) {
+                setActivePanelItem(null);
+            }
+        };
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).filter((current) => Number(current.seller_user_id) !== sellerId),
-        }));
+        const handleImpersonateSeller = async (sellerId: number) => {
+            const isImpersonating = !!auth?.impersonate_from;
 
-        if (activePanelItem?.type === 'seller' && Number(activePanelItem.id) === sellerId) {
-            setActivePanelItem(null);
-        }
-    };
-
-    const addSellerProfile = () => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
-
-        const nextId = `seller-profile-${Date.now()}`;
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
+            try {
+                if (isImpersonating) {
+                    const leaveRes = await fetch(impersonateLeave().url, {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    });
+                    if (!leaveRes.ok)
+                        throw new Error('Unable to leave impersonation');
                 }
 
-                const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
-                const profiles = [...defaults.profiles, { id: nextId, name: t('New profile'), conditions: {} }];
-
-                return {
-                    ...seller,
-                    has_seller_defaults: true,
-                    seller_defaults: {
-                        profiles,
-                        default_profile_id: defaults.default_profile_id ?? nextId,
+                const takeRes = await fetch(
+                    impersonateTake({ id: sellerId }).url,
+                    {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     },
-                };
-            }),
-        }));
+                );
+                if (!takeRes.ok) throw new Error('Impersonation failed');
 
-        setActiveSellerProfileId(nextId);
-    };
+                window.location.reload();
+            } catch {
+                // silently fail; impersonation errors handled server-side
+            }
+        };
 
-    const deleteSellerProfile = (profileId: string) => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
+        const addSellerToBilling = (sellerId: number) => {
+            if (!activeBillingRule) {
+                return;
+            }
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
-                }
-
-                const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
-                const profiles = defaults.profiles.filter((current) => current.id !== profileId);
-                return {
-                    ...seller,
-                    has_seller_defaults: true,
-                    seller_defaults: {
-                        profiles,
-                        default_profile_id: defaults.default_profile_id === profileId ? (profiles[0]?.id ?? null) : defaults.default_profile_id,
-                    },
-                };
-            }),
-        }));
-
-        if (currentSellerProfile?.id === profileId) {
-            setActiveSellerProfileId(null);
-        }
-    };
-
-    const renameBillingProfile = (name: string) => {
-        if (!activeBillingRule || !currentProfile) {
-            return;
-        }
-
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            defaults: {
-                ...rule.defaults,
-                profiles: (rule.defaults.profiles ?? []).map((profile) => {
-                    if (profile.id !== currentProfile.id) {
-                        return profile;
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => {
+                    const exists = (rule.sellers ?? []).some(
+                        (seller) => Number(seller.seller_user_id) === sellerId,
+                    );
+                    if (exists) {
+                        return rule;
                     }
 
                     return {
-                        ...profile,
-                        name,
+                        ...rule,
+                        sellers: [
+                            ...(rule.sellers ?? []),
+                            {
+                                seller_user_id: sellerId,
+                                conditions: {},
+                                use_billing_profile: true,
+                                billing_profile_id: null,
+                                can_manage: false,
+                                seller_defaults: undefined,
+                            },
+                        ],
                     };
+                },
+            );
+
+            setActivePanelItem({ type: 'seller', id: sellerId });
+        };
+
+        const deleteSellerFromBilling = (sellerId: number) => {
+            if (!activeBillingRule) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).filter(
+                        (current) =>
+                            Number(current.seller_user_id) !== sellerId,
+                    ),
                 }),
-            },
-        }));
-    };
+            );
 
-    const changeBillingProfileConditions = (next: SalesConditions) => {
-        if (!activeBillingRule || !currentProfile) {
-            return;
-        }
+            if (
+                activePanelItem?.type === 'seller' &&
+                Number(activePanelItem.id) === sellerId
+            ) {
+                setActivePanelItem(null);
+            }
+        };
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            defaults: {
-                ...rule.defaults,
-                profiles: (rule.defaults.profiles ?? []).map((profile) => {
-                    if (profile.id !== currentProfile.id) {
-                        return profile;
-                    }
+        const addSellerProfile = () => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
 
-                    return {
-                        ...profile,
-                        conditions: normalizeConditions(next),
-                    };
+            const nextId = `seller-profile-${Date.now()}`;
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
+
+                        const defaults = normalizeBillingDefaultsToProfiles(
+                            seller.seller_defaults,
+                        );
+                        const profiles = [
+                            ...defaults.profiles,
+                            {
+                                id: nextId,
+                                name: t('New profile'),
+                                conditions: {},
+                            },
+                        ];
+
+                        return {
+                            ...seller,
+                            has_seller_defaults: true,
+                            seller_defaults: {
+                                profiles,
+                                default_profile_id:
+                                    defaults.default_profile_id ?? nextId,
+                            },
+                        };
+                    }),
                 }),
-            },
-        }));
-    };
+            );
 
-    const toggleSellerCanManage = (checked: boolean) => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
+            setActiveSellerProfileId(nextId);
+        };
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
-                }
+        const deleteSellerProfile = (profileId: string) => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
 
-                return {
-                    ...seller,
-                    can_manage: checked,
-                };
-            }),
-        }));
-    };
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
 
-    const changeSellerUseBillingProfile = (useProfile: boolean) => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
+                        const defaults = normalizeBillingDefaultsToProfiles(
+                            seller.seller_defaults,
+                        );
+                        const profiles = defaults.profiles.filter(
+                            (current) => current.id !== profileId,
+                        );
+                        return {
+                            ...seller,
+                            has_seller_defaults: true,
+                            seller_defaults: {
+                                profiles,
+                                default_profile_id:
+                                    defaults.default_profile_id === profileId
+                                        ? (profiles[0]?.id ?? null)
+                                        : defaults.default_profile_id,
+                            },
+                        };
+                    }),
+                }),
+            );
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => Number(seller.seller_user_id) === Number(currentSeller.seller_user_id)
-                ? { ...seller, use_billing_profile: useProfile, billing_profile_id: useProfile ? (seller.billing_profile_id ?? currentSellerInheritedProfile?.id ?? null) : null }
-                : seller),
-        }));
-    };
+            if (currentSellerProfile?.id === profileId) {
+                setActiveSellerProfileId(null);
+            }
+        };
 
-    const changeSellerBillingProfile = (profileId: string | null) => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
+        const renameBillingProfile = (name: string) => {
+            if (!activeBillingRule || !currentProfile) {
+                return;
+            }
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => Number(seller.seller_user_id) === Number(currentSeller.seller_user_id)
-                ? { ...seller, billing_profile_id: profileId, use_billing_profile: true }
-                : seller),
-        }));
-    };
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    defaults: {
+                        ...rule.defaults,
+                        profiles: (rule.defaults.profiles ?? []).map(
+                            (profile) => {
+                                if (profile.id !== currentProfile.id) {
+                                    return profile;
+                                }
 
-    const changeSellerCustomConditions = (next: SalesConditions) => {
-        if (!activeBillingRule || !currentSeller) {
-            return;
-        }
-
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
-                }
-
-                return {
-                    ...seller,
-                    use_billing_profile: false,
-                    conditions: normalizeConditions(next),
-                };
-            }),
-        }));
-    };
-
-    const renameSellerProfile = (name: string) => {
-        if (!activeBillingRule || !currentSeller || !currentSellerProfile) {
-            return;
-        }
-
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
-                }
-
-                const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
-                return {
-                    ...seller,
-                    has_seller_defaults: true,
-                    seller_defaults: {
-                        ...defaults,
-                        profiles: defaults.profiles.map((profile) => profile.id === currentSellerProfile.id
-                            ? { ...profile, name }
-                            : profile),
+                                return {
+                                    ...profile,
+                                    name,
+                                };
+                            },
+                        ),
                     },
-                };
-            }),
-        }));
-    };
+                }),
+            );
+        };
 
-    const changeSellerProfileConditions = (next: SalesConditions) => {
-        if (!activeBillingRule || !currentSeller || !currentSellerProfile) {
-            return;
-        }
+        const changeBillingProfileConditions = (next: SalesConditions) => {
+            if (!activeBillingRule || !currentProfile) {
+                return;
+            }
 
-        updateBillingRule(Number(activeBillingRule.billing_user_id), (rule) => ({
-            ...rule,
-            sellers: (rule.sellers ?? []).map((seller) => {
-                if (Number(seller.seller_user_id) !== Number(currentSeller.seller_user_id)) {
-                    return seller;
-                }
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    defaults: {
+                        ...rule.defaults,
+                        profiles: (rule.defaults.profiles ?? []).map(
+                            (profile) => {
+                                if (profile.id !== currentProfile.id) {
+                                    return profile;
+                                }
 
-                const defaults = normalizeBillingDefaultsToProfiles(seller.seller_defaults);
-                return {
-                    ...seller,
-                    has_seller_defaults: true,
-                    seller_defaults: {
-                        ...defaults,
-                        profiles: defaults.profiles.map((profile) => profile.id === currentSellerProfile.id
-                            ? { ...profile, conditions: normalizeConditions(next) }
-                            : profile),
+                                return {
+                                    ...profile,
+                                    conditions: normalizeConditions(next),
+                                };
+                            },
+                        ),
                     },
-                };
-            }),
-        }));
-    };
+                }),
+            );
+        };
 
-    return (
-        <>
-            <Head title={`${t('Billing')} - ${dbProduct.name}`} />
+        const toggleSellerCanManage = (checked: boolean) => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
 
-            <div className="space-y-6">
-                <form onSubmit={handleSubmit}>
-                    <StickyBar className="mb-4 w-full">
-                        <div className="flex items-center gap-4 ">
-                            <Link
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    window.history.back();
-                                }}
-                                className="hover:text-gray-500 transition-colors duration-200"
-                            >
-                                <ArrowLeftCircle size={35} />
-                            </Link>
-                            <div className="flex flex-col">
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
+
+                        return {
+                            ...seller,
+                            can_manage: checked,
+                        };
+                    }),
+                }),
+            );
+        };
+
+        const changeSellerUseBillingProfile = (useProfile: boolean) => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) =>
+                        Number(seller.seller_user_id) ===
+                        Number(currentSeller.seller_user_id)
+                            ? {
+                                  ...seller,
+                                  use_billing_profile: useProfile,
+                                  billing_profile_id: useProfile
+                                      ? (seller.billing_profile_id ??
+                                        currentSellerInheritedProfile?.id ??
+                                        null)
+                                      : null,
+                              }
+                            : seller,
+                    ),
+                }),
+            );
+        };
+
+        const changeSellerBillingProfile = (profileId: string | null) => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) =>
+                        Number(seller.seller_user_id) ===
+                        Number(currentSeller.seller_user_id)
+                            ? {
+                                  ...seller,
+                                  billing_profile_id: profileId,
+                                  use_billing_profile: true,
+                              }
+                            : seller,
+                    ),
+                }),
+            );
+        };
+
+        const changeSellerCustomConditions = (next: SalesConditions) => {
+            if (!activeBillingRule || !currentSeller) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
+
+                        return {
+                            ...seller,
+                            use_billing_profile: false,
+                            conditions: normalizeConditions(next),
+                        };
+                    }),
+                }),
+            );
+        };
+
+        const renameSellerProfile = (name: string) => {
+            if (!activeBillingRule || !currentSeller || !currentSellerProfile) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
+
+                        const defaults = normalizeBillingDefaultsToProfiles(
+                            seller.seller_defaults,
+                        );
+                        return {
+                            ...seller,
+                            has_seller_defaults: true,
+                            seller_defaults: {
+                                ...defaults,
+                                profiles: defaults.profiles.map((profile) =>
+                                    profile.id === currentSellerProfile.id
+                                        ? { ...profile, name }
+                                        : profile,
+                                ),
+                            },
+                        };
+                    }),
+                }),
+            );
+        };
+
+        const changeSellerProfileConditions = (next: SalesConditions) => {
+            if (!activeBillingRule || !currentSeller || !currentSellerProfile) {
+                return;
+            }
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    sellers: (rule.sellers ?? []).map((seller) => {
+                        if (
+                            Number(seller.seller_user_id) !==
+                            Number(currentSeller.seller_user_id)
+                        ) {
+                            return seller;
+                        }
+
+                        const defaults = normalizeBillingDefaultsToProfiles(
+                            seller.seller_defaults,
+                        );
+                        return {
+                            ...seller,
+                            has_seller_defaults: true,
+                            seller_defaults: {
+                                ...defaults,
+                                profiles: defaults.profiles.map((profile) =>
+                                    profile.id === currentSellerProfile.id
+                                        ? {
+                                              ...profile,
+                                              conditions:
+                                                  normalizeConditions(next),
+                                          }
+                                        : profile,
+                                ),
+                            },
+                        };
+                    }),
+                }),
+            );
+        };
+
+        return (
+            <>
+                <Head title={`${t('Billing')} - ${dbProduct.name}`} />
+
+                <div className="space-y-6">
+                    <form ref={formRef} onSubmit={handleSubmit}>
+                        <DatabaseStickyBar
+                            dbProductId={dbProduct.id}
+                            country={dbProduct.country}
+                            activeSection="billing"
+                            canAccessBilling
+                            onSave={() => formRef.current?.requestSubmit()}
+                            saving={processing}
+                            title={
                                 <Breadcrumb>
                                     <BreadcrumbList>
                                         <BreadcrumbItemUI>
-                                            <CountryFlag countryCode={dbProduct.country} title={dbProduct.country} className="w-4" />
-                                        </BreadcrumbItemUI>
-                                        <BreadcrumbItemUI>
-                                            <BreadcrumbPage className="text-3xl font-bold capitalize">{dbProduct.name || t('Database')}</BreadcrumbPage>
+                                            <BreadcrumbPage className="text-3xl font-bold capitalize">
+                                                {dbProduct.name ||
+                                                    t('Database')}
+                                            </BreadcrumbPage>
                                         </BreadcrumbItemUI>
                                         {activeBillingRule && (
                                             <>
                                                 <BreadcrumbSeparator />
                                                 <BreadcrumbItemUI>
-                                                    <BreadcrumbPage className="text-3xl font-bold">{billingLabel}</BreadcrumbPage>
+                                                    <BreadcrumbPage className="text-3xl font-bold">
+                                                        {billingLabel}
+                                                    </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
                                             </>
                                         )}
@@ -721,133 +1021,181 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct, eligibleBil
                                                 <BreadcrumbSeparator />
                                                 <BreadcrumbItemUI>
                                                     <BreadcrumbPage className="text-3xl font-bold">
-                                                        {activePanelItem.type === 'profile'
-                                                            ? (currentProfile?.name ?? t('Profile'))
-                                                            : (userOptionById.get(Number(activePanelItem.id))?.label ?? t('Commercial'))
-                                                        }
+                                                        {activePanelItem.type ===
+                                                        'profile'
+                                                            ? (currentProfile?.name ??
+                                                              t('Profile'))
+                                                            : (userOptionById.get(
+                                                                  Number(
+                                                                      activePanelItem.id,
+                                                                  ),
+                                                              )?.label ??
+                                                              t('Commercial'))}
                                                     </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
                                             </>
                                         )}
-                                        {activeSellerProfileId && currentSellerProfile && (
-                                            <>
-                                                <BreadcrumbSeparator />
-                                                <BreadcrumbItemUI>
-                                                    <BreadcrumbPage className="text-3xl font-bold">{currentSellerProfile.name}</BreadcrumbPage>
-                                                </BreadcrumbItemUI>
-                                            </>
-                                        )}
+                                        {activeSellerProfileId &&
+                                            currentSellerProfile && (
+                                                <>
+                                                    <BreadcrumbSeparator />
+                                                    <BreadcrumbItemUI>
+                                                        <BreadcrumbPage className="text-3xl font-bold">
+                                                            {
+                                                                currentSellerProfile.name
+                                                            }
+                                                        </BreadcrumbPage>
+                                                    </BreadcrumbItemUI>
+                                                </>
+                                            )}
                                     </BreadcrumbList>
                                 </Breadcrumb>
-                            </div>
+                            }
+                        />
+
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                            {isFullAccess && (
+                                <BillingUserSelector
+                                    className="xl:col-span-3"
+                                    billingUsers={data.billing_users ?? []}
+                                    activeBillingUserId={activeBillingUserId}
+                                    userOptionById={userOptionById}
+                                    billingSearch={billingSearch}
+                                    setBillingSearch={setBillingSearch}
+                                    availableBillingOptions={
+                                        availableBillingOptions
+                                    }
+                                    canManageBillingUsers={
+                                        canManageBillingUsers
+                                    }
+                                    onSelectBillingUser={(id) => {
+                                        setActiveBillingUserId(id);
+                                        setActivePanelItem(null);
+                                    }}
+                                    onAddBillingUser={addBillingUser}
+                                    onDeleteBillingUser={deleteBillingUser}
+                                    onImpersonateBillingUser={
+                                        handleImpersonateSeller
+                                    }
+                                    errors={errorBag}
+                                />
+                            )}
+
+                            {isFullAccess ? (
+                                <BillingTreePanel
+                                    className="xl:col-span-4"
+                                    activeBillingRule={activeBillingRule}
+                                    activeBillingLabel={billingLabel}
+                                    activePanelItem={activePanelItem}
+                                    setActivePanelItem={setActivePanelItem}
+                                    canManageProfiles={canManageProfiles}
+                                    canManageSellers={canManageSellers}
+                                    sellerSearch={sellerSearch}
+                                    setSellerSearch={setSellerSearch}
+                                    availableSellerOptions={
+                                        availableSellerOptions
+                                    }
+                                    userOptionById={userOptionById}
+                                    openSection={openSection}
+                                    onOpenSectionChange={setOpenSection}
+                                    onAddProfile={addBillingProfile}
+                                    onDeleteProfile={deleteBillingProfile}
+                                    onAddSeller={addSellerToBilling}
+                                    onDeleteSeller={deleteSellerFromBilling}
+                                    onImpersonateSeller={
+                                        handleImpersonateSeller
+                                    }
+                                />
+                            ) : (
+                                <SellerProfilesPanel
+                                    className="xl:col-span-5"
+                                    currentSeller={currentSeller}
+                                    currentSellerDefaults={
+                                        currentSellerDefaults
+                                    }
+                                    currentSellerProfile={currentSellerProfile}
+                                    activeSellerProfileId={
+                                        activeSellerProfileId
+                                    }
+                                    setActiveSellerProfileId={
+                                        setActiveSellerProfileId
+                                    }
+                                    canManageSellerProfiles={
+                                        canManageSellerProfiles
+                                    }
+                                    onAddSellerProfile={addSellerProfile}
+                                    onDeleteSellerProfile={deleteSellerProfile}
+                                />
+                            )}
+
+                            {isFullAccess ? (
+                                <BillingConditionsEditor
+                                    className="xl:col-span-5"
+                                    activeBillingRule={activeBillingRule}
+                                    activePanelItem={activePanelItem}
+                                    currentProfile={currentProfile}
+                                    currentSeller={currentSeller}
+                                    currentSellerDefaults={
+                                        currentSellerDefaults
+                                    }
+                                    currentSellerProfile={currentSellerProfile}
+                                    currentSellerInheritedProfile={
+                                        currentSellerInheritedProfile
+                                    }
+                                    canManageProfiles={canManageProfiles}
+                                    canManageSellerProfiles={
+                                        canManageSellerProfiles
+                                    }
+                                    canDelegateManage={canDelegateManage}
+                                    carriers={carriers}
+                                    userOptionById={userOptionById}
+                                    setActiveSellerProfileId={
+                                        setActiveSellerProfileId
+                                    }
+                                    onRenameBillingProfile={
+                                        renameBillingProfile
+                                    }
+                                    onChangeBillingProfileConditions={
+                                        changeBillingProfileConditions
+                                    }
+                                    onToggleSellerCanManage={
+                                        toggleSellerCanManage
+                                    }
+                                    onChangeSellerUseBillingProfile={
+                                        changeSellerUseBillingProfile
+                                    }
+                                    onChangeSellerBillingProfile={
+                                        changeSellerBillingProfile
+                                    }
+                                    onChangeSellerCustomConditions={
+                                        changeSellerCustomConditions
+                                    }
+                                    onAddSellerProfile={addSellerProfile}
+                                    onDeleteSellerProfile={deleteSellerProfile}
+                                    onRenameSellerProfile={renameSellerProfile}
+                                    onChangeSellerProfileConditions={
+                                        changeSellerProfileConditions
+                                    }
+                                />
+                            ) : (
+                                <SellerProfileConditionsEditor
+                                    className="xl:col-span-7"
+                                    currentSeller={currentSeller}
+                                    currentSellerProfile={currentSellerProfile}
+                                    canManageSellerProfiles={
+                                        canManageSellerProfiles
+                                    }
+                                    carriers={carriers}
+                                    onRenameSellerProfile={renameSellerProfile}
+                                    onChangeSellerProfileConditions={
+                                        changeSellerProfileConditions
+                                    }
+                                />
+                            )}
                         </div>
-
-                        <div className="ml-auto flex items-center gap-2">
-                            <Button type="submit" disabled={processing}>
-                                <SaveIcon size={20} className="mr-2" />
-                                {t('Save')}
-                            </Button>
-                        </div>
-                    </StickyBar>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                        {isFullAccess && (
-                            <BillingUserSelector
-                                className="xl:col-span-3"
-                                billingUsers={data.billing_users ?? []}
-                                activeBillingUserId={activeBillingUserId}
-                                userOptionById={userOptionById}
-                                billingSearch={billingSearch}
-                                setBillingSearch={setBillingSearch}
-                                availableBillingOptions={availableBillingOptions}
-                                canManageBillingUsers={canManageBillingUsers}
-                                onSelectBillingUser={(id) => {
-                                    setActiveBillingUserId(id);
-                                    setActivePanelItem(null);
-                                }}
-                                onAddBillingUser={addBillingUser}
-                                onDeleteBillingUser={deleteBillingUser}
-                                onImpersonateBillingUser={handleImpersonateSeller}
-                                errors={errorBag}
-                            />
-                        )}
-
-                        {isFullAccess ? (
-                            <BillingTreePanel
-                                className="xl:col-span-4"
-                                activeBillingRule={activeBillingRule}
-                                activeBillingLabel={billingLabel}
-                                activePanelItem={activePanelItem}
-                                setActivePanelItem={setActivePanelItem}
-                                canManageProfiles={canManageProfiles}
-                                canManageSellers={canManageSellers}
-                                sellerSearch={sellerSearch}
-                                setSellerSearch={setSellerSearch}
-                                availableSellerOptions={availableSellerOptions}
-                                userOptionById={userOptionById}
-                                openSection={openSection}
-                                onOpenSectionChange={setOpenSection}
-                                onAddProfile={addBillingProfile}
-                                onDeleteProfile={deleteBillingProfile}
-                                onAddSeller={addSellerToBilling}
-                                onDeleteSeller={deleteSellerFromBilling}
-                                onImpersonateSeller={handleImpersonateSeller}
-                            />
-                        ) : (
-                            <SellerProfilesPanel
-                                className="xl:col-span-5"
-                                currentSeller={currentSeller}
-                                currentSellerDefaults={currentSellerDefaults}
-                                currentSellerProfile={currentSellerProfile}
-                                activeSellerProfileId={activeSellerProfileId}
-                                setActiveSellerProfileId={setActiveSellerProfileId}
-                                canManageSellerProfiles={canManageSellerProfiles}
-                                onAddSellerProfile={addSellerProfile}
-                                onDeleteSellerProfile={deleteSellerProfile}
-                            />
-                        )}
-
-                        {isFullAccess ? (
-                            <BillingConditionsEditor
-                                className="xl:col-span-5"
-                                activeBillingRule={activeBillingRule}
-                                activePanelItem={activePanelItem}
-                                currentProfile={currentProfile}
-                                currentSeller={currentSeller}
-                                currentSellerDefaults={currentSellerDefaults}
-                                currentSellerProfile={currentSellerProfile}
-                                currentSellerInheritedProfile={currentSellerInheritedProfile}
-                                canManageProfiles={canManageProfiles}
-                                canManageSellerProfiles={canManageSellerProfiles}
-                                canDelegateManage={canDelegateManage}
-                                carriers={carriers}
-                                userOptionById={userOptionById}
-                                setActiveSellerProfileId={setActiveSellerProfileId}
-                                onRenameBillingProfile={renameBillingProfile}
-                                onChangeBillingProfileConditions={changeBillingProfileConditions}
-                                onToggleSellerCanManage={toggleSellerCanManage}
-                                onChangeSellerUseBillingProfile={changeSellerUseBillingProfile}
-                                onChangeSellerBillingProfile={changeSellerBillingProfile}
-                                onChangeSellerCustomConditions={changeSellerCustomConditions}
-                                onAddSellerProfile={addSellerProfile}
-                                onDeleteSellerProfile={deleteSellerProfile}
-                                onRenameSellerProfile={renameSellerProfile}
-                                onChangeSellerProfileConditions={changeSellerProfileConditions}
-                            />
-                        ) : (
-                            <SellerProfileConditionsEditor
-                                className="xl:col-span-7"
-                                currentSeller={currentSeller}
-                                currentSellerProfile={currentSellerProfile}
-                                canManageSellerProfiles={canManageSellerProfiles}
-                                carriers={carriers}
-                                onRenameSellerProfile={renameSellerProfile}
-                                onChangeSellerProfileConditions={changeSellerProfileConditions}
-                            />
-                        )}
-                    </div>
-                </form>
-            </div>
-        </>
-    );
-});
+                    </form>
+                </div>
+            </>
+        );
+    },
+);

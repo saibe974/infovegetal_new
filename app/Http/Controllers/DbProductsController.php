@@ -213,6 +213,19 @@ class DbProductsController extends Controller
         ]);
     }
 
+    public function mapping(Request $request, DbProducts $db_product)
+    {
+        $this->ensureCanManageDbProduct($request, $db_product);
+        $db_product->load([
+            'users' => fn ($query) => $query->select('users.id')->where('users.id', (int) $request->user()->id),
+        ]);
+
+        return Inertia::render('products/db-mapping', [
+            'dbProduct' => DbProductsResource::make($db_product)->resolve(),
+            'categoryOptions' => $this->categoryOptions(),
+        ]);
+    }
+
     /**
      * Update the specified resource in storage.
      */
@@ -220,11 +233,37 @@ class DbProductsController extends Controller
     {
         $this->ensureCanManageDbProduct($request, $db_product);
 
-        $validated = $this->validatePayload($request, $db_product);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('db_products', 'name')->ignore($db_product->id)],
+            'description' => ['nullable', 'string', 'max:500'],
+            'traitement' => ['nullable', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'size:2'],
+            'mod_liv' => ['nullable', 'string', 'max:100'],
+            'mini' => ['nullable', 'integer', 'min:0'],
+        ]);
 
         $db_product->update($validated);
 
         return redirect()->route('db-products.index')->with('success', __('Database updated.'));
+    }
+
+    public function updateMapping(Request $request, DbProducts $db_product)
+    {
+        $this->ensureCanManageDbProduct($request, $db_product);
+        $validated = $request->validate([
+            'champs' => ['nullable', 'array'],
+            'champs.*' => ['nullable', 'string'],
+            'update_fields' => ['nullable', 'array'],
+            'update_fields.*' => ['string', 'max:255'],
+            'category_mode' => ['required', Rule::in(['column', 'block'])],
+            'category_block_prefix' => ['exclude_unless:category_mode,block', 'nullable', 'string', 'max:255', 'required_without:category_block_column', 'prohibits:category_block_column'],
+            'category_block_column' => ['exclude_unless:category_mode,block', 'nullable', 'integer', 'min:1', 'max:1000', 'required_without:category_block_prefix', 'prohibits:category_block_prefix'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['nullable', 'string'],
+        ]);
+        $db_product->update($validated);
+
+        return redirect()->route('db-products.mapping', $db_product)->with('success', __('Database mapping updated.'));
     }
 
     public function updateBilling(Request $request, DbProducts $db_product)

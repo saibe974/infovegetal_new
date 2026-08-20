@@ -99,11 +99,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('db-products/{db_product}/edit', [DbProductsController::class, 'edit'])
         ->name('db-products.edit')
         ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::get('db-products/{db_product}/mapping', [DbProductsController::class, 'mapping'])
+        ->name('db-products.mapping')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::get('db-products/{db_product}/billing', [DbProductsController::class, 'billing'])
         ->name('db-products.billing')
         ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::put('db-products/{db_product}', [DbProductsController::class, 'update'])
         ->name('db-products.update')
+        ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
+    Route::put('db-products/{db_product}/mapping', [DbProductsController::class, 'updateMapping'])
+        ->name('db-products.update-mapping')
         ->middleware(['role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his']);
     Route::put('db-products/{db_product}/billing', [DbProductsController::class, 'updateBilling'])
         ->name('db-products.update-billing')
