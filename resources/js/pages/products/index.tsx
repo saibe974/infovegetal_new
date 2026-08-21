@@ -415,7 +415,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             ) : singleProduct ? (
                 <ProductDetails product={singleProduct} showBackLink={false} />
             ) :
-                <InfiniteScroll data="collection" className=''>
+                <InfiniteScroll data="collection" buffer={600} className=''>
                     {viewMode === 'table' ? (
                         <ProductsTable
                             collection={{
