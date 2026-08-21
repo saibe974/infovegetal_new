@@ -2,7 +2,6 @@ import React, { useContext } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Zap } from "lucide-react";
 import { type Product, SharedData } from "@/types";
@@ -98,7 +97,7 @@ export function ProductCard({
             <Card
                 className={cn(
                     'relative flex flex-col p-4 gap-3 h-full overflow-hidden',
-                    isInCart && 'border-amber-400/70 ring-1 ring-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20',
+                    isInCart && 'border-green-200/70 ring-1 ring-green-300/60 bg-green-50/60 dark:border-green-900 dark:bg-green-950/20',
                     className,
                 )}
             >
@@ -135,25 +134,55 @@ export function ProductCard({
                     <img src={img} alt={name} className="w-full max-w-100 h-80 object-cover rounded" />
                 </CardHeader>
 
-                <CardTitle>
-                    <span className="text-lg font-semibold  whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
-                        {name.charAt(0).toUpperCase() + name.slice(1)}
-                    </span>
-                    {/* <p>
-                        {product?.category ? (
-                            <span className="text-sm font-light italic ">
-                                {product.category.name.charAt(0).toUpperCase() + product.category.name.slice(1)}
+                <CardTitle className="p-0">
+                    <div className="flex items-start gap-1">
+                        <div className="min-w-0 flex-1">
+                            <span className="block text-lg font-semibold whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
+                                {name.charAt(0).toUpperCase() + name.slice(1)}
                             </span>
-                        ) : null}
-                    </p> */}
-
-                    <p>
-                        {product?.ref ? (
-                            <span className="text-xs font-medium italic text-gray-500">
-                                {t('Ref')}: {String(product.ref)}
-                            </span>
-                        ) : null}
-                    </p>
+                            {product?.ref ? (
+                                <span className="block truncate text-xs font-medium italic text-gray-500">
+                                    {t('Ref')}: {String(product.ref)}
+                                </span>
+                            ) : null}
+                        </div>
+                        {(canEdit || canDelete) && (
+                            <div className="flex shrink-0 items-center">
+                                {canEdit && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6"
+                                        aria-label={t('Edit product')}
+                                        title={t('Edit product')}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleEdit(product.id);
+                                        }}
+                                    >
+                                        <EditIcon className="size-3.5" />
+                                    </Button>
+                                )}
+                                {canDelete && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        aria-label={t('Delete product')}
+                                        title={t('Delete product')}
+                                        onClick={(e: React.MouseEvent) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDelete(product.id);
+                                        }}
+                                    >
+                                        <TrashIcon className="size-3.5" />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </CardTitle>
 
                 <CardContent className="p-0 flex flex-col justify-between gap-5 flex-1">
@@ -161,76 +190,42 @@ export function ProductCard({
                         {description.charAt(0).toUpperCase() + description.slice(1)}
                     </p>
 
-                    <div className="flex items-center">
-                        <div className="flex items-center text-xs font-light italic w-full">
-                            {product?.pot ? (
-                                <p className=" flex gap-1" title={t('Diameter of the pot')}>
-                                    <span><CircleSlash2 className="size-3" /></span>
-                                    <span>{String(product.pot)} cm</span>
-                                </p>
-                            ) : null}
+                    <div className="flex items-center text-xs font-light italic w-full">
+                        {product?.pot ? (
+                            <p className=" flex gap-1" title={t('Diameter of the pot')}>
+                                <span><CircleSlash2 className="size-3" /></span>
+                                <span>{String(product.pot)} cm</span>
+                            </p>
+                        ) : null}
 
-                            {product?.height && product?.pot ? (
-                                <span className="mx-2">-</span>
-                            ) : null}
+                        {product?.height && product?.pot ? (
+                            <span className="mx-2">-</span>
+                        ) : null}
 
-                            {product?.height ? (
-                                <p className="flex" title={t('Height')}>
-                                    <span><MoveVertical className="size-4" /></span>
-                                    <span>{String(product.height)} cm</span>
-                                </p>
-                            ) : null}
-                        </div>
-                        {(canEdit || canDelete) && (
-                            <div className="w-full flex justify-end gap-2 p-0">
-                                {canEdit && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 px-2"
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleEdit(product.id);
-                                        }}
-                                        title={t('Edit product')}
-                                    >
-                                        <EditIcon size={14} />
-                                    </Button>
-                                )}
-                                {canDelete && (
-                                    <Button
-                                        size="sm"
-                                        variant="destructive-outline"
-                                        className="h-8 px-2"
-                                        onClick={(e: React.MouseEvent) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleDelete(product.id);
-                                        }}
-                                        title={t('Delete product')}
-                                    >
-                                        <TrashIcon size={14} />
-                                    </Button>
-                                )}
-                            </div>
-                        )}
+                        {product?.height ? (
+                            <p className="flex" title={t('Height')}>
+                                <span><MoveVertical className="size-4" /></span>
+                                <span>{String(product.height)} cm</span>
+                            </p>
+                        ) : null}
                     </div>
 
 
                     {/* <div className="flex-1" /> */}
 
 
-                    <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
+                    <div className="relative w-full">
+                        <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
+                        {product?.unite != null && product.unite > Number(product.cond) ? (
+                            <span className="absolute left-1/2 -top-2 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground">
+                                {t('Mini')} : {String(product.unite)}
+                            </span>
+                        ) : null}
+                    </div>
                 </CardContent>
 
                 {isAuthenticated && (
                     <>
-                        {product?.unite != null && product.unite > Number(product.cond) ? (
-                            <Badge variant="secondary" className="self-start">
-                                Mini : {String(product.unite)}
-                            </Badge>
-                        ) : null}
                         <CardFooter className="flex flex-col lg:flex-row p-0 gap-2 w-full">
                             {price !== null && (
                                 <button

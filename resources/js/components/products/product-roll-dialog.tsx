@@ -35,7 +35,7 @@ export function ProductRollDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="grid h-[90vh] grid-rows-[auto_1fr] gap-0 overflow-hidden p-0 sm:max-w-6xl">
+            <DialogContent className="grid h-[90vh] grid-rows-[auto_1fr] gap-0 overflow-hidden p-0 sm:max-w-6xl" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <DialogHeader className="border-b px-6 py-4 pr-12">
                     <DialogTitle>{t('Chargement des rolls')}</DialogTitle>
                     <DialogDescription>

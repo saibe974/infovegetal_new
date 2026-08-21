@@ -19,7 +19,8 @@ type Props = {
 
 export default function ProductDetails({ product, showBackLink = true }: Props) {
     const { t } = useI18n();
-    const { addToCart } = useContext(CartContext);
+    const { addToCart, items } = useContext(CartContext);
+    const isInCart = items.some((cartItem) => cartItem.product.id === product.id);
     const { toggleSidebar, isOpenId } = useSidebar();
 
     const { auth } = usePage<SharedData>().props;
@@ -60,7 +61,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
 
             <div className="flex flex-col gap-6">
                 <div className="gap-5 flex flex-col lg:flex-row lg:flex lg:justify-center w-full max-w-[1200px] md:mx-auto">
-                    <Card className="lg:w-1/2 lg:h-150">
+                    <Card className={cn('lg:w-1/2 lg:h-150', isInCart && 'border-green-200/70 ring-1 ring-green-300/60 bg-green-50/60 dark:border-green-900 dark:bg-green-950/20')}>
                         <CardContent className="h-full flex items-center justify-center relative overflow-hidden">
                             {product.img_link ? (
                                 <Lens
@@ -87,7 +88,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                         </CardContent>
                     </Card>
 
-                    <Card className="lg:w-1/2 relative">
+                    <Card className={cn('lg:w-1/2 relative', isInCart && 'border-green-200/70 ring-1 ring-green-300/60 bg-green-50/60 dark:border-green-900 dark:bg-green-950/20')}>
                         <CardHeader>
                             <CardTitle>
                                 <h2 className="capitalize text-xl">{product.name}</h2>
@@ -108,14 +109,14 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                 {product.description || t('Aucune description disponible')}
                             </p>
 
-                            <div className="rounded-2xl border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                            {/* <div className="rounded-2xl border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/5">
                                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
                                     {t('Prix TTC')}
                                 </div>
                                 <div className="text-3xl font-black leading-none">
                                     {formatCurrency(displayPrice)}
                                 </div>
-                            </div>
+                            </div> */}
 
                             <div className="space-y-4">
                                 {product.tags && product.tags.length > 0 && (
@@ -138,7 +139,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                         <div className="flex items-center gap-2">
                                             <CircleSlash2 className="size-4 text-main-purple dark:text-main-green" />
                                             <div className="text-sm">
-                                                <span className="text-muted-foreground">{t('Diameter of the pot')}:</span>{' '}
+                                                <span className="text-muted-foreground" title="{t('Diameter of the pot')}"></span>{' '}
                                                 <span className="font-semibold">{String(product.pot)} cm</span>
                                             </div>
                                         </div>
@@ -147,7 +148,7 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                         <div className="flex items-center gap-2">
                                             <MoveVertical className="size-4 text-main-purple dark:text-main-green" />
                                             <div className="text-sm">
-                                                <span className="text-muted-foreground">{t('Height')}:</span>{' '}
+                                                <span className="text-muted-foreground" title="{t('Height')}"></span>{' '}
                                                 <span className="font-semibold">{String(product.height)} cm</span>
                                             </div>
                                         </div>
@@ -168,13 +169,15 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
 
                         {isAuthenticated && (
                             <>
-                                {product?.unite != null && product.unite > Number(product.cond) ? (
-                                    <Badge variant="secondary" className="self-start">
-                                        Mini : {String(product.unite)}
-                                    </Badge>
-                                ) : null}
                                 <CardFooter className="w-full flex flex-col gap-3 pt-4 mt-auto">
-                                    <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
+                                    <div className="relative w-full">
+                                        <div className="w-full h-px bg-black/10 dark:bg-accent rounded" />
+                                        {product?.unite != null && product.unite > Number(product.cond) ? (
+                                            <span className="absolute left-1/2 -top-2.5 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground">
+                                                {t('Mini')} : {String(product.unite)}
+                                            </span>
+                                        ) : null}
+                                    </div>
 
                                     <div className="flex flex-row gap-2 w-full">
                                         {price !== null && (

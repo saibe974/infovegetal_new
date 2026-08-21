@@ -87,7 +87,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                     return (
                         <TableRow
                             key={item.id}
-                            className={`group hover:cursor-pointer ${isInCart ? 'bg-amber-50/60 dark:bg-amber-950/20' : ''}`}
+                            className={`group hover:cursor-pointer ${isInCart ? 'bg-green-50/60 dark:bg-green-950/20' : ''}`}
                             onClick={() => goToProductPage(item.id)}
                         >
                             <TableCell>{String(item.ref)}</TableCell>

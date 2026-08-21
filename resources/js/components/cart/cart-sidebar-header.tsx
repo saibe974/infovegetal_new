@@ -24,7 +24,7 @@ import { Badge } from "../ui/badge";
 import { buildRollDistribution } from '@/components/products/product-roll';
 import { getCarrierOverridesStorageKey, readCarrierOverrides, subscribeToCarrierOverrides, type CarrierOverrides } from './cart-carrier-storage';
 
-const validateCartButtonClassName = "bg-brand-main text-black hover:bg-brand-main-hover disabled:opacity-50";
+const validateCartButtonClassName = "bg-brand-main text-white dark:text-black hover:bg-brand-main-hover disabled:opacity-50";
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
@@ -322,17 +322,16 @@ export function CartSidebarHeader() {
                                         </button>
                                     ) : null}
 
-                                    <SidebarMenuItem className="w-fit">
-                                        <SidebarMenuButton asChild title={t("Valider le panier")}>
-                                            <button
-                                                type="button"
-                                                className={`p-2 rounded ${validateCartButtonClassName}`}
-                                                onClick={() => router.visit('/cart/checkout')}
-                                                disabled={isBusy}
-                                            >
-                                                <CheckCircleIcon className="size-6" />
-                                            </button>
-                                        </SidebarMenuButton>
+                                    <SidebarMenuItem className="w-fit flex items-center">
+                                        <button
+                                            type="button"
+                                            className={`flex items-center p-1 rounded ${validateCartButtonClassName}`}
+                                            onClick={() => router.visit('/cart/checkout')}
+                                            title={t("Valider le panier")}
+                                            disabled={isBusy}
+                                        >
+                                            <CheckCircleIcon className="size-4" />
+                                        </button>
                                     </SidebarMenuItem>
                                 </SidebarMenu>
 
