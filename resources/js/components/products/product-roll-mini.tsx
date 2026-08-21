@@ -9,6 +9,7 @@ type ProductRollMiniProps = {
     items: CartItem[];
     className?: string;
     getSupplierPrice?: (supplier: SupplierDistribution) => number | null;
+    onSupplierClick?: (supplierId: number) => void;
 };
 
 const clamp = (value: number, min = 0, max = 100): number => Math.min(max, Math.max(min, value));
@@ -44,7 +45,7 @@ const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boo
     );
 };
 
-export function ProductRollMini({ items, className, getSupplierPrice }: ProductRollMiniProps) {
+export function ProductRollMini({ items, className, getSupplierPrice, onSupplierClick }: ProductRollMiniProps) {
     const distribution = useMemo(() => buildRollDistribution(items), [items]);
     const suppliers = Object.values(distribution.suppliers);
 
@@ -76,7 +77,14 @@ export function ProductRollMini({ items, className, getSupplierPrice }: ProductR
                 const partialRolls = supplier.rolls.filter((roll) => roll.coef < 95);
 
                 return (
-                    <div key={supplier.supplierId} className="flex items-center gap-3 px-0 py-2 border-b border-accent">
+                    <button
+                        key={supplier.supplierId}
+                        type="button"
+                        className="flex w-full items-center gap-3 border-b border-accent px-0 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => onSupplierClick?.(supplier.supplierId)}
+                        disabled={!onSupplierClick}
+                        aria-label={`View roll details${supplier.name ? ` for ${supplier.name}` : ''}`}
+                    >
                         <CountryFlag countryCode={supplier.country} className="w-4" />
 
                         <div className="flex items-center gap-1">
@@ -105,7 +113,7 @@ export function ProductRollMini({ items, className, getSupplierPrice }: ProductR
                             <span className="font-semibold">{Math.round(supplier.coefAvg * 10) / 10}%</span>
                             <span>{supplierPrice !== null ? formatCurrency(supplierPrice) : 'devis'}</span>
                         </div>
-                    </div>
+                    </button>
                 );
             })}
         </div>

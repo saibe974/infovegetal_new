@@ -18,7 +18,8 @@ import { SharedData } from "@/types";
 import { Button } from "../ui/button";
 import HeadingSmall from "../heading-small";
 import { ProductRollMini } from "@/components/products/product-roll-mini";
-import { buildCartTransportContext, calculateCartShipping, getRenderedProductDeliveryPerRoll, type CartTransportOption } from "./cart-shipping";
+import { ProductRollDialog } from "@/components/products/product-roll-dialog";
+import { buildCartTransportContext, calculateCartShipping, getRenderedProductDeliveryPerRoll, getSupplierRollPrices, type CartTransportOption } from "./cart-shipping";
 import { Badge } from "../ui/badge";
 import { buildRollDistribution } from '@/components/products/product-roll';
 import { getCarrierOverridesStorageKey, readCarrierOverrides, subscribeToCarrierOverrides, type CarrierOverrides } from './cart-carrier-storage';
@@ -37,6 +38,7 @@ export function CartSidebarHeader() {
     const { isSaving, saveMessage, handleSaveCart } = useCartOrder();
     const [isPreparingNewCart, setIsPreparingNewCart] = useState(false);
     const [newCartMessage, setNewCartMessage] = useState<string | null>(null);
+    const [selectedRollSupplierId, setSelectedRollSupplierId] = useState<number | null>(null);
     const isBusy = isSaving || isPreparingNewCart;
     const feedbackMessage = newCartMessage ?? saveMessage;
 
@@ -106,6 +108,37 @@ export function CartSidebarHeader() {
         [carrierOverrides, items, transportOptions],
     );
     const orderTotal = total + shipping.total;
+    const selectedRollItems = useMemo(() => selectedRollSupplierId === null
+        ? []
+        : items.filter((item) =>
+            Number(item.product.db_products_id ?? item.product.dbProduct?.id ?? 0) === selectedRollSupplierId
+        ), [items, selectedRollSupplierId]);
+    const selectedRollTransport = useMemo(() => {
+        if (selectedRollSupplierId === null || selectedRollItems.length === 0) return null;
+
+        const context = buildCartTransportContext(selectedRollItems);
+        const attributes = context.attrsBySupplier[selectedRollSupplierId];
+        const originalTransport = context.transportBySupplier[selectedRollSupplierId];
+        const override = carrierOverrides[selectedRollSupplierId];
+
+        return {
+            attributes: override && attributes
+                ? { ...attributes, t: override.carrierId, z: override.zoneId }
+                : attributes,
+            transport: override?.transport
+                ?? (override
+                    && originalTransport?.carrier_id === override.carrierId
+                    && originalTransport.zone_id === override.zoneId
+                    ? originalTransport
+                    : !override ? originalTransport : undefined),
+        };
+    }, [carrierOverrides, selectedRollItems, selectedRollSupplierId]);
+
+    useEffect(() => {
+        if (selectedRollSupplierId !== null && selectedRollItems.length === 0) {
+            setSelectedRollSupplierId(null);
+        }
+    }, [selectedRollItems, selectedRollSupplierId]);
     const orderOverrides = useMemo(() => ({
         transportSelection: Object.fromEntries(
             Object.entries(carrierOverrides).map(([supplierId, choice]) => [
@@ -341,6 +374,7 @@ export function CartSidebarHeader() {
                                         <ProductRollMini
                                             items={items}
                                             getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                                            onSupplierClick={setSelectedRollSupplierId}
                                         />
                                     </div>
                                 )}
@@ -387,6 +421,17 @@ export function CartSidebarHeader() {
                             </Button>
                         </SidebarFooter>
                     )}
+                    <ProductRollDialog
+                        open={selectedRollSupplierId !== null}
+                        onOpenChange={(open) => !open && setSelectedRollSupplierId(null)}
+                        items={selectedRollItems}
+                        getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
+                        getSupplierRollPrices={(supplier) => getSupplierRollPrices(
+                            supplier,
+                            selectedRollTransport?.attributes,
+                            selectedRollTransport?.transport,
+                        )}
+                    />
                 </>
             )}
 
