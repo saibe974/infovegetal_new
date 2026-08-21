@@ -93,7 +93,7 @@ export function AppSidebar() {
             {
                 title: t('Products'),
                 href: products.index(),
-                icon: Flower2Icon,
+                icon: FlowerIcon,
                 subItems: []
             },
         ];

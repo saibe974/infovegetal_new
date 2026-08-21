@@ -343,6 +343,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 />
                 {/* <div className="w-200 flex-1"> */}
                 <SearchSelect
+                    className='w-auto flex-1'
                     value={search}
                     onChange={handleSearch}
                     onSubmit={onSelect}

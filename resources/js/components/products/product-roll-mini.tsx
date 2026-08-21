@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { type CartItem } from '@/components/cart/cart.context';
 import { buildRollDistribution, type SupplierDistribution } from './product-roll';
-import { ShoppingCart } from 'lucide-react';
+import { rollFilledIcon, rollPlainIcon } from '@/lib/icon';
 import { CountryFlag } from '@/components/ui/country-flag';
 
 type ProductRollMiniProps = {
@@ -13,25 +13,32 @@ type ProductRollMiniProps = {
 
 const clamp = (value: number, min = 0, max = 100): number => Math.min(max, Math.max(min, value));
 
+const RollIcon = ({ filled = false, className }: { filled?: boolean; className?: string }) => (
+    <div
+        className={cn('h-6 w-6 [&>svg]:block [&>svg]:size-full', className)}
+        dangerouslySetInnerHTML={{ __html: filled ? rollFilledIcon : rollPlainIcon }}
+    />
+);
+
 const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boolean }) => {
     const fillHeight = clamp(fill);
 
     if (isFull) {
         return (
             <div className="relative h-6 w-6">
-                <ShoppingCart className="h-6 w-6 text-emerald-500 fill-emerald-500/30" strokeWidth={2} />
+                <RollIcon filled className="text-emerald-500" />
             </div>
         );
     }
 
     return (
         <div className="relative h-6 w-6">
-            <ShoppingCart className="h-6 w-6 text-slate-300" strokeWidth={2} />
+            <RollIcon className="text-slate-300" />
             <div
                 className="absolute inset-0 overflow-hidden"
                 style={{ clipPath: `inset(${100 - fillHeight}% 0 0 0)` }}
             >
-                <ShoppingCart className="h-6 w-6 text-amber-500 fill-amber-500/30" strokeWidth={2} />
+                <RollIcon filled className="text-amber-500" />
             </div>
         </div>
     );

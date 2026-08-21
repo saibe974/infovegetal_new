@@ -4,6 +4,18 @@ export const addCartonIcon = `
     </svg>
 `;
 
+export const rollPlainIcon = `
+    <svg id="icon-rollplain" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+        <path d="M6 15c0-6.667 0.394-11 1-11 0.6 0 1 4 1 10v10h16v-10c0-6 0.4-10 1-10 0.606 0 1 4.333 1 11v11h-20v-11zM8 28.5c0-0.825 0.675-1.5 1.5-1.5s1.5 0.675 1.5 1.5c0 0.825-0.675 1.5-1.5 1.5s-1.5-0.675-1.5-1.5zM21 28.5c0-0.825 0.675-1.5 1.5-1.5s1.5 0.675 1.5 1.5c0 0.825-0.675 1.5-1.5 1.5s-1.5-0.675-1.5-1.5z"></path>
+    </svg>
+`;
+
+export const rollFilledIcon = `
+    <svg id="icon-rollfilled" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+        <path d="M6 15c0-6.667 0.394-11 1-11 0.6 0 1 4 1 10v10h16v-10c0-6 0.4-10 1-10 0.606 0 1 4.333 1 11v11h-20v-11zM7 4h18v20h-18zM8 28.5c0-0.825 0.675-1.5 1.5-1.5s1.5 0.675 1.5 1.5c0 0.825-0.675 1.5-1.5 1.5s-1.5-0.675-1.5-1.5zM21 28.5c0-0.825 0.675-1.5 1.5-1.5s1.5 0.675 1.5 1.5c0 0.825-0.675 1.5-1.5 1.5s-1.5-0.675-1.5-1.5z"></path>
+    </svg>
+`;
+
 export const addEtageIcon = `
 <svg id="icon-addetage" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
 >

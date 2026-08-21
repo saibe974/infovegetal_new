@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { CheckCircleIcon, EyeIcon, Flower2Icon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
+import { CheckCircleIcon, EyeIcon, FlowerIcon, SaveIcon, TrashIcon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -100,7 +100,7 @@ export function CartSidebarHeader() {
 
     const total = items.reduce((sum, item) =>
         sum + (pricingByProductId[item.product.id] ?? getCartPricing(item.product, item.quantity)).lineTotal,
-    0);
+        0);
     const shipping = useMemo(
         () => calculateCartShipping(items, carrierOverrides, transportOptions),
         [carrierOverrides, items, transportOptions],
@@ -236,7 +236,7 @@ export function CartSidebarHeader() {
                                                 className="p-2 rounded hover:bg-muted"
                                                 onClick={clearCart}
                                             >
-                                                <Trash2Icon className="size-5 text-destructive" />
+                                                <TrashIcon className="size-5 text-destructive" />
                                             </button>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -305,7 +305,7 @@ export function CartSidebarHeader() {
 
 
                                 <div className="flex-shrink-0">
-                                    <div className="my-1 text-sm flex gap-2 items-center"><Flower2Icon size={20} /> : {total.toFixed(2)} €</div>
+                                    <div className="my-1 text-sm flex gap-2 items-center"><FlowerIcon size={20} /> : {total.toFixed(2)} €</div>
                                     <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
                                     <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
 

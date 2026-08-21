@@ -86,11 +86,11 @@ export default function SearchSelect({
     const renderedFilters =
         hasFilters && isValidElement(filters)
             ? cloneElement(
-                  filters as ReactElement<{ closeFilters?: () => void }>,
-                  {
-                      closeFilters: () => setOpenFilters(false),
-                  },
-              )
+                filters as ReactElement<{ closeFilters?: () => void }>,
+                {
+                    closeFilters: () => setOpenFilters(false),
+                },
+            )
             : filters;
 
     const toOptions = (arr?: (string | Option)[]) =>
@@ -314,19 +314,19 @@ export default function SearchSelect({
                         typeof filter.value === 'string';
                     const countryCode =
                         filter.name === 'country' &&
-                        typeof filter.value === 'string'
+                            typeof filter.value === 'string'
                             ? filter.value.toUpperCase()
                             : null;
                     const Flag = countryCode
                         ? (
-                              Flags as Record<
-                                  string,
-                                  ComponentType<{
-                                      title?: string;
-                                      className?: string;
-                                  }>
-                              >
-                          )[countryCode]
+                            Flags as Record<
+                                string,
+                                ComponentType<{
+                                    title?: string;
+                                    className?: string;
+                                }>
+                            >
+                        )[countryCode]
                         : undefined;
 
                     return (
@@ -412,14 +412,14 @@ export default function SearchSelect({
                 {((filtersActive?.length ?? 0) > 0 ||
                     selected.length > 0 ||
                     value) && (
-                    <button
-                        type="button"
-                        onClick={handleClear}
-                        className="px-1 text-muted-foreground hover:text-destructive"
-                    >
-                        <X size={16} />
-                    </button>
-                )}
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            className="px-1 text-muted-foreground hover:text-destructive"
+                        >
+                            <X size={16} />
+                        </button>
+                    )}
 
                 {/* Bouton recherche */}
                 {search && (
@@ -438,8 +438,8 @@ export default function SearchSelect({
                         {count > 1
                             ? `${count} ${t('results')}`
                             : count === 0
-                              ? t('No results.')
-                              : ''}
+                                ? t('No results.')
+                                : ''}
                     </span>
                 )}
             </div>
