@@ -1,8 +1,13 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { type CartItem } from '@/components/cart/cart.context';
+import { getCondQuantity, getUniteQuantity } from '@/components/cart/cart-quantity-rules';
+import { getProductCartImage } from '@/components/products/product-cart-image';
 import { type Product } from '@/types';
 import { CountryFlag } from '@/components/ui/country-flag';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 
 type BinpackItem = {
     x: number;
@@ -112,6 +117,9 @@ type ProductRollProps = {
     onDistributionChange?: (distribution: RollDistribution) => void;
     getSupplierPrice?: (supplier: SupplierDistribution) => number | null;
     getRollPrice?: (supplier: SupplierDistribution, roll: Roll, rollIndex: number) => number | null;
+    onAddCarton?: (productId: number, quantity: number) => void;
+    onRemoveCarton?: (productId: number, quantity: number) => void;
+    onRemoveProduct?: (productId: number) => void;
 };
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -671,7 +679,12 @@ export function ProductRoll({
     onDistributionChange,
     getSupplierPrice,
     getRollPrice,
+    onAddCarton,
+    onRemoveCarton,
+    onRemoveProduct,
 }: ProductRollProps) {
+    const [activeCarton, setActiveCarton] = useState<string | null>(null);
+    const [activeProductId, setActiveProductId] = useState<number | null>(null);
     const distribution = useMemo(() => buildRollDistribution(items), [items]);
 
     useEffect(() => {
@@ -685,6 +698,28 @@ export function ProductRoll({
         });
         return map;
     }, [items]);
+
+    const cartItemMap = useMemo(() => {
+        const map = new Map<number, CartItem>();
+        items.forEach((item) => map.set(item.product.id, item));
+        return map;
+    }, [items]);
+
+    const isCartonInteractive = Boolean(onAddCarton || onRemoveCarton || onRemoveProduct);
+
+    const closeCartonEvent = () => {
+        setActiveCarton(null);
+        setActiveProductId(null);
+    };
+
+    const removeProduct = (product: Product) => {
+        if (!onRemoveProduct) return;
+
+        if (window.confirm(`Supprimer complètement « ${product.name} » du panier ?`)) {
+            onRemoveProduct(product.id);
+            closeCartonEvent();
+        }
+    };
 
     const suppliers = Object.values(distribution.suppliers);
 
@@ -790,35 +825,185 @@ export function ProductRoll({
                                                         })
                                                         .map((etage, etageIndex) => {
                                                             const isFull = etage.perte <= 5;
+                                                            const logicalWidth = etage.items.reduce((sum, productId) => {
+                                                                const product = productMap.get(productId);
+                                                                const floor = Math.max(1, Math.floor(toNumber(product?.floor ?? 1)));
+                                                                return sum + 100 / floor;
+                                                            }, 0);
+                                                            // Le binpacking tolère un léger dépassement. On le normalise
+                                                            // pour que le navigateur ne renvoie jamais un carton à la ligne.
+                                                            const widthScale = 100 / Math.max(100, logicalWidth);
+
                                                             return (
                                                                 <div
                                                                     key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}`}
                                                                     className={cn(
-                                                                        'flex items-end border-b border-slate-900',
-                                                                        isFull ? 'justify-between' : 'flex-wrap'
+                                                                        'flex shrink-0 flex-nowrap items-end border-b border-slate-900',
+                                                                        isFull && 'justify-between',
                                                                     )}
                                                                     style={{ marginTop: '2px' }}
                                                                 >
                                                                     {etage.items.map((productId, cartonIndex) => {
                                                                         const product = productMap.get(productId);
+                                                                        const cartItem = cartItemMap.get(productId);
                                                                         const floor = Math.max(1, Math.floor(toNumber(product?.floor ?? 1)));
                                                                         const rollCount = Math.max(1, Math.floor(toNumber(product?.roll ?? roll.nbetages)));
-                                                                        const cartonHeight = Math.max(12, Math.floor(rollHeight / rollCount));
-                                                                        const widthPx = Math.max(10, Math.floor((rollWidth - Math.floor(floor / 5)) * 100 / floor) / 100);
-                                                                        return (
-                                                                            <div
-                                                                                key={`${supplier.supplierId}-${rollIndex}-etage-${etageIndex}-carton-${cartonIndex}`}
-                                                                                className={cn(
-                                                                                    'flex items-center justify-center bg-slate-300 border border-slate-400',
-                                                                                    isFull ? 'mr-0' : 'mr-px'
-                                                                                )}
-                                                                                style={{
-                                                                                    width: widthPx,
-                                                                                    height: cartonHeight,
-                                                                                    backgroundColor: getColorForId(productId),
-                                                                                }}
-                                                                                title={product ? product.name : `Product ${productId}`}
+                                                                        // Les 3 px compensent la marge et la bordure de l'étage,
+                                                                        // comme dans le rendu historique.
+                                                                        const cartonHeight = Math.max(12, Math.floor(rollHeight / rollCount) - 3);
+                                                                        const widthPx = Math.max(2, Math.floor((rollWidth * widthScale / floor) * 100) / 100);
+                                                                        const cartonKey = `${supplier.supplierId}-${rollIndex}-etage-${etageIndex}-carton-${cartonIndex}`;
+                                                                        const cond = product ? getCondQuantity(product) : 1;
+                                                                        const unite = product ? getUniteQuantity(product) : 1;
+                                                                        const quantity = cartItem?.quantity ?? 0;
+                                                                        const canRemoveCarton = quantity - cond >= unite;
+                                                                        const cartonClassName = cn(
+                                                                            'flex items-center justify-center border border-slate-400 bg-slate-300',
+                                                                            isCartonInteractive && product && 'cursor-pointer transition hover:z-10 hover:ring-2 hover:ring-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                                                            activeProductId === productId && 'z-10 ring-2 ring-primary',
+                                                                        );
+                                                                        const cartonStyle = {
+                                                                            width: widthPx,
+                                                                            height: cartonHeight,
+                                                                            backgroundColor: getColorForId(productId),
+                                                                        };
+                                                                        const showThumbnail = Boolean(product && widthPx >= 22 && cartonHeight >= 22);
+                                                                        const thumbnail = showThumbnail && product ? (
+                                                                            <img
+                                                                                src={getProductCartImage(product)}
+                                                                                alt=""
+                                                                                loading="lazy"
+                                                                                className="pointer-events-none max-h-[90%] max-w-[90%] object-contain"
                                                                             />
+                                                                        ) : null;
+
+                                                                        if (!isCartonInteractive || !product) {
+                                                                            return (
+                                                                                <div
+                                                                                    key={cartonKey}
+                                                                                    className={cn('-mr-px last:mr-0', cartonClassName)}
+                                                                                    style={cartonStyle}
+                                                                                    title={product ? product.name : `Product ${productId}`}
+                                                                                >
+                                                                                    {thumbnail}
+                                                                                </div>
+                                                                            );
+                                                                        }
+
+                                                                        const actionButtons = (closeAfterAction: boolean) => (
+                                                                            <>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-7 w-7"
+                                                                                    disabled={!onRemoveCarton || !canRemoveCarton}
+                                                                                    title={canRemoveCarton ? `Retirer ${cond} produits` : `Minimum de commande : ${unite} produits`}
+                                                                                    aria-label={canRemoveCarton ? `Retirer un carton de ${cond} produits` : `Impossible de descendre sous le minimum de ${unite} produits`}
+                                                                                    onClick={() => {
+                                                                                        onRemoveCarton?.(productId, cond);
+                                                                                        if (closeAfterAction) closeCartonEvent();
+                                                                                    }}
+                                                                                >
+                                                                                    <Minus className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-7 w-7"
+                                                                                    disabled={!onAddCarton}
+                                                                                    title={`Ajouter ${cond} produits`}
+                                                                                    aria-label={`Ajouter un carton de ${cond} produits`}
+                                                                                    onClick={() => {
+                                                                                        onAddCarton?.(productId, cond);
+                                                                                        if (closeAfterAction) closeCartonEvent();
+                                                                                    }}
+                                                                                >
+                                                                                    <Plus className="h-4 w-4" />
+                                                                                </Button>
+                                                                                {onRemoveProduct && (
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                                                                        title="Supprimer complètement le produit"
+                                                                                        aria-label={`Supprimer complètement ${product.name}`}
+                                                                                        onClick={() => removeProduct(product)}
+                                                                                    >
+                                                                                        <Trash2 className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                )}
+                                                                            </>
+                                                                        );
+
+                                                                        return (
+                                                                            <Popover
+                                                                                key={cartonKey}
+                                                                                open={activeCarton === cartonKey}
+                                                                                onOpenChange={(open) => {
+                                                                                    setActiveCarton(open ? cartonKey : null);
+                                                                                    setActiveProductId(open ? productId : null);
+                                                                                }}
+                                                                            >
+                                                                                <div
+                                                                                    className="group relative -mr-px shrink-0 last:mr-0"
+                                                                                    style={{ width: widthPx, height: cartonHeight }}
+                                                                                >
+                                                                                    <PopoverTrigger asChild>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className={cn('h-full w-full', cartonClassName)}
+                                                                                            style={{ backgroundColor: getColorForId(productId) }}
+                                                                                            title={`${product.name} — ouvrir l'aperçu du carton`}
+                                                                                            aria-label={`${product.name} — ouvrir l'aperçu du carton`}
+                                                                                        >
+                                                                                            {thumbnail}
+                                                                                        </button>
+                                                                                    </PopoverTrigger>
+                                                                                    <div
+                                                                                        className="absolute bottom-full left-1/2 z-30 hidden -translate-x-1/2 items-center gap-0.5 rounded-md border bg-popover p-0.5 text-popover-foreground shadow-md group-hover:flex group-focus-within:flex"
+                                                                                        aria-label={`Actions rapides pour ${product.name}`}
+                                                                                    >
+                                                                                        {actionButtons(false)}
+                                                                                    </div>
+                                                                                </div>
+                                                                                <PopoverContent
+                                                                                    className="w-80 space-y-1.5 p-2"
+                                                                                    side="top"
+                                                                                    sideOffset={6}
+                                                                                    aria-label={`Actions pour ${product.name}`}
+                                                                                >
+                                                                                    <div className="flex gap-3">
+                                                                                        <img
+                                                                                            src={getProductCartImage(product)}
+                                                                                            alt=""
+                                                                                            className="h-28 w-28 shrink-0 rounded-md border object-contain"
+                                                                                        />
+                                                                                        <div className="min-w-0">
+                                                                                            <p className="line-clamp-2 text-sm font-semibold">{product.name}</p>
+                                                                                            {product.ref ? (
+                                                                                                <p className="mt-1 truncate text-xs text-muted-foreground">Réf. : {String(product.ref)}</p>
+                                                                                            ) : null}
+                                                                                            {product.pot ? (
+                                                                                                <p className="text-xs text-muted-foreground">Pot : {String(product.pot)} cm</p>
+                                                                                            ) : null}
+                                                                                            {product.height ? (
+                                                                                                <p className="text-xs text-muted-foreground">Hauteur : {String(product.height)} cm</p>
+                                                                                            ) : null}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-between gap-3 whitespace-nowrap border-t pt-1 text-xs text-muted-foreground">
+                                                                                        <span>Quantité : {quantity}</span>
+                                                                                        <span>Carton : {cond}</span>
+                                                                                        <span>Mini : {unite}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-end gap-1 border-t pt-1">
+                                                                                        {actionButtons(true)}
+                                                                                    </div>
+                                                                                </PopoverContent>
+                                                                            </Popover>
                                                                         );
                                                                     })}
                                                                 </div>

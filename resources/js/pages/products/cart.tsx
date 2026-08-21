@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, Flower2Icon, Minus, Pencil, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
+import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/datePicker';
 import { useI18n } from '@/lib/i18n';
@@ -631,7 +631,7 @@ export default withAppLayout<Props>(
                                     <CardHeader>
                                         <CardTitle>
                                             {<CountryFlag countryCode={group.country} className="inline-block w-6" />}
-                                            &nbsp; {group.items.length} <Flower2Icon className='inline size-4' /> : {formatCurrency(group.itemsTotal)}
+                                            &nbsp; {group.items.length} <FlowerIcon className='inline size-4' /> : {formatCurrency(group.itemsTotal)}
                                             &nbsp;-&nbsp;{<TruckIcon className='inline size-4' />}
                                             &nbsp;:&nbsp;{formatCurrency(group.deliveryTotal)}
                                             &nbsp;-&nbsp;Total : {formatCurrency(group.orderTotal)}
@@ -806,6 +806,15 @@ export default withAppLayout<Props>(
 
                                             <ProductRoll
                                                 items={group.cartItems}
+                                                onAddCarton={(productId, cond) => {
+                                                    const item = group.cartItems.find(({ product }) => product.id === productId);
+                                                    if (item) handleQuantityChange(productId, item.quantity + cond);
+                                                }}
+                                                onRemoveCarton={(productId, cond) => {
+                                                    const item = group.cartItems.find(({ product }) => product.id === productId);
+                                                    if (item) handleQuantityChange(productId, item.quantity - cond);
+                                                }}
+                                                onRemoveProduct={removeFromCart}
                                                 getSupplierPrice={(supplier) =>
                                                     group.shipping.bySupplier[supplier.supplierId] ?? 0
                                                 }
