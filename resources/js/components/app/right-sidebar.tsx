@@ -11,6 +11,7 @@ export function RightSidebar({
     side = 'right',
     variant = 'sidebar',
     className = '',
+    headerClassName = '',
     header,
     children,
     footer,
@@ -24,7 +25,7 @@ export function RightSidebar({
             className={className}
             {...props}
         >
-            {header && <SidebarHeader>{header}</SidebarHeader>}
+            {header && <SidebarHeader className={headerClassName}>{header}</SidebarHeader>}
             {children && <SidebarContent>{children}</SidebarContent>}
             {footer && <SidebarFooter>{footer}</SidebarFooter>}
         </Sidebar>

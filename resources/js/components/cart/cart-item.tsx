@@ -1,7 +1,7 @@
 import React, { ComponentType, useContext, useState } from 'react';
 import { type Product } from '@/types';
 import { CartContext } from './cart.context';
-import { Trash2, Minus, Pencil, Plus } from 'lucide-react';
+import { CircleSlash2, Minus, MoveVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -40,32 +40,7 @@ export function CartItem({ product, quantity, comment = '', pricingOverride }: C
         : (quantity >= unite ? getCondQuantity(product) : unite);
 
     return (
-        <div className="group relative border-b pb-3 last:border-b-0">
-            <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                    'absolute top-0 right-7 size-6',
-                    (hasComment || isCommentOpen) && 'text-primary',
-                )}
-                aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
-                title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
-                onClick={() => setIsCommentOpen((open) => !open)}
-            >
-                <Pencil className="size-3.5" />
-            </Button>
-            {/* Bouton supprimer en haut à droite */}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-0 right-0 size-6 text-destructive hover:text-destructive hover:bg-destructive/10"
-                aria-label={t('Retirer du panier')}
-                title={t('Retirer du panier')}
-                onClick={() => removeFromCart(product.id)}
-            >
-                <Trash2 className="size-3.5" />
-            </Button>
-
+        <div className="group relative w-full border-b pb-3 last:border-b-0">
             <div className="flex gap-2.5">
                 {/* Image produit */}
                 <div className="relative shrink-0">
@@ -87,57 +62,96 @@ export function CartItem({ product, quantity, comment = '', pricingOverride }: C
                 </div>
 
                 {/* Infos produit */}
-                <div className="flex-1 min-w-0 pr-12">
-                    <h4 className="font-medium text-sm leading-tight line-clamp-2">
-                        {product.name}
-                    </h4>
-                    <div className="text-xs text-muted-foreground mb-2">
-                        {product.ref}
-                    </div>
-                    <div className="text-xs text-muted-foreground mb-2">
-                        {pricing.unitPrice.toFixed(2)} €
-                    </div>
-
-                    {/* Contrôles quantité + Total */}
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-0.5 bg-muted rounded p-0.5">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-1">
+                        <div className="min-w-0 flex-1">
+                            <h4 className="truncate text-sm font-medium leading-tight" title={product.name}>
+                                {product.name}
+                            </h4>
+                            <div className="truncate text-[11px] text-muted-foreground" title={String(product.ref ?? '')}>
+                                {product.ref}
+                            </div>
+                        </div>
+                        <div className="flex shrink-0 items-center">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="size-5 hover:bg-background"
-                                aria-label="Diminuer la quantité"
-                                onClick={() => updateQuantity(product.id, quantity - decreaseStep)}
+                                className={cn(
+                                    'size-6',
+                                    (hasComment || isCommentOpen) && 'text-primary',
+                                )}
+                                aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                onClick={() => setIsCommentOpen((open) => !open)}
                             >
-                                <Minus className="size-3" />
+                                <Pencil className="size-3.5" />
                             </Button>
-                            {/* <span className="min-w-[1.25rem] text-center text-xs font-medium">
-                                {quantity}
-                            </span> */}
-                            <input
-                                type="text"
-                                min={unite}
-                                value={quantity}
-                                onChange={(e) => {
-                                    const newQuantity = parseInt(e.target.value, 10);
-                                    updateQuantity(product.id, newQuantity);
-                                }}
-                                className="w-[1.25rem] text-center text-xs font-medium bg-transparent outline-none"
-                            />
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="size-5 hover:bg-background"
-                                aria-label="Augmenter la quantité"
-                                onClick={() => updateQuantity(product.id, quantity + increaseStep)}
+                                className="size-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                aria-label={t('Retirer du panier')}
+                                title={t('Retirer du panier')}
+                                onClick={() => removeFromCart(product.id)}
                             >
-                                <Plus className="size-3" />
+                                <Trash2 className="size-3.5" />
                             </Button>
                         </div>
-
-                        <div className="font-semibold text-sm text-nowrap">
-                            {total} €
-                        </div>
                     </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        {product.pot ? (
+                            <span className="flex items-center gap-1" title={t('Diameter of the pot')}>
+                                <CircleSlash2 className="size-3" aria-hidden="true" />
+                                {String(product.pot)} cm
+                            </span>
+                        ) : null}
+                        {product.height ? (
+                            <span className="flex items-center gap-1" title={t('Height')}>
+                                <MoveVertical className="size-3.5" aria-hidden="true" />
+                                {String(product.height)} cm
+                            </span>
+                        ) : null}
+                    </div>
+                </div>
+            </div>
+
+            {/* Prix unitaire + contrôles quantité + total */}
+            <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <div className="justify-self-start text-xs text-muted-foreground">
+                    {pricing.unitPrice.toFixed(2)} €
+                </div>
+                <div className="flex items-center gap-0.5 bg-muted rounded p-0.5">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-5 hover:bg-background"
+                        aria-label="Diminuer la quantité"
+                        onClick={() => updateQuantity(product.id, quantity - decreaseStep)}
+                    >
+                        <Minus className="size-3" />
+                    </Button>
+                    <input
+                        type="text"
+                        min={unite}
+                        value={quantity}
+                        onChange={(e) => {
+                            const newQuantity = parseInt(e.target.value, 10);
+                            updateQuantity(product.id, newQuantity);
+                        }}
+                        className="w-[1.25rem] text-center text-xs font-medium bg-transparent outline-none"
+                    />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-5 hover:bg-background"
+                        aria-label="Augmenter la quantité"
+                        onClick={() => updateQuantity(product.id, quantity + increaseStep)}
+                    >
+                        <Plus className="size-3" />
+                    </Button>
+                </div>
+                <div className="justify-self-end font-semibold text-sm text-nowrap">
+                    {total} €
                 </div>
             </div>
             {isCommentOpen ? (

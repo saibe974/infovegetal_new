@@ -32,6 +32,7 @@ export default function AppSidebarLayout({
                         <RightSidebar
                             id='right'
                             variant='inset'
+                            headerClassName='pl-0'
                             header={<CartSidebarHeader />}
                         >
                         </RightSidebar>
@@ -42,4 +43,3 @@ export default function AppSidebarLayout({
         </CartProvider>
     );
 }
-

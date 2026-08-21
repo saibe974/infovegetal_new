@@ -295,6 +295,7 @@ export interface RightSidebarProps {
     side?: 'left' | 'right';
     variant?: 'sidebar' | 'floating' | 'inset';
     className?: string;
+    headerClassName?: string;
     header?: ReactNode;
     children?: ReactNode;
     footer?: ReactNode;

@@ -956,8 +956,8 @@ export function ProductRoll({
                                                                                             type="button"
                                                                                             className={cn('h-full w-full', cartonClassName)}
                                                                                             style={{ backgroundColor: getColorForId(productId) }}
-                                                                                            title={`${product.name} — ouvrir l'aperçu du carton`}
-                                                                                            aria-label={`${product.name} — ouvrir l'aperçu du carton`}
+                                                                                            title={`${product.name} — ${product.ref}`}
+                                                                                            aria-label={`${product.name} — ${product.ref}`}
                                                                                         >
                                                                                             {thumbnail}
                                                                                         </button>

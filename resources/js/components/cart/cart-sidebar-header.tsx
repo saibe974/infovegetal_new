@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { CheckCircleIcon, EyeIcon, FlowerIcon, SaveIcon, TrashIcon, Truck } from "lucide-react";
+import { CheckCircleIcon, EyeIcon, FlowerIcon, SaveIcon, Trash2Icon, Truck } from "lucide-react";
 import {
     SidebarContent,
     SidebarFooter,
@@ -225,7 +225,7 @@ export function CartSidebarHeader() {
                 </SidebarContent>
             ) : (
                 <>
-                    <SidebarHeader>
+                    <SidebarHeader className="pl-0">
                         {items.length > 0 && (
                             <>
                                 <SidebarMenu className="flex flex-row w-full justify-between gap-2 md:mt-14 flex-shrink-0">
@@ -236,7 +236,7 @@ export function CartSidebarHeader() {
                                                 className="p-2 rounded hover:bg-muted"
                                                 onClick={clearCart}
                                             >
-                                                <TrashIcon className="size-5 text-destructive" />
+                                                <Trash2Icon className="size-5 text-destructive" />
                                             </button>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
@@ -304,10 +304,25 @@ export function CartSidebarHeader() {
                                 </SidebarMenu>
 
 
-                                <div className="flex-shrink-0">
-                                    <div className="my-1 text-sm flex gap-2 items-center"><FlowerIcon size={20} /> : {total.toFixed(2)} €</div>
-                                    <div className="my-1 text-sm flex gap-2 items-center"><Truck size={20} /> : {shipping.total.toFixed(2)} €</div>
-                                    <div className="my-1">Total : {orderTotal?.toFixed(2) ?? 0} €</div>
+                                <div className="flex-shrink-0 rounded-md bg-muted px-2 py-1.5">
+                                    <div className="my-1 flex items-center justify-between gap-4 text-sm font-medium">
+                                        <span className="flex items-center gap-2">
+                                            <FlowerIcon size={20} aria-hidden="true" />
+                                            {total.toFixed(2)} €
+                                        </span>
+                                        <span
+                                            className="flex items-center gap-2"
+                                            title={t("Livraison")}
+                                            aria-label={`${t("Livraison")} : ${shipping.total.toFixed(2)} €`}
+                                        >
+                                            <Truck size={20} aria-hidden="true" />
+                                            {shipping.total.toFixed(2)} €
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between border-t pt-2 text-lg font-bold">
+                                        <span>{t("Total")}</span>
+                                        <span>{orderTotal?.toFixed(2) ?? 0} €</span>
+                                    </div>
 
                                     {feedbackMessage && (
                                         <div
@@ -322,7 +337,7 @@ export function CartSidebarHeader() {
                                 </div>
 
                                 {items.length > 0 && (
-                                    <div className="mt-4">
+                                    <div className="mt-1">
                                         <ProductRollMini
                                             items={items}
                                             getSupplierPrice={(supplier) => shipping.bySupplier[supplier.supplierId] ?? 0}
@@ -335,7 +350,7 @@ export function CartSidebarHeader() {
 
 
                     <SidebarContent className="flex flex-col gap-3 flex-1 overflow-y-auto min-h-0">
-                        <div className="my-2 flex flex-col gap-2 items-center justify-center">
+                        <div className="my-2 flex w-full flex-col items-center justify-center gap-2">
                             {items.length === 0 && (
                                 <>
                                     <div className="text-center text-muted-foreground text-sm py-8">
