@@ -46,7 +46,6 @@ export default function PermissionsChecklistCard({
     selectedPermissionIds,
     onTogglePermission,
     translate,
-    submit,
     createPermission,
     onDeletePermission,
     officialPermissionNames,

@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { type BillingDraft } from '@/components/sales/types';
 
-type Option = { description: any; value: string; label: string };
+type Option = { description?: string; value: string; label: string };
 
 type BillingUserSelectorProps = {
     className?: string;

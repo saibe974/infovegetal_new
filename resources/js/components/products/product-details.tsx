@@ -28,7 +28,6 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const isAuthenticated = !!user;
 
     const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
-    const displayPrice = product.price_ttc ?? price;
 
     return (
         <div className="space-y-6">

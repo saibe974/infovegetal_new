@@ -13,7 +13,7 @@ type Props = {
 
 export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDelimiter }: Props) {
     const { t } = useI18n();
-    const pondRef = useRef<any>(null);
+    const pondRef = useRef<InstanceType<typeof FilePond> | null>(null);
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -26,16 +26,6 @@ export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDe
     };
 
     const csrfToken = getCsrfToken() || '';
-
-    const computeChunkSize = (size: number) => {
-        const kb = 1024;
-        const mb = 1024 * kb;
-
-        if (size <= 5 * mb) return 512 * kb;
-        if (size <= 20 * mb) return 1 * mb;
-        if (size <= 100 * mb) return 2 * mb;
-        return 4 * mb;
-    };
 
     const handleServerResponse = (response: string) => {
         try {
@@ -82,13 +72,6 @@ export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDe
                 <FilePond
                     ref={pondRef}
                     onupdatefiles={(nextFiles) => {
-                        const fileSize = (nextFiles?.[0] as { file?: { size?: number } } | undefined)?.file?.size;
-                        if (typeof fileSize === 'number' && fileSize > 0) {
-                            const chunkSize = computeChunkSize(fileSize);
-                            const pond = pondRef.current?.pond ?? pondRef.current?.getFilePond?.();
-                            pond?.setOptions?.({ chunkSize });
-                        }
-
                         if (nextFiles.length === 0) {
                             setUploadId(null);
                             setUploadError(null);
@@ -138,7 +121,7 @@ export function ProductImportConfigPanel({ dbProductId, headerRowIndex, sourceDe
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => pondRef.current?.browse?.() ?? pondRef.current?.pond?.browse?.()}
+                        onClick={() => pondRef.current?.browse()}
                     >
                         {t('Upload sample file')}
                     </Button>

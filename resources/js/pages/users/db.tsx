@@ -143,8 +143,8 @@ export default function UserDbPage() {
     const { t } = useI18n();
     const targetUser: User = propsUser;
 
-    const dbProductsList = Array.isArray(dbProducts) ? dbProducts : [];
-    const carriersList = Array.isArray(carriers) ? carriers : [];
+    const dbProductsList = useMemo(() => (Array.isArray(dbProducts) ? dbProducts : []), [dbProducts]);
+    const carriersList = useMemo(() => (Array.isArray(carriers) ? carriers : []), [carriers]);
 
     const dbById = useMemo(() => new Map(dbProductsList.map((db) => [Number(db.id), db])), [dbProductsList]);
 
@@ -249,7 +249,7 @@ export default function UserDbPage() {
         if (Number(activeRow.billing_user_id) === nextBillingId) return;
 
         updateRow(activeIndex, { billing_user_id: nextBillingId, seller_user_id: null });
-    }, [billingOptions, activeRow?.billing_user_id, activeIndex]);
+    }, [billingOptions, activeRow, activeIndex]);
 
     const activeSellerData = useMemo(() => {
         if (!activeRow || !activeRow.billing_user_id || !activeRow.seller_user_id) {
@@ -321,7 +321,7 @@ export default function UserDbPage() {
             label: profile.name,
             conditions: normalizeConditions(profile.conditions),
         }));
-    }, [activeSellerData, t]);
+    }, [activeSellerData]);
 
     const billingProfiles = useMemo(() => {
         if (!activeBillingData) {

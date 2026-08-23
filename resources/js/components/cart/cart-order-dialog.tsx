@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -15,9 +15,6 @@ const pdfGenerationPhases = [
 ];
 
 export function CartOrderDialog() {
-    const page = usePage();
-    const isCartPage = page.component === 'products/cart' || page.url.startsWith('/cart/checkout');
-
     const {
         isPdfGenerating,
         pdfPhaseIndex,

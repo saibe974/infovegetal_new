@@ -25,7 +25,7 @@ import {
     type SalesConditions,
 } from '@/types';
 import { ChevronUp, TrashIcon, UserIcon } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ButtonsActions } from '../buttons-actions';
 import { formatSalesConditionsSummary } from './billing-utils';
 
@@ -101,7 +101,7 @@ export default function BillingConditionsEditor({
 }: BillingConditionsEditorProps) {
     const { t } = useI18n();
 
-    const profiles = activeBillingRule?.defaults.profiles ?? [];
+    const profiles = useMemo(() => activeBillingRule?.defaults.profiles ?? [], [activeBillingRule]);
 
     useEffect(() => {
         if (!currentSeller || profiles.length === 0) {

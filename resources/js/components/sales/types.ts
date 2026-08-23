@@ -1,7 +1,7 @@
 import { type BillingDefaults, type SalesConditions } from '@/types';
 
 export type UserOption = {
-    value: any;
+    value: string;
     id: number;
     name: string;
     email: string;

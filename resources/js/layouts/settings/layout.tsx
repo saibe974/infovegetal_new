@@ -1,7 +1,6 @@
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { edit as editAdminAppearance } from '@/routes/appearance';
-import { edit as editAdminPassword } from '@/routes/admin/password';
 import { edit as editAdminUser } from '@/routes/users';
 import { show as showAdminTwoFactor } from '@/routes/admin/two-factor';
 import { edit as editProfile } from '@/routes/profile';

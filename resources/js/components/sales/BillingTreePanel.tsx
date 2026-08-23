@@ -21,7 +21,7 @@ import { ButtonsActions } from '../buttons-actions';
 import { formatSalesConditionsSummary } from './billing-utils';
 
 type Option = {
-    description: any;
+    description?: string;
     value: string;
     label: string;
 };

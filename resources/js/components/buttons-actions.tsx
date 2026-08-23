@@ -49,7 +49,7 @@ export function ButtonsActions({
             }
 
             {onExport &&
-                <Button type="button" onClick={(e) => { e.stopPropagation(); typeof onExport === 'function' ? onExport() : undefined; }} variant={'outline'} title={t('Export CSV')} disabled={saving} size={'icon'}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); if (typeof onExport === 'function') onExport(); }} variant={'outline'} title={t('Export CSV')} disabled={saving} size={'icon'}>
                     <a href={typeof onExport === 'string' ? onExport : undefined}>
                         <UploadIcon />
                     </a>

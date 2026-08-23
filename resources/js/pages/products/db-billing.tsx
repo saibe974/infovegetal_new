@@ -40,9 +40,10 @@ import {
     type BreadcrumbItem,
     type dbProduct,
     type SalesConditions,
+    type SharedData,
 } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type Props = {
     dbProduct: dbProduct;
@@ -92,7 +93,7 @@ export default withAppLayout<Props>(
         // console.log(dbProduct);
         const { t } = useI18n();
         const formRef = useRef<HTMLFormElement>(null);
-        const auth = usePage<any>().props.auth;
+        const auth = usePage<SharedData>().props.auth;
         const isGlobalManager = billingAbilities?.is_global_manager ?? false;
         const isBillingUser =
             Array.isArray(dbProduct.billing_users) &&
@@ -111,7 +112,7 @@ export default withAppLayout<Props>(
 
         const STORAGE_KEY = `db-billing-view-${dbProduct.id}`;
 
-        const loadViewPrefs = (): {
+        const loadViewPrefs = useCallback((): {
             billingUserId: number | null;
             panelItem: ActivePanelItem;
             openSection: 'profiles' | 'sellers' | 'files' | null;
@@ -128,14 +129,16 @@ export default withAppLayout<Props>(
                         sellerProfileId: parsed.sellerProfileId ?? null,
                     };
                 }
-            } catch {}
+            } catch {
+                // preferences illisibles : on retombe sur les valeurs par defaut
+            }
             return {
                 billingUserId: null,
                 panelItem: null,
                 openSection: 'profiles',
                 sellerProfileId: null,
             };
-        };
+        }, [STORAGE_KEY]);
 
         const initialBillingUsers: BillingDraft[] = useMemo(() => {
             const rows = Array.isArray(dbProduct.billing_users)
@@ -144,7 +147,7 @@ export default withAppLayout<Props>(
             return rows.map(normalizeRowToDraft);
         }, [dbProduct.billing_users]);
 
-        const viewPrefs = useMemo(() => loadViewPrefs(), []);
+        const viewPrefs = useMemo(() => loadViewPrefs(), [loadViewPrefs]);
 
         const [activeBillingUserId, setActiveBillingUserId] = useState<
             number | null
@@ -447,8 +450,11 @@ export default withAppLayout<Props>(
                         sellerProfileId: activeSellerProfileId,
                     }),
                 );
-            } catch {}
+            } catch {
+                // localStorage indisponible : on ignore silencieusement
+            }
         }, [
+            STORAGE_KEY,
             activeBillingUserId,
             activePanelItem,
             openSection,

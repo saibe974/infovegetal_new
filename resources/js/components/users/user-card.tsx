@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, router } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User } from "@/types";
 
 
@@ -27,20 +26,15 @@ type UserCardProps = {
 
 export function UserCard({
     user,
-    roles,
-    currentUser,
     canEdit = false,
     canDelete = false,
-    canChangeRole = false,
     canImpersonate = false,
     editUser,
     deleteUser,
-    changeUserRole,
     impersonateUser,
     className
 }: UserCardProps) {
     const { t } = useI18n();
-    const [isUpdating, setIsUpdating] = useState(false);
     const isGroup = (user.roles ?? []).some((role) => role.name === 'group');
 
     const handleEdit = (id: number) => {
@@ -56,24 +50,6 @@ export function UserCard({
             });
         }
     };
-
-    const handleRoleChange = (roleValue: string) => {
-        if (changeUserRole) {
-            changeUserRole(user.id, roleValue);
-        } else {
-            setIsUpdating(true);
-            router.post(
-                `/settings/users/${user.id}/role`,
-                { role: roleValue },
-                {
-                    preserveScroll: true,
-                    onFinish: () => setIsUpdating(false),
-                }
-            );
-        }
-    };
-
-    const isCurrentUser = currentUser?.id === user.id;
 
     return (
         <Link
