@@ -27,7 +27,7 @@ it('resolves the matching zone tariff for the roll count', function (): void {
  * BR-029
  * BR-035
  */
-it('returns zero when no tariff matches the roll count', function (): void {
+it('falls back to the closest upper tier when no tariff matches the roll count', function (): void {
     $resolver = new TransportZoneTariffResolver();
 
     $tariffs = [
@@ -35,6 +35,6 @@ it('returns zero when no tariff matches the roll count', function (): void {
         'roll:4-6' => 110,
     ];
 
-    expect($resolver->resolve(1, $tariffs))->toBe(0.0)
+    expect($resolver->resolve(1, $tariffs))->toBe(110.0)
         ->and($resolver->resolve(0, $tariffs))->toBe(0.0);
 });
