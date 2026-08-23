@@ -440,6 +440,18 @@ export default function UserDbPage() {
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
 
+    const customConditionsForm = selectedProfileKey === '__custom__' ? (
+        <SalesConditionsForm
+            value={normalizeConditions(activeRow?.conditions_override ?? {})}
+            onChange={(next) => updateRow(activeIndex, {
+                profile_selection_key: '__custom__',
+                conditions_override: normalizeConditions(next),
+            })}
+            carriers={carriersList}
+            mode="client"
+        />
+    ) : null;
+
     type CarrierAssignment = { carrier_id: number | null; zone_id: number | null; tva?: number | null };
 
     const [carrierTvaRaw, setCarrierTvaRaw] = useState<Record<number, string>>({});
@@ -800,6 +812,10 @@ export default function UserDbPage() {
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
+
+                                                        {customConditionsForm}
+
+
                                                     </FormField>
                                                 ) : (
                                                     <FormField label={t('Commercial')}>
@@ -876,6 +892,9 @@ export default function UserDbPage() {
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
+
+                                                        {customConditionsForm}
+
                                                     </FormField>
                                                 )}
 
@@ -901,17 +920,7 @@ export default function UserDbPage() {
 
                                             </div>
 
-                                            {selectedProfileKey === '__custom__' ? (
-                                                <SalesConditionsForm
-                                                    value={merged}
-                                                    onChange={(next) => updateRow(activeIndex, {
-                                                        profile_selection_key: '__custom__',
-                                                        conditions_override: diffConditions(inheritedConditions, normalizeConditions(next)),
-                                                    })}
-                                                    carriers={carriersList}
-                                                    mode="client"
-                                                />
-                                            ) : null}
+
 
                                             <Separator />
 

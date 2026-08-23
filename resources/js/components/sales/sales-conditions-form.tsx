@@ -1,20 +1,17 @@
-import { FormField } from '@/components/ui/form-field';
+import EditableProfileTitle from '@/components/sales/EditableProfileTitle';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useI18n } from '@/lib/i18n';
 import type { SalesConditions } from '@/types';
-import { ChevronDown, Check } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { CirclePlus, TrashIcon } from 'lucide-react';
+import { useState } from 'react';
 
 type CarrierOption = {
     id: number;
     name: string;
     country?: string | null;
-    zones?: Array<{
-        id: number;
-        carrier_id: number;
-        name: string;
-    }>;
+    zones?: Array<{ id: number; carrier_id: number; name: string }>;
 };
 
 type Props = {
@@ -22,6 +19,11 @@ type Props = {
     onChange: (next: SalesConditions) => void;
     carriers: CarrierOption[];
     mode: 'defaults' | 'override' | 'client';
+    profileName?: string;
+    canRenameProfile?: boolean;
+    onRenameProfile?: (name: string) => void;
+    hideTitle?: boolean;
+    embedded?: boolean;
 };
 
 const DEFAULT_VALUES: SalesConditions = {
@@ -42,206 +44,242 @@ const DEFAULT_VALUES: SalesConditions = {
     p: '-1',
 };
 
-const normalizePriceMode = (value: unknown): string => {
-    if (value === null || value === undefined || value === '') {
-        return '-1';
-    }
+type ConditionKey = 'tvap' | 'm' | 'mc' | 'me' | 'mr' | 'mm' | 'pd';
 
-    const raw = String(value).trim().toLowerCase();
-
-    if (raw === 'price_depart' || raw === 'depart' || raw === 'departure' || raw === '0') {
-        return 'price_depart';
-    }
-
-    if (raw === 'price_render' || raw === 'price_rendu' || raw === 'render' || raw === 'rendered' || raw === 'rendu' || raw === '1') {
-        return 'price_render';
-    }
-
-    if (raw === 'price' || raw === 'price_floor' || raw === 'price_roll' || raw === 'price_promo') {
-        return raw;
-    }
-
-    return raw === '-1' ? '-1' : '-1';
-};
+const CONDITION_OPTIONS: Array<{
+    key: ConditionKey;
+    label: string;
+    suffix: string;
+    input?: 'boolean' | 'number';
+}> = [
+    { key: 'tvap', label: 'Tva', suffix: '', input: 'boolean' },
+    { key: 'm', label: 'General margin', suffix: '%' },
+    { key: 'mc', label: 'Margin per carton', suffix: '%' },
+    { key: 'me', label: 'Margin per level', suffix: '%' },
+    { key: 'mr', label: 'Margin per roll', suffix: '%' },
+    { key: 'mm', label: 'Minimum margin per roll', suffix: '€' },
+    { key: 'pd', label: 'Ponderation coefficient', suffix: '%' },
+];
 
 const toNumber = (value: string | number, fallback = 0): number => {
     const parsed = Number(String(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-function AccordionVolet({
-    title,
-    summary,
-    badge,
-    children,
-    defaultOpen = false,
-    cols,
-}: {
-    title: string;
-    summary?: string;
-    badge?: ReactNode;
-    children: ReactNode;
-    defaultOpen?: boolean;
-    cols?: number;
-}) {
-    const { t } = useI18n();
-    const [open, setOpen] = useState(defaultOpen);
-
-    return (
-        <Collapsible
-            open={open}
-            onOpenChange={setOpen}
-            className="rounded-md border border-border bg-card"
-        >
-            <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between px-4 py-3">
-
-                    <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                        {badge}
-                        {title}
-                        {summary ? <span className="text-xs text-muted-foreground font-normal">{summary}</span> : null}
-                    </h4>
-                    <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                        {/* {open ? t('Moins d\'options') : t('Plus d\'options')} */}
-                        <ChevronDown
-                            className={`size-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-                        />
-                    </button>
-
-                </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-t border-border px-4 py-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1">
-                <div className={`grid grid-cols-1 md:grid-cols-${cols ?? 2} gap-4`}>
-                    {children}
-                </div>
-            </CollapsibleContent>
-        </Collapsible>
-    );
-}
-
-export default function SalesConditionsForm({ value, onChange, mode }: Props) {
+export default function SalesConditionsForm({
+    value,
+    onChange,
+    mode,
+    profileName,
+    canRenameProfile = false,
+    onRenameProfile,
+    hideTitle = false,
+    embedded = false,
+}: Props) {
     const { t } = useI18n();
     const [rawFloats, setRawFloats] = useState<Record<string, string>>({});
-
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...(value ?? {}) };
+    const activeKeys = CONDITION_OPTIONS.filter(
+        ({ key }) => value?.[key] !== null && value?.[key] !== undefined,
+    ).map(({ key }) => key);
+    const availableOptions = CONDITION_OPTIONS.filter(
+        ({ key }) => !activeKeys.includes(key),
+    );
 
-    const update = (key: keyof SalesConditions, nextValue: SalesConditions[keyof SalesConditions]) => {
-        onChange({
-            ...merged,
-            [key]: nextValue,
-        });
+    const update = (patch: Partial<SalesConditions>) => {
+        onChange({ ...(value ?? {}), ...patch });
     };
 
-    const floatValue = (key: string, fallback: number): string =>
-        key in rawFloats ? rawFloats[key] : String(merged[key as keyof SalesConditions] ?? fallback);
+    const floatValue = (key: ConditionKey): string =>
+        key in rawFloats ? rawFloats[key] : String(merged[key] ?? 0);
 
-    const handleFloatChange = (key: string, raw: string) => {
-        setRawFloats((prev) => ({ ...prev, [key]: raw }));
-        const num = toNumber(raw);
-        if (Number.isFinite(num)) {
-            update(key as keyof SalesConditions, num);
-        }
+    const handleFloatChange = (key: ConditionKey, raw: string) => {
+        setRawFloats((previous) => ({ ...previous, [key]: raw }));
+        const parsed = Number(raw.replace(',', '.'));
+        if (Number.isFinite(parsed)) update({ [key]: parsed });
     };
 
-    const handleFloatBlur = (key: string) => {
-        setRawFloats((prev) => {
-            const next = { ...prev };
+    const clearRawFloat = (key: ConditionKey) => {
+        setRawFloats((previous) => {
+            const next = { ...previous };
             delete next[key];
             return next;
         });
     };
 
-    const summary = (parts: Array<{ value: number; suffix: string }>): string => {
-        const nonZero = parts.filter((p) => p.value !== 0);
-        if (nonZero.length === 0) return '';
-        return nonZero.map((p) => `${p.value}${p.suffix}`).join(' / ');
+    const addCondition = () => {
+        const nextOption = availableOptions[0];
+        if (nextOption) update({ [nextOption.key]: 0 });
     };
 
+    const removeCondition = (key: ConditionKey) => {
+        clearRawFloat(key);
+        update({ [key]: null });
+    };
+
+    const changeConditionType = (
+        currentKey: ConditionKey,
+        nextKey: ConditionKey,
+    ) => {
+        if (currentKey === nextKey) return;
+        const currentValue = toNumber(merged[currentKey] as number, 0);
+        const nextValue =
+            CONDITION_OPTIONS.find((option) => option.key === nextKey)
+                ?.input === 'boolean'
+                ? currentValue !== 0
+                    ? 1
+                    : 0
+                : currentValue;
+        clearRawFloat(currentKey);
+        update({ [currentKey]: null, [nextKey]: nextValue });
+    };
+
+    const header = (
+        <>
+            {hideTitle ? null : profileName && onRenameProfile ? (
+                <EditableProfileTitle
+                    name={profileName}
+                    canEdit={canRenameProfile}
+                    onRename={onRenameProfile}
+                    className="text-lg"
+                />
+            ) : (
+                <CardTitle className="text-lg">
+                    {t('Sales conditions')}
+                </CardTitle>
+            )}
+            {availableOptions.length > 0 && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-green-600 hover:bg-green-500/10 hover:text-green-700"
+                    title={t('Add condition')}
+                    onClick={addCondition}
+                >
+                    <CirclePlus />
+                </Button>
+            )}
+        </>
+    );
+
+    const content = (
+        <>
+            {activeKeys.map((key) => {
+                const option = CONDITION_OPTIONS.find(
+                    (candidate) => candidate.key === key,
+                );
+                if (!option) return null;
+
+                const rowOptions = CONDITION_OPTIONS.filter(
+                    (candidate) =>
+                        candidate.key === key ||
+                        !activeKeys.includes(candidate.key),
+                );
+
+                return (
+                    <div
+                        key={key}
+                        className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,0.55fr)_auto] items-center gap-2 rounded-md border p-2"
+                    >
+                        <select
+                            aria-label={t('Condition type')}
+                            className="h-10 min-w-0 rounded-md border bg-card px-3 text-sm"
+                            value={key}
+                            onChange={(event) =>
+                                changeConditionType(
+                                    key,
+                                    event.target.value as ConditionKey,
+                                )
+                            }
+                        >
+                            {rowOptions.map((candidate) => (
+                                <option
+                                    key={candidate.key}
+                                    value={candidate.key}
+                                >
+                                    {t(candidate.label)}
+                                </option>
+                            ))}
+                        </select>
+                        {option.input === 'boolean' ? (
+                            <div className="flex h-10 items-center rounded-md border px-3">
+                                <Input
+                                    aria-label={t(option.label)}
+                                    className="size-4"
+                                    type="checkbox"
+                                    checked={Number(merged[key] ?? 0) === 1}
+                                    onChange={(event) =>
+                                        update({
+                                            [key]: event.target.checked ? 1 : 0,
+                                        })
+                                    }
+                                />
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <Input
+                                    aria-label={t(option.label)}
+                                    className="pr-8"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={floatValue(key)}
+                                    onChange={(event) =>
+                                        handleFloatChange(
+                                            key,
+                                            event.target.value,
+                                        )
+                                    }
+                                    onBlur={() => clearRawFloat(key)}
+                                />
+                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                                    {option.suffix}
+                                </span>
+                            </div>
+                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title={t('Delete condition')}
+                            onClick={() => removeCondition(key)}
+                        >
+                            <TrashIcon />
+                        </Button>
+                    </div>
+                );
+            })}
+
+            {activeKeys.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                    {t('No sales condition.')}
+                </p>
+            )}
+
+            {mode === 'override' && (
+                <p className="text-xs text-muted-foreground">
+                    {t('Only changed values are relevant for seller override.')}
+                </p>
+            )}
+        </>
+    );
+
+    if (embedded) {
+        return (
+            <div className="space-y-3">
+                <div className="flex items-center justify-end">{header}</div>
+                {content}
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-3">
-            <AccordionVolet title={t('TVA & Marge générale')} summary={summary([{ value: merged.m ?? 0, suffix: '%' }])} badge={Number(merged.tvap ?? 0) === 1 ? <Check className="size-3.5 text-green-600" /> : null}>
-                <FormField label={t('Tva')}>
-                    <Input
-                        type="checkbox"
-                        checked={Number(merged.tvap ?? 0) === 1}
-                        onChange={(e) => update('tvap', toNumber(e.target.checked ? 1 : 0))}
-                    />
-                </FormField>
-                <FormField label={t('General margin (%)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('m', 0)}
-                        onChange={(e) => handleFloatChange('m', e.target.value)}
-                        onBlur={() => handleFloatBlur('m')}
-                    />
-                </FormField>
-            </AccordionVolet>
-
-            <AccordionVolet title={t('Marges par unité')} cols={3} summary={summary([
-                { value: merged.mc ?? 0, suffix: '%' },
-                { value: merged.me ?? 0, suffix: '%' },
-                { value: merged.mr ?? 0, suffix: '%' },
-            ])}>
-                <FormField label={t('Margin per carton (%)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('mc', 0)}
-                        onChange={(e) => handleFloatChange('mc', e.target.value)}
-                        onBlur={() => handleFloatBlur('mc')}
-                    />
-                </FormField>
-                <FormField label={t('Margin per level (%)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('me', 0)}
-                        onChange={(e) => handleFloatChange('me', e.target.value)}
-                        onBlur={() => handleFloatBlur('me')}
-                    />
-                </FormField>
-                <FormField label={t('Margin per roll (%)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('mr', 0)}
-                        onChange={(e) => handleFloatChange('mr', e.target.value)}
-                        onBlur={() => handleFloatBlur('mr')}
-                    />
-                </FormField>
-            </AccordionVolet>
-
-            <AccordionVolet title={t('Marges avancées')} summary={summary([
-                { value: merged.mm ?? 0, suffix: '€' },
-                { value: merged.pd ?? 0, suffix: '%' },
-            ])}>
-                <FormField label={t('Minimum margin per roll (€)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('mm', 0)}
-                        onChange={(e) => handleFloatChange('mm', e.target.value)}
-                        onBlur={() => handleFloatBlur('mm')}
-                    />
-                </FormField>
-                <FormField label={t('Ponderation coefficient (%)')}>
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={floatValue('pd', 0)}
-                        onChange={(e) => handleFloatChange('pd', e.target.value)}
-                        onBlur={() => handleFloatBlur('pd')}
-                    />
-                </FormField>
-            </AccordionVolet>
-
-            {mode === 'override' ? (
-                <p className="text-xs text-muted-foreground">{t('Only changed values are relevant for seller override.')}</p>
-            ) : null}
-        </div>
+        <Card className="gap-0 shadow-none">
+            <CardHeader className="flex-row items-center justify-between pb-3">
+                {header}
+            </CardHeader>
+            <CardContent className="space-y-3">{content}</CardContent>
+        </Card>
     );
 }

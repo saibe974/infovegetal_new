@@ -1,4 +1,6 @@
+import EditableProfileTitle from '@/components/sales/EditableProfileTitle';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
+import SellerProfileConditionsEditor from '@/components/sales/SellerProfileConditionsEditor';
 import {
     type ActivePanelItem,
     type BillingDraft,
@@ -20,7 +22,7 @@ import {
     type SalesConditionProfile,
     type SalesConditions,
 } from '@/types';
-import { TrashIcon, UserIcon } from 'lucide-react';
+import { ChevronUp, TrashIcon, UserIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { ButtonsActions } from '../buttons-actions';
 import { formatSalesConditionsSummary } from './billing-utils';
@@ -121,35 +123,23 @@ export default function BillingConditionsEditor({
                     )}
                 </p>
             ) : activePanelItem?.type === 'profile' && currentProfile ? (
-                <>
-                    <CardContent className="space-y-4 px-0">
-                        <input
-                            className="w-full rounded-md border px-3 py-2"
-                            value={currentProfile.name}
-                            disabled={!canManageProfiles}
-                            onChange={(e) => {
-                                if (!canManageProfiles) {
-                                    return;
-                                }
+                <CardContent className="space-y-4 px-0">
+                    <SalesConditionsForm
+                        value={currentProfile.conditions ?? {}}
+                        onChange={(next) => {
+                            if (!canManageProfiles) {
+                                return;
+                            }
 
-                                onRenameBillingProfile(e.target.value);
-                            }}
-                        />
-
-                        <SalesConditionsForm
-                            value={currentProfile.conditions ?? {}}
-                            onChange={(next) => {
-                                if (!canManageProfiles) {
-                                    return;
-                                }
-
-                                onChangeBillingProfileConditions(next);
-                            }}
-                            carriers={carriers ?? []}
-                            mode="defaults"
-                        />
-                    </CardContent>
-                </>
+                            onChangeBillingProfileConditions(next);
+                        }}
+                        carriers={carriers ?? []}
+                        mode="defaults"
+                        profileName={currentProfile.name}
+                        canRenameProfile={canManageProfiles}
+                        onRenameProfile={onRenameBillingProfile}
+                    />
+                </CardContent>
             ) : activePanelItem?.type === 'seller' && currentSeller ? (
                 <>
                     <CardHeader className="flex flex-row items-start justify-between gap-3 rounded-md border border-blue-200/80 bg-blue-100/70 px-4 py-3 dark:border-blue-400/30 dark:bg-blue-500/15">
@@ -185,9 +175,12 @@ export default function BillingConditionsEditor({
                     <CardContent className="space-y-6 px-0">
                         <div className="space-y-2">
                             <h3 className="text-sm font-semibold">
-                                {activeBillingLabel} {t('vend à')} {userOptionById.get(
+                                {activeBillingLabel} {t('vend à')}{' '}
+                                {userOptionById.get(
                                     Number(currentSeller.seller_user_id),
-                                )?.label ?? `#${currentSeller.seller_user_id}`} {t('sous le profil')}
+                                )?.label ??
+                                    `#${currentSeller.seller_user_id}`}{' '}
+                                {t('sous le profil')}
                             </h3>
 
                             <Select
@@ -195,9 +188,9 @@ export default function BillingConditionsEditor({
                                     !currentSeller.use_billing_profile
                                         ? '__custom__'
                                         : (currentSeller.billing_profile_id ??
-                                            currentSellerInheritedProfile?.id ??
-                                            profiles[0]?.id ??
-                                            '__custom__')
+                                          currentSellerInheritedProfile?.id ??
+                                          profiles[0]?.id ??
+                                          '__custom__')
                                 }
                                 onValueChange={(v) => {
                                     if (v === '__custom__') {
@@ -220,9 +213,14 @@ export default function BillingConditionsEditor({
                                             key={profile.id}
                                             value={profile.id}
                                         >
-                                            <span className="block">{profile.name}</span>
+                                            <span className="block">
+                                                {profile.name}
+                                            </span>
                                             <span className="block text-xs text-muted-foreground">
-                                                {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
+                                                {formatSalesConditionsSummary(
+                                                    profile.conditions,
+                                                    t('Vente directe'),
+                                                )}
                                             </span>
                                         </SelectItem>
                                     ))}
@@ -244,97 +242,162 @@ export default function BillingConditionsEditor({
                         <div className="space-y-3">
                             <div className="flex items-center justify-between gap-2">
                                 <h3 className="text-sm font-semibold">
-                                    {t('Profils de ')} {userOptionById.get(
+                                    {t('Profils de ')}{' '}
+                                    {userOptionById.get(
                                         Number(currentSeller.seller_user_id),
-                                    )?.label ?? `#${currentSeller.seller_user_id}`}
+                                    )?.label ??
+                                        `#${currentSeller.seller_user_id}`}
                                 </h3>
                                 {canManageSellerProfiles ? (
                                     <ButtonsActions add={onAddSellerProfile} />
                                 ) : null}
                             </div>
 
-                            <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                            <div className="space-y-2">
                                 {(currentSellerDefaults?.profiles ?? []).map(
                                     (profile) => (
                                         <div
                                             key={profile.id}
-                                            className="flex items-center justify-between gap-2"
+                                            className="space-y-2"
                                         >
-                                            <button
-                                                type="button"
-                                                className={`w-full rounded-md border px-3 py-2 text-left ${currentSellerProfile?.id === profile.id ? 'border-primary bg-muted' : 'border-border'}`}
-                                                onClick={() =>
-                                                    setActiveSellerProfileId(
-                                                        profile.id,
-                                                    )
-                                                }
-                                            >
-                                                <span className="block truncate font-medium">
-                                                    {profile.name}
-                                                </span>
-                                                <span className="block truncate text-xs text-muted-foreground">
-                                                    {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
-                                                </span>
-                                            </button>
-                                            {canManageSellerProfiles ? (
-                                                <Button
-                                                    type="button"
-                                                    variant="destructive-outline"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        onDeleteSellerProfile(
-                                                            profile.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </Button>
+                                            <div className="flex items-center justify-between gap-2">
+                                                {currentSellerProfile?.id ===
+                                                profile.id ? (
+                                                    <div className="flex min-h-14 w-full items-center gap-3 rounded-md border border-primary bg-muted px-3 py-2">
+                                                        <label className="flex shrink-0 items-center gap-2 text-sm">
+                                                            <Input
+                                                                type="checkbox"
+                                                                className="size-4"
+                                                                checked={Boolean(
+                                                                    currentSellerProfile
+                                                                        .conditions
+                                                                        ?.retro_com,
+                                                                )}
+                                                                disabled={
+                                                                    !canManageSellerProfiles
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    onChangeSellerProfileConditions(
+                                                                        {
+                                                                            ...(currentSellerProfile.conditions ??
+                                                                                {}),
+                                                                            retro_com:
+                                                                                event
+                                                                                    .target
+                                                                                    .checked
+                                                                                    ? 1
+                                                                                    : 0,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                            <span>
+                                                                {t('Rétro com')}
+                                                            </span>
+                                                        </label>
+                                                        <EditableProfileTitle
+                                                            name={profile.name}
+                                                            canEdit={
+                                                                canManageSellerProfiles
+                                                            }
+                                                            onRename={
+                                                                onRenameSellerProfile
+                                                            }
+                                                            className="min-w-0 flex-1 truncate text-base"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title={t('Close')}
+                                                            onClick={() =>
+                                                                setActiveSellerProfileId(
+                                                                    null,
+                                                                )
+                                                            }
+                                                        >
+                                                            <ChevronUp className="size-4" />
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        aria-expanded={false}
+                                                        className="w-full rounded-md border border-border px-3 py-2 text-left"
+                                                        onClick={() =>
+                                                            setActiveSellerProfileId(
+                                                                profile.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <span className="block truncate font-medium">
+                                                            {profile.name}
+                                                        </span>
+                                                        <span className="block truncate text-xs text-muted-foreground">
+                                                            {formatSalesConditionsSummary(
+                                                                profile.conditions,
+                                                                t(
+                                                                    'Vente directe',
+                                                                ),
+                                                            )}
+                                                        </span>
+                                                    </button>
+                                                )}
+                                                {canManageSellerProfiles ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive-outline"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            onDeleteSellerProfile(
+                                                                profile.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                            {currentSellerProfile?.id ===
+                                            profile.id ? (
+                                                <div className="rounded-md border border-border bg-card p-4">
+                                                    <SellerProfileConditionsEditor
+                                                        currentSeller={
+                                                            currentSeller
+                                                        }
+                                                        currentSellerProfile={
+                                                            currentSellerProfile
+                                                        }
+                                                        canManageSellerProfiles={
+                                                            canManageSellerProfiles
+                                                        }
+                                                        carriers={carriers}
+                                                        onRenameSellerProfile={
+                                                            onRenameSellerProfile
+                                                        }
+                                                        onChangeSellerProfileConditions={
+                                                            onChangeSellerProfileConditions
+                                                        }
+                                                        showProfileHeader={
+                                                            false
+                                                        }
+                                                        embedded
+                                                    />
+                                                </div>
                                             ) : null}
                                         </div>
                                     ),
                                 )}
                             </div>
 
-                            {currentSellerProfile ? (
-                                <div className="space-y-3 rounded-md border p-3">
-                                    <input
-                                        className="w-full rounded-md border px-3 py-2"
-                                        value={currentSellerProfile.name}
-                                        disabled={!canManageSellerProfiles}
-                                        onChange={(e) => {
-                                            if (!canManageSellerProfiles) {
-                                                return;
-                                            }
-
-                                            onRenameSellerProfile(
-                                                e.target.value,
-                                            );
-                                        }}
-                                    />
-
-                                    <SalesConditionsForm
-                                        value={
-                                            currentSellerProfile.conditions ??
-                                            {}
-                                        }
-                                        onChange={(next) => {
-                                            if (!canManageSellerProfiles) {
-                                                return;
-                                            }
-
-                                            onChangeSellerProfileConditions(
-                                                next,
-                                            );
-                                        }}
-                                        carriers={carriers ?? []}
-                                        mode="defaults"
-                                    />
-                                </div>
-                            ) : (
+                            {(currentSellerDefaults?.profiles ?? []).length ===
+                            0 ? (
                                 <p className="text-sm text-muted-foreground">
                                     {t('Aucun profil commercial défini.')}
                                 </p>
-                            )}
+                            ) : null}
                         </div>
                     </CardContent>
                 </>

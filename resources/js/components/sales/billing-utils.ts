@@ -1,18 +1,25 @@
+import { type BillingDraft } from '@/components/sales/types';
+import {
+    normalizeBillingDefaultsToProfiles,
+    profilesToBillingDefaults,
+} from '@/lib/billing-defaults';
 import {
     type BillingUserRule,
     type SalesConditions,
     type SellerDefaults,
     type SellerUserRule,
 } from '@/types';
-import { normalizeBillingDefaultsToProfiles, profilesToBillingDefaults } from '@/lib/billing-defaults';
-import { type BillingDraft } from '@/components/sales/types';
 
-export const normalizeConditions = (value: SalesConditions | undefined): SalesConditions => {
+export const normalizeConditions = (
+    value: SalesConditions | undefined,
+): SalesConditions => {
     if (!value) {
         return {};
     }
 
-    const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+    const entries = Object.entries(value).sort(([a], [b]) =>
+        a.localeCompare(b),
+    );
     return Object.fromEntries(entries);
 };
 
@@ -24,6 +31,14 @@ export const formatSalesConditionsSummary = (
     emptyLabel = 'Vente directe',
 ): string => {
     const value = conditions ?? {};
+
+    if (value.retro_com === true || Number(value.retro_com ?? 0) === 1) {
+        const billingMargin = Number(value.billing_margin ?? 0);
+        return Number.isFinite(billingMargin)
+            ? `Rétro com · marge facturant ${formatConditionNumber(billingMargin)} %`
+            : 'Rétro com';
+    }
+
     const parts: string[] = [];
 
     if (Number(value.tvap ?? 0) === 1) {
@@ -42,14 +57,18 @@ export const formatSalesConditionsSummary = (
     numericConditions.forEach(([key, label, suffix]) => {
         const numericValue = Number(value[key] ?? 0);
         if (Number.isFinite(numericValue) && numericValue !== 0) {
-            parts.push(`${label} ${formatConditionNumber(numericValue)}${suffix}`);
+            parts.push(
+                `${label} ${formatConditionNumber(numericValue)}${suffix}`,
+            );
         }
     });
 
     return parts.length > 0 ? parts.join(' · ') : emptyLabel;
 };
 
-export const normalizeBillingUsers = (rules: BillingDraft[]): BillingDraft[] => {
+export const normalizeBillingUsers = (
+    rules: BillingDraft[],
+): BillingDraft[] => {
     return rules.map((rule) => {
         const defaults = profilesToBillingDefaults(rule.defaults);
 
@@ -66,9 +85,17 @@ export const normalizeBillingUsers = (rules: BillingDraft[]): BillingDraft[] => 
             sellers: (rule.sellers ?? []).map((seller) => ({
                 seller_user_id: Number(seller.seller_user_id),
                 conditions: normalizeConditions(seller.conditions),
-                use_billing_profile: Boolean(seller.use_billing_profile ?? true),
+                use_billing_profile: Boolean(
+                    seller.use_billing_profile ?? true,
+                ),
                 billing_profile_id: seller.billing_profile_id ?? null,
-                ...(seller.has_seller_defaults && seller.seller_defaults ? { seller_defaults: profilesToBillingDefaults(seller.seller_defaults) } : {}),
+                ...(seller.has_seller_defaults && seller.seller_defaults
+                    ? {
+                          seller_defaults: profilesToBillingDefaults(
+                              seller.seller_defaults,
+                          ),
+                      }
+                    : {}),
                 can_manage: Boolean(seller.can_manage ?? false),
             })),
         };
@@ -86,13 +113,20 @@ export const normalizeRowToDraft = (row: BillingUserRule): BillingDraft => {
             conditions: normalizeConditions(seller.conditions ?? {}),
             use_billing_profile: Boolean(seller.use_billing_profile ?? true),
             billing_profile_id: seller.billing_profile_id ?? null,
-            seller_defaults: seller.seller_defaults && typeof seller.seller_defaults === 'object' && Array.isArray((seller.seller_defaults as SellerDefaults).profiles)
-                ? normalizeBillingDefaultsToProfiles(seller.seller_defaults)
-                : undefined,
+            seller_defaults:
+                seller.seller_defaults &&
+                typeof seller.seller_defaults === 'object' &&
+                Array.isArray(
+                    (seller.seller_defaults as SellerDefaults).profiles,
+                )
+                    ? normalizeBillingDefaultsToProfiles(seller.seller_defaults)
+                    : undefined,
             has_seller_defaults: Boolean(
-                seller.seller_defaults
-                && typeof seller.seller_defaults === 'object'
-                && Array.isArray((seller.seller_defaults as SellerDefaults).profiles),
+                seller.seller_defaults &&
+                    typeof seller.seller_defaults === 'object' &&
+                    Array.isArray(
+                        (seller.seller_defaults as SellerDefaults).profiles,
+                    ),
             ),
             can_manage: Boolean(seller.can_manage ?? false),
         })),

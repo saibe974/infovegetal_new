@@ -10,9 +10,9 @@ final class SalesConditionSnapshotResolver
      * BR-018
      * BR-019
      *
-     * @param array<string, mixed> $defaults
-     * @param array<string, mixed> $sellerRuleData
-     * @param array<string, mixed> $clientOverride
+     * @param  array<string, mixed>  $defaults
+     * @param  array<string, mixed>  $sellerRuleData
+     * @param  array<string, mixed>  $clientOverride
      * @return array<string, mixed>
      */
     public function resolve(array $defaults, array $sellerRuleData = [], array $clientOverride = []): array
@@ -23,15 +23,18 @@ final class SalesConditionSnapshotResolver
         $sellerDefaults = $this->extractDefaultConditions(
             is_array($sellerRuleData['seller_defaults'] ?? null) ? $sellerRuleData['seller_defaults'] : []
         );
+        $activeSellerDefaults = $this->isRetroCommission($sellerDefaults)
+            ? array_intersect_key($sellerDefaults, array_flip(['retro_com', 'billing_margin']))
+            : $sellerDefaults;
 
-        if (!empty($sellerRuleData)) {
+        if (! empty($sellerRuleData)) {
             if ((bool) ($sellerRuleData['use_billing_profile'] ?? true)) {
                 $profileConditions = $this->extractProfileConditionsById(
                     $defaults,
                     isset($sellerRuleData['billing_profile_id']) ? (string) $sellerRuleData['billing_profile_id'] : null,
                 );
 
-                $billingToSellerConditions = !empty($profileConditions) ? $profileConditions : $defaultConditions;
+                $billingToSellerConditions = ! empty($profileConditions) ? $profileConditions : $defaultConditions;
             } else {
                 $billingToSellerConditions = is_array($sellerRuleData['conditions'] ?? null)
                     ? $sellerRuleData['conditions']
@@ -39,17 +42,17 @@ final class SalesConditionSnapshotResolver
             }
         }
 
-        $resolved = array_replace_recursive($billingToSellerConditions, $sellerDefaults, $clientOverride);
+        $resolved = array_replace_recursive($billingToSellerConditions, $activeSellerDefaults, $clientOverride);
 
         // Business semantic for commercial chain:
         // total margin key = billing margin key + active commercial margin key
         // active commercial margin key = client override key (if provided) else seller default key.
-        if (!empty($sellerRuleData)) {
+        if (! empty($sellerRuleData)) {
             foreach (['m', 'mc', 'me', 'mr'] as $marginKey) {
                 $this->mergeCommercialMarginKey(
                     resolved: $resolved,
                     billingToSellerConditions: $billingToSellerConditions,
-                    sellerDefaults: $sellerDefaults,
+                    sellerDefaults: $activeSellerDefaults,
                     clientOverride: $clientOverride,
                     marginKey: $marginKey,
                 );
@@ -68,13 +71,13 @@ final class SalesConditionSnapshotResolver
     /**
      * BR-019
      *
-     * @param array<string, mixed> $defaults
+     * @param  array<string, mixed>  $defaults
      * @return array<string, mixed>
      */
     public function extractDefaultConditions(array $defaults): array
     {
         $profiles = $defaults['profiles'] ?? null;
-        if (!is_array($profiles)) {
+        if (! is_array($profiles)) {
             return $defaults;
         }
 
@@ -86,7 +89,7 @@ final class SalesConditionSnapshotResolver
         $selected = null;
 
         foreach ($profiles as $profile) {
-            if (!is_array($profile)) {
+            if (! is_array($profile)) {
                 continue;
             }
 
@@ -97,7 +100,7 @@ final class SalesConditionSnapshotResolver
             }
         }
 
-        if (!$selected) {
+        if (! $selected) {
             $selected = is_array($profiles[0] ?? null) ? $profiles[0] : [];
         }
 
@@ -107,19 +110,19 @@ final class SalesConditionSnapshotResolver
     /**
      * BR-019
      *
-     * @param array<string, mixed> $defaults
+     * @param  array<string, mixed>  $defaults
      * @return array<string, mixed>
      */
     public function extractProfileConditionsById(array $defaults, ?string $profileId): array
     {
         $profiles = $defaults['profiles'] ?? null;
-        if (!is_array($profiles) || empty($profiles)) {
+        if (! is_array($profiles) || empty($profiles)) {
             return [];
         }
 
         if ($profileId) {
             foreach ($profiles as $profile) {
-                if (!is_array($profile)) {
+                if (! is_array($profile)) {
                     continue;
                 }
 
@@ -138,10 +141,21 @@ final class SalesConditionSnapshotResolver
     }
 
     /**
-     * @param array<string, mixed> $resolved
-     * @param array<string, mixed> $billingToSellerConditions
-     * @param array<string, mixed> $sellerDefaults
-     * @param array<string, mixed> $clientOverride
+     * A retro-commission profile keeps its former pricing conditions for later
+     * reactivation, but none of them participates in the active price snapshot.
+     *
+     * @param  array<string, mixed>  $conditions
+     */
+    private function isRetroCommission(array $conditions): bool
+    {
+        return filter_var($conditions['retro_com'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * @param  array<string, mixed>  $resolved
+     * @param  array<string, mixed>  $billingToSellerConditions
+     * @param  array<string, mixed>  $sellerDefaults
+     * @param  array<string, mixed>  $clientOverride
      */
     private function mergeCommercialMarginKey(
         array &$resolved,

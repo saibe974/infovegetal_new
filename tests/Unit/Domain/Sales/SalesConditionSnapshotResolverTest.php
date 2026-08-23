@@ -10,7 +10,7 @@ use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
  * BR-019
  */
 it('resolves inherited billing profile conditions then merges seller defaults and client overrides', function (): void {
-    $resolver = new SalesConditionSnapshotResolver();
+    $resolver = new SalesConditionSnapshotResolver;
 
     $snapshot = $resolver->resolve(
         defaults: [
@@ -49,7 +49,7 @@ it('resolves inherited billing profile conditions then merges seller defaults an
  * BR-019
  */
 it('selects the default profile and falls back to the first profile when needed', function (): void {
-    $resolver = new SalesConditionSnapshotResolver();
+    $resolver = new SalesConditionSnapshotResolver;
 
     expect($resolver->extractDefaultConditions([
         'default_profile_id' => 'pro',
@@ -73,7 +73,7 @@ it('selects the default profile and falls back to the first profile when needed'
 });
 
 it('computes total margin as billing margin plus commercial standard margin when no client margin is provided', function (): void {
-    $resolver = new SalesConditionSnapshotResolver();
+    $resolver = new SalesConditionSnapshotResolver;
 
     $snapshot = $resolver->resolve(
         defaults: [
@@ -104,7 +104,7 @@ it('computes total margin as billing margin plus commercial standard margin when
 });
 
 it('uses client margin as commercial margin and adds it to billing margin when commercial relation exists', function (): void {
-    $resolver = new SalesConditionSnapshotResolver();
+    $resolver = new SalesConditionSnapshotResolver;
 
     $snapshot = $resolver->resolve(
         defaults: [
@@ -135,7 +135,7 @@ it('uses client margin as commercial margin and adds it to billing margin when c
 });
 
 it('adds billing and commercial tier margins for mc me mr when commercial relation exists', function (): void {
-    $resolver = new SalesConditionSnapshotResolver();
+    $resolver = new SalesConditionSnapshotResolver;
 
     $snapshot = $resolver->resolve(
         defaults: [
@@ -163,5 +163,45 @@ it('adds billing and commercial tier margins for mc me mr when commercial relati
         'mc' => 12.0,
         'me' => 25.0,
         'mr' => 34.0,
+    ]);
+});
+
+it('ignores commercial pricing conditions when its profile uses retro commission', function (): void {
+    $resolver = new SalesConditionSnapshotResolver;
+
+    $snapshot = $resolver->resolve(
+        defaults: [
+            'default_profile_id' => 'standard',
+            'profiles' => [
+                ['id' => 'standard', 'conditions' => ['m' => 15, 'mc' => 10]],
+            ],
+        ],
+        sellerRuleData: [
+            'use_billing_profile' => true,
+            'billing_profile_id' => 'standard',
+            'seller_defaults' => [
+                'default_profile_id' => 'retro',
+                'profiles' => [
+                    ['id' => 'retro', 'conditions' => [
+                        'retro_com' => 1,
+                        'billing_margin' => 7.5,
+                        'm' => 20,
+                        'mc' => 30,
+                    ]],
+                ],
+            ],
+        ],
+    );
+
+    expect($snapshot['seller_defaults'])->toMatchArray([
+        'retro_com' => 1,
+        'billing_margin' => 7.5,
+        'm' => 20,
+        'mc' => 30,
+    ])->and($snapshot['resolved'])->toMatchArray([
+        'retro_com' => 1,
+        'billing_margin' => 7.5,
+        'm' => 15.0,
+        'mc' => 10.0,
     ]);
 });

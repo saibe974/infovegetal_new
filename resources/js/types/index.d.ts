@@ -83,6 +83,8 @@ export interface SellerDefaults {
 }
 
 export interface SalesConditions {
+    retro_com?: number | boolean;
+    billing_margin?: number;
     m?: number;
     mm?: number;
     pd?: number;

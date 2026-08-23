@@ -123,7 +123,7 @@ export default withAppLayout<Props>(
                         sellerProfileId: parsed.sellerProfileId ?? null,
                     };
                 }
-            } catch { }
+            } catch {}
             return {
                 billingUserId: null,
                 panelItem: null,
@@ -335,11 +335,7 @@ export default withAppLayout<Props>(
                 return null;
             }
 
-            const requestedId =
-                activeSellerProfileId ??
-                currentSellerDefaults.default_profile_id ??
-                currentSellerDefaults.profiles[0]?.id ??
-                null;
+            const requestedId = activeSellerProfileId;
             if (!requestedId) {
                 return null;
             }
@@ -365,27 +361,19 @@ export default withAppLayout<Props>(
         }, [canManageSellers, currentSeller, currentUserId]);
 
         useEffect(() => {
-            if (!currentSellerDefaults) {
-                setActiveSellerProfileId(null);
-                return;
-            }
-
-            const hasActiveProfile =
-                !!activeSellerProfileId &&
-                (currentSellerDefaults.profiles ?? []).some(
+            if (
+                activeSellerProfileId &&
+                !(currentSellerDefaults?.profiles ?? []).some(
                     (profile) => profile.id === activeSellerProfileId,
-                );
-
-            if (hasActiveProfile) {
-                return;
+                )
+            ) {
+                setActiveSellerProfileId(null);
             }
-
-            const nextId =
-                currentSellerDefaults.default_profile_id ??
-                currentSellerDefaults.profiles[0]?.id ??
-                null;
-            setActiveSellerProfileId(nextId);
         }, [currentSellerDefaults, activeSellerProfileId]);
+
+        useEffect(() => {
+            setActiveSellerProfileId(null);
+        }, [currentSeller?.seller_user_id]);
 
         const canManageProfiles = useMemo(() => {
             if (!activeBillingRule) {
@@ -395,7 +383,7 @@ export default withAppLayout<Props>(
             return (
                 canManageSellers ||
                 Number(activeBillingRule.billing_user_id) ===
-                Number(currentUserId)
+                    Number(currentUserId)
             );
         }, [activeBillingRule, canManageSellers, currentUserId]);
 
@@ -421,7 +409,7 @@ export default withAppLayout<Props>(
             if (
                 activePanelItem?.type !== 'seller' ||
                 Number(activePanelItem.id) !==
-                Number(fallbackSeller.seller_user_id)
+                    Number(fallbackSeller.seller_user_id)
             ) {
                 setActivePanelItem({
                     type: 'seller',
@@ -441,7 +429,7 @@ export default withAppLayout<Props>(
                         sellerProfileId: activeSellerProfileId,
                     }),
                 );
-            } catch { }
+            } catch {}
         }, [
             activeBillingUserId,
             activePanelItem,
@@ -464,7 +452,7 @@ export default withAppLayout<Props>(
 
         const billingLabel = activeBillingRule
             ? (userOptionById.get(Number(activeBillingRule.billing_user_id))
-                ?.label ?? `#${activeBillingRule.billing_user_id}`)
+                  ?.label ?? `#${activeBillingRule.billing_user_id}`)
             : '';
 
         const addBillingUser = (id: number) => {
@@ -849,16 +837,16 @@ export default withAppLayout<Props>(
                     ...rule,
                     sellers: (rule.sellers ?? []).map((seller) =>
                         Number(seller.seller_user_id) ===
-                            Number(currentSeller.seller_user_id)
+                        Number(currentSeller.seller_user_id)
                             ? {
-                                ...seller,
-                                use_billing_profile: useProfile,
-                                billing_profile_id: useProfile
-                                    ? (seller.billing_profile_id ??
+                                  ...seller,
+                                  use_billing_profile: useProfile,
+                                  billing_profile_id: useProfile
+                                      ? (seller.billing_profile_id ??
                                         currentSellerInheritedProfile?.id ??
                                         null)
-                                    : null,
-                            }
+                                      : null,
+                              }
                             : seller,
                     ),
                 }),
@@ -876,12 +864,12 @@ export default withAppLayout<Props>(
                     ...rule,
                     sellers: (rule.sellers ?? []).map((seller) =>
                         Number(seller.seller_user_id) ===
-                            Number(currentSeller.seller_user_id)
+                        Number(currentSeller.seller_user_id)
                             ? {
-                                ...seller,
-                                billing_profile_id: profileId,
-                                use_billing_profile: true,
-                            }
+                                  ...seller,
+                                  billing_profile_id: profileId,
+                                  use_billing_profile: true,
+                              }
                             : seller,
                     ),
                 }),
@@ -980,10 +968,10 @@ export default withAppLayout<Props>(
                                 profiles: defaults.profiles.map((profile) =>
                                     profile.id === currentSellerProfile.id
                                         ? {
-                                            ...profile,
-                                            conditions:
-                                                normalizeConditions(next),
-                                        }
+                                              ...profile,
+                                              conditions:
+                                                  normalizeConditions(next),
+                                          }
                                         : profile,
                                 ),
                             },
@@ -1031,15 +1019,15 @@ export default withAppLayout<Props>(
                                                 <BreadcrumbItemUI>
                                                     <BreadcrumbPage className="text-3xl font-bold">
                                                         {activePanelItem.type ===
-                                                            'profile'
+                                                        'profile'
                                                             ? (currentProfile?.name ??
-                                                                t('Profile'))
+                                                              t('Profile'))
                                                             : (userOptionById.get(
-                                                                Number(
-                                                                    activePanelItem.id,
-                                                                ),
-                                                            )?.label ??
-                                                                t('Commercial'))}
+                                                                  Number(
+                                                                      activePanelItem.id,
+                                                                  ),
+                                                              )?.label ??
+                                                              t('Commercial'))}
                                                     </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
                                             </>
