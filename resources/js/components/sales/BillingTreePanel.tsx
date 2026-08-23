@@ -15,6 +15,7 @@ import { useI18n } from '@/lib/i18n';
 import { ChevronDown, TrashIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ButtonsActions } from '../buttons-actions';
+import { formatSalesConditionsSummary } from './billing-utils';
 
 type Option = {
     description: any;
@@ -94,7 +95,7 @@ export default function BillingTreePanel({
                                     className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 transition-colors hover:bg-muted ${openSection === 'profiles' ? 'bg-muted' : ''}`}
                                 >
                                     <h3 className="text-lg font-semibold">
-                                        {t('Profils')}
+                                        {t('Profiles')}
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
@@ -131,8 +132,11 @@ export default function BillingTreePanel({
                                                     })
                                                 }
                                             >
-                                                <span className="font-medium">
+                                                <span className="block truncate font-medium">
                                                     {profile.name}
+                                                </span>
+                                                <span className="block truncate text-xs text-muted-foreground">
+                                                    {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
                                                 </span>
                                             </button>
                                             {canManageProfiles ? (

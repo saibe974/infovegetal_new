@@ -23,6 +23,7 @@ import {
 import { TrashIcon, UserIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { ButtonsActions } from '../buttons-actions';
+import { formatSalesConditionsSummary } from './billing-utils';
 
 type Option = { value: string; label: string };
 
@@ -219,7 +220,10 @@ export default function BillingConditionsEditor({
                                             key={profile.id}
                                             value={profile.id}
                                         >
-                                            {profile.name}
+                                            <span className="block">{profile.name}</span>
+                                            <span className="block text-xs text-muted-foreground">
+                                                {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
+                                            </span>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -265,8 +269,11 @@ export default function BillingConditionsEditor({
                                                     )
                                                 }
                                             >
-                                                <span className="font-medium">
+                                                <span className="block truncate font-medium">
                                                     {profile.name}
+                                                </span>
+                                                <span className="block truncate text-xs text-muted-foreground">
+                                                    {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
                                                 </span>
                                             </button>
                                             {canManageSellerProfiles ? (

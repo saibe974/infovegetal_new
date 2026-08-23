@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
 import CountryFlag from '@/components/ui/country-flag';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { formatSalesConditionsSummary } from '@/components/sales/billing-utils';
 
 type CarrierOption = {
     id: number;
@@ -276,9 +277,9 @@ export default function UserDbPage() {
         [activeBillingData],
     );
 
-    const activeBillingProfileName = useMemo(() => {
+    const activeBillingProfile = useMemo(() => {
         if (!activeRow?.billing_user_id) {
-            return '';
+            return null;
         }
 
         if (!activeSellerData) {
@@ -286,7 +287,7 @@ export default function UserDbPage() {
                 ?? activeBillingDefaults.profiles[0]
                 ?? null;
 
-            return profile?.name ?? '';
+            return profile;
         }
 
         const profileId = activeSellerData.use_billing_profile
@@ -294,11 +295,19 @@ export default function UserDbPage() {
             : null;
 
         if (!profileId) {
-            return t('Paramétrage custom');
+            return {
+                id: '__custom__',
+                name: t('Paramétrage custom'),
+                conditions: normalizeConditions(activeSellerData.conditions ?? {}),
+            };
         }
 
         const profile = activeBillingDefaults.profiles.find((p) => p.id === String(profileId));
-        return profile?.name ?? String(profileId);
+        return profile ?? {
+            id: String(profileId),
+            name: String(profileId),
+            conditions: {},
+        };
     }, [activeBillingDefaults, activeSellerData, activeRow?.billing_user_id, t]);
 
     const sellerProfiles = useMemo(() => {
@@ -448,10 +457,10 @@ export default function UserDbPage() {
 
     const updateCarrierAssignments = (next: CarrierAssignment[]) => {
         const json = next.length === 0 ? null : JSON.stringify(next);
-        updateTransport({ t: json as unknown as SalesConditions['t'] });
+        updateWithoutChangingProfile({ t: json as unknown as SalesConditions['t'] });
     };
 
-    const updateTransport = (patch: Partial<SalesConditions>) => {
+    const updateWithoutChangingProfile = (patch: Partial<SalesConditions>) => {
         const nextResolved = normalizeConditions({ ...merged, ...patch });
 
         updateRow(activeIndex, {
@@ -690,12 +699,19 @@ export default function UserDbPage() {
                                                     )}
 
                                                     {activeRow.seller_user_id ? (
-                                                        <Input
-                                                            disabled
-                                                            readOnly
-                                                            value={activeBillingProfileName}
-                                                            placeholder={t('Profil facturant assigné')}
-                                                        />
+                                                        <div
+                                                            className="w-full rounded-md border border-border bg-muted/40 px-3 py-2"
+                                                            title={activeBillingProfile ? formatSalesConditionsSummary(activeBillingProfile.conditions, t('Vente directe')) : undefined}
+                                                        >
+                                                            <span className="block truncate font-medium">
+                                                                {activeBillingProfile?.name ?? t('Profil facturant assigné')}
+                                                            </span>
+                                                            {activeBillingProfile ? (
+                                                                <span className="block truncate text-xs text-muted-foreground">
+                                                                    {formatSalesConditionsSummary(activeBillingProfile.conditions, t('Vente directe'))}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
                                                     ) : (<></>)}
 
                                                 </FormField>
@@ -775,7 +791,12 @@ export default function UserDbPage() {
                                                             <SelectContent>
                                                                 <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
                                                                 {billingProfiles.map((profile) => (
-                                                                    <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
+                                                                    <SelectItem key={profile.key} value={profile.key}>
+                                                                        <span className="block">{profile.label}</span>
+                                                                        <span className="block text-xs text-muted-foreground">
+                                                                            {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
+                                                                        </span>
+                                                                    </SelectItem>
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
@@ -846,7 +867,12 @@ export default function UserDbPage() {
                                                             <SelectContent>
                                                                 <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
                                                                 {sellerProfiles.map((profile) => (
-                                                                    <SelectItem key={profile.key} value={profile.key}>{profile.label}</SelectItem>
+                                                                    <SelectItem key={profile.key} value={profile.key}>
+                                                                        <span className="block">{profile.label}</span>
+                                                                        <span className="block text-xs text-muted-foreground">
+                                                                            {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
+                                                                        </span>
+                                                                    </SelectItem>
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
@@ -857,7 +883,7 @@ export default function UserDbPage() {
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField label={t('Price mode')}>
-                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => update({ p: v })}>
+                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => updateWithoutChangingProfile({ p: v })}>
                                                         <SelectTrigger>
                                                             <SelectValue />
                                                         </SelectTrigger>

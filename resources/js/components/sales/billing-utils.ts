@@ -16,6 +16,39 @@ export const normalizeConditions = (value: SalesConditions | undefined): SalesCo
     return Object.fromEntries(entries);
 };
 
+const formatConditionNumber = (value: number): string =>
+    new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value);
+
+export const formatSalesConditionsSummary = (
+    conditions: SalesConditions | undefined,
+    emptyLabel = 'Vente directe',
+): string => {
+    const value = conditions ?? {};
+    const parts: string[] = [];
+
+    if (Number(value.tvap ?? 0) === 1) {
+        parts.push('✓ TVA');
+    }
+
+    const numericConditions: Array<[keyof SalesConditions, string, string]> = [
+        ['m', 'marge', ' %'],
+        ['mc', 'MC', ' %'],
+        ['me', 'ME', ' %'],
+        ['mr', 'MR', ' %'],
+        ['mm', 'MMR', ' €'],
+        ['pd', 'pond.', ' %'],
+    ];
+
+    numericConditions.forEach(([key, label, suffix]) => {
+        const numericValue = Number(value[key] ?? 0);
+        if (Number.isFinite(numericValue) && numericValue !== 0) {
+            parts.push(`${label} ${formatConditionNumber(numericValue)}${suffix}`);
+        }
+    });
+
+    return parts.length > 0 ? parts.join(' · ') : emptyLabel;
+};
+
 export const normalizeBillingUsers = (rules: BillingDraft[]): BillingDraft[] => {
     return rules.map((rule) => {
         const defaults = profilesToBillingDefaults(rule.defaults);
