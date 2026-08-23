@@ -105,7 +105,7 @@ export default function BillingTreePanel({
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
-                                            openSection === 'profiles' ? (
+                                        openSection === 'profiles' ? (
                                             <ButtonsActions
                                                 add={() => {
                                                     onAddProfile();
@@ -182,7 +182,7 @@ export default function BillingTreePanel({
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageSellers &&
-                                            openSection === 'sellers' ? (
+                                        openSection === 'sellers' ? (
                                             <ButtonsActions
                                                 add={() =>
                                                     setShowSellerSearch(
@@ -267,8 +267,8 @@ export default function BillingTreePanel({
                                                                 className="font-medium"
                                                                 {...(option?.description
                                                                     ? {
-                                                                        title: option.description,
-                                                                    }
+                                                                          title: option.description,
+                                                                      }
                                                                     : {})}
                                                             >
                                                                 {option.label}
@@ -315,7 +315,7 @@ export default function BillingTreePanel({
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
-                                            openSection === 'files' ? (
+                                        openSection === 'files' ? (
                                             <ButtonsActions add={onAddFile} />
                                         ) : null}
                                         <ChevronDown
@@ -347,14 +347,17 @@ export default function BillingTreePanel({
                                                     {file.name}
                                                 </span>
                                                 <span className="block truncate text-xs text-muted-foreground">
-                                                    {file.enabled
-                                                        ? t('Actif')
-                                                        : t('Inactif')}{' '}
-                                                    · CSV
+                                                    {file.id === 'order-pdf'
+                                                        ? t('Système')
+                                                        : file.enabled
+                                                          ? t('Actif')
+                                                          : t('Inactif')}{' '}
+                                                    ·{' '}
+                                                    {file.extension.toUpperCase()}
                                                 </span>
                                             </button>
                                             {canManageProfiles &&
-                                                !file.system ? (
+                                            !file.system ? (
                                                 <Button
                                                     type="button"
                                                     variant="destructive-outline"
@@ -371,7 +374,6 @@ export default function BillingTreePanel({
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>
-
                     </CardContent>
                 </>
             )}

@@ -9,9 +9,13 @@ import type {
 export const createOrderCsvTemplate = (): BillingFileTemplate => ({
     id: 'order-csv',
     name: 'Commande CSV',
+    filename: '%document.number%_%document.date%_commande_%db.name%',
     event: 'order',
+    events: ['order'],
     enabled: true,
+    shared: false,
     delimiter: ';',
+    extension: 'csv',
     system: true,
     blocks: [
         {
@@ -41,6 +45,20 @@ export const createOrderCsvTemplate = (): BillingFileTemplate => ({
             ],
         },
     ],
+});
+
+export const createOrderPdfTemplate = (): BillingFileTemplate => ({
+    id: 'order-pdf',
+    name: 'Commande PDF',
+    filename: '%document.number%_%document.date%',
+    event: 'order',
+    events: ['order'],
+    enabled: true,
+    shared: true,
+    delimiter: ';',
+    extension: 'pdf',
+    system: true,
+    blocks: [],
 });
 
 const normalizeRows = (
@@ -140,6 +158,19 @@ const normalizeFiles = (
                 !!file && typeof file === 'object',
         )
         .map((file, fileIndex) => {
+            const event = [
+                'order',
+                'delivery',
+                'invoice',
+                'credit_note',
+            ].includes(file.event)
+                ? file.event
+                : 'order';
+            const events = (
+                Array.isArray(file.events) ? file.events : [event]
+            ).filter((item): item is BillingFileTemplate['event'] =>
+                ['order', 'delivery', 'invoice', 'credit_note'].includes(item),
+            );
             const columns = Array.isArray(file.columns)
                 ? file.columns.map((column, columnIndex) => ({
                       id: String(column.id || `column-${columnIndex + 1}`),
@@ -150,17 +181,27 @@ const normalizeFiles = (
             return {
                 id: String(file.id || `file-${fileIndex + 1}`),
                 name: String(file.name || `Fichier ${fileIndex + 1}`),
-                event: ['order', 'delivery', 'invoice', 'credit_note'].includes(
-                    file.event,
-                )
-                    ? file.event
-                    : 'order',
+                filename: String(
+                    file.filename ||
+                        `%document.number%_%document.date%_${file.name || `fichier-${fileIndex + 1}`}_%db.name%`,
+                ),
+                event,
+                events: events.length ? events : [event],
                 enabled: file.enabled !== false,
+                shared: Boolean(file.shared),
                 delimiter: [';', ',', '\t', '|'].includes(file.delimiter)
                     ? file.delimiter
                     : ';',
+                extension: ['csv', 'tsv', 'pdf', 'xls'].includes(file.extension)
+                    ? file.extension
+                    : ['\t', '|'].includes(file.delimiter)
+                      ? 'tsv'
+                      : 'csv',
                 system: Boolean(file.system),
-                blocks: normalizeBlocks(file, columns),
+                blocks:
+                    file.id === 'order-pdf'
+                        ? []
+                        : normalizeBlocks(file, columns),
             };
         });
 };
@@ -169,11 +210,14 @@ export const ensureOrderCsvTemplate = (
     value: BillingDefaults,
 ): BillingDefaults => {
     const files = normalizeFiles(value) ?? [];
+    const withOrderCsv = files.some((file) => file.id === 'order-csv')
+        ? files
+        : [createOrderCsvTemplate(), ...files];
     return {
         ...value,
-        files: files.some((file) => file.id === 'order-csv')
-            ? files
-            : [createOrderCsvTemplate(), ...files],
+        files: withOrderCsv.some((file) => file.id === 'order-pdf')
+            ? withOrderCsv
+            : [createOrderPdfTemplate(), ...withOrderCsv],
     };
 };
 

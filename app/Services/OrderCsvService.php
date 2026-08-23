@@ -15,7 +15,7 @@ class OrderCsvService
     private const EVENTS = ['order', 'delivery', 'invoice', 'credit_note'];
 
     /**
-     * @return array<int, array{filename:string, relative_path:string, disk:string, event:string, billing_user_id:int}>
+     * @return array<int, array{filename:string, relative_path:string, disk:string, event:string, billing_user_id:int, seller_user_id:int, client_user_id:int, shared:bool, mime:string}>
      */
     public function generate(Cart $cart, User $client, array $payload): array
     {
@@ -25,7 +25,7 @@ class OrderCsvService
     /**
      * Shared entry point for order, delivery, invoice and credit-note generators.
      *
-     * @return array<int, array{filename:string, relative_path:string, disk:string, event:string, billing_user_id:int}>
+     * @return array<int, array{filename:string, relative_path:string, disk:string, event:string, billing_user_id:int, seller_user_id:int, client_user_id:int, shared:bool, mime:string}>
      */
     public function generateForEvent(string $event, Cart $cart, User $client, array $payload): array
     {
@@ -66,7 +66,10 @@ class OrderCsvService
                 : [];
 
             foreach ($templates as $template) {
-                if (! is_array($template) || ($template['event'] ?? null) !== $event || ! ($template['enabled'] ?? false)) {
+                if (! is_array($template)
+                    || ($template['id'] ?? null) === 'order-pdf'
+                    || ! in_array($event, $this->templateEvents($template), true)
+                    || ! ($template['enabled'] ?? false)) {
                     continue;
                 }
 
@@ -81,7 +84,7 @@ class OrderCsvService
                     'event' => $event,
                 ];
 
-                $csv = $this->render($template, $dbItems, [
+                $context = [
                     'document' => $documentContext,
                     $event => $documentContext,
                     'client' => [
@@ -98,16 +101,40 @@ class OrderCsvService
                         'id' => $rule->dbProduct?->id,
                         'name' => $rule->dbProduct?->name,
                     ],
-                ]);
+                ];
+                $csv = $this->render($template, $dbItems, $context);
 
-                $templateName = Str::slug((string) ($template['name'] ?? 'commande-csv')) ?: 'commande-csv';
-                $dbName = Str::slug((string) ($rule->dbProduct?->name ?? $dbProductId)) ?: (string) $dbProductId;
-                $filename = sprintf('%s_%s_%s_%s.csv', $safeDocumentNumber, str_replace('-', '_', $documentDate), $templateName, $dbName);
+                $extension = in_array($template['extension'] ?? null, ['csv', 'tsv'], true)
+                    ? $template['extension']
+                    : (in_array($template['delimiter'] ?? null, ["\t", '|'], true) ? 'tsv' : 'csv');
+                $templateName = Str::slug((string) ($template['name'] ?? 'fichier')) ?: 'fichier';
+                $fallbackName = sprintf(
+                    '%s_%s_%s_%s',
+                    $safeDocumentNumber,
+                    str_replace('-', '_', $documentDate),
+                    $templateName,
+                    Str::slug((string) ($rule->dbProduct?->name ?? $dbProductId)) ?: (string) $dbProductId,
+                );
+                $filename = $this->resolveFilename(
+                    (string) ($template['filename'] ?? ''),
+                    $context,
+                    $dbItems->first(),
+                    $extension,
+                    $fallbackName,
+                );
+                $storageFilename = sprintf(
+                    '%s_%s_%s_db-%d.%s',
+                    $event,
+                    $safeDocumentNumber,
+                    Str::slug((string) ($template['id'] ?? $templateName)) ?: $templateName,
+                    $dbProductId,
+                    $extension,
+                );
                 $relativePath = sprintf(
                     'commandes/facturants/%d/client-%d/%s',
                     $billingUserId,
                     $client->id,
-                    $filename,
+                    $storageFilename,
                 );
 
                 Storage::disk('local')->put($relativePath, $csv);
@@ -122,6 +149,10 @@ class OrderCsvService
                     'disk' => 'local',
                     'event' => $event,
                     'billing_user_id' => (int) $billingUserId,
+                    'seller_user_id' => (int) ($billingContext[$dbProductId]['seller_user_id'] ?? 0),
+                    'client_user_id' => (int) $client->id,
+                    'shared' => (bool) ($template['shared'] ?? false),
+                    'mime' => $extension === 'tsv' ? 'text/tab-separated-values' : 'text/csv',
                 ];
             }
         }
@@ -145,8 +176,6 @@ class OrderCsvService
     }
 
     /**
-     * The client never receives billing files, even when they are also configured as a billing user.
-     *
      * @param  array<int, array<string, mixed>>  $generatedFiles
      * @return array<int, string>
      */
@@ -163,16 +192,124 @@ class OrderCsvService
      */
     public function attachmentsForRecipient(array $generatedFiles, int $recipientId, int $clientId): array
     {
-        if ($recipientId === $clientId) {
-            return [];
-        }
-
         return collect($generatedFiles)
             ->filter(fn ($file) => is_array($file)
-                && (int) ($file['billing_user_id'] ?? 0) === $recipientId
+                && (
+                    (int) ($file['billing_user_id'] ?? 0) === $recipientId
+                    || (
+                        ($file['shared'] ?? false) === true
+                        && (
+                            $recipientId === $clientId
+                            || (int) ($file['seller_user_id'] ?? 0) === $recipientId
+                        )
+                    )
+                )
                 && is_string($file['relative_path'] ?? null))
             ->values()
             ->all();
+    }
+
+    public function resolveOrderPdfFilename(
+        Cart $cart,
+        User $client,
+        array $payload,
+        string $fallbackFilename,
+    ): string {
+        $items = collect($payload['items'] ?? []);
+        $billingContext = is_array($payload['billing_context_by_db'] ?? null)
+            ? $payload['billing_context_by_db']
+            : [];
+        $documentNumber = (string) ($payload['order_number'] ?? $payload['document_number'] ?? $cart->id);
+        $documentDate = (string) ($payload['document_date'] ?? now()->format('Y-m-d'));
+
+        foreach ($items->groupBy(fn ($item) => (int) ($item['product']->db_products_id ?? 0)) as $dbProductId => $dbItems) {
+            $dbProductId = (int) $dbProductId;
+            $billingUserId = (int) ($billingContext[$dbProductId]['billing_user_id'] ?? 0);
+            if ($dbProductId <= 0 || $billingUserId <= 0) {
+                continue;
+            }
+
+            $rule = DbProductBillingUser::query()
+                ->with(['billingUser', 'dbProduct'])
+                ->where('db_product_id', $dbProductId)
+                ->where('billing_user_id', $billingUserId)
+                ->where('active', true)
+                ->first();
+            $template = collect($rule?->defaults['files'] ?? [])->first(
+                fn ($file) => is_array($file) && ($file['id'] ?? null) === 'order-pdf',
+            );
+            if (! is_array($template)) {
+                continue;
+            }
+
+            $documentContext = [
+                'id' => $payload['document_id'] ?? $cart->id,
+                'number' => $documentNumber,
+                'date' => $documentDate,
+                'comment' => (string) ($payload['comment'] ?? ''),
+                'items_total' => $this->decimal($payload['items_total'] ?? 0),
+                'shipping_total' => $this->decimal($payload['shipping_total'] ?? 0),
+                'total' => $this->decimal($payload['total'] ?? 0),
+                'event' => 'order',
+            ];
+            $context = [
+                'document' => $documentContext,
+                'order' => $documentContext,
+                'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email],
+                'billing' => [
+                    'id' => $rule->billingUser?->id,
+                    'name' => $rule->billingUser?->name,
+                    'email' => $rule->billingUser?->email,
+                ],
+                'db' => ['id' => $rule->dbProduct?->id, 'name' => $rule->dbProduct?->name],
+            ];
+
+            return $this->resolveFilename(
+                (string) ($template['filename'] ?? ''),
+                $context,
+                $dbItems->first(),
+                'pdf',
+                pathinfo($fallbackFilename, PATHINFO_FILENAME),
+            );
+        }
+
+        return $fallbackFilename;
+    }
+
+    /** @return array<int, string> */
+    private function templateEvents(array $template): array
+    {
+        $events = is_array($template['events'] ?? null)
+            ? $template['events']
+            : [$template['event'] ?? 'order'];
+
+        return array_values(array_filter(
+            $events,
+            fn ($event) => is_string($event) && in_array($event, self::EVENTS, true),
+        ));
+    }
+
+    private function resolveFilename(
+        string $rule,
+        array $context,
+        mixed $item,
+        string $extension,
+        string $fallback,
+    ): string {
+        $resolved = $this->replaceVariables(
+            $rule,
+            $context,
+            is_array($item) ? $item : null,
+        );
+        $resolved = (string) preg_replace('/\.(?:csv|tsv|pdf|xls)$/i', '', trim($resolved));
+        $resolved = (string) preg_replace('/[<>:"\/\\|?*\x00-\x1F]+/u', '-', $resolved);
+        $resolved = trim((string) preg_replace('/\s+/u', ' ', $resolved), ". \t\n\r\0\x0B");
+
+        if ($resolved === '' || str_contains($resolved, '%')) {
+            $resolved = $fallback;
+        }
+
+        return Str::limit($resolved, 180, '').'.'.$extension;
     }
 
     /**

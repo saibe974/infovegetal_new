@@ -73,6 +73,7 @@ export interface SalesConditionProfile {
 }
 
 export type BillingFileEvent = 'order' | 'delivery' | 'invoice' | 'credit_note';
+export type BillingFileExtension = 'csv' | 'tsv' | 'pdf' | 'xls';
 
 export interface BillingFileColumn {
     id: string;
@@ -99,9 +100,13 @@ export interface BillingFileBlock {
 export interface BillingFileTemplate {
     id: string;
     name: string;
+    filename: string;
     event: BillingFileEvent;
+    events: BillingFileEvent[];
     enabled: boolean;
+    shared: boolean;
     delimiter: ';' | ',' | '\t' | '|';
+    extension: BillingFileExtension;
     /** Legacy fields kept while stored templates are transparently upgraded. */
     scope?: 'items' | 'document';
     system?: boolean;

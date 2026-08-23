@@ -150,8 +150,15 @@ class CartController extends Controller
         $cart->save();
 
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
-        $pdfFilename = $this->buildOrderPdfFilename((int) $cart->id);
-        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $pdfFilename);
+        $pdfPayload['order_number'] = $orderNumber;
+        $storagePdfFilename = $this->buildOrderPdfFilename((int) $cart->id);
+        $pdfFilename = app(OrderCsvService::class)->resolveOrderPdfFilename(
+            $cart,
+            $user,
+            $pdfPayload,
+            $storagePdfFilename,
+        );
+        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $storagePdfFilename);
 
         Pdf::view('pdf.cart', array_merge($pdfPayload, [
             'order_id' => $cart->id,
@@ -161,7 +168,6 @@ class CartController extends Controller
             ->disk('public', 'public')
             ->save($pdfRelativePath);
 
-        $pdfPayload['order_number'] = $orderNumber;
         $csvFiles = app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $pdfPayload);
 
         $mailCount = $this->sendOrderPdfMails(
@@ -170,7 +176,7 @@ class CartController extends Controller
             $orderNumber,
             $user,
             'public',
-            null,
+            $pdfFilename,
             $csvFiles,
         );
 
@@ -1115,7 +1121,7 @@ class CartController extends Controller
                             }
                             $message->attach(Storage::disk($csvDisk)->path($csvRelativePath), [
                                 'as' => (string) ($csvAttachment['filename'] ?? basename($csvRelativePath)),
-                                'mime' => 'text/csv',
+                                'mime' => (string) ($csvAttachment['mime'] ?? 'text/csv'),
                             ]);
                         }
                     }
@@ -1165,10 +1171,16 @@ class CartController extends Controller
         $cart->shipping_total = round((float) ($payload['shipping_total'] ?? 0), 2);
         $cart->save();
 
-        $filename = $this->buildOrderPdfFilename((int) $cart->id);
+        $storageFilename = $this->buildOrderPdfFilename((int) $cart->id);
+        $filename = app(OrderCsvService::class)->resolveOrderPdfFilename(
+            $cart,
+            $user,
+            $payload,
+            $storageFilename,
+        );
         $pdfBinary = $cartTcpdfService->render($payload);
 
-        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $filename);
+        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $storageFilename);
         Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
 
         $csvFiles = $sendEmails

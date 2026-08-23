@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import {
     DropdownMenu,
+    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
@@ -32,6 +33,8 @@ import { cn } from '@/lib/utils';
 import type {
     BillingFileBlock,
     BillingFileBlockType,
+    BillingFileEvent,
+    BillingFileExtension,
     BillingFileRow,
     BillingFileTemplate,
 } from '@/types';
@@ -114,6 +117,18 @@ const blockLabels: Record<BillingFileBlockType, string> = {
     items: 'Liste des produits',
     footer: 'Total / pied de fichier',
 };
+
+const eventLabels: Record<BillingFileEvent, string> = {
+    order: 'Commande',
+    delivery: 'Livraison',
+    invoice: 'Facture',
+    credit_note: 'Avoir',
+};
+
+const preferredExtension = (
+    delimiter: BillingFileTemplate['delimiter'],
+): Extract<BillingFileExtension, 'csv' | 'tsv'> =>
+    delimiter === '\t' || delimiter === '|' ? 'tsv' : 'csv';
 
 const uniqueId = (prefix: string) =>
     `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -1144,6 +1159,118 @@ function BillingFileRuleEditor({
     );
 }
 
+type FilenameRuleFieldProps = {
+    value: string;
+    event: BillingFileEvent;
+    disabled: boolean;
+    onChange: (value: string) => void;
+};
+
+function FilenameRuleField({
+    value,
+    event,
+    disabled,
+    onChange,
+}: FilenameRuleFieldProps) {
+    const { t } = useI18n();
+    const variables = variablesForBlock('items', event);
+    const parsedVariable = parseVariableToken(value);
+    const isSingleVariable = parsedVariable?.format === 'raw';
+    const isConfigured =
+        !isSingleVariable &&
+        /%calc:[^%]+%|%[a-z0-9_.-]+(?:\|(?:date|decimal):[a-z0-9]+)?%/i.test(
+            value,
+        );
+
+    const variablePicker = (active = false) => (
+        <DropdownMenu key={active ? 'filename-variable' : 'filename-add'}>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                        'shrink-0',
+                        active &&
+                            'text-green-600 hover:bg-green-500/10 hover:text-green-700 dark:text-green-400',
+                    )}
+                    title={t(active ? 'Nom variable' : 'Insérer une variable')}
+                >
+                    <BracesIcon className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-72 overflow-y-auto">
+                {variables.map((variable) => (
+                    <DropdownMenuItem
+                        key={variable}
+                        onSelect={() =>
+                            onChange(
+                                isSingleVariable
+                                    ? variable
+                                    : `${value}${variable}`,
+                            )
+                        }
+                    >
+                        {variable}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+
+    const ruleEditor = (active = false) => (
+        <div
+            key={active ? 'filename-rule' : 'filename-rule-action'}
+            className={cn(
+                'shrink-0',
+                active &&
+                    '[&_button]:text-violet-600 [&_button]:hover:bg-violet-500/10 [&_button]:hover:text-violet-700 dark:[&_button]:text-violet-400',
+            )}
+        >
+            <BillingFileRuleEditor
+                value={value}
+                variables={variables}
+                event={event}
+                blockType="items"
+                onApply={onChange}
+            />
+        </div>
+    );
+
+    return (
+        <div className="group/filename flex min-w-0 items-center gap-1.5">
+            {!disabled && isSingleVariable ? variablePicker(true) : null}
+            {!disabled && isConfigured ? ruleEditor(true) : null}
+            <div className="relative min-w-0 flex-1">
+                <Input
+                    value={value}
+                    disabled={disabled}
+                    className={cn(value && !disabled && 'pr-8')}
+                    placeholder={t('Nom du fichier')}
+                    onChange={(event) => onChange(event.target.value)}
+                />
+                {value && !disabled ? (
+                    <button
+                        type="button"
+                        className="absolute top-1/2 right-1 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        title={t('Vider le nom du fichier')}
+                        aria-label={t('Vider le nom du fichier')}
+                        onClick={() => onChange('')}
+                    >
+                        <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
+            </div>
+            {!disabled ? (
+                <div className="pointer-events-none flex items-center gap-1.5 opacity-0 transition-opacity group-focus-within/filename:pointer-events-auto group-focus-within/filename:opacity-100 group-hover/filename:pointer-events-auto group-hover/filename:opacity-100">
+                    {!isSingleVariable ? variablePicker() : null}
+                    {!isConfigured ? ruleEditor() : null}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 type BlockEditorProps = {
     block: BillingFileBlock;
     file: BillingFileTemplate;
@@ -1671,6 +1798,16 @@ export default function BillingFileEditor({
     const { t } = useI18n();
     const [newBlockType, setNewBlockType] =
         useState<BillingFileBlockType>('header');
+    const primaryEvent = file.events[0] ?? file.event;
+    const isOrderPdf = file.id === 'order-pdf';
+    const suggestedExtension = preferredExtension(file.delimiter);
+    const extensionMismatch =
+        !isOrderPdf && file.extension !== suggestedExtension;
+    const filenamePreview = `${replacePreviewVariables(
+        file.filename,
+        primaryEvent,
+        previewItems[0],
+    )}.${file.extension}`;
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor, {
@@ -1757,172 +1894,304 @@ export default function BillingFileEditor({
                 </Button>
             </CardHeader>
             <CardContent className="space-y-5 px-0">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
                     <FormField label={t('Nom du fichier')}>
-                        <Input
-                            value={file.name}
-                            disabled={!canManage || file.system}
-                            onChange={(event) =>
-                                onChange({ ...file, name: event.target.value })
+                        <FilenameRuleField
+                            value={file.filename}
+                            event={primaryEvent}
+                            disabled={!canManage}
+                            onChange={(filename) =>
+                                onChange({ ...file, filename })
                             }
                         />
                     </FormField>
-                    <FormField label={t('Événement')}>
-                        <Select
-                            value={file.event}
-                            disabled={!canManage || file.system}
-                            onValueChange={(
-                                event: BillingFileTemplate['event'],
-                            ) => onChange({ ...file, event })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="order">
-                                    {t('Commande')}
-                                </SelectItem>
-                                <SelectItem value="delivery">
-                                    {t('Livraison')}
-                                </SelectItem>
-                                <SelectItem value="invoice">
-                                    {t('Facture')}
-                                </SelectItem>
-                                <SelectItem value="credit_note">
-                                    {t('Avoir')}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </FormField>
-                    <FormField label={t('Séparateur CSV')}>
-                        <Select
-                            value={file.delimiter}
-                            disabled={!canManage}
-                            onValueChange={(
-                                delimiter: BillingFileTemplate['delimiter'],
-                            ) => onChange({ ...file, delimiter })}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value=";">
-                                    ; ({t('point-virgule')})
-                                </SelectItem>
-                                <SelectItem value=",">
-                                    , ({t('virgule')})
-                                </SelectItem>
-                                <SelectItem value="\t">
-                                    {t('Tabulation')}
-                                </SelectItem>
-                                <SelectItem value="|">|</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </FormField>
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                    <Input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={file.enabled}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                            onChange({ ...file, enabled: event.target.checked })
-                        }
-                    />
-                    <span>{t('Générer ce fichier automatiquement')}</span>
-                </label>
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 className="font-semibold">
-                            {t('Blocs du fichier')}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                            {t(
-                                'Faites glisser les blocs pour définir leur ordre dans le CSV.',
-                            )}
-                        </p>
-                    </div>
-                    {canManage ? (
-                        <div className="flex items-center gap-2">
-                            <Select
-                                value={newBlockType}
-                                onValueChange={(value: BillingFileBlockType) =>
-                                    setNewBlockType(value)
+                    {!isOrderPdf ? (
+                        <label className="flex h-9 items-center gap-2 text-sm whitespace-nowrap">
+                            <Input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={file.shared}
+                                disabled={!canManage}
+                                onChange={(event) =>
+                                    onChange({
+                                        ...file,
+                                        shared: event.target.checked,
+                                    })
                                 }
-                            >
-                                <SelectTrigger className="w-52">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(blockLabels).map(
-                                        ([value, label]) => (
-                                            <SelectItem
-                                                key={value}
-                                                value={value}
-                                            >
-                                                {t(label)}
-                                            </SelectItem>
-                                        ),
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            <ButtonsActions add={addBlock} />
-                        </div>
+                            />
+                            <span>{t('Partager avec les destinataires')}</span>
+                        </label>
                     ) : null}
                 </div>
 
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext
-                        items={file.blocks.map((block) => block.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        <div className="space-y-4">
-                            {file.blocks.map((block) => (
-                                <BlockEditor
-                                    key={block.id}
-                                    block={block}
-                                    file={file}
-                                    canManage={canManage}
-                                    onChange={(next) =>
-                                        updateBlock(block.id, next)
-                                    }
-                                    onDelete={() =>
+                <p className="text-xs text-muted-foreground">
+                    {t('Aperçu')} :{' '}
+                    <span className="font-mono">{filenamePreview}</span>
+                </p>
+
+                {!isOrderPdf ? (
+                    <>
+                        <div className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <FormField label={t('Événements')}>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full justify-between font-normal"
+                                            disabled={!canManage}
+                                        >
+                                            <span className="truncate">
+                                                {file.events
+                                                    .map((event) =>
+                                                        t(eventLabels[event]),
+                                                    )
+                                                    .join(', ')}
+                                            </span>
+                                            <ChevronDownIcon className="h-4 w-4 opacity-60" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                                        {Object.entries(eventLabels).map(
+                                            ([event, label]) => {
+                                                const typedEvent =
+                                                    event as BillingFileEvent;
+                                                const checked =
+                                                    file.events.includes(
+                                                        typedEvent,
+                                                    );
+                                                return (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={event}
+                                                        checked={checked}
+                                                        onSelect={(event) =>
+                                                            event.preventDefault()
+                                                        }
+                                                        onCheckedChange={() => {
+                                                            const events =
+                                                                checked
+                                                                    ? file.events.filter(
+                                                                          (
+                                                                              item,
+                                                                          ) =>
+                                                                              item !==
+                                                                              typedEvent,
+                                                                      )
+                                                                    : [
+                                                                          ...file.events,
+                                                                          typedEvent,
+                                                                      ];
+                                                            if (!events.length)
+                                                                return;
+                                                            onChange({
+                                                                ...file,
+                                                                events,
+                                                                event: events[0],
+                                                            });
+                                                        }}
+                                                    >
+                                                        {t(label)}
+                                                    </DropdownMenuCheckboxItem>
+                                                );
+                                            },
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </FormField>
+                            <label className="flex h-9 items-center gap-2 text-sm whitespace-nowrap">
+                                <Input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={file.enabled}
+                                    disabled={!canManage}
+                                    onChange={(event) =>
                                         onChange({
                                             ...file,
-                                            blocks: file.blocks.filter(
-                                                (item) => item.id !== block.id,
-                                            ),
+                                            enabled: event.target.checked,
                                         })
                                     }
                                 />
-                            ))}
+                                <span>
+                                    {t('Générer ce fichier automatiquement')}
+                                </span>
+                            </label>
                         </div>
-                    </SortableContext>
-                </DndContext>
 
-                {file.blocks.length === 0 ? (
-                    <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                        {t(
-                            'Ajoutez un premier bloc pour construire le fichier.',
-                        )}
-                    </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <FormField label={t('Séparateur')}>
+                                <Select
+                                    value={file.delimiter}
+                                    disabled={!canManage}
+                                    onValueChange={(
+                                        delimiter: BillingFileTemplate['delimiter'],
+                                    ) => {
+                                        const extension =
+                                            file.extension ===
+                                            preferredExtension(file.delimiter)
+                                                ? preferredExtension(delimiter)
+                                                : file.extension;
+                                        onChange({
+                                            ...file,
+                                            delimiter,
+                                            extension,
+                                        });
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value=";">
+                                            ; ({t('point-virgule')})
+                                        </SelectItem>
+                                        <SelectItem value=",">
+                                            , ({t('virgule')})
+                                        </SelectItem>
+                                        <SelectItem value="\t">
+                                            {t('Tabulation')}
+                                        </SelectItem>
+                                        <SelectItem value="|">|</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FormField>
+                            <FormField label={t('Extension')}>
+                                <Select
+                                    value={file.extension}
+                                    disabled={!canManage}
+                                    onValueChange={(
+                                        extension: BillingFileExtension,
+                                    ) => onChange({ ...file, extension })}
+                                >
+                                    <SelectTrigger
+                                        className={cn(
+                                            extensionMismatch &&
+                                                'border-orange-500 text-orange-700 focus:ring-orange-500 dark:text-orange-400',
+                                        )}
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="csv">
+                                            .csv
+                                        </SelectItem>
+                                        <SelectItem value="tsv">
+                                            .tsv
+                                        </SelectItem>
+                                        <SelectItem value="pdf" disabled>
+                                            .pdf — {t('À venir')}
+                                        </SelectItem>
+                                        <SelectItem value="xls" disabled>
+                                            .xls — {t('À venir')}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {extensionMismatch ? (
+                                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                                        {t(
+                                            `Extension suggérée : .${suggestedExtension}`,
+                                        )}
+                                    </p>
+                                ) : null}
+                            </FormField>
+                        </div>
+                    </>
                 ) : null}
 
-                <details className="rounded-lg border border-violet-200 bg-background/80 p-3 dark:border-violet-400/25">
-                    <summary className="cursor-pointer text-sm font-semibold">
-                        {t('Aperçu CSV')}
-                    </summary>
-                    <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
-                        {preview}
-                    </pre>
-                </details>
+                {!isOrderPdf ? (
+                    <>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h3 className="font-semibold">
+                                    {t('Blocs du fichier')}
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                    {t(
+                                        'Faites glisser les blocs pour définir leur ordre dans le CSV.',
+                                    )}
+                                </p>
+                            </div>
+                            {canManage ? (
+                                <div className="flex items-center gap-2">
+                                    <Select
+                                        value={newBlockType}
+                                        onValueChange={(
+                                            value: BillingFileBlockType,
+                                        ) => setNewBlockType(value)}
+                                    >
+                                        <SelectTrigger className="w-52">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(blockLabels).map(
+                                                ([value, label]) => (
+                                                    <SelectItem
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {t(label)}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <ButtonsActions add={addBlock} />
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={file.blocks.map((block) => block.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <div className="space-y-4">
+                                    {file.blocks.map((block) => (
+                                        <BlockEditor
+                                            key={block.id}
+                                            block={block}
+                                            file={file}
+                                            canManage={canManage}
+                                            onChange={(next) =>
+                                                updateBlock(block.id, next)
+                                            }
+                                            onDelete={() =>
+                                                onChange({
+                                                    ...file,
+                                                    blocks: file.blocks.filter(
+                                                        (item) =>
+                                                            item.id !==
+                                                            block.id,
+                                                    ),
+                                                })
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+
+                        {file.blocks.length === 0 ? (
+                            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                {t(
+                                    'Ajoutez un premier bloc pour construire le fichier.',
+                                )}
+                            </div>
+                        ) : null}
+
+                        <details className="rounded-lg border border-violet-200 bg-background/80 p-3 dark:border-violet-400/25">
+                            <summary className="cursor-pointer text-sm font-semibold">
+                                {t('Aperçu CSV')}
+                            </summary>
+                            <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
+                                {preview}
+                            </pre>
+                        </details>
+                    </>
+                ) : null}
             </CardContent>
         </>
     );

@@ -28,6 +28,7 @@ import {
 import { withAppLayout } from '@/layouts/app-layout';
 import {
     createOrderCsvTemplate,
+    createOrderPdfTemplate,
     normalizeBillingDefaultsToProfiles,
 } from '@/lib/billing-defaults';
 import { useI18n } from '@/lib/i18n';
@@ -506,7 +507,10 @@ export default withAppLayout<Props>(
                             },
                         ],
                         default_profile_id: 'standard',
-                        files: [createOrderCsvTemplate()],
+                        files: [
+                            createOrderPdfTemplate(),
+                            createOrderCsvTemplate(),
+                        ],
                     },
                     sellers: [],
                 },
@@ -1021,9 +1025,13 @@ export default withAppLayout<Props>(
             const nextFile: BillingFileTemplate = {
                 id: fileId,
                 name: `${t('Fichier')} ${fileNumber}`,
+                filename: `%document.number%_fichier-${fileNumber}_%db.name%`,
                 event: 'order',
+                events: ['order'],
                 enabled: true,
+                shared: false,
                 delimiter: ';',
+                extension: 'csv',
                 blocks: [
                     {
                         id: 'header',
