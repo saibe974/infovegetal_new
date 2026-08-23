@@ -1233,6 +1233,7 @@ export default withAppLayout<Props>(
                                     onAddSeller={addSellerToBilling}
                                     onDeleteSeller={deleteSellerFromBilling}
                                     onAddFile={addBillingFile}
+                                    onChangeFile={changeBillingFile}
                                     onDeleteFile={deleteBillingFile}
                                     onImpersonateSeller={
                                         handleImpersonateSeller

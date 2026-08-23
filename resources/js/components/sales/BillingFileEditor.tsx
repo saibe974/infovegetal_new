@@ -4,6 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -59,14 +64,17 @@ import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import {
     BracesIcon,
     ChevronDownIcon,
+    ChevronRightIcon,
     ChevronUpIcon,
     GripVerticalIcon,
     Maximize2Icon,
     Minimize2Icon,
     PlusIcon,
     Settings2Icon,
+    Share2Icon,
     TrashIcon,
     XIcon,
+    ZapIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
@@ -147,12 +155,12 @@ const csvCell = (value: string, delimiter: string): string => {
 };
 
 const previewValues: Record<string, string> = {
-    'document.number': 'CMD-00124',
+    'document.number': '00124',
     'document.date': '2026-08-23',
     'document.items_total': '145.00',
     'document.shipping_total': '15.00',
     'document.total': '160.00',
-    'order.number': 'CMD-00124',
+    'order.number': '00124',
     'order.date': '2026-08-23',
     'order.total': '160.00',
     'client.id': '508',
@@ -1276,29 +1284,13 @@ type BlockEditorProps = {
     file: BillingFileTemplate;
     canManage: boolean;
     onChange: (block: BillingFileBlock) => void;
-    onDelete: () => void;
 };
 
-function BlockEditor({
-    block,
-    file,
-    canManage,
-    onChange,
-    onDelete,
-}: BlockEditorProps) {
+function BlockEditor({ block, file, canManage, onChange }: BlockEditorProps) {
     const { t } = useI18n();
     const tRef = useRef(t);
     tRef.current = t;
     const focusRowIdRef = useRef<string | null>(null);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: block.id, disabled: !canManage });
-
     const updateCell = useCallback(
         (rowId: string, columnId: string, value: string) => {
             onChange({
@@ -1629,29 +1621,12 @@ function BlockEditor({
 
     return (
         <section
-            ref={setNodeRef}
-            style={{
-                transform: CSS.Transform.toString(transform),
-                transition,
-            }}
             className={cn(
                 'rounded-lg border border-violet-200 bg-background/90 shadow-sm dark:border-violet-400/25',
-                isDragging && 'z-10 opacity-70 shadow-lg',
                 !block.enabled && 'opacity-60',
             )}
         >
             <div className="flex flex-wrap items-center gap-2 border-b border-violet-100 p-3 dark:border-violet-400/20">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="cursor-grab touch-none"
-                    disabled={!canManage}
-                    {...attributes}
-                    {...listeners}
-                >
-                    <GripVerticalIcon className="h-4 w-4" />
-                </Button>
                 <Input
                     value={block.name}
                     disabled={!canManage}
@@ -1682,21 +1657,6 @@ function BlockEditor({
                     <Input
                         type="checkbox"
                         className="h-4 w-4"
-                        checked={block.enabled}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                            onChange({
-                                ...block,
-                                enabled: event.target.checked,
-                            })
-                        }
-                    />
-                    {t('Actif')}
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                    <Input
-                        type="checkbox"
-                        className="h-4 w-4"
                         checked={block.show_headers}
                         disabled={!canManage}
                         onChange={(event) =>
@@ -1708,17 +1668,6 @@ function BlockEditor({
                     />
                     {t('Afficher les titres')}
                 </label>
-                {canManage ? (
-                    <Button
-                        type="button"
-                        variant="destructive-outline"
-                        size="icon"
-                        title={t('Supprimer le bloc')}
-                        onClick={onDelete}
-                    >
-                        <TrashIcon className="h-4 w-4" />
-                    </Button>
-                ) : null}
             </div>
 
             <div className="space-y-3 p-3">
@@ -1788,6 +1737,109 @@ function BlockEditor({
     );
 }
 
+type CompactBlockProps = {
+    block: BillingFileBlock;
+    canManage: boolean;
+    selected: boolean;
+    onEdit: () => void;
+    onToggle: () => void;
+    onDelete: () => void;
+};
+
+function CompactBlock({
+    block,
+    canManage,
+    selected,
+    onEdit,
+    onToggle,
+    onDelete,
+}: CompactBlockProps) {
+    const { t } = useI18n();
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: block.id, disabled: !canManage });
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={{
+                transform: CSS.Transform.toString(transform),
+                transition,
+            }}
+            className={cn(
+                'flex items-center gap-2 rounded-md border bg-background px-2 py-2 transition-colors',
+                selected &&
+                    'border-violet-400 bg-violet-50/70 dark:border-violet-400/50 dark:bg-violet-500/10',
+                isDragging && 'z-10 opacity-70 shadow-lg',
+                !block.enabled && 'opacity-60',
+            )}
+        >
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="cursor-grab touch-none text-muted-foreground"
+                disabled={!canManage}
+                title={t('Déplacer le bloc')}
+                aria-label={t('Déplacer le bloc')}
+                {...attributes}
+                {...listeners}
+            >
+                <GripVerticalIcon className="h-4 w-4" />
+            </Button>
+            <button
+                type="button"
+                className="min-w-0 flex-1 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                onClick={onEdit}
+            >
+                <span className="block truncate text-sm font-medium">
+                    {block.name}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                    {t(blockLabels[block.type])} · {block.columns.length}{' '}
+                    {t('colonnes')} · {block.rows.length} {t('lignes')}
+                </span>
+            </button>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                    'h-8 text-xs',
+                    block.enabled
+                        ? 'bg-green-500/10 text-green-700 hover:bg-green-500/15 hover:text-green-800 dark:text-green-400'
+                        : 'bg-muted text-muted-foreground',
+                )}
+                disabled={!canManage}
+                title={t(
+                    block.enabled ? 'Désactiver le bloc' : 'Activer le bloc',
+                )}
+                onClick={onToggle}
+            >
+                {t(block.enabled ? 'Actif' : 'Inactif')}
+            </Button>
+            {canManage ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    title={t('Supprimer le bloc')}
+                    aria-label={t('Supprimer le bloc')}
+                    onClick={onDelete}
+                >
+                    <TrashIcon className="h-4 w-4" />
+                </Button>
+            ) : null}
+        </div>
+    );
+}
+
 export default function BillingFileEditor({
     file,
     canManage,
@@ -1798,8 +1850,16 @@ export default function BillingFileEditor({
     const { t } = useI18n();
     const [newBlockType, setNewBlockType] =
         useState<BillingFileBlockType>('header');
+    const [openSection, setOpenSection] = useState<
+        'settings' | 'content' | null
+    >(null);
+    const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+    const [editingFileName, setEditingFileName] = useState(false);
+    const [fileNameDraft, setFileNameDraft] = useState(file.name);
     const primaryEvent = file.events[0] ?? file.event;
     const isOrderPdf = file.id === 'order-pdf';
+    const automaticEnabled = isOrderPdf || file.enabled;
+    const sharingEnabled = isOrderPdf || file.shared;
     const suggestedExtension = preferredExtension(file.delimiter);
     const extensionMismatch =
         !isOrderPdf && file.extension !== suggestedExtension;
@@ -1854,6 +1914,7 @@ export default function BillingFileEditor({
                 },
             ],
         });
+        setSelectedBlockId(id);
     };
 
     const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -1865,11 +1926,56 @@ export default function BillingFileEditor({
     };
 
     const preview = useMemo(() => renderPreview(file), [file]);
+    const finishFileNameEditing = (save: boolean) => {
+        const name = fileNameDraft.trim();
+        if (save && name && name !== file.name) {
+            onChange({ ...file, name });
+        } else {
+            setFileNameDraft(file.name);
+        }
+        setEditingFileName(false);
+    };
 
     return (
         <>
             <CardHeader className="flex flex-row items-center justify-between gap-3 rounded-md border border-violet-200/80 bg-violet-100/70 px-4 py-3 dark:border-violet-400/30 dark:bg-violet-500/15">
-                <CardTitle>{file.name}</CardTitle>
+                {editingFileName ? (
+                    <Input
+                        value={fileNameDraft}
+                        autoFocus
+                        className="h-8 max-w-sm text-base font-semibold"
+                        aria-label={t('Nom du modèle de fichier')}
+                        onChange={(event) =>
+                            setFileNameDraft(event.target.value)
+                        }
+                        onBlur={() => finishFileNameEditing(true)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                event.preventDefault();
+                                finishFileNameEditing(true);
+                            }
+                            if (event.key === 'Escape') {
+                                event.preventDefault();
+                                finishFileNameEditing(false);
+                            }
+                        }}
+                    />
+                ) : (
+                    <CardTitle>
+                        <button
+                            type="button"
+                            className="rounded-sm text-left hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            disabled={!canManage}
+                            title={t('Modifier le nom')}
+                            onClick={() => {
+                                setFileNameDraft(file.name);
+                                setEditingFileName(true);
+                            }}
+                        >
+                            {file.name}
+                        </button>
+                    </CardTitle>
+                )}
                 <Button
                     type="button"
                     variant="outline"
@@ -1893,304 +1999,485 @@ export default function BillingFileEditor({
                     )}
                 </Button>
             </CardHeader>
-            <CardContent className="space-y-5 px-0">
-                <div className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <FormField label={t('Nom du fichier')}>
-                        <FilenameRuleField
-                            value={file.filename}
-                            event={primaryEvent}
-                            disabled={!canManage}
-                            onChange={(filename) =>
-                                onChange({ ...file, filename })
+            <CardContent className="space-y-3 px-0">
+                <Collapsible
+                    open={openSection === 'settings'}
+                    onOpenChange={(open) =>
+                        setOpenSection(open ? 'settings' : null)
+                    }
+                    className="overflow-hidden rounded-lg border border-violet-200 bg-background/80 dark:border-violet-400/25"
+                >
+                    <div className="flex min-w-0 items-center gap-2 p-2">
+                        <CollapsibleTrigger asChild>
+                            <button
+                                type="button"
+                                className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-violet-500/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
+                                {openSection === 'settings' ? (
+                                    <ChevronDownIcon className="h-4 w-4 shrink-0" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 shrink-0" />
+                                )}
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">
+                                        {t('Paramètres du fichier')}
+                                    </span>
+                                    <span className="block truncate font-mono text-xs text-muted-foreground">
+                                        {filenamePreview}
+                                    </span>
+                                </span>
+                            </button>
+                        </CollapsibleTrigger>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!canManage || isOrderPdf}
+                            className={cn(
+                                'shrink-0',
+                                automaticEnabled
+                                    ? 'bg-green-500/10 text-green-700 hover:bg-green-500/15 hover:text-green-800 dark:text-green-400'
+                                    : 'bg-muted text-muted-foreground',
+                            )}
+                            title={t(
+                                isOrderPdf
+                                    ? 'Le PDF est toujours généré automatiquement'
+                                    : automaticEnabled
+                                      ? 'Génération automatique activée'
+                                      : 'Génération automatique désactivée',
+                            )}
+                            aria-label={t(
+                                automaticEnabled
+                                    ? 'Désactiver la génération automatique'
+                                    : 'Activer la génération automatique',
+                            )}
+                            aria-pressed={automaticEnabled}
+                            onClick={() =>
+                                onChange({
+                                    ...file,
+                                    enabled: !file.enabled,
+                                })
                             }
-                        />
-                    </FormField>
-                    {!isOrderPdf ? (
-                        <label className="flex h-9 items-center gap-2 text-sm whitespace-nowrap">
-                            <Input
-                                type="checkbox"
-                                className="h-4 w-4"
-                                checked={file.shared}
-                                disabled={!canManage}
-                                onChange={(event) =>
-                                    onChange({
-                                        ...file,
-                                        shared: event.target.checked,
-                                    })
-                                }
-                            />
-                            <span>{t('Partager avec les destinataires')}</span>
-                        </label>
-                    ) : null}
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                    {t('Aperçu')} :{' '}
-                    <span className="font-mono">{filenamePreview}</span>
-                </p>
-
-                {!isOrderPdf ? (
-                    <>
-                        <div className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                            <FormField label={t('Événements')}>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="w-full justify-between font-normal"
-                                            disabled={!canManage}
-                                        >
-                                            <span className="truncate">
-                                                {file.events
-                                                    .map((event) =>
-                                                        t(eventLabels[event]),
-                                                    )
-                                                    .join(', ')}
-                                            </span>
-                                            <ChevronDownIcon className="h-4 w-4 opacity-60" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
-                                        {Object.entries(eventLabels).map(
-                                            ([event, label]) => {
-                                                const typedEvent =
-                                                    event as BillingFileEvent;
-                                                const checked =
-                                                    file.events.includes(
-                                                        typedEvent,
-                                                    );
-                                                return (
-                                                    <DropdownMenuCheckboxItem
-                                                        key={event}
-                                                        checked={checked}
-                                                        onSelect={(event) =>
-                                                            event.preventDefault()
-                                                        }
-                                                        onCheckedChange={() => {
-                                                            const events =
-                                                                checked
-                                                                    ? file.events.filter(
-                                                                          (
-                                                                              item,
-                                                                          ) =>
-                                                                              item !==
-                                                                              typedEvent,
-                                                                      )
-                                                                    : [
-                                                                          ...file.events,
-                                                                          typedEvent,
-                                                                      ];
-                                                            if (!events.length)
-                                                                return;
-                                                            onChange({
-                                                                ...file,
-                                                                events,
-                                                                event: events[0],
-                                                            });
-                                                        }}
-                                                    >
-                                                        {t(label)}
-                                                    </DropdownMenuCheckboxItem>
-                                                );
-                                            },
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </FormField>
-                            <label className="flex h-9 items-center gap-2 text-sm whitespace-nowrap">
-                                <Input
-                                    type="checkbox"
-                                    className="h-4 w-4"
-                                    checked={file.enabled}
+                        >
+                            <ZapIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={!canManage || isOrderPdf}
+                            className={cn(
+                                'shrink-0',
+                                sharingEnabled
+                                    ? 'bg-blue-500/10 text-blue-700 hover:bg-blue-500/15 hover:text-blue-800 dark:text-blue-400'
+                                    : 'bg-muted text-muted-foreground',
+                            )}
+                            title={t(
+                                isOrderPdf
+                                    ? 'Le PDF est toujours partagé avec les destinataires'
+                                    : sharingEnabled
+                                      ? 'Partage avec les destinataires activé'
+                                      : 'Partage avec les destinataires désactivé',
+                            )}
+                            aria-label={t(
+                                sharingEnabled
+                                    ? 'Désactiver le partage'
+                                    : 'Activer le partage',
+                            )}
+                            aria-pressed={sharingEnabled}
+                            onClick={() =>
+                                onChange({
+                                    ...file,
+                                    shared: !file.shared,
+                                })
+                            }
+                        >
+                            <Share2Icon className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <CollapsibleContent className="border-t border-violet-100 p-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-violet-400/20">
+                        <div className="space-y-4">
+                            <FormField label={t('Nom du fichier')}>
+                                <FilenameRuleField
+                                    value={file.filename}
+                                    event={primaryEvent}
                                     disabled={!canManage}
-                                    onChange={(event) =>
-                                        onChange({
-                                            ...file,
-                                            enabled: event.target.checked,
-                                        })
+                                    onChange={(filename) =>
+                                        onChange({ ...file, filename })
                                     }
                                 />
-                                <span>
-                                    {t('Générer ce fichier automatiquement')}
+                            </FormField>
+                            <p className="text-xs text-muted-foreground">
+                                {t('Aperçu')} :{' '}
+                                <span className="font-mono">
+                                    {filenamePreview}
                                 </span>
-                            </label>
-                        </div>
+                            </p>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <FormField label={t('Séparateur')}>
-                                <Select
-                                    value={file.delimiter}
-                                    disabled={!canManage}
-                                    onValueChange={(
-                                        delimiter: BillingFileTemplate['delimiter'],
-                                    ) => {
-                                        const extension =
-                                            file.extension ===
-                                            preferredExtension(file.delimiter)
-                                                ? preferredExtension(delimiter)
-                                                : file.extension;
-                                        onChange({
-                                            ...file,
-                                            delimiter,
-                                            extension,
-                                        });
-                                    }}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value=";">
-                                            ; ({t('point-virgule')})
-                                        </SelectItem>
-                                        <SelectItem value=",">
-                                            , ({t('virgule')})
-                                        </SelectItem>
-                                        <SelectItem value="\t">
-                                            {t('Tabulation')}
-                                        </SelectItem>
-                                        <SelectItem value="|">|</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormField>
-                            <FormField label={t('Extension')}>
-                                <Select
-                                    value={file.extension}
-                                    disabled={!canManage}
-                                    onValueChange={(
-                                        extension: BillingFileExtension,
-                                    ) => onChange({ ...file, extension })}
-                                >
-                                    <SelectTrigger
-                                        className={cn(
-                                            extensionMismatch &&
-                                                'border-orange-500 text-orange-700 focus:ring-orange-500 dark:text-orange-400',
-                                        )}
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="csv">
-                                            .csv
-                                        </SelectItem>
-                                        <SelectItem value="tsv">
-                                            .tsv
-                                        </SelectItem>
-                                        <SelectItem value="pdf" disabled>
-                                            .pdf — {t('À venir')}
-                                        </SelectItem>
-                                        <SelectItem value="xls" disabled>
-                                            .xls — {t('À venir')}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {extensionMismatch ? (
-                                    <p className="text-xs text-orange-600 dark:text-orange-400">
-                                        {t(
-                                            `Extension suggérée : .${suggestedExtension}`,
-                                        )}
-                                    </p>
-                                ) : null}
-                            </FormField>
-                        </div>
-                    </>
-                ) : null}
-
-                {!isOrderPdf ? (
-                    <>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <h3 className="font-semibold">
-                                    {t('Blocs du fichier')}
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    {t(
-                                        'Faites glisser les blocs pour définir leur ordre dans le CSV.',
-                                    )}
-                                </p>
-                            </div>
-                            {canManage ? (
-                                <div className="flex items-center gap-2">
-                                    <Select
-                                        value={newBlockType}
-                                        onValueChange={(
-                                            value: BillingFileBlockType,
-                                        ) => setNewBlockType(value)}
-                                    >
-                                        <SelectTrigger className="w-52">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Object.entries(blockLabels).map(
-                                                ([value, label]) => (
-                                                    <SelectItem
-                                                        key={value}
-                                                        value={value}
-                                                    >
-                                                        {t(label)}
+                            {!isOrderPdf ? (
+                                <div className="space-y-4">
+                                    <FormField label={t('Événements')}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-between font-normal"
+                                                    disabled={!canManage}
+                                                >
+                                                    <span className="truncate">
+                                                        {file.events
+                                                            .map((event) =>
+                                                                t(
+                                                                    eventLabels[
+                                                                        event
+                                                                    ],
+                                                                ),
+                                                            )
+                                                            .join(', ')}
+                                                    </span>
+                                                    <ChevronDownIcon className="h-4 w-4 opacity-60" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                                                {Object.entries(
+                                                    eventLabels,
+                                                ).map(([event, label]) => {
+                                                    const typedEvent =
+                                                        event as BillingFileEvent;
+                                                    const checked =
+                                                        file.events.includes(
+                                                            typedEvent,
+                                                        );
+                                                    return (
+                                                        <DropdownMenuCheckboxItem
+                                                            key={event}
+                                                            checked={checked}
+                                                            onSelect={(event) =>
+                                                                event.preventDefault()
+                                                            }
+                                                            onCheckedChange={() => {
+                                                                const events =
+                                                                    checked
+                                                                        ? file.events.filter(
+                                                                              (
+                                                                                  item,
+                                                                              ) =>
+                                                                                  item !==
+                                                                                  typedEvent,
+                                                                          )
+                                                                        : [
+                                                                              ...file.events,
+                                                                              typedEvent,
+                                                                          ];
+                                                                if (
+                                                                    !events.length
+                                                                )
+                                                                    return;
+                                                                onChange({
+                                                                    ...file,
+                                                                    events,
+                                                                    event: events[0],
+                                                                });
+                                                            }}
+                                                        >
+                                                            {t(label)}
+                                                        </DropdownMenuCheckboxItem>
+                                                    );
+                                                })}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </FormField>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <FormField label={t('Extension')}>
+                                            <Select
+                                                value={file.extension}
+                                                disabled={!canManage}
+                                                onValueChange={(
+                                                    extension: BillingFileExtension,
+                                                ) => {
+                                                    const delimiter =
+                                                        extension === 'csv'
+                                                            ? file.delimiter ===
+                                                                  ';' ||
+                                                              file.delimiter ===
+                                                                  ','
+                                                                ? file.delimiter
+                                                                : ';'
+                                                            : extension ===
+                                                                'tsv'
+                                                              ? file.delimiter ===
+                                                                    '\t' ||
+                                                                file.delimiter ===
+                                                                    '|'
+                                                                  ? file.delimiter
+                                                                  : '\t'
+                                                              : file.delimiter;
+                                                    onChange({
+                                                        ...file,
+                                                        delimiter,
+                                                        extension,
+                                                    });
+                                                }}
+                                            >
+                                                <SelectTrigger
+                                                    className={cn(
+                                                        extensionMismatch &&
+                                                            'border-orange-500 text-orange-700 focus:ring-orange-500 dark:text-orange-400',
+                                                    )}
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="csv">
+                                                        .csv
                                                     </SelectItem>
-                                                ),
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    <ButtonsActions add={addBlock} />
+                                                    <SelectItem value="tsv">
+                                                        .tsv
+                                                    </SelectItem>
+                                                    <SelectItem
+                                                        value="pdf"
+                                                        disabled
+                                                    >
+                                                        .pdf — {t('À venir')}
+                                                    </SelectItem>
+                                                    <SelectItem
+                                                        value="xls"
+                                                        disabled
+                                                    >
+                                                        .xls — {t('À venir')}
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            {extensionMismatch ? (
+                                                <p className="text-xs text-orange-600 dark:text-orange-400">
+                                                    {t(
+                                                        `Extension suggérée : .${suggestedExtension}`,
+                                                    )}
+                                                </p>
+                                            ) : null}
+                                        </FormField>
+                                        <FormField label={t('Séparateur')}>
+                                            <Select
+                                                value={file.delimiter}
+                                                disabled={!canManage}
+                                                onValueChange={(
+                                                    delimiter: BillingFileTemplate['delimiter'],
+                                                ) =>
+                                                    onChange({
+                                                        ...file,
+                                                        delimiter,
+                                                    })
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {file.extension ===
+                                                    'csv' ? (
+                                                        <>
+                                                            <SelectItem value=";">
+                                                                ; (
+                                                                {t(
+                                                                    'point-virgule',
+                                                                )}
+                                                                )
+                                                            </SelectItem>
+                                                            <SelectItem value=",">
+                                                                , (
+                                                                {t('virgule')})
+                                                            </SelectItem>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="\t">
+                                                                {t(
+                                                                    'Tabulation',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="|">
+                                                                |
+                                                            </SelectItem>
+                                                        </>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormField>
+                                    </div>
                                 </div>
                             ) : null}
                         </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <SortableContext
-                                items={file.blocks.map((block) => block.id)}
-                                strategy={verticalListSortingStrategy}
+                {!isOrderPdf ? (
+                    <Collapsible
+                        open={openSection === 'content'}
+                        onOpenChange={(open) =>
+                            setOpenSection(open ? 'content' : null)
+                        }
+                        className="overflow-hidden rounded-lg border border-violet-200 bg-background/80 dark:border-violet-400/25"
+                    >
+                        <CollapsibleTrigger asChild>
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-3 p-4 text-left hover:bg-violet-500/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             >
-                                <div className="space-y-4">
-                                    {file.blocks.map((block) => (
-                                        <BlockEditor
-                                            key={block.id}
-                                            block={block}
-                                            file={file}
-                                            canManage={canManage}
-                                            onChange={(next) =>
-                                                updateBlock(block.id, next)
-                                            }
-                                            onDelete={() =>
-                                                onChange({
-                                                    ...file,
-                                                    blocks: file.blocks.filter(
-                                                        (item) =>
-                                                            item.id !==
-                                                            block.id,
-                                                    ),
-                                                })
-                                            }
-                                        />
-                                    ))}
-                                </div>
-                            </SortableContext>
-                        </DndContext>
-
-                        {file.blocks.length === 0 ? (
-                            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                                {t(
-                                    'Ajoutez un premier bloc pour construire le fichier.',
+                                {openSection === 'content' ? (
+                                    <ChevronDownIcon className="h-4 w-4 shrink-0" />
+                                ) : (
+                                    <ChevronRightIcon className="h-4 w-4 shrink-0" />
                                 )}
-                            </div>
-                        ) : null}
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-semibold">
+                                        {t('Contenu du fichier')}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {file.blocks.length} {t('blocs')} ·{' '}
+                                        {t('Glissez pour modifier leur ordre')}
+                                    </span>
+                                </span>
+                            </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border-t border-violet-100 p-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-violet-400/20">
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        {t(
+                                            'Sélectionnez un bloc pour modifier ses colonnes et ses lignes.',
+                                        )}
+                                    </p>
+                                    {canManage ? (
+                                        <div className="flex items-center gap-2">
+                                            <Select
+                                                value={newBlockType}
+                                                onValueChange={(
+                                                    value: BillingFileBlockType,
+                                                ) => setNewBlockType(value)}
+                                            >
+                                                <SelectTrigger className="w-52">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(
+                                                        blockLabels,
+                                                    ).map(([value, label]) => (
+                                                        <SelectItem
+                                                            key={value}
+                                                            value={value}
+                                                        >
+                                                            {t(label)}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <ButtonsActions add={addBlock} />
+                                        </div>
+                                    ) : null}
+                                </div>
 
-                        <details className="rounded-lg border border-violet-200 bg-background/80 p-3 dark:border-violet-400/25">
-                            <summary className="cursor-pointer text-sm font-semibold">
-                                {t('Aperçu CSV')}
-                            </summary>
-                            <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
-                                {preview}
-                            </pre>
-                        </details>
-                    </>
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <SortableContext
+                                        items={file.blocks.map(
+                                            (block) => block.id,
+                                        )}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-2">
+                                            {file.blocks.map((block) => (
+                                                <div
+                                                    key={block.id}
+                                                    className="space-y-2"
+                                                >
+                                                    <CompactBlock
+                                                        block={block}
+                                                        canManage={canManage}
+                                                        selected={
+                                                            selectedBlockId ===
+                                                            block.id
+                                                        }
+                                                        onEdit={() =>
+                                                            setSelectedBlockId(
+                                                                selectedBlockId ===
+                                                                    block.id
+                                                                    ? null
+                                                                    : block.id,
+                                                            )
+                                                        }
+                                                        onToggle={() =>
+                                                            updateBlock(
+                                                                block.id,
+                                                                {
+                                                                    ...block,
+                                                                    enabled:
+                                                                        !block.enabled,
+                                                                },
+                                                            )
+                                                        }
+                                                        onDelete={() => {
+                                                            if (
+                                                                selectedBlockId ===
+                                                                block.id
+                                                            )
+                                                                setSelectedBlockId(
+                                                                    null,
+                                                                );
+                                                            onChange({
+                                                                ...file,
+                                                                blocks: file.blocks.filter(
+                                                                    (item) =>
+                                                                        item.id !==
+                                                                        block.id,
+                                                                ),
+                                                            });
+                                                        }}
+                                                    />
+                                                    {selectedBlockId ===
+                                                    block.id ? (
+                                                        <BlockEditor
+                                                            block={block}
+                                                            file={file}
+                                                            canManage={
+                                                                canManage
+                                                            }
+                                                            onChange={(next) =>
+                                                                updateBlock(
+                                                                    block.id,
+                                                                    next,
+                                                                )
+                                                            }
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </SortableContext>
+                                </DndContext>
+
+                                {file.blocks.length === 0 ? (
+                                    <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                                        {t(
+                                            'Ajoutez un premier bloc pour construire le fichier.',
+                                        )}
+                                    </div>
+                                ) : null}
+
+                                <details className="rounded-lg border border-violet-200 bg-background/80 p-3 dark:border-violet-400/25">
+                                    <summary className="cursor-pointer text-sm font-semibold">
+                                        {t('Aperçu CSV')}
+                                    </summary>
+                                    <pre className="mt-3 max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
+                                        {preview}
+                                    </pre>
+                                </details>
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
                 ) : null}
             </CardContent>
         </>

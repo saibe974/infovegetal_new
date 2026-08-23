@@ -1,16 +1,26 @@
 import { router, usePage } from '@inertiajs/react';
-import { DE, ES, FR, GB, IT, NL } from 'country-flag-icons/react/3x2';
+import { BE, DE, ES, FR, GB, IT, NL } from 'country-flag-icons/react/3x2';
 import { useEffect, useState, type ReactNode } from 'react';
 import { SharedData } from '@/types';
 import { SelectWithItems } from './select-with-items';
 
-const LANGS: { value: string; country: string; label: string; countryLabel: string; img: ReactNode }[] = [
-    { value: 'en', country: 'GB', label: 'English', countryLabel: 'United Kingdom', img: <GB title="United Kingdom" className="w-4" /> },
-    { value: 'fr', country: 'FR', label: 'Français', countryLabel: 'France', img: <FR title="France" className="w-4" /> },
-    { value: 'es', country: 'ES', label: 'Español', countryLabel: 'Spain', img: <ES title="Spain" className="w-4" /> },
-    { value: 'de', country: 'DE', label: 'Deutsch', countryLabel: 'Germany', img: <DE title="Germany" className="w-4" /> },
-    { value: 'it', country: 'IT', label: 'Italiano', countryLabel: 'Italy', img: <IT title="Italy" className="w-4" /> },
-    { value: 'nl', country: 'NL', label: 'Nederlands', countryLabel: 'Netherlands', img: <NL title="Netherlands" className="w-4" /> },
+const LANGS: { value: string; label: string; img: ReactNode }[] = [
+    { value: 'en', label: 'English', img: <GB title="United Kingdom" className="w-4" /> },
+    { value: 'fr', label: 'Français', img: <FR title="France" className="w-4" /> },
+    { value: 'es', label: 'Español', img: <ES title="Spain" className="w-4" /> },
+    { value: 'de', label: 'Deutsch', img: <DE title="Germany" className="w-4" /> },
+    { value: 'it', label: 'Italiano', img: <IT title="Italy" className="w-4" /> },
+    { value: 'nl', label: 'Nederlands', img: <NL title="Netherlands" className="w-4" /> },
+];
+
+const COUNTRIES: { value: string; label: string; img: ReactNode }[] = [
+    { value: 'BE', label: 'Belgium', img: <BE title="Belgium" className="w-4" /> },
+    { value: 'DE', label: 'Germany', img: <DE title="Germany" className="w-4" /> },
+    { value: 'ES', label: 'Spain', img: <ES title="Spain" className="w-4" /> },
+    { value: 'FR', label: 'France', img: <FR title="France" className="w-4" /> },
+    { value: 'GB', label: 'United Kingdom', img: <GB title="United Kingdom" className="w-4" /> },
+    { value: 'IT', label: 'Italy', img: <IT title="Italy" className="w-4" /> },
+    { value: 'NL', label: 'Netherlands', img: <NL title="Netherlands" className="w-4" /> },
 ];
 
 type SelectLangProps = {
@@ -74,7 +84,7 @@ export function SelectLang({
     };
 
     const items = mode === 'country'
-        ? LANGS.map((lang) => ({ value: lang.country, label: lang.countryLabel, img: lang.img }))
+        ? COUNTRIES
         : LANGS.map((lang) => ({ value: lang.value, label: lang.label, img: lang.img }));
 
     return (

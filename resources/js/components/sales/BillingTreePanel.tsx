@@ -3,6 +3,7 @@ import {
     type ActivePanelItem,
     type BillingDraft,
 } from '@/components/sales/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,7 +13,9 @@ import {
 } from '@/components/ui/collapsible';
 import { FormField } from '@/components/ui/form-field';
 import { useI18n } from '@/lib/i18n';
-import { ChevronDown, TrashIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { BillingFileTemplate } from '@/types';
+import { ChevronDown, Share2Icon, TrashIcon, ZapIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ButtonsActions } from '../buttons-actions';
 import { formatSalesConditionsSummary } from './billing-utils';
@@ -44,6 +47,7 @@ type BillingTreePanelProps = {
     onAddSeller: (sellerId: number) => void;
     onDeleteSeller: (sellerId: number) => void;
     onAddFile: () => void;
+    onChangeFile: (file: BillingFileTemplate) => void;
     onDeleteFile: (fileId: string) => void;
     onImpersonateSeller?: (sellerId: number) => void;
 };
@@ -67,6 +71,7 @@ export default function BillingTreePanel({
     onAddSeller,
     onDeleteSeller,
     onAddFile,
+    onChangeFile,
     onDeleteFile,
     onImpersonateSeller,
 }: BillingTreePanelProps) {
@@ -310,9 +315,14 @@ export default function BillingTreePanel({
                                 <div
                                     className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 transition-colors hover:bg-violet-100/70 dark:hover:bg-violet-500/15 ${openSection === 'files' ? 'bg-violet-100/70 dark:bg-violet-500/15' : ''}`}
                                 >
-                                    <h3 className="text-lg font-semibold">
-                                        {t('Fichiers')}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-semibold">
+                                            {t('Fichiers')}
+                                        </h3>
+                                        <Badge className="border-violet-300 bg-violet-500/10 text-violet-700 dark:border-violet-400/40 dark:text-violet-300">
+                                            Premium
+                                        </Badge>
+                                    </div>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
                                         openSection === 'files' ? (
@@ -335,7 +345,7 @@ export default function BillingTreePanel({
                                         >
                                             <button
                                                 type="button"
-                                                className={`w-full rounded-md border bg-background/80 px-3 py-2 text-left ${activePanelItem?.type === 'file' && String(activePanelItem.id) === file.id ? 'border-violet-500 bg-violet-100 dark:border-violet-400/40 dark:bg-violet-500/15' : 'border-violet-200/80 dark:border-violet-400/25'}`}
+                                                className={`min-w-0 flex-1 rounded-md border bg-background/80 px-3 py-2 text-left ${activePanelItem?.type === 'file' && String(activePanelItem.id) === file.id ? 'border-violet-500 bg-violet-100 dark:border-violet-400/40 dark:bg-violet-500/15' : 'border-violet-200/80 dark:border-violet-400/25'}`}
                                                 onClick={() =>
                                                     setActivePanelItem({
                                                         type: 'file',
@@ -356,6 +366,86 @@ export default function BillingTreePanel({
                                                     {file.extension.toUpperCase()}
                                                 </span>
                                             </button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled={
+                                                    !canManageProfiles ||
+                                                    file.id === 'order-pdf'
+                                                }
+                                                className={cn(
+                                                    'shrink-0',
+                                                    file.id === 'order-pdf' ||
+                                                        file.enabled
+                                                        ? 'bg-green-500/10 text-green-700 hover:bg-green-500/15 hover:text-green-800 dark:text-green-400'
+                                                        : 'bg-muted text-muted-foreground',
+                                                )}
+                                                title={t(
+                                                    file.id === 'order-pdf'
+                                                        ? 'Le PDF est toujours généré automatiquement'
+                                                        : file.enabled
+                                                          ? 'Génération automatique activée'
+                                                          : 'Génération automatique désactivée',
+                                                )}
+                                                aria-label={t(
+                                                    file.enabled
+                                                        ? 'Désactiver la génération automatique'
+                                                        : 'Activer la génération automatique',
+                                                )}
+                                                aria-pressed={
+                                                    file.id === 'order-pdf' ||
+                                                    file.enabled
+                                                }
+                                                onClick={() =>
+                                                    onChangeFile({
+                                                        ...file,
+                                                        enabled: !file.enabled,
+                                                    })
+                                                }
+                                            >
+                                                <ZapIcon className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled={
+                                                    !canManageProfiles ||
+                                                    file.id === 'order-pdf'
+                                                }
+                                                className={cn(
+                                                    'shrink-0',
+                                                    file.id === 'order-pdf' ||
+                                                        file.shared
+                                                        ? 'bg-blue-500/10 text-blue-700 hover:bg-blue-500/15 hover:text-blue-800 dark:text-blue-400'
+                                                        : 'bg-muted text-muted-foreground',
+                                                )}
+                                                title={t(
+                                                    file.id === 'order-pdf'
+                                                        ? 'Le PDF est toujours partagé avec les destinataires'
+                                                        : file.shared
+                                                          ? 'Partage avec les destinataires activé'
+                                                          : 'Partage avec les destinataires désactivé',
+                                                )}
+                                                aria-label={t(
+                                                    file.shared
+                                                        ? 'Désactiver le partage'
+                                                        : 'Activer le partage',
+                                                )}
+                                                aria-pressed={
+                                                    file.id === 'order-pdf' ||
+                                                    file.shared
+                                                }
+                                                onClick={() =>
+                                                    onChangeFile({
+                                                        ...file,
+                                                        shared: !file.shared,
+                                                    })
+                                                }
+                                            >
+                                                <Share2Icon className="h-4 w-4" />
+                                            </Button>
                                             {canManageProfiles &&
                                             !file.system ? (
                                                 <Button
