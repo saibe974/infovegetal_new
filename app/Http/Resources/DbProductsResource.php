@@ -224,18 +224,29 @@ class DbProductsResource extends JsonResource
                 'default_profile_id' => isset($defaults['default_profile_id'])
                     ? (string) $defaults['default_profile_id']
                     : null,
+                'files' => collect(is_array($defaults['files'] ?? null) ? $defaults['files'] : [])
+                    ->filter(fn ($file) => is_array($file))
+                    ->values()
+                    ->all(),
             ];
         }
+
+        $legacyConditions = $defaults;
+        unset($legacyConditions['files'], $legacyConditions['default_profile_id']);
 
         return [
             'profiles' => [
                 [
                     'id' => 'standard',
                     'name' => 'Standard',
-                    'conditions' => $defaults,
+                    'conditions' => $legacyConditions,
                 ],
             ],
             'default_profile_id' => 'standard',
+            'files' => collect(is_array($defaults['files'] ?? null) ? $defaults['files'] : [])
+                ->filter(fn ($file) => is_array($file))
+                ->values()
+                ->all(),
         ];
     }
 }

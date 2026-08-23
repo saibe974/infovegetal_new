@@ -1,5 +1,6 @@
 import { type BillingDraft } from '@/components/sales/types';
 import {
+    ensureOrderCsvTemplate,
     normalizeBillingDefaultsToProfiles,
     profilesToBillingDefaults,
 } from '@/lib/billing-defaults';
@@ -81,6 +82,7 @@ export const normalizeBillingUsers = (
                     conditions: normalizeConditions(profile.conditions),
                 })),
                 default_profile_id: defaults.default_profile_id ?? null,
+                files: defaults.files ?? [],
             },
             sellers: (rule.sellers ?? []).map((seller) => ({
                 seller_user_id: Number(seller.seller_user_id),
@@ -103,7 +105,9 @@ export const normalizeBillingUsers = (
 };
 
 export const normalizeRowToDraft = (row: BillingUserRule): BillingDraft => {
-    const defaults = normalizeBillingDefaultsToProfiles(row.defaults);
+    const defaults = ensureOrderCsvTemplate(
+        normalizeBillingDefaultsToProfiles(row.defaults),
+    );
 
     return {
         billing_user_id: Number(row.id),

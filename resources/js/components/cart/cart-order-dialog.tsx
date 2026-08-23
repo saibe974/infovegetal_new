@@ -164,6 +164,11 @@ export function CartOrderDialog() {
                                         )}
                                     </div>
                                 )}
+                                {Number(pdfResult?.csvCount ?? 0) > 0 && (
+                                    <span className="mt-2 block border-t border-green-200 pt-2 text-xs text-green-700">
+                                        {pdfResult?.csvCount} fichier(s) CSV généré(s) et envoyé(s) aux facturants concernés.
+                                    </span>
+                                )}
                             </div>
 
                             <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">

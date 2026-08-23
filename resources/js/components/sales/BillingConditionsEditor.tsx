@@ -1,3 +1,4 @@
+import BillingFileEditor from '@/components/sales/BillingFileEditor';
 import EditableProfileTitle from '@/components/sales/EditableProfileTitle';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
 import SellerProfileConditionsEditor from '@/components/sales/SellerProfileConditionsEditor';
@@ -19,6 +20,7 @@ import {
 import { useI18n } from '@/lib/i18n';
 import {
     type BillingDefaults,
+    type BillingFileTemplate,
     type SalesConditionProfile,
     type SalesConditions,
 } from '@/types';
@@ -36,6 +38,8 @@ type BillingConditionsEditorProps = {
     activePanelItem: ActivePanelItem;
     currentProfile: SalesConditionProfile | null;
     currentSeller: SellerDraft | null;
+    currentFile: BillingFileTemplate | null;
+    isFileEditorExpanded: boolean;
     currentSellerDefaults: BillingDefaults | null;
     currentSellerProfile: SalesConditionProfile | null;
     currentSellerInheritedProfile: SalesConditionProfile | null;
@@ -56,6 +60,8 @@ type BillingConditionsEditorProps = {
     onChangeSellerUseBillingProfile: (useBillingProfile: boolean) => void;
     onChangeSellerBillingProfile: (billingProfileId: string | null) => void;
     onChangeSellerCustomConditions: (value: SalesConditions) => void;
+    onChangeBillingFile: (value: BillingFileTemplate) => void;
+    onFileEditorExpandedChange: (expanded: boolean) => void;
     onAddSellerProfile: () => void;
     onDeleteSellerProfile: (profileId: string) => void;
     onRenameSellerProfile: (value: string) => void;
@@ -69,6 +75,8 @@ export default function BillingConditionsEditor({
     activePanelItem,
     currentProfile,
     currentSeller,
+    currentFile,
+    isFileEditorExpanded,
     currentSellerDefaults,
     currentSellerProfile,
     currentSellerInheritedProfile,
@@ -84,6 +92,8 @@ export default function BillingConditionsEditor({
     onChangeSellerUseBillingProfile,
     onChangeSellerBillingProfile,
     onChangeSellerCustomConditions,
+    onChangeBillingFile,
+    onFileEditorExpandedChange,
     onAddSellerProfile,
     onDeleteSellerProfile,
     onRenameSellerProfile,
@@ -114,7 +124,7 @@ export default function BillingConditionsEditor({
 
     return (
         <Card
-            className={`space-y-4 p-6 ${activePanelItem?.type === 'seller' ? 'border-blue-200/80 bg-blue-50/60 dark:border-blue-400/25 dark:bg-blue-500/10' : ''} ${className ?? ''}`}
+            className={`space-y-4 p-6 ${activePanelItem?.type === 'seller' ? 'border-blue-200/80 bg-blue-50/60 dark:border-blue-400/25 dark:bg-blue-500/10' : ''} ${activePanelItem?.type === 'profile' ? 'border-amber-200/80 bg-amber-50/60 dark:border-amber-400/25 dark:bg-amber-500/10' : ''} ${activePanelItem?.type === 'file' ? 'border-violet-200/80 bg-violet-50/60 dark:border-violet-400/25 dark:bg-violet-500/10' : ''} ${className ?? ''}`}
         >
             {!activeBillingRule ? (
                 <p className="text-sm text-muted-foreground">
@@ -122,6 +132,14 @@ export default function BillingConditionsEditor({
                         'Select a billing user to edit profiles and seller conditions.',
                     )}
                 </p>
+            ) : activePanelItem?.type === 'file' && currentFile ? (
+                <BillingFileEditor
+                    file={currentFile}
+                    canManage={canManageProfiles}
+                    expanded={isFileEditorExpanded}
+                    onChange={onChangeBillingFile}
+                    onExpandedChange={onFileEditorExpandedChange}
+                />
             ) : activePanelItem?.type === 'profile' && currentProfile ? (
                 <CardContent className="space-y-4 px-0">
                     <SalesConditionsForm
@@ -403,7 +421,9 @@ export default function BillingConditionsEditor({
                 </>
             ) : (
                 <p className="text-sm text-muted-foreground">
-                    {t('Select a profile or seller to edit conditions.')}
+                    {t(
+                        'Sélectionnez un profil, un commercial ou un fichier à modifier.',
+                    )}
                 </p>
             )}
         </Card>

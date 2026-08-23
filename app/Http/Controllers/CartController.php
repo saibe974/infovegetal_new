@@ -12,6 +12,7 @@ use App\Support\RenderedTransportCalculator;
 use App\Services\PdfRollDistributionService;
 use App\Services\CartTcpdfService;
 use App\Services\OrderSnapshotService;
+use App\Services\OrderCsvService;
 use App\Services\PriceCalculatorService;
 use App\Services\ProductMediaService;
 use Illuminate\Http\Request;
@@ -160,11 +161,17 @@ class CartController extends Controller
             ->disk('public', 'public')
             ->save($pdfRelativePath);
 
+        $pdfPayload['order_number'] = $orderNumber;
+        $csvFiles = app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $pdfPayload);
+
         $mailCount = $this->sendOrderPdfMails(
             $pdfPayload['mail_recipients'],
             $pdfRelativePath,
             $orderNumber,
             $user,
+            'public',
+            null,
+            $csvFiles,
         );
 
         $existingSnapshot = \App\Models\OrderHeader::query()
@@ -188,6 +195,7 @@ class CartController extends Controller
             'order_number' => $orderNumber,
             'pdf_filename' => $pdfFilename,
             'pdf_download_url' => asset('storage/' . $pdfRelativePath),
+            'csv_files_count' => count($csvFiles),
             'mail_recipients_count' => $mailCount,
             'message' => 'Commande enregistree, PDF genere et emails envoyes.',
         ]);
@@ -821,6 +829,7 @@ class CartController extends Controller
         return response($result['pdf_binary'], 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $result['pdf_filename'] . '"',
+            'X-Generated-Csv-Count' => (string) count($result['csv_files'] ?? []),
         ]);
     }
 
@@ -1057,6 +1066,12 @@ class CartController extends Controller
             'commercial' => $commercialUsers->first(),
             'mail_recipients' => $mailRecipients,
             'comment' => trim((string) ($comment ?? '')),
+            'billing_context_by_db' => collect($pivotsByDbProductId)
+                ->map(fn ($attributes) => [
+                    'billing_user_id' => (int) ($attributes['fact'] ?? 0),
+                    'seller_user_id' => (int) ($attributes['com'] ?? 0),
+                ])
+                ->all(),
         ];
     }
 
@@ -1066,7 +1081,8 @@ class CartController extends Controller
         string $orderNumber,
         \App\Models\User $client,
         string $disk = 'public',
-        ?string $attachmentName = null
+        ?string $attachmentName = null,
+        array $generatedFiles = [],
     ): int
     {
         $sent = 0;
@@ -1075,15 +1091,33 @@ class CartController extends Controller
 
         foreach ($recipients as $recipient) {
             try {
+                $csvAttachments = app(OrderCsvService::class)->attachmentsForRecipient(
+                    $generatedFiles,
+                    (int) ($recipient->id ?? 0),
+                    (int) $client->id,
+                );
+
                 Mail::raw(
                     "Bonjour {$recipient->name},\n\nVeuillez trouver en piece jointe la commande n{$orderNumber} du client {$client->name}.\n\nCordialement,\nInfovegetal",
-                    function ($message) use ($recipient, $orderNumber, $pdfAbsolutePath, $attachmentFilename) {
+                    function ($message) use ($recipient, $orderNumber, $pdfAbsolutePath, $attachmentFilename, $csvAttachments) {
                         $message->to($recipient->email, $recipient->name)
                             ->subject("Commande n{$orderNumber} - Infovegetal")
                             ->attach($pdfAbsolutePath, [
                                 'as' => $attachmentFilename,
                                 'mime' => 'application/pdf',
                             ]);
+
+                        foreach ($csvAttachments as $csvAttachment) {
+                            $csvDisk = (string) ($csvAttachment['disk'] ?? 'local');
+                            $csvRelativePath = (string) ($csvAttachment['relative_path'] ?? '');
+                            if ($csvRelativePath === '' || ! Storage::disk($csvDisk)->exists($csvRelativePath)) {
+                                continue;
+                            }
+                            $message->attach(Storage::disk($csvDisk)->path($csvRelativePath), [
+                                'as' => (string) ($csvAttachment['filename'] ?? basename($csvRelativePath)),
+                                'mime' => 'text/csv',
+                            ]);
+                        }
                     }
                 );
 
@@ -1137,6 +1171,10 @@ class CartController extends Controller
         $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $filename);
         Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
 
+        $csvFiles = $sendEmails
+            ? app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $payload)
+            : [];
+
         $user->files()->create([
             'file_name' => $filename,
             'file_path' => $pdfRelativePath,
@@ -1169,6 +1207,7 @@ class CartController extends Controller
                 $user,
                 'public',
                 $filename,
+                $csvFiles,
             );
         }
 
@@ -1182,6 +1221,7 @@ class CartController extends Controller
             'shipping_total' => $cart->shipping_total,
             'discount_total' => $payload['discount_total'] ?? 0,
             'mail_recipients_count' => $mailCount,
+            'csv_files' => $csvFiles,
             'pdf_binary' => $pdfBinary,
         ];
     }

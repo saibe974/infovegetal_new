@@ -26,11 +26,15 @@ import {
     BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { withAppLayout } from '@/layouts/app-layout';
-import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
+import {
+    createOrderCsvTemplate,
+    normalizeBillingDefaultsToProfiles,
+} from '@/lib/billing-defaults';
 import { useI18n } from '@/lib/i18n';
 import dbProducts from '@/routes/db-products';
 import products from '@/routes/products';
 import {
+    type BillingFileTemplate,
     type BillingUserRule,
     type BreadcrumbItem,
     type dbProduct,
@@ -109,7 +113,7 @@ export default withAppLayout<Props>(
         const loadViewPrefs = (): {
             billingUserId: number | null;
             panelItem: ActivePanelItem;
-            openSection: 'profiles' | 'sellers' | null;
+            openSection: 'profiles' | 'sellers' | 'files' | null;
             sellerProfileId: string | null;
         } => {
             try {
@@ -163,11 +167,12 @@ export default withAppLayout<Props>(
             () => viewPrefs.panelItem,
         );
         const [openSection, setOpenSection] = useState<
-            'profiles' | 'sellers' | null
+            'profiles' | 'sellers' | 'files' | null
         >(() => viewPrefs.openSection);
         const [activeSellerProfileId, setActiveSellerProfileId] = useState<
             string | null
         >(() => viewPrefs.sellerProfileId);
+        const [isFileEditorExpanded, setIsFileEditorExpanded] = useState(false);
 
         const { data, setData, put, processing, errors, transform } = useForm({
             billing_users: initialBillingUsers,
@@ -296,6 +301,18 @@ export default withAppLayout<Props>(
                     (seller) =>
                         Number(seller.seller_user_id) ===
                         Number(activePanelItem.id),
+                ) ?? null
+            );
+        }, [activeBillingRule, activePanelItem]);
+
+        const currentFile = useMemo(() => {
+            if (!activeBillingRule || activePanelItem?.type !== 'file') {
+                return null;
+            }
+
+            return (
+                (activeBillingRule.defaults.files ?? []).find(
+                    (file) => file.id === String(activePanelItem.id),
                 ) ?? null
             );
         }, [activeBillingRule, activePanelItem]);
@@ -437,6 +454,19 @@ export default withAppLayout<Props>(
             activeSellerProfileId,
         ]);
 
+        useEffect(() => {
+            if (!isFileEditorExpanded) return;
+
+            const handleKeyDown = (event: KeyboardEvent) => {
+                if (event.key === 'Escape') {
+                    setIsFileEditorExpanded(false);
+                }
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }, [isFileEditorExpanded]);
+
         const handleSubmit = (e: FormEvent) => {
             e.preventDefault();
 
@@ -476,6 +506,7 @@ export default withAppLayout<Props>(
                             },
                         ],
                         default_profile_id: 'standard',
+                        files: [createOrderCsvTemplate()],
                     },
                     sellers: [],
                 },
@@ -981,6 +1012,92 @@ export default withAppLayout<Props>(
             );
         };
 
+        const addBillingFile = () => {
+            if (!activeBillingRule) return;
+
+            const fileNumber =
+                (activeBillingRule.defaults.files ?? []).length + 1;
+            const fileId = `custom-${Date.now()}`;
+            const nextFile: BillingFileTemplate = {
+                id: fileId,
+                name: `${t('Fichier')} ${fileNumber}`,
+                event: 'order',
+                enabled: true,
+                delimiter: ';',
+                blocks: [
+                    {
+                        id: 'header',
+                        name: t('Entête'),
+                        type: 'header',
+                        enabled: true,
+                        show_headers: false,
+                        columns: [
+                            { id: 'column-1', name: `${t('Colonne')} 1` },
+                        ],
+                        rows: [
+                            {
+                                id: 'row-1',
+                                cells: { 'column-1': '' },
+                            },
+                        ],
+                    },
+                ],
+            };
+
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    defaults: {
+                        ...rule.defaults,
+                        files: [...(rule.defaults.files ?? []), nextFile],
+                    },
+                }),
+            );
+            setActivePanelItem({ type: 'file', id: fileId });
+        };
+
+        const changeBillingFile = (nextFile: BillingFileTemplate) => {
+            if (!activeBillingRule) return;
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    defaults: {
+                        ...rule.defaults,
+                        files: (rule.defaults.files ?? []).map((file) =>
+                            file.id === nextFile.id ? nextFile : file,
+                        ),
+                    },
+                }),
+            );
+        };
+
+        const deleteBillingFile = (fileId: string) => {
+            if (!activeBillingRule) return;
+            updateBillingRule(
+                Number(activeBillingRule.billing_user_id),
+                (rule) => ({
+                    ...rule,
+                    defaults: {
+                        ...rule.defaults,
+                        files: (rule.defaults.files ?? []).filter(
+                            (file) => file.id !== fileId,
+                        ),
+                    },
+                }),
+            );
+            if (
+                activePanelItem?.type === 'file' &&
+                activePanelItem.id === fileId
+            ) {
+                setActivePanelItem(null);
+            }
+        };
+
+        const isFileEditorWide =
+            activePanelItem?.type === 'file' && isFileEditorExpanded;
+
         return (
             <>
                 <Head title={`${t('Billing')} - ${dbProduct.name}`} />
@@ -1022,12 +1139,18 @@ export default withAppLayout<Props>(
                                                         'profile'
                                                             ? (currentProfile?.name ??
                                                               t('Profile'))
-                                                            : (userOptionById.get(
-                                                                  Number(
-                                                                      activePanelItem.id,
-                                                                  ),
-                                                              )?.label ??
-                                                              t('Commercial'))}
+                                                            : activePanelItem.type ===
+                                                                'file'
+                                                              ? (currentFile?.name ??
+                                                                t('Fichier'))
+                                                              : (userOptionById.get(
+                                                                    Number(
+                                                                        activePanelItem.id,
+                                                                    ),
+                                                                )?.label ??
+                                                                t(
+                                                                    'Commercial',
+                                                                ))}
                                                     </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
                                             </>
@@ -1050,10 +1173,12 @@ export default withAppLayout<Props>(
                             }
                         />
 
-                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                            {isFullAccess && (
+                        <div
+                            className={`grid grid-cols-1 ${isFullAccess ? (isFileEditorWide ? 'gap-0 transition-all duration-300 ease-in-out xl:grid-cols-[minmax(0,0fr)_minmax(0,0fr)_minmax(0,1fr)]' : 'gap-6 transition-all duration-300 ease-in-out xl:grid-cols-[minmax(0,3fr)_minmax(0,4fr)_minmax(0,5fr)]') : 'gap-6 xl:grid-cols-12'}`}
+                        >
+                            {isFullAccess ? (
                                 <BillingUserSelector
-                                    className="xl:col-span-3"
+                                    className={`min-w-0 overflow-hidden transition-all duration-300 ${isFileEditorWide ? 'hidden xl:pointer-events-none xl:block xl:-translate-x-4 xl:opacity-0' : 'translate-x-0 opacity-100'}`}
                                     billingUsers={data.billing_users ?? []}
                                     activeBillingUserId={activeBillingUserId}
                                     userOptionById={userOptionById}
@@ -1076,11 +1201,11 @@ export default withAppLayout<Props>(
                                     }
                                     errors={errorBag}
                                 />
-                            )}
+                            ) : null}
 
                             {isFullAccess ? (
                                 <BillingTreePanel
-                                    className="xl:col-span-4"
+                                    className={`min-w-0 overflow-hidden transition-all duration-300 ${isFileEditorWide ? 'hidden xl:pointer-events-none xl:block xl:-translate-x-4 xl:opacity-0' : 'translate-x-0 opacity-100'}`}
                                     activeBillingRule={activeBillingRule}
                                     activeBillingLabel={billingLabel}
                                     activePanelItem={activePanelItem}
@@ -1099,6 +1224,8 @@ export default withAppLayout<Props>(
                                     onDeleteProfile={deleteBillingProfile}
                                     onAddSeller={addSellerToBilling}
                                     onDeleteSeller={deleteSellerFromBilling}
+                                    onAddFile={addBillingFile}
+                                    onDeleteFile={deleteBillingFile}
                                     onImpersonateSeller={
                                         handleImpersonateSeller
                                     }
@@ -1127,12 +1254,14 @@ export default withAppLayout<Props>(
 
                             {isFullAccess ? (
                                 <BillingConditionsEditor
-                                    className="xl:col-span-5"
+                                    className="min-w-0 transition-all duration-300"
                                     activeBillingRule={activeBillingRule}
                                     activeBillingLabel={billingLabel}
                                     activePanelItem={activePanelItem}
                                     currentProfile={currentProfile}
                                     currentSeller={currentSeller}
+                                    currentFile={currentFile}
+                                    isFileEditorExpanded={isFileEditorExpanded}
                                     currentSellerDefaults={
                                         currentSellerDefaults
                                     }
@@ -1167,6 +1296,10 @@ export default withAppLayout<Props>(
                                     }
                                     onChangeSellerCustomConditions={
                                         changeSellerCustomConditions
+                                    }
+                                    onChangeBillingFile={changeBillingFile}
+                                    onFileEditorExpandedChange={
+                                        setIsFileEditorExpanded
                                     }
                                     onAddSellerProfile={addSellerProfile}
                                     onDeleteSellerProfile={deleteSellerProfile}

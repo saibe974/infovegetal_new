@@ -35,12 +35,16 @@ type BillingTreePanelProps = {
     setSellerSearch: (value: string) => void;
     availableSellerOptions: Option[];
     userOptionById: Map<number, Option>;
-    openSection: 'profiles' | 'sellers' | null;
-    onOpenSectionChange: (section: 'profiles' | 'sellers' | null) => void;
+    openSection: 'profiles' | 'sellers' | 'files' | null;
+    onOpenSectionChange: (
+        section: 'profiles' | 'sellers' | 'files' | null,
+    ) => void;
     onAddProfile: () => void;
     onDeleteProfile: (profileId: string) => void;
     onAddSeller: (sellerId: number) => void;
     onDeleteSeller: (sellerId: number) => void;
+    onAddFile: () => void;
+    onDeleteFile: (fileId: string) => void;
     onImpersonateSeller?: (sellerId: number) => void;
 };
 
@@ -62,13 +66,15 @@ export default function BillingTreePanel({
     onDeleteProfile,
     onAddSeller,
     onDeleteSeller,
+    onAddFile,
+    onDeleteFile,
     onImpersonateSeller,
 }: BillingTreePanelProps) {
     const { t } = useI18n();
 
     const [showSellerSearch, setShowSellerSearch] = useState(false);
 
-    const toggleSection = (section: 'profiles' | 'sellers') => {
+    const toggleSection = (section: 'profiles' | 'sellers' | 'files') => {
         onOpenSectionChange(openSection === section ? null : section);
         setActivePanelItem(null);
     };
@@ -88,11 +94,11 @@ export default function BillingTreePanel({
                         <Collapsible
                             open={openSection === 'profiles'}
                             onOpenChange={() => toggleSection('profiles')}
-                            className="rounded-md border border-border"
+                            className="rounded-md border border-amber-200/80 bg-amber-50/60 dark:border-amber-400/25 dark:bg-amber-500/10"
                         >
                             <CollapsibleTrigger asChild>
                                 <div
-                                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 transition-colors hover:bg-muted ${openSection === 'profiles' ? 'bg-muted' : ''}`}
+                                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 transition-colors hover:bg-amber-100/70 dark:hover:bg-amber-500/15 ${openSection === 'profiles' ? 'bg-amber-100/70 dark:bg-amber-500/15' : ''}`}
                                 >
                                     <h3 className="text-lg font-semibold">
                                         {t('Profiles')}
@@ -112,7 +118,7 @@ export default function BillingTreePanel({
                                     </div>
                                 </div>
                             </CollapsibleTrigger>
-                            <CollapsibleContent className="border-t border-border px-3 py-3 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1">
+                            <CollapsibleContent className="border-t border-amber-200/80 px-3 py-3 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-amber-400/25">
                                 <div className="max-h-[220px] space-y-2 overflow-y-auto">
                                     {(
                                         activeBillingRule.defaults.profiles ??
@@ -124,7 +130,7 @@ export default function BillingTreePanel({
                                         >
                                             <button
                                                 type="button"
-                                                className={`w-full rounded-md border px-3 py-2 text-left ${activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id ? 'border-primary bg-muted' : 'border-border'}`}
+                                                className={`w-full rounded-md border bg-background/80 px-3 py-2 text-left ${activePanelItem?.type === 'profile' && String(activePanelItem.id) === profile.id ? 'border-amber-500 bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15' : 'border-amber-200/80 dark:border-amber-400/25'}`}
                                                 onClick={() =>
                                                     setActivePanelItem({
                                                         type: 'profile',
@@ -136,7 +142,10 @@ export default function BillingTreePanel({
                                                     {profile.name}
                                                 </span>
                                                 <span className="block truncate text-xs text-muted-foreground">
-                                                    {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
+                                                    {formatSalesConditionsSummary(
+                                                        profile.conditions,
+                                                        t('Vente directe'),
+                                                    )}
                                                 </span>
                                             </button>
                                             {canManageProfiles ? (
@@ -291,6 +300,78 @@ export default function BillingTreePanel({
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>
+
+                        <Collapsible
+                            open={openSection === 'files'}
+                            onOpenChange={() => toggleSection('files')}
+                            className="rounded-md border border-violet-200/80 bg-violet-50/60 dark:border-violet-400/25 dark:bg-violet-500/10"
+                        >
+                            <CollapsibleTrigger asChild>
+                                <div
+                                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 transition-colors hover:bg-violet-100/70 dark:hover:bg-violet-500/15 ${openSection === 'files' ? 'bg-violet-100/70 dark:bg-violet-500/15' : ''}`}
+                                >
+                                    <h3 className="text-lg font-semibold">
+                                        {t('Fichiers')}
+                                    </h3>
+                                    <div className="flex items-center gap-1">
+                                        {canManageProfiles &&
+                                            openSection === 'files' ? (
+                                            <ButtonsActions add={onAddFile} />
+                                        ) : null}
+                                        <ChevronDown
+                                            className={`size-4 transition-transform duration-200 ${openSection === 'files' ? 'rotate-180' : ''}`}
+                                        />
+                                    </div>
+                                </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="border-t border-violet-200/80 px-3 py-3 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-violet-400/25">
+                                <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                                    {(
+                                        activeBillingRule.defaults.files ?? []
+                                    ).map((file) => (
+                                        <div
+                                            key={file.id}
+                                            className="flex items-center justify-between gap-2"
+                                        >
+                                            <button
+                                                type="button"
+                                                className={`w-full rounded-md border bg-background/80 px-3 py-2 text-left ${activePanelItem?.type === 'file' && String(activePanelItem.id) === file.id ? 'border-violet-500 bg-violet-100 dark:border-violet-400/40 dark:bg-violet-500/15' : 'border-violet-200/80 dark:border-violet-400/25'}`}
+                                                onClick={() =>
+                                                    setActivePanelItem({
+                                                        type: 'file',
+                                                        id: file.id,
+                                                    })
+                                                }
+                                            >
+                                                <span className="block truncate font-medium">
+                                                    {file.name}
+                                                </span>
+                                                <span className="block truncate text-xs text-muted-foreground">
+                                                    {file.enabled
+                                                        ? t('Actif')
+                                                        : t('Inactif')}{' '}
+                                                    · CSV
+                                                </span>
+                                            </button>
+                                            {canManageProfiles &&
+                                                !file.system ? (
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive-outline"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        onDeleteFile(file.id)
+                                                    }
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
+
                     </CardContent>
                 </>
             )}

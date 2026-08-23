@@ -72,9 +72,49 @@ export interface SalesConditionProfile {
     conditions: SalesConditions;
 }
 
+export type BillingFileEvent = 'order' | 'delivery' | 'invoice' | 'credit_note';
+
+export interface BillingFileColumn {
+    id: string;
+    name: string;
+}
+
+export interface BillingFileRow {
+    id: string;
+    cells: Record<string, string>;
+}
+
+export type BillingFileBlockType = 'header' | 'items' | 'footer';
+
+export interface BillingFileBlock {
+    id: string;
+    name: string;
+    type: BillingFileBlockType;
+    enabled: boolean;
+    show_headers: boolean;
+    columns: BillingFileColumn[];
+    rows: BillingFileRow[];
+}
+
+export interface BillingFileTemplate {
+    id: string;
+    name: string;
+    event: BillingFileEvent;
+    enabled: boolean;
+    delimiter: ';' | ',' | '\t' | '|';
+    /** Legacy fields kept while stored templates are transparently upgraded. */
+    scope?: 'items' | 'document';
+    system?: boolean;
+    /** Legacy columns copied into each block during normalization. */
+    columns?: BillingFileColumn[];
+    rows?: BillingFileRow[];
+    blocks: BillingFileBlock[];
+}
+
 export interface BillingDefaults {
     profiles: SalesConditionProfile[];
     default_profile_id?: string | null;
+    files?: BillingFileTemplate[];
 }
 
 export interface SellerDefaults {

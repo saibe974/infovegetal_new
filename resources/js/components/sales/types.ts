@@ -1,7 +1,4 @@
-import {
-    type BillingDefaults,
-    type SalesConditions,
-} from '@/types';
+import { type BillingDefaults, type SalesConditions } from '@/types';
 
 export type UserOption = {
     value: any;
@@ -27,6 +24,6 @@ export type BillingDraft = {
 };
 
 export type ActivePanelItem = {
-    type: 'profile' | 'seller';
+    type: 'profile' | 'seller' | 'file';
     id: string | number;
 } | null;

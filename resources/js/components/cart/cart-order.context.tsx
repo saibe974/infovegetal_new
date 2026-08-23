@@ -20,6 +20,7 @@ export type PdfResult = {
     orderNumber: string | null;
     itemsTotal?: number;
     shippingTotal?: number;
+    csvCount?: number;
     origin: 'save' | 'order';
 };
 
@@ -195,6 +196,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                         orderNumber: data?.order_number ? String(data.order_number) : null,
                         itemsTotal: typeof data.items_total === 'number' ? data.items_total : itemsTotal,
                         shippingTotal: typeof data.shipping_total === 'number' ? data.shipping_total : deliveryTotal,
+                        csvCount: typeof data.csv_files_count === 'number' ? data.csv_files_count : 0,
                         origin: 'save',
                     });
                 }
@@ -245,6 +247,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
             }
 
             const blob = await response.blob();
+            const csvCount = Number(response.headers.get('x-generated-csv-count') ?? 0);
             const url = window.URL.createObjectURL(blob);
             const contentDisposition = response.headers.get('content-disposition') ?? '';
             const filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
@@ -259,6 +262,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 orderNumber: orderMatch ? orderMatch[1] : null,
                 itemsTotal,
                 shippingTotal: deliveryTotal,
+                csvCount: Number.isFinite(csvCount) ? csvCount : 0,
                 origin: 'order',
             });
 
