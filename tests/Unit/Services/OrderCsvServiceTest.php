@@ -14,6 +14,9 @@ it('renders an item CSV with headers literals and percent variables', function (
         'roll' => 4,
         'pot' => 14.5,
         'height' => '40-60 cm',
+        'price_floor' => 10.5,
+        'price_roll' => 9.75,
+        'price_promo' => 8.9,
     ]);
 
     $csv = (new OrderCsvService)->render([
@@ -28,6 +31,7 @@ it('renders an item CSV with headers literals and percent variables', function (
             ['id' => 'calculation', 'name' => 'Calcul'],
             ['id' => 'dimensions', 'name' => 'Dimensions'],
             ['id' => 'description', 'name' => 'Description'],
+            ['id' => 'prices', 'name' => 'Prix'],
         ],
         'rows' => [[
             'id' => 'item-row',
@@ -40,6 +44,7 @@ it('renders an item CSV with headers literals and percent variables', function (
                 'calculation' => '%calc:product.cond*product.floor*product.roll|decimal:2%',
                 'dimensions' => '%product.pot% / %product.height%',
                 'description' => '%product.description%',
+                'prices' => '%product.price_floor% / %product.price_roll% / %product.price_promo%',
             ],
         ]],
     ], collect([[
@@ -55,8 +60,8 @@ it('renders an item CSV with headers literals and percent variables', function (
     $csv = preg_replace('/^\xEF\xBB\xBF/', '', $csv);
     $lines = array_values(array_filter(explode("\n", trim((string) $csv))));
 
-    expect(str_getcsv($lines[0], ';'))->toBe(['Reference', 'Libelle', 'Quantite', 'Total', 'Conditionnement', 'Calcul', 'Dimensions', 'Description'])
-        ->and(str_getcsv($lines[1], ';'))->toBe(['ROS-42', 'Commande 00042 - Rose rouge', '3', '7.50', '10*5*4', '200.00', '14.50 / 40-60 cm', 'Rose rouge à longue tige']);
+    expect(str_getcsv($lines[0], ';'))->toBe(['Reference', 'Libelle', 'Quantite', 'Total', 'Conditionnement', 'Calcul', 'Dimensions', 'Description', 'Prix'])
+        ->and(str_getcsv($lines[1], ';'))->toBe(['ROS-42', 'Commande 00042 - Rose rouge', '3', '7.50', '10*5*4', '200.00', '14.50 / 40-60 cm', 'Rose rouge à longue tige', '10.50 / 9.75 / 8.90']);
 });
 
 it('keeps unknown variables visible in fixed custom rows', function (): void {
