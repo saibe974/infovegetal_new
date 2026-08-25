@@ -126,10 +126,20 @@ class ProductController extends Controller
             });
         };
 
+        $multiValue = function (string $key) use ($request): array {
+            $values = $request->input($key, []);
+            $values = is_array($values) ? $values : [$values];
+
+            return array_values(array_unique(array_filter(
+                array_map(fn ($value) => trim((string) $value), $values),
+                fn ($value) => $value !== ''
+            )));
+        };
+
         $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
-        $country = $request->filled('country') ? trim((string) $request->input('country')) : null;
-        $pot = $request->filled('pot') ? trim((string) $request->input('pot')) : null;
-        $height = $request->filled('height') ? trim((string) $request->input('height')) : null;
+        $country = $multiValue('country');
+        $pot = $multiValue('pot');
+        $height = $multiValue('height');
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
@@ -151,18 +161,18 @@ class ProductController extends Controller
                 $q->whereIn('category_products_id', $filters['category_branch_ids']);
             }
 
-            if (!in_array('country', $skip, true) && $filters['country']) {
+            if (!in_array('country', $skip, true) && !empty($filters['country'])) {
                 $q->whereHas('dbProduct', function ($db) use ($filters) {
-                    $db->where('country', $filters['country']);
+                    $db->whereIn('country', $filters['country']);
                 });
             }
 
-            if (!in_array('pot', $skip, true) && $filters['pot'] !== null && $filters['pot'] !== '') {
-                $q->where('pot', $filters['pot']);
+            if (!in_array('pot', $skip, true) && !empty($filters['pot'])) {
+                $q->whereIn('pot', $filters['pot']);
             }
 
-            if (!in_array('height', $skip, true) && $filters['height'] !== null && $filters['height'] !== '') {
-                $q->where('height', $filters['height']);
+            if (!in_array('height', $skip, true) && !empty($filters['height'])) {
+                $q->whereIn('height', $filters['height']);
             }
 
             if (!in_array('image', $skip, true)) {

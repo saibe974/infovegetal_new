@@ -114,6 +114,7 @@ const itemVariables = [
     '%product.roll%',
     '%product.pot%',
     '%product.height%',
+    '%product.price%',
     '%product.price_floor%',
     '%product.price_roll%',
     '%product.price_promo%',
@@ -458,12 +459,12 @@ const variablesForBlock = (
     blockType: BillingFileBlockType,
     event: BillingFileTemplate['event'],
 ) => [
-    ...documentVariables,
-    `%${event}.number%`,
-    `%${event}.date%`,
-    `%${event}.total%`,
-    ...(blockType === 'items' ? itemVariables : []),
-];
+        ...documentVariables,
+        `%${event}.number%`,
+        `%${event}.date%`,
+        `%${event}.total%`,
+        ...(blockType === 'items' ? itemVariables : []),
+    ];
 
 const hasVariableIssue = (
     value: string,
@@ -501,14 +502,14 @@ const hasVariableIssue = (
         return formatType === 'date'
             ? !['date:dmy', 'date:ymd'].includes(parsed.format)
             : formatType === 'decimal'
-              ? ![
+                ? ![
                     'decimal:0',
                     'decimal:1',
                     'decimal:2',
                     'decimal:3',
                     'decimal:4',
                 ].includes(parsed.format)
-              : true;
+                : true;
     });
 };
 
@@ -826,7 +827,7 @@ function SortableRuleSegment({
                 kind === 'variable'
                     ? (variables[0] ?? '')
                     : kind === 'calculation'
-                      ? serializeCalculation({
+                        ? serializeCalculation({
                             operands: [
                                 {
                                     id: uniqueId('operand'),
@@ -836,7 +837,7 @@ function SortableRuleSegment({
                             ],
                             decimals: 'raw',
                         })
-                      : '',
+                        : '',
         });
 
     return (
@@ -1209,7 +1210,7 @@ function FilenameRuleField({
                     className={cn(
                         'shrink-0',
                         active &&
-                            'text-green-600 hover:bg-green-500/10 hover:text-green-700 dark:text-green-400',
+                        'text-green-600 hover:bg-green-500/10 hover:text-green-700 dark:text-green-400',
                     )}
                     title={t(active ? 'Nom variable' : 'Insérer une variable')}
                 >
@@ -1241,7 +1242,7 @@ function FilenameRuleField({
             className={cn(
                 'shrink-0',
                 active &&
-                    '[&_button]:text-violet-600 [&_button]:hover:bg-violet-500/10 [&_button]:hover:text-violet-700 dark:[&_button]:text-violet-400',
+                '[&_button]:text-violet-600 [&_button]:hover:bg-violet-500/10 [&_button]:hover:text-violet-700 dark:[&_button]:text-violet-400',
             )}
         >
             <BillingFileRuleEditor
@@ -1421,7 +1422,7 @@ function BlockEditor({ block, file, canManage, onChange }: BlockEditorProps) {
                                     className={cn(
                                         'shrink-0',
                                         active &&
-                                            'text-green-600 hover:bg-green-500/10 hover:text-green-700 dark:text-green-400',
+                                        'text-green-600 hover:bg-green-500/10 hover:text-green-700 dark:text-green-400',
                                     )}
                                     title={tRef.current(
                                         active
@@ -1463,7 +1464,7 @@ function BlockEditor({ block, file, canManage, onChange }: BlockEditorProps) {
                             className={cn(
                                 'shrink-0',
                                 active &&
-                                    '[&_button]:text-violet-600 [&_button]:hover:bg-violet-500/10 [&_button]:hover:text-violet-700 dark:[&_button]:text-violet-400',
+                                '[&_button]:text-violet-600 [&_button]:hover:bg-violet-500/10 [&_button]:hover:text-violet-700 dark:[&_button]:text-violet-400',
                             )}
                         >
                             <BillingFileRuleEditor
@@ -1498,7 +1499,7 @@ function BlockEditor({ block, file, canManage, onChange }: BlockEditorProps) {
                                     value={value}
                                     autoFocus={
                                         focusRowIdRef.current ===
-                                            row.original.id &&
+                                        row.original.id &&
                                         column.id === block.columns[0]?.id
                                     }
                                     disabled={!canManage}
@@ -1507,8 +1508,8 @@ function BlockEditor({ block, file, canManage, onChange }: BlockEditorProps) {
                                     title={
                                         hasIssue
                                             ? tRef.current(
-                                                  'Variable inconnue ou indisponible dans ce bloc',
-                                              )
+                                                'Variable inconnue ou indisponible dans ce bloc',
+                                            )
                                             : undefined
                                     }
                                     placeholder={tRef.current(
@@ -1783,7 +1784,7 @@ function CompactBlock({
             className={cn(
                 'flex items-center gap-2 rounded-md border bg-background px-2 py-2 transition-colors',
                 selected &&
-                    'border-violet-400 bg-violet-50/70 dark:border-violet-400/50 dark:bg-violet-500/10',
+                'border-violet-400 bg-violet-50/70 dark:border-violet-400/50 dark:bg-violet-500/10',
                 isDragging && 'z-10 opacity-70 shadow-lg',
                 !block.enabled && 'opacity-60',
             )}
@@ -2052,8 +2053,8 @@ export default function BillingFileEditor({
                                 isOrderPdf
                                     ? 'Le PDF est toujours généré automatiquement'
                                     : automaticEnabled
-                                      ? 'Génération automatique activée'
-                                      : 'Génération automatique désactivée',
+                                        ? 'Génération automatique activée'
+                                        : 'Génération automatique désactivée',
                             )}
                             aria-label={t(
                                 automaticEnabled
@@ -2085,8 +2086,8 @@ export default function BillingFileEditor({
                                 isOrderPdf
                                     ? 'Le PDF est toujours partagé avec les destinataires'
                                     : sharingEnabled
-                                      ? 'Partage avec les destinataires activé'
-                                      : 'Partage avec les destinataires désactivé',
+                                        ? 'Partage avec les destinataires activé'
+                                        : 'Partage avec les destinataires désactivé',
                             )}
                             aria-label={t(
                                 sharingEnabled
@@ -2139,7 +2140,7 @@ export default function BillingFileEditor({
                                                             .map((event) =>
                                                                 t(
                                                                     eventLabels[
-                                                                        event
+                                                                    event
                                                                     ],
                                                                 ),
                                                             )
@@ -2169,16 +2170,16 @@ export default function BillingFileEditor({
                                                                 const events =
                                                                     checked
                                                                         ? file.events.filter(
-                                                                              (
-                                                                                  item,
-                                                                              ) =>
-                                                                                  item !==
-                                                                                  typedEvent,
-                                                                          )
+                                                                            (
+                                                                                item,
+                                                                            ) =>
+                                                                                item !==
+                                                                                typedEvent,
+                                                                        )
                                                                         : [
-                                                                              ...file.events,
-                                                                              typedEvent,
-                                                                          ];
+                                                                            ...file.events,
+                                                                            typedEvent,
+                                                                        ];
                                                                 if (
                                                                     !events.length
                                                                 )
@@ -2208,20 +2209,20 @@ export default function BillingFileEditor({
                                                     const delimiter =
                                                         extension === 'csv'
                                                             ? file.delimiter ===
-                                                                  ';' ||
-                                                              file.delimiter ===
-                                                                  ','
+                                                                ';' ||
+                                                                file.delimiter ===
+                                                                ','
                                                                 ? file.delimiter
                                                                 : ';'
                                                             : extension ===
                                                                 'tsv'
-                                                              ? file.delimiter ===
+                                                                ? file.delimiter ===
                                                                     '\t' ||
-                                                                file.delimiter ===
+                                                                    file.delimiter ===
                                                                     '|'
-                                                                  ? file.delimiter
-                                                                  : '\t'
-                                                              : file.delimiter;
+                                                                    ? file.delimiter
+                                                                    : '\t'
+                                                                : file.delimiter;
                                                     onChange({
                                                         ...file,
                                                         delimiter,
@@ -2232,7 +2233,7 @@ export default function BillingFileEditor({
                                                 <SelectTrigger
                                                     className={cn(
                                                         extensionMismatch &&
-                                                            'border-orange-500 text-orange-700 focus:ring-orange-500 dark:text-orange-400',
+                                                        'border-orange-500 text-orange-700 focus:ring-orange-500 dark:text-orange-400',
                                                     )}
                                                 >
                                                     <SelectValue />
@@ -2284,7 +2285,7 @@ export default function BillingFileEditor({
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {file.extension ===
-                                                    'csv' ? (
+                                                        'csv' ? (
                                                         <>
                                                             <SelectItem value=";">
                                                                 ; (
@@ -2447,7 +2448,7 @@ export default function BillingFileEditor({
                                                         }}
                                                     />
                                                     {selectedBlockId ===
-                                                    block.id ? (
+                                                        block.id ? (
                                                         <BlockEditor
                                                             block={block}
                                                             file={file}

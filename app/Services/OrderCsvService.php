@@ -403,6 +403,7 @@ class OrderCsvService
             'product.roll' => $product?->roll,
             'product.pot' => $product?->pot,
             'product.height' => $product?->height,
+            'product.price' => $product?->price,
             'product.price_floor' => $product?->price_floor,
             'product.price_roll' => $product?->price_roll,
             'product.price_promo' => $product?->price_promo,

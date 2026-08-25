@@ -1,7 +1,16 @@
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import * as Flags from 'country-flag-icons/react/3x2';
-import { Loader2, SearchIcon, SlidersHorizontalIcon, X } from 'lucide-react';
+import {
+    Camera,
+    CameraOff,
+    Diameter,
+    Loader2,
+    MoveVertical,
+    SearchIcon,
+    SlidersHorizontalIcon,
+    X,
+} from 'lucide-react';
 import {
     ReactElement,
     ReactNode,
@@ -19,6 +28,7 @@ interface SearchBarProps {
     value: string;
     onChange: (val: string) => void;
     onSubmit: (val: string, options?: { force?: boolean }) => void;
+    onSelectOption?: (option: Option) => boolean | void;
     propositions?: (string | Option)[];
     loading?: boolean;
     // Optional total count to display next to the search button
@@ -30,7 +40,18 @@ interface SearchBarProps {
     search?: boolean;
     selection?: (string | Option)[];
     multiple?: boolean;
-    filtersActive?: { name: string; label: string; value?: string }[];
+    fixedFilters?: {
+        name: string;
+        label: string;
+        country?: string;
+        title?: string;
+    }[];
+    filtersActive?: {
+        name: string;
+        label: string;
+        value?: string;
+        values?: string[];
+    }[];
     removeFilter?: (filterName: string) => void;
     clearAll?: () => void;
     // Minimum characters required to show propositions (default: 3). Set to 0 to show on focus.
@@ -43,6 +64,9 @@ export type Option = {
     description?: string;
     country?: string;
     icone?: string;
+    badge?: string;
+    kind?: string;
+    id?: number;
 };
 
 const areOptionsEqual = (a: Option[], b: Option[]): boolean => {
@@ -65,6 +89,7 @@ export default function SearchSelect({
     value,
     onChange,
     onSubmit,
+    onSelectOption,
     propositions,
     loading = false,
     count,
@@ -74,6 +99,7 @@ export default function SearchSelect({
     search = true,
     selection = undefined,
     multiple = true,
+    fixedFilters = undefined,
     filtersActive = undefined,
     removeFilter = undefined,
     clearAll = undefined,
@@ -123,6 +149,13 @@ export default function SearchSelect({
     }, [JSON.stringify(selection || [])]);
 
     const handleSelectOption = (option: Option) => {
+        if (onSelectOption?.(option) === true) {
+            setHighlightedIndex(-1);
+            setOpen(false);
+            onChange('');
+            return;
+        }
+
         const selection = { value: option.value, label: option.label };
         if (multiple) {
             if (!selected.some((s) => s.value === selection.value)) {
@@ -294,29 +327,8 @@ export default function SearchSelect({
                 )}
                 onClick={() => inputRef.current?.focus()}
             >
-                {hasFilters && (
-                    <button
-                        type="button"
-                        onMouseDown={() => {
-                            setOpenFilters((v) => !v);
-                        }}
-                        // onClick={(e) => { e.stopPropagation(); }}
-                        className="px-1 text-muted-foreground hover:text-foreground"
-                        title="Filters"
-                    >
-                        <SlidersHorizontalIcon size={16} />
-                    </button>
-                )}
-
-                {filtersActive?.map((filter) => {
-                    const isCountry =
-                        filter.name === 'country' &&
-                        typeof filter.value === 'string';
-                    const countryCode =
-                        filter.name === 'country' &&
-                            typeof filter.value === 'string'
-                            ? filter.value.toUpperCase()
-                            : null;
+                {fixedFilters?.map((filter) => {
+                    const countryCode = filter.country?.toUpperCase();
                     const Flag = countryCode
                         ? (
                             Flags as Record<
@@ -332,9 +344,14 @@ export default function SearchSelect({
                     return (
                         <span
                             key={filter.name}
-                            className="flex items-center gap-1 rounded-xl bg-brand-main px-2 py-0.5 text-sm text-white dark:text-black"
+                            title={filter.title ?? filter.label}
+                            aria-label={filter.title ?? filter.label}
+                            className={cn(
+                                'flex items-center gap-1 rounded-xl border border-brand-main/30 bg-brand-main/10 px-2 text-sm text-foreground',
+                                Flag ? 'py-1.5' : 'py-0.5',
+                            )}
                         >
-                            {isCountry && Flag ? (
+                            {Flag ? (
                                 <>
                                     <Flag
                                         title={filter.label}
@@ -343,6 +360,104 @@ export default function SearchSelect({
                                     <span className="sr-only">
                                         {filter.label}
                                     </span>
+                                </>
+                            ) : (
+                                <>
+                                    {filter.name === 'pot' ? (
+                                        <Diameter size={14} aria-hidden="true" />
+                                    ) : null}
+                                    {filter.name === 'height' ? (
+                                        <MoveVertical size={14} aria-hidden="true" />
+                                    ) : null}
+                                    {filter.label}
+                                </>
+                            )}
+                        </span>
+                    );
+                })}
+
+                {hasFilters && (
+                    <button
+                        type="button"
+                        onMouseDown={() => {
+                            setOpenFilters((v) => !v);
+                        }}
+                        // onClick={(e) => { e.stopPropagation(); }}
+                        className="px-1 text-muted-foreground hover:text-foreground"
+                        title="Filters"
+                    >
+                        <SlidersHorizontalIcon size={16} />
+                    </button>
+                )}
+
+                {filtersActive?.map((filter) => {
+                    const isCountry = filter.name === 'country';
+                    const countryCodes = isCountry
+                        ? (filter.values ?? (filter.value ? [filter.value] : []))
+                            .map((value) => value.toUpperCase())
+                        : [];
+                    const isImage = filter.name === 'image';
+                    const isPot = filter.name === 'pot';
+                    const isHeight = filter.name === 'height';
+                    const compactValues = filter.values ?? (filter.value ? [filter.value] : []);
+                    const compactSummary = compactValues.length <= 2
+                        ? compactValues.join(', ')
+                        : `${compactValues.slice(0, 2).join(', ')} +${compactValues.length - 2}`;
+
+                    return (
+                        <span
+                            key={filter.name}
+                            title={filter.label}
+                            aria-label={filter.label}
+                            className={cn(
+                                'flex items-center gap-1 rounded-xl px-2 py-0.5 text-sm',
+                                isImage
+                                    ? 'border border-border bg-muted/70 text-foreground'
+                                    : 'bg-brand-main text-white dark:text-black',
+                            )}
+                        >
+                            {isCountry ? (
+                                <>
+                                    {countryCodes.slice(0, 2).map((countryCode) => {
+                                        const Flag = (
+                                            Flags as Record<
+                                                string,
+                                                ComponentType<{
+                                                    title?: string;
+                                                    className?: string;
+                                                }>
+                                            >
+                                        )[countryCode];
+                                        return Flag ? (
+                                            <Flag
+                                                key={countryCode}
+                                                title={filter.label}
+                                                className="w-4"
+                                            />
+                                        ) : null;
+                                    })}
+                                    {countryCodes.length > 2 ? (
+                                        <span>+{countryCodes.length - 2}</span>
+                                    ) : null}
+                                    <span className="sr-only">
+                                        {filter.label}
+                                    </span>
+                                </>
+                            ) : isImage ? (
+                                filter.value === 'without' ? (
+                                    <CameraOff size={17} aria-hidden="true" />
+                                ) : (
+                                    <Camera size={17} aria-hidden="true" />
+                                )
+                            ) : isPot ? (
+                                <>
+                                    <Diameter size={14} aria-hidden="true" />
+                                    {compactSummary}
+                                </>
+                            ) : isHeight ? (
+                                <>
+                                    <MoveVertical size={14} aria-hidden="true" />
+                                    {compactSummary}
                                 </>
                             ) : (
                                 filter.label
@@ -490,6 +605,11 @@ export default function SearchSelect({
                                             )}
                                         >
                                             <span>
+                                                {option.badge ? (
+                                                    <span className="mr-2 inline-flex rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
+                                                        {option.badge}
+                                                    </span>
+                                                ) : null}
                                                 {option.country ? (
                                                     <CountryFlag
                                                         countryCode={

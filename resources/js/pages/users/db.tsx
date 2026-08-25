@@ -47,6 +47,15 @@ type SearchSelectOption = {
 
 const EMPTY_SEARCH_SELECTION: SearchSelectOption[] = [];
 
+const PROFILE_INDEPENDENT_CONDITION_KEYS = new Set([
+    'l',
+    'lm',
+    'p',
+    't',
+    'tvat',
+    'z',
+]);
+
 type DbPageProps = SharedData & {
     user: User;
     dbProducts: dbProduct[];
@@ -84,6 +93,19 @@ const diffConditions = (base: SalesConditions | undefined, target: SalesConditio
 
     return normalizeConditions(diff);
 };
+
+const filterConditions = (
+    value: SalesConditions | undefined,
+    keep: (key: string) => boolean,
+): SalesConditions => normalizeConditions(
+    Object.fromEntries(Object.entries(value ?? {}).filter(([key]) => keep(key))),
+);
+
+const getProfileConditions = (value: SalesConditions | undefined): SalesConditions =>
+    filterConditions(value, (key) => !PROFILE_INDEPENDENT_CONDITION_KEYS.has(key));
+
+const getProfileIndependentConditions = (value: SalesConditions | undefined): SalesConditions =>
+    filterConditions(value, (key) => PROFILE_INDEPENDENT_CONDITION_KEYS.has(key));
 
 const getDefaultProfileConditions = (defaults: ReturnType<typeof normalizeBillingDefaultsToProfiles>): SalesConditions => {
     const selected = defaults.profiles.find((profile) => profile.id === defaults.default_profile_id)
@@ -386,12 +408,14 @@ export default function UserDbPage() {
             return explicitProfile ? explicitProfile.key : '';
         }
 
-        const override = normalizeConditions(activeRow.conditions_override ?? {});
+        const override = getProfileConditions(activeRow.conditions_override);
 
         const matchingProfile = activeProfileOptions.find((profile) => {
-            const profileOverride = diffConditions(
-                inheritedConditions,
-                normalizeConditions({ ...inheritedConditions, ...profile.conditions }),
+            const profileOverride = getProfileConditions(
+                diffConditions(
+                    inheritedConditions,
+                    normalizeConditions({ ...inheritedConditions, ...profile.conditions }),
+                ),
             );
 
             return areConditionsEqual(profileOverride, override);
@@ -439,13 +463,42 @@ export default function UserDbPage() {
 
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
+    const selectedProfileBase = selectedProfile
+        ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions })
+        : inheritedConditions;
+    const activeIndependentOverrides = getProfileIndependentConditions(
+        diffConditions(selectedProfileBase, merged),
+    );
+
+    const selectProfile = (profileKey: string) => {
+        if (profileKey === '__custom__') {
+            updateRow(activeIndex, {
+                profile_selection_key: '__custom__',
+                conditions_override: activeIndependentOverrides,
+            });
+            return;
+        }
+
+        const profile = activeProfileOptions.find((item) => item.key === profileKey);
+        if (!profile) {
+            return;
+        }
+
+        updateRow(activeIndex, {
+            profile_selection_key: profile.key,
+            conditions_override: activeIndependentOverrides,
+        });
+    };
 
     const customConditionsForm = selectedProfileKey === '__custom__' ? (
         <SalesConditionsForm
-            value={normalizeConditions(activeRow?.conditions_override ?? {})}
+            value={getProfileConditions(activeRow?.conditions_override)}
             onChange={(next) => updateRow(activeIndex, {
                 profile_selection_key: '__custom__',
-                conditions_override: normalizeConditions(next),
+                conditions_override: normalizeConditions({
+                    ...activeIndependentOverrides,
+                    ...next,
+                }),
             })}
             carriers={carriersList}
             mode="client"
@@ -477,16 +530,7 @@ export default function UserDbPage() {
 
         updateRow(activeIndex, {
             profile_selection_key: selectedProfileKey,
-            conditions_override: diffConditions(inheritedConditions, nextResolved),
-        });
-    };
-
-    const update = (patch: Partial<SalesConditions>) => {
-        const nextResolved = normalizeConditions({ ...merged, ...patch });
-
-        updateRow(activeIndex, {
-            profile_selection_key: '__custom__',
-            conditions_override: diffConditions(inheritedConditions, nextResolved),
+            conditions_override: diffConditions(selectedProfileBase, nextResolved),
         });
     };
 
@@ -529,7 +573,7 @@ export default function UserDbPage() {
         }
 
         if (!row.profile_selection_key) {
-            return {};
+            return getProfileIndependentConditions(row.conditions_override);
         }
 
         const profilePool = seller
@@ -775,27 +819,7 @@ export default function UserDbPage() {
                                                         )}
                                                         <Select
                                                             value={selectedProfileKey}
-                                                            onValueChange={(val) => {
-                                                                if (val === '__custom__') {
-                                                                    updateRow(activeIndex, {
-                                                                        profile_selection_key: '__custom__',
-                                                                        conditions_override: {},
-                                                                    });
-                                                                } else {
-                                                                    const profile = billingProfiles.find((item) => item.key === val);
-                                                                    if (profile) {
-                                                                        const resolvedProfile = normalizeConditions({
-                                                                            ...inheritedConditions,
-                                                                            ...profile.conditions,
-                                                                        });
-
-                                                                        updateRow(activeIndex, {
-                                                                            profile_selection_key: profile.key,
-                                                                            conditions_override: diffConditions(inheritedConditions, resolvedProfile),
-                                                                        });
-                                                                    }
-                                                                }
-                                                            }}
+                                                            onValueChange={selectProfile}
                                                         >
                                                             <SelectTrigger>
                                                                 <SelectValue placeholder={t('Select a billing profile')} />
@@ -855,27 +879,7 @@ export default function UserDbPage() {
                                                         </Select>
                                                         <Select
                                                             value={selectedProfileKey}
-                                                            onValueChange={(val) => {
-                                                                if (val === '__custom__') {
-                                                                    updateRow(activeIndex, {
-                                                                        profile_selection_key: '__custom__',
-                                                                        conditions_override: {},
-                                                                    });
-                                                                } else {
-                                                                    const profile = sellerProfiles.find((item) => item.key === val);
-                                                                    if (profile) {
-                                                                        const resolvedProfile = normalizeConditions({
-                                                                            ...inheritedConditions,
-                                                                            ...profile.conditions,
-                                                                        });
-
-                                                                        updateRow(activeIndex, {
-                                                                            profile_selection_key: profile.key,
-                                                                            conditions_override: diffConditions(inheritedConditions, resolvedProfile),
-                                                                        });
-                                                                    }
-                                                                }
-                                                            }}
+                                                            onValueChange={selectProfile}
                                                         >
                                                             <SelectTrigger>
                                                                 <SelectValue placeholder={t('Select a seller profile')} />
@@ -1022,7 +1026,7 @@ export default function UserDbPage() {
                                                                 setDeliveryRaw(e.target.value);
                                                                 const num = toNumber(e.target.value);
                                                                 if (Number.isFinite(num)) {
-                                                                    update({ l: num });
+                                                                    updateWithoutChangingProfile({ l: num });
                                                                 }
                                                             }}
                                                             onBlur={() => setDeliveryRaw('')}
@@ -1037,7 +1041,7 @@ export default function UserDbPage() {
                                                                 setLmRaw(e.target.value);
                                                                 const num = toNumber(e.target.value);
                                                                 if (Number.isFinite(num)) {
-                                                                    update({ lm: num });
+                                                                    updateWithoutChangingProfile({ lm: num });
                                                                 }
                                                             }}
                                                             onBlur={() => setLmRaw('')}
@@ -1052,7 +1056,7 @@ export default function UserDbPage() {
                                                             onChange={(e) => {
                                                                 setTvatRaw(e.target.value);
                                                                 const num = toNumber(e.target.value);
-                                                                update({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
+                                                                updateWithoutChangingProfile({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
                                                             }}
                                                             onBlur={() => setTvatRaw('')}
                                                         />

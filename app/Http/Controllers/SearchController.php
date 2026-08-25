@@ -22,8 +22,15 @@ class SearchController extends Controller
 
         if ($context === 'products') {
             $query = Product::with(['category','tags'])->orderFromRequest($request);
-            $items = ProductController::getSearchPropositions($query, $search);
-            return response()->json(['propositions' => array_slice($items, 0, $limit)]);
+            $categoryItems = $this->productCategoryPropositions($search, $limit);
+            $remaining = max(0, $limit - count($categoryItems));
+            $productItems = $remaining > 0
+                ? array_slice(ProductController::getSearchPropositions($query, $search), 0, $remaining)
+                : [];
+
+            return response()->json([
+                'propositions' => array_merge($categoryItems, $productItems),
+            ]);
         }
 
         if ($context === 'users') {
@@ -116,5 +123,51 @@ class SearchController extends Controller
 
         // Contexte inconnu: renvoyer vide
         return response()->json(['propositions' => []]);
+    }
+
+    private function productCategoryPropositions(string $search, int $limit): array
+    {
+        $tokens = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $query = CategoryProducts::query();
+        foreach ($tokens as $token) {
+            $query->where('name', 'like', '%' . $token . '%');
+        }
+
+        $taxonomyRootId = CategoryProducts::query()
+            ->whereKey(1)
+            ->whereNull('parent_id')
+            ->value('id');
+
+        if ($taxonomyRootId !== null) {
+            $query->whereKeyNot($taxonomyRootId);
+        }
+
+        $lowerSearch = mb_strtolower($search);
+        $categories = $query
+            ->limit($limit)
+            ->get(['id', 'name'])
+            ->all();
+
+        usort($categories, function (CategoryProducts $a, CategoryProducts $b) use ($lowerSearch) {
+            $aName = mb_strtolower($a->name);
+            $bName = mb_strtolower($b->name);
+            $aPriority = str_starts_with($aName, $lowerSearch) ? 1 : 2;
+            $bPriority = str_starts_with($bName, $lowerSearch) ? 1 : 2;
+
+            if ($aPriority !== $bPriority) {
+                return $aPriority <=> $bPriority;
+            }
+
+            return strnatcasecmp($a->name, $b->name);
+        });
+
+        return array_map(fn (CategoryProducts $category) => [
+            'value' => 'category:' . $category->id,
+            'label' => $category->name,
+            'badge' => 'cat',
+            'kind' => 'category',
+            'id' => (int) $category->id,
+        ], $categories);
     }
 }

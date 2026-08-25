@@ -29,18 +29,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 type FiltersState = {
     active: 'all' | 'active' | 'inactive';
     category: number | null;
-    country: string | null;
-    pot: string | null;
-    height: string | null;
+    country: string[];
+    pot: string[];
+    height: string[];
     image: 'all' | 'with' | 'without';
 };
 
 type RawFilters = {
     active: boolean | null;
     category: number | null;
-    country?: string | null;
-    pot?: string | null;
-    height?: string | null;
+    country?: string[] | string | null;
+    pot?: string[] | string | null;
+    height?: string[] | string | null;
     image?: string | null;
 };
 
@@ -60,12 +60,17 @@ type Props = {
     heightOptions?: string[];
 };
 
+const normalizeMultiFilter = (value?: string[] | string | null): string[] => {
+    const values = Array.isArray(value) ? value : value ? [value] : [];
+    return Array.from(new Set(values.map((item) => String(item).trim()).filter(Boolean)));
+};
+
 const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersState & CartFilter => ({
     active: raw?.active === true ? 'active' : raw?.active === false ? 'inactive' : 'all',
     category: raw?.category ?? null,
-    country: raw?.country ?? null,
-    pot: raw?.pot ?? null,
-    height: raw?.height ?? null,
+    country: normalizeMultiFilter(raw?.country),
+    pot: normalizeMultiFilter(raw?.pot),
+    height: normalizeMultiFilter(raw?.height),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
     cart: cartFilter?.cart,
 });
@@ -124,21 +129,60 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         return normalized;
     };
 
+    const categoryChoices = categoryOptions.length > 0
+        ? categories.filter((category) => categoryOptions.includes(category.id))
+        : categories;
+    const countries = Array.from(
+        new Set(
+            countryOptions
+                .map((value) => normalizeCountry(value))
+                .filter((value): value is string => Boolean(value))
+        )
+    ).sort((a, b) => a.localeCompare(b));
+    const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
+    const singleCountry = countries.length === 1 ? countries[0] : null;
+    const singlePot = potOptions.length === 1 ? potOptions[0] : null;
+    const singleHeight = heightOptions.length === 1 ? heightOptions[0] : null;
+    const singleFilters = [
+        singleCategory && filtersState.category === null
+            ? { name: 'category', label: singleCategory.name }
+            : null,
+        singleCountry && filtersState.country.length === 0
+            ? { name: 'country', label: getCountryLabel(singleCountry), country: singleCountry }
+            : null,
+        singlePot && filtersState.pot.length === 0
+            ? { name: 'pot', label: String(singlePot), title: `${t('Pot diameter')}: ${singlePot}` }
+            : null,
+        singleHeight && filtersState.height.length === 0
+            ? { name: 'height', label: String(singleHeight), title: `${t('Height')}: ${singleHeight}` }
+            : null,
+    ].filter((item): item is NonNullable<typeof item> => item !== null);
+
     const filtersActive = [
-        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
-        filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
-        filtersState.country !== null
+        filtersState.image !== 'all'
             ? {
-                name: 'country',
-                label: getCountryLabel(filtersState.country) || '',
-                value: normalizeCountry(filtersState.country) ?? undefined,
+                name: 'image',
+                label: t(filtersState.image === 'with' ? 'With image' : 'Without image'),
+                value: filtersState.image,
             }
             : null,
-        filtersState.pot !== null ? { name: 'pot', label: `${t('Pot')}: ${filtersState.pot}` } : null,
-        filtersState.height !== null ? { name: 'height', label: `${t('Height')}: ${filtersState.height}` } : null,
-        filtersState.image !== 'all' ? { name: 'image', label: t(filtersState.image === 'with' ? 'With image' : 'Without image') } : null,
+        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
+        filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
+        filtersState.country.length > 0
+            ? {
+                name: 'country',
+                label: filtersState.country.map(getCountryLabel).join(', '),
+                values: filtersState.country.map((value) => normalizeCountry(value) ?? value),
+            }
+            : null,
+        filtersState.pot.length > 0
+            ? { name: 'pot', label: `${t('Pot diameter')}: ${filtersState.pot.join(', ')}`, values: filtersState.pot }
+            : null,
+        filtersState.height.length > 0
+            ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
+            : null,
         filtersState.cart ? { name: 'cart', label: `Panier (${cartItems.length})` } : null,
-    ].filter((item): item is { name: string; label: string } => Boolean(item && item.label));
+    ].filter((item): item is NonNullable<typeof item> => Boolean(item?.label));
 
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
         if (typeof window === 'undefined') return 'table';
@@ -147,7 +191,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     });
 
     const buildQueryParams = (nextFilters: FiltersState & CartFilter, searchOverride: string | null = q ?? '') => {
-        const params: Record<string, string | number> = {};
+        const params: Record<string, string | number | string[]> = {};
         const qValue = (searchOverride ?? '').trim();
 
         if (qValue.length > 0) {
@@ -164,15 +208,15 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.category = nextFilters.category;
         }
 
-        if (nextFilters.country) {
+        if (nextFilters.country.length > 0) {
             params.country = nextFilters.country;
         }
 
-        if (nextFilters.pot) {
+        if (nextFilters.pot.length > 0) {
             params.pot = nextFilters.pot;
         }
 
-        if (nextFilters.height) {
+        if (nextFilters.height.length > 0) {
             params.height = nextFilters.height;
         }
 
@@ -208,11 +252,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         } else if (key === 'category') {
             nextFilters.category = null;
         } else if (key === 'country') {
-            nextFilters.country = null;
+            nextFilters.country = [];
         } else if (key === 'pot') {
-            nextFilters.pot = null;
+            nextFilters.pot = [];
         } else if (key === 'height') {
-            nextFilters.height = null;
+            nextFilters.height = [];
         } else if (key === 'image') {
             nextFilters.image = 'all';
         } else if (key === 'cart') {
@@ -235,9 +279,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         const nextFilters: FiltersState & CartFilter = {
             active: 'all',
             category: null,
-            country: null,
-            pot: null,
-            height: null,
+            country: [],
+            pot: [],
+            height: [],
             image: 'all',
             cart: undefined,
         };
@@ -272,10 +316,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         if (timerRef.current) {
             clearTimeout(timerRef.current);
         }
-        router.cancelAll();
         if (s.length < 2) {
             return;
         }
+        router.cancelAll();
         setFetching(true);
         timerRef.current = setTimeout(async () => {
             try {
@@ -317,6 +361,20 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         // console.log("selected:", trimmed);
     };
 
+    const handleSelectOption = (option: SearchOption) => {
+        if (option.kind !== 'category' || typeof option.id !== 'number') {
+            return false;
+        }
+
+        setSearch('');
+        applyFilters({
+            ...filtersState,
+            category: option.id,
+        });
+
+        return true;
+    };
+
     const uniqueCount = Array.from(new Set(collection.data.map((p: Product) => p.id))).length;
 
     // console.log('Debug filters:', { 
@@ -347,10 +405,12 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     value={search}
                     onChange={handleSearch}
                     onSubmit={onSelect}
+                    onSelectOption={handleSelectOption}
                     propositions={searchPropositionsState}
                     loading={fetching}
                     count={collection.meta.total}
                     query={q ?? ''}
+                    fixedFilters={singleFilters}
                     filters={(
                         <ProductsFilters
                             categories={categories}

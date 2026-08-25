@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
 import {
     DropdownMenu,
+    DropdownMenuCheckboxItem,
     DropdownMenuContent,
-    DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
-import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
 import { type ProductCategory } from "@/types";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,115 @@ import { Checkbox } from "../ui/checkbox";
 
 type FilterActive = 'all' | 'active' | 'inactive';
 type ImageFilter = 'all' | 'with' | 'without';
+type ProductsFilterValues = {
+    active: FilterActive;
+    category: number | null;
+    country: string[];
+    pot: string[];
+    height: string[];
+    image: ImageFilter;
+};
+
+type MultiSelectOption = {
+    value: string;
+    text: string;
+    label: ReactNode;
+};
+
+function MultiSelectDropdown({
+    label,
+    allLabel,
+    options,
+    selected,
+    onApply,
+    applyLabel,
+    clearLabel,
+}: {
+    label: string;
+    allLabel: string;
+    options: MultiSelectOption[];
+    selected: string[];
+    onApply: (values: string[]) => void;
+    applyLabel: string;
+    clearLabel: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState<string[]>(selected);
+
+    useEffect(() => {
+        if (!open) {
+            setDraft(selected);
+        }
+    }, [selected, open]);
+
+    const summaryValues = selected
+        .map((value) => options.find((option) => option.value === value)?.text ?? value);
+    const summary = summaryValues.length === 0
+        ? allLabel
+        : summaryValues.length <= 2
+            ? summaryValues.join(', ')
+            : `${summaryValues.slice(0, 2).join(', ')} +${summaryValues.length - 2}`;
+
+    return (
+        <div className="w-full space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <DropdownMenu
+                modal={false}
+                open={open}
+                onOpenChange={(nextOpen) => {
+                    if (nextOpen) {
+                        setDraft(selected);
+                    }
+                    setOpen(nextOpen);
+                }}
+            >
+                <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
+                        <span className="truncate">{summary}</span>
+                        <ChevronDown className="size-5" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    align="start"
+                    className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]"
+                >
+                    <div className="max-h-60 overflow-y-auto">
+                        {options.map((option) => (
+                            <DropdownMenuCheckboxItem
+                                key={option.value}
+                                checked={draft.includes(option.value)}
+                                onCheckedChange={() => {
+                                    setDraft((current) => current.includes(option.value)
+                                        ? current.filter((value) => value !== option.value)
+                                        : [...current, option.value]);
+                                }}
+                                onSelect={(event) => event.preventDefault()}
+                            >
+                                {option.label}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </div>
+                    <DropdownMenuSeparator />
+                    <div className="flex items-center justify-end gap-2 p-1">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setDraft([])}>
+                            {clearLabel}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                                onApply(draft);
+                                setOpen(false);
+                            }}
+                        >
+                            {applyLabel}
+                        </Button>
+                    </div>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    );
+}
 
 type ProductsFiltersProps = {
     categories: ProductCategory[];
@@ -28,12 +137,12 @@ type ProductsFiltersProps = {
     heightOptions: string[];
     active: FilterActive;
     categoryId: number | null;
-    country?: string | null;
-    pot?: string | null;
-    height?: string | null;
+    country?: string[];
+    pot?: string[];
+    height?: string[];
     image?: ImageFilter | null;
-    onApply: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null; image: ImageFilter }) => void;
-    onChange?: (filters: { active: FilterActive; category: number | null; country: string | null; pot: string | null; height: string | null; image: ImageFilter }) => void;
+    onApply: (filters: ProductsFilterValues) => void;
+    onChange?: (filters: ProductsFilterValues) => void;
     closeFilters?: () => void;
     autoApply?: boolean;
 };
@@ -60,24 +169,21 @@ export function ProductsFilters({
     const [localActive, setLocalActive] = useState<FilterActive>(active);
     const ALL_CATEGORIES = "all";
     const [localCategory, setLocalCategory] = useState<string>(categoryId ? String(categoryId) : ALL_CATEGORIES);
-    const ALL_COUNTRIES = "all";
-    const [localCountry, setLocalCountry] = useState<string>(country ? String(country) : ALL_COUNTRIES);
-    const ALL_POTS = "all";
-    const [localPot, setLocalPot] = useState<string>(pot ? String(pot) : ALL_POTS);
-    const ALL_HEIGHTS = "all";
-    const [localHeight, setLocalHeight] = useState<string>(height ? String(height) : ALL_HEIGHTS);
+    const [localCountry, setLocalCountry] = useState<string[]>(country ?? []);
+    const [localPot, setLocalPot] = useState<string[]>(pot ?? []);
+    const [localHeight, setLocalHeight] = useState<string[]>(height ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
     const didInitRef = useRef(false);
     const lastAppliedRef = useRef<string>(
-        `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}|${localImage}`
+        `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}`
     );
 
     useEffect(() => {
         setLocalActive(active);
         setLocalCategory(categoryId ? String(categoryId) : ALL_CATEGORIES);
-        setLocalCountry(country ? String(country) : ALL_COUNTRIES);
-        setLocalPot(pot ? String(pot) : ALL_POTS);
-        setLocalHeight(height ? String(height) : ALL_HEIGHTS);
+        setLocalCountry(country ?? []);
+        setLocalPot(pot ?? []);
+        setLocalHeight(height ?? []);
         setLocalImage(image === 'with' || image === 'without' ? image : 'all');
     }, [active, categoryId, country, pot, height, image]);
 
@@ -85,9 +191,9 @@ export function ProductsFilters({
         onChange?.({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
-            pot: localPot !== ALL_POTS ? localPot : null,
-            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            country: localCountry,
+            pot: localPot,
+            height: localHeight,
             image: localImage,
         });
     }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onChange]);
@@ -102,7 +208,7 @@ export function ProductsFilters({
             return;
         }
 
-        const nextKey = `${localActive}|${localCategory}|${localCountry}|${localPot}|${localHeight}|${localImage}`;
+        const nextKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}`;
         if (nextKey === lastAppliedRef.current) {
             return;
         }
@@ -111,18 +217,18 @@ export function ProductsFilters({
         onApply({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
-            pot: localPot !== ALL_POTS ? localPot : null,
-            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            country: localCountry,
+            pot: localPot,
+            height: localHeight,
             image: localImage,
         });
     }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onApply, autoApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
-        || localCountry !== ALL_COUNTRIES
-        || localPot !== ALL_POTS
-        || localHeight !== ALL_HEIGHTS
+        || localCountry.length > 0
+        || localPot.length > 0
+        || localHeight.length > 0
         || localImage !== 'all';
 
 
@@ -130,9 +236,9 @@ export function ProductsFilters({
         onApply({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: localCountry !== ALL_COUNTRIES ? localCountry : null,
-            pot: localPot !== ALL_POTS ? localPot : null,
-            height: localHeight !== ALL_HEIGHTS ? localHeight : null,
+            country: localCountry,
+            pot: localPot,
+            height: localHeight,
             image: localImage,
         });
         closeFilters?.();
@@ -141,18 +247,30 @@ export function ProductsFilters({
     const reset = () => {
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
-        setLocalCountry(ALL_COUNTRIES);
-        setLocalPot(ALL_POTS);
-        setLocalHeight(ALL_HEIGHTS);
+        setLocalCountry([]);
+        setLocalPot([]);
+        setLocalHeight([]);
         setLocalImage('all');
-        onApply({ active: 'all', category: null, country: null, pot: null, height: null, image: 'all' });
+        onApply({ active: 'all', category: null, country: [], pot: [], height: [], image: 'all' });
         closeFilters?.();
     };
 
-    const renderCategoryLabel = (category: ProductCategory) => {
-        const depth = category.depth ?? 0;
-        const prefix = depth > 0 ? `${' '.repeat(depth * 2)} ` : "";
-        return `${prefix}${category.name}`;
+    const applyMultiFilter = (key: 'country' | 'pot' | 'height', values: string[]) => {
+        const next: ProductsFilterValues = {
+            active: localActive,
+            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
+            country: key === 'country' ? values : localCountry,
+            pot: key === 'pot' ? values : localPot,
+            height: key === 'height' ? values : localHeight,
+            image: localImage,
+        };
+
+        if (key === 'country') setLocalCountry(values);
+        if (key === 'pot') setLocalPot(values);
+        if (key === 'height') setLocalHeight(values);
+
+        lastAppliedRef.current = `${next.active}|${next.category ?? ALL_CATEGORIES}|${next.country.join(',')}|${next.pot.join(',')}|${next.height.join(',')}|${next.image}`;
+        onApply(next);
     };
 
     const normalizeCountry = (value?: string | null) => {
@@ -173,11 +291,17 @@ export function ProductsFilters({
 
     const countries = Array.from(
         new Set(
-            (countryOptions || [])
+            [...(countryOptions || []), ...localCountry]
                 .map((value) => normalizeCountry(value))
                 .filter((value): value is string => Boolean(value))
         )
     ).sort((a, b) => a.localeCompare(b));
+    const availablePotOptions = Array.from(
+        new Set([...(potOptions || []), ...localPot].map((value) => String(value)))
+    ).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+    const availableHeightOptions = Array.from(
+        new Set([...(heightOptions || []), ...localHeight].map((value) => String(value)))
+    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
     const categoryChoices = categoryOptions.length > 0
         ? categories.filter((category) => categoryOptions.includes(category.id))
@@ -251,36 +375,9 @@ export function ProductsFilters({
     };
 
     const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
-    const singleCountry = countries.length === 1 ? countries[0] : null;
-    const singlePot = potOptions.length === 1 ? potOptions[0] : null;
-    const singleHeight = heightOptions.length === 1 ? heightOptions[0] : null;
-
-    const singleFilters = [
-        singleCategory ? { key: 'category', label: t('Category'), value: renderCategoryLabel(singleCategory) } : null,
-        singleCountry ? { key: 'country', label: t('Country'), value: getCountryLabel(singleCountry) } : null,
-        singlePot ? { key: 'pot', label: t('Pot diameter'), value: String(singlePot) } : null,
-        singleHeight ? { key: 'height', label: t('Height'), value: String(singleHeight) } : null,
-    ].filter((item): item is { key: string; label: string; value: string } => Boolean(item));
 
     return (
         <div className="w-full space-y-4 text-left">
-            {singleFilters.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                    {singleFilters.map((filter) => (
-                        <div key={filter.key} className="flex items-center gap-2">
-                            {filter.key === 'country' && singleCountry ? (
-                                (() => {
-                                    const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[singleCountry];
-                                    return Flag ? <Flag title={filter.value} className="w-4" /> : null;
-                                })()
-                            ) : null}
-                            <span className="font-semibold uppercase tracking-wide">{filter.label}</span>
-                            <span>{filter.value}</span>
-                        </div>
-                    ))}
-                </div>
-            )}
-
             <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2 md:border-r md:pr-6">
                     {!singleCategory && (
@@ -416,115 +513,61 @@ export function ProductsFilters({
                         </div>
                     </div>
 
-                    {!singleCountry && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Country')}</p>
-                            <ToggleGroup
-                                type="single"
-                                variant="outline"
-                                size="sm"
-                                className="flex w-full flex-wrap"
-                                spacing={2}
-                                value={localCountry}
-                                onValueChange={(val) => setLocalCountry(val || ALL_COUNTRIES)}
-                            >
-                                <ToggleGroupItem value={ALL_COUNTRIES}>
-                                    {t('All countries')}
-                                </ToggleGroupItem>
-                                {countries.map((code) => {
-                                    const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
-                                    return (
-                                        <ToggleGroupItem key={code} value={code}>
-                                            {Flag && <Flag title={getCountryLabel(code)} className="mr-1 w-4" />}
-                                            {getCountryLabel(code)}
-                                        </ToggleGroupItem>
-                                    );
-                                })}
-                            </ToggleGroup>
-                        </div>
+                    {countries.length >= 2 && (
+                        <MultiSelectDropdown
+                            label={t('Country')}
+                            allLabel={t('All countries')}
+                            options={countries.map((code) => {
+                                const countryLabel = getCountryLabel(code);
+                                const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
+                                return {
+                                    value: code,
+                                    text: countryLabel,
+                                    label: (
+                                        <span className="flex items-center gap-2">
+                                            {Flag ? <Flag title={countryLabel} className="w-4" /> : null}
+                                            {countryLabel}
+                                        </span>
+                                    ),
+                                };
+                            })}
+                            selected={localCountry}
+                            onApply={(values) => applyMultiFilter('country', values)}
+                            applyLabel={t('Apply filters')}
+                            clearLabel={t('Reset')}
+                        />
                     )}
 
-                    {!singlePot && (
-                        <div className="w-full space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Pot diameter')}</p>
-
-                            <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
-                                        <span className="truncate">
-                                            {localPot === ALL_POTS ? t('All pot diameters') : localPot}
-                                        </span>
-                                        <ChevronDown className="size-5" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="start"
-                                    className="max-h-75 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto md:max-h-80"
-                                >
-                                    <DropdownMenuItem
-                                        onSelect={() => setLocalPot(ALL_POTS)}
-                                        className={localPot === ALL_POTS ? "bg-accent" : undefined}
-                                    >
-                                        {t('All pot diameters')}
-                                    </DropdownMenuItem>
-                                    {(potOptions || []).map((value) => {
-                                        const option = String(value);
-                                        const isSelected = localPot === option;
-
-                                        return (
-                                            <DropdownMenuItem
-                                                key={option}
-                                                onSelect={() => setLocalPot(option)}
-                                                className={isSelected ? "bg-accent" : undefined}
-                                            >
-                                                {option}
-                                            </DropdownMenuItem>
-                                        );
-                                    })}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
+                    {availablePotOptions.length >= 2 && (
+                        <MultiSelectDropdown
+                            label={t('Pot diameter')}
+                            allLabel={t('All pot diameters')}
+                            options={availablePotOptions.map((value) => ({
+                                value: String(value),
+                                text: String(value),
+                                label: String(value),
+                            }))}
+                            selected={localPot}
+                            onApply={(values) => applyMultiFilter('pot', values)}
+                            applyLabel={t('Apply filters')}
+                            clearLabel={t('Reset')}
+                        />
                     )}
 
-                    {!singleHeight && (
-                        <div className="w-full space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Height')}</p>
-                            <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
-                                        <span className="truncate">
-                                            {localHeight === ALL_HEIGHTS ? t('All heights') : localHeight}
-                                        </span>
-                                        <ChevronDown className="size-5" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="start"
-                                    className="max-h-75 w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-auto md:max-h-80"
-                                >
-                                    <DropdownMenuItem
-                                        onSelect={() => setLocalHeight(ALL_HEIGHTS)}
-                                        className={localHeight === ALL_HEIGHTS ? "bg-accent" : undefined}
-                                    >
-                                        {t('All heights')}
-                                    </DropdownMenuItem>
-                                    {(heightOptions || []).map((value) => {
-                                        const option = String(value);
-                                        const isSelected = localHeight === option;
-
-                                        return (
-                                            <DropdownMenuItem
-                                                key={option}
-                                                onSelect={() => setLocalHeight(option)}
-                                                className={isSelected ? "bg-accent" : undefined}
-                                            >
-                                                {option}
-                                            </DropdownMenuItem>
-                                        );
-                                    })}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
+                    {availableHeightOptions.length >= 2 && (
+                        <MultiSelectDropdown
+                            label={t('Height')}
+                            allLabel={t('All heights')}
+                            options={availableHeightOptions.map((value) => ({
+                                value: String(value),
+                                text: String(value),
+                                label: String(value),
+                            }))}
+                            selected={localHeight}
+                            onApply={(values) => applyMultiFilter('height', values)}
+                            applyLabel={t('Apply filters')}
+                            clearLabel={t('Reset')}
+                        />
                     )}
 
                     <div className="flex justify-end gap-2 pt-2">

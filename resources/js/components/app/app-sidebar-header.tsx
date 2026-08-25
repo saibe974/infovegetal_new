@@ -28,27 +28,32 @@ type ImageFilter = 'all' | 'with' | 'without';
 type FiltersState = {
     active: FilterActive;
     category: number | null;
-    country: string | null;
-    pot: string | null;
-    height: string | null;
+    country: string[];
+    pot: string[];
+    height: string[];
     image: ImageFilter;
 };
 
 type HomeFilterProps = {
     active: boolean | null;
     category: number | null;
-    country?: string | null;
-    pot?: string | null;
-    height?: string | null;
+    country?: string[] | string | null;
+    pot?: string[] | string | null;
+    height?: string[] | string | null;
     image?: string | null;
+};
+
+const normalizeMultiFilter = (value?: string[] | string | null): string[] => {
+    const values = Array.isArray(value) ? value : value ? [value] : [];
+    return Array.from(new Set(values.map((item) => String(item).trim()).filter(Boolean)));
 };
 
 const normalizeFilters = (raw?: HomeFilterProps): FiltersState => ({
     active: raw?.active === true ? 'active' : raw?.active === false ? 'inactive' : 'all',
     category: raw?.category ?? null,
-    country: raw?.country ?? null,
-    pot: raw?.pot ?? null,
-    height: raw?.height ?? null,
+    country: normalizeMultiFilter(raw?.country),
+    pot: normalizeMultiFilter(raw?.pot),
+    height: normalizeMultiFilter(raw?.height),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
 });
 
@@ -122,22 +127,32 @@ export function AppSidebarHeader({
     };
 
     const filtersActive = [
-        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
-        filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
-        filtersState.country !== null
+        filtersState.image !== 'all'
             ? {
-                name: 'country',
-                label: getCountryLabel(filtersState.country) || '',
-                value: normalizeCountry(filtersState.country) ?? undefined,
+                name: 'image',
+                label: t(filtersState.image === 'with' ? 'With image' : 'Without image'),
+                value: filtersState.image,
             }
             : null,
-        filtersState.pot !== null ? { name: 'pot', label: `${t('Pot')}: ${filtersState.pot}` } : null,
-        filtersState.height !== null ? { name: 'height', label: `${t('Height')}: ${filtersState.height}` } : null,
-        filtersState.image !== 'all' ? { name: 'image', label: t(filtersState.image === 'with' ? 'With image' : 'Without image') } : null,
-    ].filter((item): item is { name: string; label: string; value?: string } => Boolean(item && item.label));
+        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
+        filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
+        filtersState.country.length > 0
+            ? {
+                name: 'country',
+                label: filtersState.country.map(getCountryLabel).join(', '),
+                values: filtersState.country.map((value) => normalizeCountry(value) ?? value),
+            }
+            : null,
+        filtersState.pot.length > 0
+            ? { name: 'pot', label: `${t('Pot diameter')}: ${filtersState.pot.join(', ')}`, values: filtersState.pot }
+            : null,
+        filtersState.height.length > 0
+            ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
+            : null,
+    ].filter((item): item is NonNullable<typeof item> => Boolean(item?.label));
 
     const buildQueryParams = (nextFilters: FiltersState, searchOverride: string | null = '') => {
-        const params: Record<string, string | number> = {};
+        const params: Record<string, string | number | string[]> = {};
         const qValue = (searchOverride ?? '').trim();
 
         if (qValue.length > 0) {
@@ -154,15 +169,15 @@ export function AppSidebarHeader({
             params.category = nextFilters.category;
         }
 
-        if (nextFilters.country) {
+        if (nextFilters.country.length > 0) {
             params.country = nextFilters.country;
         }
 
-        if (nextFilters.pot) {
+        if (nextFilters.pot.length > 0) {
             params.pot = nextFilters.pot;
         }
 
-        if (nextFilters.height) {
+        if (nextFilters.height.length > 0) {
             params.height = nextFilters.height;
         }
 
@@ -194,11 +209,11 @@ export function AppSidebarHeader({
         } else if (key === 'category') {
             nextFilters.category = null;
         } else if (key === 'country') {
-            nextFilters.country = null;
+            nextFilters.country = [];
         } else if (key === 'pot') {
-            nextFilters.pot = null;
+            nextFilters.pot = [];
         } else if (key === 'height') {
-            nextFilters.height = null;
+            nextFilters.height = [];
         } else if (key === 'image') {
             nextFilters.image = 'all';
         }
@@ -210,9 +225,9 @@ export function AppSidebarHeader({
         const nextFilters: FiltersState = {
             active: 'all',
             category: null,
-            country: null,
-            pot: null,
-            height: null,
+            country: [],
+            pot: [],
+            height: [],
             image: 'all',
         };
 
