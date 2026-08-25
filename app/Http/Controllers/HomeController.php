@@ -46,6 +46,7 @@ class HomeController extends Controller
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
+        $promo = $request->boolean('promo');
 
         $filters = [
             'category' => $categoryId,
@@ -53,6 +54,7 @@ class HomeController extends Controller
             'pot' => $pot,
             'height' => $height,
             'image' => $image,
+            'promo' => $promo,
         ];
 
         $applyFilters = function ($q, array $filters, array $skip = []) {
@@ -76,6 +78,16 @@ class HomeController extends Controller
 
             if (!in_array('image', $skip, true)) {
                 $q->imageAvailability($filters['image']);
+            }
+
+            if (!in_array('promo', $skip, true) && $filters['promo']) {
+                $q->whereNotNull('price_promo')
+                    ->where('price_promo', '>', 0)
+                    ->where(function ($promoQuery) {
+                        $promoQuery
+                            ->whereNull('price_roll')
+                            ->orWhereColumn('price_promo', '<>', 'price_roll');
+                    });
             }
         };
 
@@ -146,6 +158,7 @@ class HomeController extends Controller
                 'pot' => $pot,
                 'height' => $height,
                 'image' => $image,
+                'promo' => $promo,
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()

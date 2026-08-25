@@ -67,3 +67,45 @@ it('filters products with multiple countries, pot diameters and heights', functi
         ->and($payload['props']['filters']['pot'] ?? null)->toBe(['12', '14'])
         ->and($payload['props']['filters']['height'] ?? null)->toBe(['40', '60']);
 });
+
+it('keeps only genuine promotional roll prices', function (): void {
+    $database = createMultiFilterDatabase('PROMO');
+
+    createMultiFilterProduct('promo-match', $database, '12', '40')->update([
+        'price_roll' => 10,
+        'price_promo' => 8,
+    ]);
+    createMultiFilterProduct('promo-no-roll', $database, '12', '40')->update([
+        'price_roll' => null,
+        'price_promo' => 7,
+    ]);
+    createMultiFilterProduct('promo-equal', $database, '12', '40')->update([
+        'price_roll' => 10,
+        'price_promo' => 10,
+    ]);
+    createMultiFilterProduct('promo-zero', $database, '12', '40')->update([
+        'price_roll' => 10,
+        'price_promo' => 0,
+    ]);
+    createMultiFilterProduct('promo-null', $database, '12', '40')->update([
+        'price_roll' => 10,
+        'price_promo' => null,
+    ]);
+
+    $request = Request::create(route('products.index'), 'GET', [
+        'promo' => 1,
+        'sort' => 'name',
+        'dir' => 'asc',
+    ], [], [], [
+        'HTTP_X_INERTIA' => 'true',
+        'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+    ]);
+
+    $response = app(ProductController::class)->index($request);
+    $content = $response->toResponse($request)->getContent();
+    $payload = is_string($content) ? json_decode($content, true) : [];
+
+    expect(collect($payload['props']['collection']['data'] ?? [])->pluck('name')->all())
+        ->toBe(['Multi filter promo-match', 'Multi filter promo-no-roll'])
+        ->and($payload['props']['filters']['promo'] ?? null)->toBeTrue();
+});

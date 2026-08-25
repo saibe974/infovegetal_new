@@ -12,7 +12,7 @@ import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ProductCategory } from "@/types";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 import { Checkbox } from "../ui/checkbox";
@@ -26,6 +26,7 @@ type ProductsFilterValues = {
     pot: string[];
     height: string[];
     image: ImageFilter;
+    promo: boolean;
 };
 
 type MultiSelectOption = {
@@ -141,6 +142,7 @@ type ProductsFiltersProps = {
     pot?: string[];
     height?: string[];
     image?: ImageFilter | null;
+    promo?: boolean | null;
     onApply: (filters: ProductsFilterValues) => void;
     onChange?: (filters: ProductsFilterValues) => void;
     closeFilters?: () => void;
@@ -159,6 +161,7 @@ export function ProductsFilters({
     pot,
     height,
     image,
+    promo,
     onApply,
     onChange,
     closeFilters,
@@ -173,9 +176,10 @@ export function ProductsFilters({
     const [localPot, setLocalPot] = useState<string[]>(pot ?? []);
     const [localHeight, setLocalHeight] = useState<string[]>(height ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
+    const [localPromo, setLocalPromo] = useState(Boolean(promo));
     const didInitRef = useRef(false);
     const lastAppliedRef = useRef<string>(
-        `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}`
+        `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`
     );
 
     useEffect(() => {
@@ -185,7 +189,8 @@ export function ProductsFilters({
         setLocalPot(pot ?? []);
         setLocalHeight(height ?? []);
         setLocalImage(image === 'with' || image === 'without' ? image : 'all');
-    }, [active, categoryId, country, pot, height, image]);
+        setLocalPromo(Boolean(promo));
+    }, [active, categoryId, country, pot, height, image, promo]);
 
     useEffect(() => {
         onChange?.({
@@ -195,8 +200,9 @@ export function ProductsFilters({
             pot: localPot,
             height: localHeight,
             image: localImage,
+            promo: localPromo,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onChange]);
+    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onChange]);
 
     useEffect(() => {
         if (!autoApply) {
@@ -208,7 +214,7 @@ export function ProductsFilters({
             return;
         }
 
-        const nextKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}`;
+        const nextKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`;
         if (nextKey === lastAppliedRef.current) {
             return;
         }
@@ -221,15 +227,17 @@ export function ProductsFilters({
             pot: localPot,
             height: localHeight,
             image: localImage,
+            promo: localPromo,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, onApply, autoApply]);
+    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onApply, autoApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
         || localCountry.length > 0
         || localPot.length > 0
         || localHeight.length > 0
-        || localImage !== 'all';
+        || localImage !== 'all'
+        || localPromo;
 
 
     const apply = () => {
@@ -240,6 +248,7 @@ export function ProductsFilters({
             pot: localPot,
             height: localHeight,
             image: localImage,
+            promo: localPromo,
         });
         closeFilters?.();
     };
@@ -251,7 +260,8 @@ export function ProductsFilters({
         setLocalPot([]);
         setLocalHeight([]);
         setLocalImage('all');
-        onApply({ active: 'all', category: null, country: [], pot: [], height: [], image: 'all' });
+        setLocalPromo(false);
+        onApply({ active: 'all', category: null, country: [], pot: [], height: [], image: 'all', promo: false });
         closeFilters?.();
     };
 
@@ -263,13 +273,14 @@ export function ProductsFilters({
             pot: key === 'pot' ? values : localPot,
             height: key === 'height' ? values : localHeight,
             image: localImage,
+            promo: localPromo,
         };
 
         if (key === 'country') setLocalCountry(values);
         if (key === 'pot') setLocalPot(values);
         if (key === 'height') setLocalHeight(values);
 
-        lastAppliedRef.current = `${next.active}|${next.category ?? ALL_CATEGORIES}|${next.country.join(',')}|${next.pot.join(',')}|${next.height.join(',')}|${next.image}`;
+        lastAppliedRef.current = `${next.active}|${next.category ?? ALL_CATEGORIES}|${next.country.join(',')}|${next.pot.join(',')}|${next.height.join(',')}|${next.image}|${next.promo}`;
         onApply(next);
     };
 
@@ -512,6 +523,15 @@ export function ProductsFilters({
                             </label>
                         </div>
                     </div>
+
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <Checkbox
+                            checked={localPromo}
+                            onCheckedChange={(checked) => setLocalPromo(checked === true)}
+                        />
+                        <Zap className="size-4" />
+                        <span>{t('PROMO')}</span>
+                    </label>
 
                     {countries.length >= 2 && (
                         <MultiSelectDropdown
