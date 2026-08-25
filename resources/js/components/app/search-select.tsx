@@ -10,6 +10,7 @@ import {
     SearchIcon,
     SlidersHorizontalIcon,
     X,
+    Zap,
 } from 'lucide-react';
 import {
     ReactElement,
@@ -397,6 +398,7 @@ export default function SearchSelect({
                             .map((value) => value.toUpperCase())
                         : [];
                     const isImage = filter.name === 'image';
+                    const isPromo = filter.name === 'promo';
                     const isPot = filter.name === 'pot';
                     const isHeight = filter.name === 'height';
                     const compactValues = filter.values ?? (filter.value ? [filter.value] : []);
@@ -449,6 +451,8 @@ export default function SearchSelect({
                                 ) : (
                                     <Camera size={17} aria-hidden="true" />
                                 )
+                            ) : isPromo ? (
+                                <Zap size={17} aria-hidden="true" />
                             ) : isPot ? (
                                 <>
                                     <Diameter size={14} aria-hidden="true" />

@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Zap } from "lucide-react";
 import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
-import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
-import { useSidebar } from "../ui/sidebar";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { ProductOrderButtons } from "@/components/products/product-order-buttons";
 
 
 
@@ -34,8 +33,6 @@ export function ProductCard({
     showStatusBadge = false,
 }: Props) {
     const { t } = useI18n();
-
-    const { toggleSidebar, isOpenId } = useSidebar()
 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -63,13 +60,7 @@ export function ProductCard({
         }
     };
 
-    const { addToCart, items } = useContext(CartContext);
-    const handleAddToCart = (id: number, quantity: number) => {
-        addToCart(product, quantity);
-        if (!isOpenId('right')) {
-            toggleSidebar('right');
-        }
-    };
+    const { items } = useContext(CartContext);
 
     const isInCart = items.some((item) => item.product.id === product.id);
 
@@ -82,7 +73,8 @@ export function ProductCard({
         return `/products/${id}`;
     };
 
-    const { price, price_floor: priceFloor, price_roll: priceRoll, price_promo: pricePromo } = resolveProductPrices(product);
+    const { price, price_floor: priceFloor, price_roll: priceRoll } = resolveProductPrices(product);
+    const canOrder = isAuthenticated && (price !== null || priceFloor !== null || priceRoll !== null);
     const countryCode = (product.dbProduct?.country ?? '').trim().toUpperCase();
 
     // console.log(product)
@@ -214,100 +206,22 @@ export function ProductCard({
                     {/* <div className="flex-1" /> */}
 
 
-                    <div className="relative w-full">
-                        <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
-                        {product?.unite != null && product.unite > Number(product.cond) ? (
-                            <span className="absolute left-1/2 -top-2 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground">
-                                {t('Mini')} : {String(product.unite)}
-                            </span>
-                        ) : null}
-                    </div>
+                    {canOrder && (
+                        <div className="relative w-full">
+                            <div className="w-full h-1 bg-black/10 dark:bg-accent rounded" />
+                            {product?.unite != null && product.unite > Number(product.cond) ? (
+                                <span className="absolute left-1/2 -top-2 -translate-x-1/2 bg-card px-2 text-xs text-muted-foreground">
+                                    {t('Mini')} : {String(product.unite)}
+                                </span>
+                            ) : null}
+                        </div>
+                    )}
                 </CardContent>
 
-                {isAuthenticated && (
-                    <>
-                        <CardFooter className="flex flex-col lg:flex-row p-0 gap-2 w-full">
-                            {price !== null && (
-                                <button
-                                    className={cn(
-                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                        "bg-brand-tertiary hover:bg-brand-tertiary/90 text-white",
-                                        "dark:text-black",
-                                    )}
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleAddToCart(product.id, Number(product.cond))
-                                    }}
-                                    title={t('Add a tray')}
-                                >
-
-                                    <div className="flex items-center gap-1">
-                                        <span className="w-5 h-5">
-                                            <div dangerouslySetInnerHTML={{ __html: addCartonIcon }} />
-                                        </span>
-                                        <span className="font-semibold">{formatCurrency(price)}</span>
-                                    </div>
-                                    <span className="text-xs font-light">X {String(product.cond)}</span>
-                                </button>
-                            )}
-                            {priceFloor !== null ? (
-                                <button
-                                    className={cn(
-                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                        "bg-brand-secondary hover:bg-brand-secondary/90 text-white",
-                                        "dark:text-black",
-                                    )}
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleAddToCart(product.id, (Number(product.cond) * Number(product.floor)))
-                                    }}
-                                    title={t('Add a floor')}
-                                >
-
-                                    <div className="flex items-center gap-1">
-                                        <span className="w-5 h-5">
-                                            <div dangerouslySetInnerHTML={{ __html: addEtageIcon }} />
-                                        </span>
-                                        <span className="font-semibold">{formatCurrency(priceFloor)}</span>
-                                    </div>
-                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor)}</span>
-                                </button>
-                            ) : null}
-                            {priceRoll !== null ? (
-                                <button
-                                    className={cn(
-                                        "w-full gap-2 lg:gap-0 flex lg:flex-col items-center justify-center rounded-lg py-0.5",
-                                        "bg-brand-main hover:bg-brand-main-hover text-white",
-                                        "dark:text-black",
-                                    )}
-                                    onClick={(e: React.MouseEvent) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleAddToCart(product.id, (Number(product.cond) * Number(product.floor) * Number(product.roll)))
-                                    }}
-                                    title={t('Add a roll')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        <span className="w-5 h-5">
-                                            <div dangerouslySetInnerHTML={{ __html: addRollIcon }} />
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                "font-semibold",
-                                                product?.price_promo && Number(product.price_promo) > 0 ? "font-bold text-red-300 dark:text-red-600" : ""
-                                            )}
-                                        >
-                                            {pricePromo > 0 ? formatCurrency(pricePromo) : formatCurrency(priceRoll)}
-                                        </span>
-                                    </div>
-
-                                    <span className="text-xs font-light">X {Number(product.cond) * Number(product.floor) * Number(product.roll)}</span>
-                                </button>
-                            ) : null}
-                        </CardFooter>
-                    </>
+                {canOrder && (
+                    <CardFooter className="w-full p-0">
+                        <ProductOrderButtons product={product} className="flex w-full flex-col lg:flex-row" />
+                    </CardFooter>
                 )}
             </Card>
         </Link>

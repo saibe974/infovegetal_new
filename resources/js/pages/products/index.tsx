@@ -10,6 +10,7 @@ import { DialogUpload } from '@/components/dialog-upload';
 import { getEffectiveUser, isAdmin, hasPermission } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
+import { ProductsSmallCardsList } from '@/components/products/products-small-cards-list';
 import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -33,6 +34,7 @@ type FiltersState = {
     pot: string[];
     height: string[];
     image: 'all' | 'with' | 'without';
+    promo: boolean;
 };
 
 type RawFilters = {
@@ -42,6 +44,7 @@ type RawFilters = {
     pot?: string[] | string | null;
     height?: string[] | string | null;
     image?: string | null;
+    promo?: boolean | null;
 };
 
 type CartFilter = { cart?: string };
@@ -72,6 +75,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
     pot: normalizeMultiFilter(raw?.pot),
     height: normalizeMultiFilter(raw?.height),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
+    promo: raw?.promo === true,
     cart: cartFilter?.cart,
 });
 
@@ -166,6 +170,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 value: filtersState.image,
             }
             : null,
+        filtersState.promo
+            ? { name: 'promo', label: t('PROMO') }
+            : null,
         filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.country.length > 0
@@ -224,6 +231,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.image = nextFilters.image;
         }
 
+        if (nextFilters.promo) {
+            params.promo = 1;
+        }
+
         if (nextFilters.cart) {
             params.cart = 1;
         }
@@ -245,7 +256,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'cart') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo' | 'cart') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
@@ -259,6 +270,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             nextFilters.height = [];
         } else if (key === 'image') {
             nextFilters.image = 'all';
+        } else if (key === 'promo') {
+            nextFilters.promo = false;
         } else if (key === 'cart') {
             nextFilters.cart = undefined;
             // Seulement effacer le filtre session, pas le panier lui-même
@@ -283,6 +296,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             pot: [],
             height: [],
             image: 'all',
+            promo: false,
             cart: undefined,
         };
 
@@ -397,7 +411,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     pageKey="products"
-                    modes={['table', 'grid']}
+                    modes={['table', 'list', 'grid']}
                 />
                 {/* <div className="w-200 flex-1"> */}
                 <SearchSelect
@@ -424,11 +438,12 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                             pot={filtersState.pot}
                             height={filtersState.height}
                             image={filtersState.image}
+                            promo={filtersState.promo}
                             onApply={applyFilters}
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'cart')}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo' | 'cart')}
                     clearAll={clearAllFilters}
                 />
                 {/* </div> */}
@@ -484,6 +499,13 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                             }}
                             canEdit={canEdit}
                             canDelete={canDelete}
+                        />
+                    ) : viewMode === 'list' ? (
+                        <ProductsSmallCardsList
+                            products={uniqueProducts}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                            showStatusBadge={filtersState.active !== 'active'}
                         />
                     ) : (
                         <ProductsCardsList

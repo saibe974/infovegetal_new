@@ -92,11 +92,11 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                         >
                             <TableCell>{String(item.ref)}</TableCell>
                             <TableCell>
-                                <div className="relative w-20">
+                                <div className="relative size-20">
                                     {item.img_link ? (
-                                        <img src={item.image_thumb ?? item.img_link} className="w-20 object-cover" alt={item.name} />
+                                        <img src={item.image_thumb ?? item.img_link} className="size-full rounded-md object-cover object-center" alt={item.name} />
                                     ) : (
-                                        <img src={'/placeholder.png'} className="w-20 object-cover" alt="Placeholder" />
+                                        <img src={'/placeholder.png'} className="size-full rounded-md object-cover object-center" alt="Placeholder" />
                                     )}
                                     {countryCode ? (
                                         <span className="absolute right-1 top-1">
