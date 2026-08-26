@@ -134,9 +134,8 @@ try {
 set -eu
 cd '__REMOTE_DIRECTORY__'
 
-dirty="$(git status --porcelain)"
-if [ -n "$dirty" ]; then
-    echo "Le depot serveur contient des modifications locales :" >&2
+if git status --porcelain | grep -q .; then
+    echo 'Le depot serveur contient des modifications locales :' >&2
     git status --short >&2
     exit 1
 fi
