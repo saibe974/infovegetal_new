@@ -185,6 +185,48 @@
   --brand-tertiary: #00B07D;
 }
 
+html[data-accent='green'] {
+  --display-primary: oklch(0.49 0.13 160);
+  --display-ring: oklch(0.62 0.12 160);
+  --display-brand: #16835d;
+  --display-brand-hover: #11694b;
+}
+
+html[data-accent='blue'] {
+  --display-primary: oklch(0.55 0.21 263);
+  --display-ring: oklch(0.62 0.18 263);
+  --display-brand: #2563eb;
+  --display-brand-hover: #1d4ed8;
+}
+
+html[data-accent='neutral'] {
+  --display-primary: oklch(0.37 0.01 286);
+  --display-ring: oklch(0.55 0.01 286);
+  --display-brand: #52525b;
+  --display-brand-hover: #3f3f46;
+}
+
+html[data-accent='green'],
+html[data-accent='blue'],
+html[data-accent='neutral'] {
+  --primary: var(--display-primary);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: var(--display-ring);
+  --sidebar-primary: var(--display-primary);
+  --brand-main: var(--display-brand);
+  --brand-main-hover: var(--display-brand-hover);
+}
+
+html.dark[data-accent='green'],
+html.dark[data-accent='blue'],
+html.dark[data-accent='neutral'] {
+  --primary-foreground: oklch(0.16 0 0);
+}
+
+html[data-density='compact'] {
+  --spacing: 0.22rem;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -262,6 +304,70 @@
 
 /* Comportement cohérent pour tout élément cliquable */
 @layer components {
+
+  .appearance-choice {
+    @apply flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .appearance-choice[aria-pressed='true'] {
+    @apply border-primary bg-primary text-primary-foreground shadow-sm;
+  }
+
+  .appearance-accent-option {
+    @apply flex items-center gap-2 rounded-lg border border-border p-3 text-left text-sm transition-colors hover:bg-accent;
+  }
+
+  .appearance-accent-option[aria-pressed='true'] {
+    @apply border-primary ring-2 ring-primary/20;
+  }
+
+  .appearance-swatch {
+    @apply size-5 rounded-full border border-black/10;
+  }
+
+  .appearance-swatch[data-accent='brand'] {
+    background-color: #9c0060;
+  }
+
+  .dark .appearance-swatch[data-accent='brand'] {
+    background-color: #c6e300;
+  }
+
+  .appearance-swatch[data-accent='green'] {
+    background-color: #16835d;
+  }
+
+  .appearance-swatch[data-accent='blue'] {
+    background-color: #2563eb;
+  }
+
+  .appearance-swatch[data-accent='neutral'] {
+    background-color: #52525b;
+  }
+
+  .appearance-option-check {
+    @apply size-4 text-primary opacity-0;
+  }
+
+  .appearance-accent-option[aria-pressed='true'] .appearance-option-check {
+    @apply opacity-100;
+  }
+
+  .appearance-scope-switch {
+    @apply inline-flex overflow-hidden rounded-md border bg-background shadow-xs;
+  }
+
+  .appearance-scope-button {
+    @apply flex h-9 items-center gap-2 border-r px-3 text-sm text-muted-foreground transition-colors last:border-r-0 hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .appearance-scope-button[aria-pressed='true'] {
+    @apply bg-muted text-foreground;
+  }
+
+  .appearance-account-label {
+    @apply flex h-9 min-w-0 items-center gap-2 rounded-md border bg-muted px-3 text-sm;
+  }
 
   /* Utilisez .clickable ou [data-clickable] sur vos wrappers/boutons/liens */
   .clickable,

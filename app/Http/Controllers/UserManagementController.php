@@ -10,6 +10,7 @@ use App\Models\Cart;
 use App\Models\ClientSalesCondition;
 use App\Models\DbProducts;
 use App\Models\User;
+use App\Models\UserMeta;
 use App\Models\UserOption;
 use App\Services\PriceCalculatorService;
 use App\Services\UserImportService;
@@ -468,7 +469,7 @@ class UserManagementController extends Controller
                 : null,
             'childrenCount' => $user->children()->count(),
             'userMeta' => $user->usersMeta
-                ->where('key', '!=', 'logo')
+                ->whereNotIn('key', UserMeta::SYSTEM_KEYS)
                 ->values()
                 ->map(fn ($meta) => $meta->only([
                     'id', 'key', 'title', 'value', 'type', 'sort_order',
@@ -513,6 +514,7 @@ class UserManagementController extends Controller
                 : collect(),
             'userAbilities' => $this->userAbilities($request, $user),
             'userMeta' => $user->usersMeta()
+                ->where('key', '!=', UserMeta::APPEARANCE_PREFERENCES_KEY)
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(['id', 'user_id', 'key', 'title', 'value', 'type', 'sort_order']),

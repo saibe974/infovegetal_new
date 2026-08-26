@@ -10,6 +10,10 @@ class UserMeta extends Model
 {
     use HasFactory;
 
+    public const APPEARANCE_PREFERENCES_KEY = 'appearance_preferences';
+
+    public const SYSTEM_KEYS = ['logo', self::APPEARANCE_PREFERENCES_KEY];
+
     protected $table = 'users_meta';
 
     protected $fillable = [

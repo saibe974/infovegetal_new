@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Cart;
 use App\Models\User;
 use App\Services\UserManagementAuthorizationService;
+use App\Http\Controllers\Settings\AppearanceController;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -149,6 +150,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'query' => $request->query->all(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'appearancePreferences' => AppearanceController::preferencesFor($user),
         ];
     }
 }

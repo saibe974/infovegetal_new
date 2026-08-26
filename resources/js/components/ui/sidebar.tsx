@@ -5,6 +5,7 @@ import { MenuIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { persistSidebarPreference } from "@/lib/display-preferences"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -136,6 +137,7 @@ function SidebarProvider({
       setOpenMap((m) => {
         const updated = { ...m, [id]: !m[id] }
         saveSidebarStateToCookie(updated)
+        persistSidebarPreference(id, updated[id])
         return updated
       })
     },

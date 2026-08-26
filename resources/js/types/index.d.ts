@@ -1,6 +1,7 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type { DisplayPreferences } from '@/lib/display-preferences';
 
 export interface PaginatedCollection<T> {
     data: T[];
@@ -296,6 +297,7 @@ export interface SharedData {
     cart_refresh_token?: number | string | null;
     users?: User[];
     sidebarOpen: boolean;
+    appearancePreferences?: DisplayPreferences | null;
     flash: {
         success?: string;
         error?: string;

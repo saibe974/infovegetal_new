@@ -4,11 +4,9 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\UserAdditionalInfoController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
-use App\Models\User;
-use App\Services\UserManagementAuthorizationService;
+use App\Http\Controllers\Settings\AppearanceController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 Route::middleware('auth')->group(function () {
     // Redirect legacy settings root to the authenticated user's profile path
@@ -43,12 +41,11 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/contracts', [ProfileController::class, 'editContracts'])
         ->name('settings.contracts.edit');
 
-    Route::get('settings/appearance', function (Request $request) {
-        $user = $request->user();
-        return Inertia::render('settings/appearance', [
-            'editingUser' => $user?->load(['roles', 'permissions']),
-        ]);
-    })->name('settings.appearance.edit');
+    Route::get('settings/appearance', [AppearanceController::class, 'edit'])
+        ->name('settings.appearance.edit');
+
+    Route::put('settings/appearance', [AppearanceController::class, 'update'])
+        ->name('settings.appearance.update');
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
@@ -82,18 +79,11 @@ Route::middleware('auth')->group(function () {
     })->middleware('throttle:6,1')
             ->name('admin.password.update');
 
-    Route::get('admin/users/{user}/appearance', function (Request $request) {
-        $user = User::findOrFail($request->route('user'));
-        $authorization = app(UserManagementAuthorizationService::class);
+    Route::get('admin/users/{user}/appearance', [AppearanceController::class, 'edit'])
+        ->name('appearance.edit');
 
-        return Inertia::render('settings/appearance', [
-            'editingUser' => $user->load(['roles', 'permissions']),
-            'userAbilities' => [
-                'manage_db' => $authorization->canManageClientDatabase($request->user(), $user),
-                'can_access_contracts' => $user->canInvoiceAnyDbProduct(),
-            ],
-        ]);
-    })->name('appearance.edit');
+    Route::put('admin/users/{user}/appearance', [AppearanceController::class, 'update'])
+        ->name('appearance.update');
 
     Route::get('admin/users/{user}/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('admin.two-factor.show');

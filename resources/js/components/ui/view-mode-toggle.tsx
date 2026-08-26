@@ -2,6 +2,7 @@ import { LayoutGrid, LayoutList, ListCollapse, Network, Table2, LucideIcon } fro
 import { useEffect } from 'react';
 import { Button } from './button';
 import { useI18n } from '@/lib/i18n';
+import { persistPagePreference, type PreferencePage } from '@/lib/display-preferences';
 
 export type ViewMode = 'table' | 'list' | 'grid' | 'tree' | 'accordion';
 
@@ -41,6 +42,9 @@ export function ViewModeToggle({
             const views = JSON.parse(localStorage.getItem('views') || '{}');
             views[pageKey] = viewMode;
             localStorage.setItem('views', JSON.stringify(views));
+            if (pageKey === 'products' || pageKey === 'users') {
+                persistPagePreference(pageKey as PreferencePage, { view: viewMode });
+            }
         } catch {
             // ignore (ex: stockage bloqué)
         }

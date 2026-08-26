@@ -1,3 +1,4 @@
+import { persistThemePreference } from '@/lib/display-preferences';
 import { useCallback, useEffect, useState } from 'react';
 
 export type Appearance = 'light' | 'dark' | 'system';
@@ -58,6 +59,7 @@ export function useAppearance() {
 
         // Store in localStorage for client-side persistence...
         localStorage.setItem('appearance', mode);
+        persistThemePreference(mode);
 
         // Store in cookie for SSR...
         setCookie('appearance', mode);
@@ -69,7 +71,9 @@ export function useAppearance() {
         const savedAppearance = localStorage.getItem(
             'appearance',
         ) as Appearance | null;
-        updateAppearance(savedAppearance || 'system');
+        const initialAppearance = savedAppearance || 'system';
+        setAppearance(initialAppearance);
+        applyTheme(initialAppearance);
 
         return () =>
             mediaQuery()?.removeEventListener(
