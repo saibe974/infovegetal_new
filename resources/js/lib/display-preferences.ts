@@ -5,7 +5,11 @@ export type AccentColor = 'brand' | 'green' | 'blue' | 'neutral';
 export type DisplayDensity = 'comfortable' | 'compact';
 export type PreferenceScope = 'local' | 'account';
 export type PreferencePage = 'products' | 'users';
-export type CartConfirmationPreference = 'removeItem' | 'clearCart';
+export type CartConfirmationPreference =
+    | 'removeItem'
+    | 'clearCart'
+    | 'removeMissingImageLink'
+    | 'removeMissingImageLinks';
 
 export type PageDisplayPreference = {
     enabled: boolean;
@@ -24,6 +28,8 @@ export type DisplayPreferences = {
     confirmations: {
         removeItem: boolean;
         clearCart: boolean;
+        removeMissingImageLink: boolean;
+        removeMissingImageLinks: boolean;
     };
     pages: Record<PreferencePage, PageDisplayPreference>;
 };
@@ -42,6 +48,8 @@ export const defaultDisplayPreferences: DisplayPreferences = {
     confirmations: {
         removeItem: true,
         clearCart: true,
+        removeMissingImageLink: true,
+        removeMissingImageLinks: true,
     },
     pages: {
         products: {
@@ -96,6 +104,16 @@ export function normalizeDisplayPreferences(
             clearCart:
                 typeof confirmations.clearCart === 'boolean'
                     ? confirmations.clearCart
+                    : true,
+            removeMissingImageLink:
+                typeof confirmations.removeMissingImageLink === 'boolean'
+                    ? confirmations.removeMissingImageLink
+                    : typeof confirmations.removeMissingImageLinks === 'boolean'
+                        ? confirmations.removeMissingImageLinks
+                        : true,
+            removeMissingImageLinks:
+                typeof confirmations.removeMissingImageLinks === 'boolean'
+                    ? confirmations.removeMissingImageLinks
                     : true,
         },
         pages: {

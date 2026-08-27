@@ -45,6 +45,10 @@ type DialogUploadProps<TPostTreatmentProps extends PostTreatmentBaseProps = Post
     postTreatmentComponent?: React.ComponentType<TPostTreatmentProps>;
     postTreatmentProps?: Partial<TPostTreatmentProps>;
     disableProgressTracking?: boolean;
+    finishedLink?: {
+        label: string;
+        href: string;
+    };
 
 };
 
@@ -104,6 +108,7 @@ export function DialogUpload<TPostTreatmentProps extends PostTreatmentBaseProps 
     postTreatmentComponent,
     postTreatmentProps,
     disableProgressTracking = false,
+    finishedLink,
 }: DialogUploadProps<TPostTreatmentProps>) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<PondFile[]>([]);
@@ -972,6 +977,14 @@ export function DialogUpload<TPostTreatmentProps extends PostTreatmentBaseProps 
                                             : "Annuler l'import"}
                                     </button>
                                 )}
+                            {importStatus === 'finished' && finishedLink && (
+                                <a
+                                    href={finishedLink.href}
+                                    className="inline-flex items-center border px-3 py-1 rounded text-sm"
+                                >
+                                    {finishedLink.label}
+                                </a>
+                            )}
                             <button
                                 type="button"
                                 onClick={handleClose}

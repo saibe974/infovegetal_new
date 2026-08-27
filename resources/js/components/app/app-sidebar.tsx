@@ -12,7 +12,7 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FlowerIcon, Folder, FolderTreeIcon, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ImageIcon, ShieldCheck } from 'lucide-react';
+import { BookOpen, Files, FlowerIcon, Folder, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck } from 'lucide-react';
 import { DatabaseAccessIcon } from '@/lib/icons';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
@@ -51,6 +51,7 @@ export function AppSidebar() {
     ]);
     const canManageMedia = isAdmin(effectiveUser);
     const canManageDbProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'users.db_products.manage.all') || hasPermission(effectiveUser, 'users.db_products.manage.his');
+    const canViewMissingImages = isDev(effectiveUser) || canManageDbProducts;
 
     const title: string = '';
     let mainNavItems: NavItemExtended[] = [];
@@ -124,13 +125,11 @@ export function AppSidebar() {
             });
         }
 
-
-        if (canManageMedia && productsMenu?.subItems) {
+        if (canViewMissingImages && productsMenu?.subItems) {
             productsMenu.subItems.push({
-                title: t('Media library'),
-                href: '/admin/media-manager',
-                icon: ImageIcon,
-                target: '_self',
+                title: t('Missing images'),
+                href: '/products/images',
+                icon: ImageOff,
             });
         }
 
@@ -160,6 +159,14 @@ export function AppSidebar() {
                 title: t('Carriers'),
                 href: carriers.index(),
                 icon: TruckIcon,
+            });
+        }
+
+        if (canManageMedia) {
+            mainNavItems.push({
+                title: t('Media library'),
+                href: '/admin/media-manager',
+                icon: Files,
             });
         }
 

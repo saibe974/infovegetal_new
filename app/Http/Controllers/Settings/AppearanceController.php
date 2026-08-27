@@ -77,6 +77,8 @@ class AppearanceController extends Controller
             'confirmations' => ['required', 'array'],
             'confirmations.removeItem' => ['required', 'boolean'],
             'confirmations.clearCart' => ['required', 'boolean'],
+            'confirmations.removeMissingImageLink' => ['required', 'boolean'],
+            'confirmations.removeMissingImageLinks' => ['required', 'boolean'],
             'pages' => ['required', 'array'],
             'pages.products' => ['required', 'array'],
             'pages.products.enabled' => ['required', 'boolean'],

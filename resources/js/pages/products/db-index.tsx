@@ -67,7 +67,10 @@ function DbProductActions({ item }: { item: DbProduct }) {
                     }
                     postTreatmentComponent={ProductsImportTreatment}
                     postTreatmentProps={{ dbProductsId: item.id }}
-                    successRedirectUrl={products.index().url}
+                    finishedLink={{
+                        label: 'Missing image',
+                        href: products.images.index.url(),
+                    }}
                     buttonLabel=""
                 />
             ) : null}
@@ -119,8 +122,8 @@ function DbProductsMiniCards({ items }: { items: DbProduct[] }) {
                 const destination = item.abilities?.update
                     ? dbProducts.edit(item.id).url
                     : item.abilities?.billing
-                      ? dbProducts.billing(item.id).url
-                      : null;
+                        ? dbProducts.billing(item.id).url
+                        : null;
 
                 return (
                     <Card
@@ -166,8 +169,8 @@ function DbProductsMiniCards({ items }: { items: DbProduct[] }) {
                                 <CalendarClockIcon className="size-3.5" />
                                 {item.updated_at
                                     ? new Date(
-                                          item.updated_at,
-                                      ).toLocaleDateString()
+                                        item.updated_at,
+                                    ).toLocaleDateString()
                                     : '-'}
                             </p>
                             <DbProductActions item={item} />
@@ -328,8 +331,8 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                         <TableCell className="text-sm">
                                             {item.updated_at
                                                 ? new Date(
-                                                      item.updated_at,
-                                                  ).toLocaleDateString()
+                                                    item.updated_at,
+                                                ).toLocaleDateString()
                                                 : '-'}
                                         </TableCell>
                                         <TableCell>

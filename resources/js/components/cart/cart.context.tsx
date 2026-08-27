@@ -8,10 +8,11 @@ import {
     persistCartConfirmationPreference,
 } from '@/lib/display-preferences';
 import {
-    CartConfirmationDialog,
-    type CartConfirmationKind,
-} from './cart-confirmation-dialog';
+    ConfirmationDialog,
+} from '@/components/ui/confirmation-dialog';
 import { getAddQuantity, getUniteQuantity, normalizeQuantity } from './cart-quantity-rules';
+
+type CartConfirmationKind = 'removeItem' | 'clearCart';
 
 const getCsrfToken = (): string => {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -494,9 +495,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return (
         <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart }}>
             {children}
-            <CartConfirmationDialog
-                kind={confirmationRequest?.kind ?? null}
-                productName={confirmationRequest?.productName}
+            <ConfirmationDialog
+                open={confirmationRequest !== null}
+                title={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? 'Retirer ce produit ?'
+                        : 'Vider le panier ?'
+                }
+                description={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? confirmationRequest?.productName
+                            ? `Le produit « ${confirmationRequest.productName} » sera retiré du panier.`
+                            : 'Ce produit sera retiré du panier.'
+                        : 'Tous les produits et le commentaire du panier seront supprimés.'
+                }
+                confirmLabel={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? 'Retirer'
+                        : 'Vider le panier'
+                }
                 confirmationEnabled={
                     confirmationRequest
                         ? confirmations[confirmationRequest.kind]

@@ -463,7 +463,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                                 importCancelUrl={products.admin.import.cancel.url()}
                                 importProgressUrl={(id) => products.admin.import.progress.url({ id })}
                                 postTreatmentComponent={ProductsImportTreatment}
-                                successRedirectUrl={products.index().url}
+                                finishedLink={{
+                                    label: 'Missing image',
+                                    href: products.images.index.url(),
+                                }}
                                 buttonLabel=''
                             />
                         }

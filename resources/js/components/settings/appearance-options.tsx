@@ -187,24 +187,36 @@ export function AppearanceConfirmationSettings({
         label: string;
         description: string;
     }> = [
-        {
-            key: 'removeItem',
-            label: 'Retrait d’un produit',
-            description:
-                'Demander une confirmation avant de retirer un produit du panier.',
-        },
-        {
-            key: 'clearCart',
-            label: 'Vidage du panier',
-            description:
-                'Demander une confirmation avant de vider complètement le panier.',
-        },
-    ];
+            {
+                key: 'removeItem',
+                label: 'Retrait d’un produit',
+                description:
+                    'Demander une confirmation avant de retirer un produit du panier.',
+            },
+            {
+                key: 'clearCart',
+                label: 'Vidage du panier',
+                description:
+                    'Demander une confirmation avant de vider complètement le panier.',
+            },
+            {
+                key: 'removeMissingImageLink',
+                label: 'Suppression d’un lien invalide',
+                description:
+                    'Demander une confirmation avant de supprimer un seul img_link dans Missing images.',
+            },
+            {
+                key: 'removeMissingImageLinks',
+                label: 'Suppression de tous les liens invalides',
+                description:
+                    'Demander une confirmation avant de supprimer plusieurs img_link dans Missing images.',
+            },
+        ];
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Confirmations du panier</CardTitle>
+                <CardTitle>Confirmations des actions</CardTitle>
                 <CardDescription>
                     Choisissez les actions qui nécessitent votre confirmation.
                 </CardDescription>
