@@ -11,8 +11,9 @@ use RuntimeException;
 
 class ProductMediaService
 {
-    public function syncFromImgLink(Product $product, ?string $imgLink): bool
+    public function syncFromImgLink(Product $product, ?string $imgLink, ?int &$httpStatus = null): bool
     {
+        $httpStatus = null;
         $imgLink = is_string($imgLink) ? trim($imgLink) : null;
         if (! $imgLink || ! $this->isRemoteUrl($imgLink)) {
             return false;
@@ -47,7 +48,9 @@ class ProductMediaService
                 ->get($imgLink);
 
             if (! $response->successful()) {
-                throw new RuntimeException('HTTP '.$response->status());
+                $httpStatus = $response->status();
+
+                throw new RuntimeException('HTTP '.$httpStatus, $httpStatus);
             }
 
             $body = $response->body();
@@ -64,10 +67,20 @@ class ProductMediaService
                 ->withCustomProperties(['source_url' => $imgLink])
                 ->toMediaCollection('images');
         } catch (\Throwable $e) {
+            if ($httpStatus === null) {
+                $exceptionCode = (int) $e->getCode();
+                if ($exceptionCode >= 100 && $exceptionCode <= 599) {
+                    $httpStatus = $exceptionCode;
+                } elseif (preg_match('/HTTP\s+(\d{3})/i', $e->getMessage(), $matches) === 1) {
+                    $httpStatus = (int) ($matches[1] ?? 0) ?: null;
+                }
+            }
+
             Log::warning('Product image download failed', [
                 'product_id' => $product->id,
                 'url' => $imgLink,
                 'error' => $e->getMessage(),
+                'http_status' => $httpStatus,
             ]);
 
             return false;
@@ -93,6 +106,7 @@ class ProductMediaService
                 'ok' => true,
                 'message' => 'Image deja presente',
                 'downloaded' => false,
+                'http_status' => null,
                 'has_local' => true,
                 'local_url' => $existing->getFullUrl(),
                 'thumb_url' => $existing->getFullUrl('thumb'),
@@ -113,16 +127,19 @@ class ProductMediaService
                 'ok' => false,
                 'message' => 'URL image distante invalide',
                 'downloaded' => false,
+                'http_status' => null,
             ];
         }
 
-        $downloaded = $this->syncFromImgLink($product, $imgLink);
+        $httpStatus = null;
+        $downloaded = $this->syncFromImgLink($product, $imgLink, $httpStatus);
         $product->refresh();
 
         return [
             'ok' => $downloaded,
             'message' => $downloaded ? 'Image telechargee' : 'Image deja presente ou echec',
             'downloaded' => $downloaded,
+            'http_status' => $httpStatus,
             'has_local' => (bool) $product->getFirstMedia('images'),
             'local_url' => $product->getFirstMediaUrl('images') ?: null,
             'thumb_url' => $product->getFirstMediaUrl('images', 'thumb') ?: null,

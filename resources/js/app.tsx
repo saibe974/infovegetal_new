@@ -4,10 +4,12 @@ import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { initializeTheme } from './hooks/use-appearance';
+import { initializeDisplayPreferences } from './lib/display-preferences';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Infovegetal';
 type CsrfPageProps = {
     csrf_token?: string;
+    appearancePreferences?: unknown;
 };
 
 const syncCsrfToken = (token?: string | null) => {
@@ -30,14 +32,24 @@ createInertiaApp({
             import.meta.glob('./pages/**/*.tsx'),
         ),
     setup({ el, App, props }) {
-        syncCsrfToken((props.initialPage.props as CsrfPageProps).csrf_token);
+        const initialProps = props.initialPage.props as CsrfPageProps;
+        syncCsrfToken(initialProps.csrf_token);
+        initializeDisplayPreferences(
+            initialProps.appearancePreferences,
+            window.location.pathname,
+        );
 
         const root = createRoot(el);
 
         root.render(<App {...props} />);
 
         router.on('navigate', (event) => {
-            syncCsrfToken((event.detail.page.props as CsrfPageProps).csrf_token);
+            const pageProps = event.detail.page.props as CsrfPageProps;
+            syncCsrfToken(pageProps.csrf_token);
+            initializeDisplayPreferences(
+                pageProps.appearancePreferences,
+                window.location.pathname,
+            );
         });
     },
     progress: {

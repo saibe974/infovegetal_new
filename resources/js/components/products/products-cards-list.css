@@ -1,0 +1,15 @@
+.products-cards-list {
+    container-name: products-cards-list;
+    container-type: inline-size;
+}
+
+.products-cards-list__item {
+    display: block;
+    width: 100%;
+}
+
+@container products-cards-list (min-width: 680px) {
+    .products-cards-list__item {
+        width: 20rem;
+    }
+}

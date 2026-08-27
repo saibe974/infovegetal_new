@@ -14,6 +14,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\User;
 use App\Models\UserOption;
+use App\Models\UserMeta;
 use App\Services\UserManagementAuthorizationService;
 use App\Services\UserMetaSyncService;
 use Spatie\Permission\Models\Permission;
@@ -53,6 +54,7 @@ class ProfileController extends Controller
                 'can_access_contracts' => $target->canInvoiceAnyDbProduct(),
             ],
             'userMeta' => $target->usersMeta()
+                ->where('key', '!=', UserMeta::APPEARANCE_PREFERENCES_KEY)
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(['id', 'user_id', 'key', 'title', 'value', 'type', 'sort_order']),

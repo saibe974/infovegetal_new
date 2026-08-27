@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\DbProductsController as ApiDbProductsController;
 use App\Http\Controllers\CategoryProductsController;
 use App\Http\Controllers\DbProductsController;
+use App\Http\Controllers\MediaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\TagController;
 use App\Http\Resources\ProductResource;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 // Routes publiques de consultation des produits
 Route::prefix('products')->name('products.')->group(function () {
     Route::get('/', [ProductController::class, 'index'])->name('index');
-    Route::get('/{product}', [ProductController::class, 'show'])->name('show');
+    Route::get('/{product}', [ProductController::class, 'show'])->name('show')->whereNumber('product');
 });
 
 // API publique pour récupérer un produit (pour l'ajout au panier après login)
@@ -121,3 +122,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Tags
     Route::resource('tags-products', TagController::class)->middleware(['role_or_impersonator:admin']);
 });
+
+// Images manquantes — admin, dev, gestionnaires db produits
+Route::middleware(['role_or_permission_or_impersonator:admin|dev|users.db_products.manage.all|users.db_products.manage.his'])
+    ->prefix('products/images')
+    ->name('products.images.')
+    ->group(function () {
+        Route::get('/', [MediaController::class, 'images'])->name('index');
+        Route::get('/items', [MediaController::class, 'imageItems'])->name('items');
+        Route::post('/action/download', [MediaController::class, 'actionDownload'])->name('action.download');
+        Route::post('/action/compare', [MediaController::class, 'actionCompare'])->name('action.compare');
+        Route::post('/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('action.thumbnail');
+        Route::post('/action/remove-missing-img-link', [MediaController::class, 'actionRemoveMissingImgLink'])->name('action.remove-missing-img-link');
+    });

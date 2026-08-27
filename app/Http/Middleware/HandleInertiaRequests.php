@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Cart;
 use App\Models\User;
 use App\Services\UserManagementAuthorizationService;
+use App\Http\Controllers\Settings\AppearanceController;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -65,7 +66,13 @@ class HandleInertiaRequests extends Middleware
         $impersonationStrictMode = false;
 
         $formatUser = function (User $user) {
-            $user->loadMissing(['roles', 'permissions']);
+            $user->loadMissing([
+                'roles',
+                'permissions',
+                'usersMeta' => fn ($query) => $query
+                    ->where('key', 'logo')
+                    ->select(['id', 'user_id', 'key', 'value']),
+            ]);
 
             $allPermissions = $user->getAllPermissions()
                 ->map(fn ($permission) => $permission->only(['id', 'name']))
@@ -77,6 +84,14 @@ class HandleInertiaRequests extends Middleware
                 ->map(fn ($role) => $role->only(['id', 'name']))
                 ->values();
             $userArray['permissions'] = $allPermissions;
+            $logo = $user->usersMeta->firstWhere('key', 'logo');
+            $logoValue = $logo?->value
+                ? json_decode($logo->value, true)
+                : null;
+            $userArray['logo_url'] = is_array($logoValue)
+                ? ($logoValue['url'] ?? null)
+                : null;
+            unset($userArray['users_meta']);
 
             return $userArray;
         };
@@ -149,6 +164,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'query' => $request->query->all(),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'appearancePreferences' => AppearanceController::preferencesFor($user),
         ];
     }
 }

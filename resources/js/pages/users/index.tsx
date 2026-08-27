@@ -595,8 +595,9 @@ export default withAppLayout<UsersPageProps>(
                         onViewModeChange={setViewMode}
                         pageKey="users"
                         modes={[/*'table', 'tree',*/ 'accordion', 'grid']}
+                        mobileMenuModes={['accordion', 'grid']}
                     />
-                    <div className="w-200 left-0 top-1 mr-2">
+                    <div className="w-200 left-0 top-1 mr-2 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1">
                         <SearchSelect
                             value={search}
                             onChange={handleSearch}
@@ -606,6 +607,7 @@ export default withAppLayout<UsersPageProps>(
                             count={collection.meta?.total ?? collection.data?.length ?? 0}
                             query={q ?? ''}
                             minQueryLength={2}
+                            compactMobile
                         />
                     </div>
 

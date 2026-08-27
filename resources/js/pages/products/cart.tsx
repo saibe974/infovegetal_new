@@ -542,7 +542,7 @@ export default withAppLayout<Props>(
                     return;
                 }
 
-                clearCart();
+                clearCart({ skipConfirmation: true });
                 setPageMessage(t('Panier actif vide. Enregistrez pour creer un nouvel identifiant.'));
                 router.reload({ only: ['cart', 'cart_refresh_token'] });
             } catch (error) {

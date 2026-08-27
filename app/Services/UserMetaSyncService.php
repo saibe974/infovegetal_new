@@ -16,7 +16,7 @@ class UserMetaSyncService
     {
         DB::transaction(function () use ($user, $metas): void {
             $existing = $user->usersMeta()
-                ->where('key', '!=', 'logo')
+                ->whereNotIn('key', UserMeta::SYSTEM_KEYS)
                 ->get()
                 ->keyBy('id');
             $keptIds = [];
@@ -24,7 +24,7 @@ class UserMetaSyncService
 
             foreach ($metas as $index => $payload) {
                 $key = trim((string) ($payload['key'] ?? ''));
-                if ($key === '' || $key === 'logo') {
+                if ($key === '' || in_array($key, UserMeta::SYSTEM_KEYS, true)) {
                     throw ValidationException::withMessages([
                         "metas.$index.key" => 'La clé du champ dynamique est invalide.',
                     ]);

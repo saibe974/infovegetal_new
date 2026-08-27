@@ -326,7 +326,9 @@ export function AppSidebarHeader({
 
                 <div className='flex items-center gap-2'>
                     <SidebarTrigger className="-ml-1" targetId='main' />
-                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+                    <div className="hidden sm:block">
+                        <Breadcrumbs breadcrumbs={breadcrumbs} />
+                    </div>
                 </div>
 
                 {isHomePage && (

@@ -9,10 +9,10 @@ import { type Product, PaginatedCollection, SharedData } from '@/types';
 import { useI18n } from "@/lib/i18n";
 import { CartContext } from "../cart/cart.context";
 import { addCartonIcon, addEtageIcon, addRollIcon } from "@/lib/icon";
-import { useSidebar } from "../ui/sidebar";
 import { resolveProductPrices } from "@/lib/resolve-product-prices";
 import { formatCurrency } from '@/lib/utils';
 import { CountryFlag } from '@/components/ui/country-flag';
+import { useCartAutoOpen } from '@/components/cart/use-cart-auto-open';
 
 type Props = {
     collection: PaginatedCollection<Product>;
@@ -52,7 +52,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
     }
 
     const { addToCart, items } = useContext(CartContext);
-    const { toggleSidebar, isOpenId } = useSidebar()
+    const openCartAfterAdd = useCartAutoOpen();
 
     return (
         <Table>
@@ -156,9 +156,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond));
-                                                        if (!isOpenId('right')) {
-                                                            toggleSidebar('right');
-                                                        }
+                                                        openCartAfterAdd();
                                                     }}
                                                     title={t('Add a tray')}
                                                 >
@@ -179,9 +177,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond) * Number(item.floor));
-                                                        if (!isOpenId('right')) {
-                                                            toggleSidebar('right');
-                                                        }
+                                                        openCartAfterAdd();
                                                     }}
                                                     title={t('Add a floor')}
                                                 >
@@ -202,9 +198,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                                                     onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
                                                         addToCart(item, Number(item.cond) * Number(item.floor) * Number(item.roll));
-                                                        if (!isOpenId('right')) {
-                                                            toggleSidebar('right');
-                                                        }
+                                                        openCartAfterAdd();
                                                     }}
                                                     title={t('Add a roll')}
                                                 >

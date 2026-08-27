@@ -159,7 +159,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     }, [pdfResult]);
 
     const handleClearCartFromModal = useCallback(() => {
-        clearCart();
+        clearCart({ skipConfirmation: true });
         closePdfModal();
         setSaveMessage('Panier vide');
         setTimeout(() => setSaveMessage(null), 3000);

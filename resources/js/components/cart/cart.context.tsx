@@ -2,7 +2,17 @@ import React, { createContext, useCallback, useState, useEffect, useRef } from '
 import { usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
 import { type SharedData } from '@/types';
+import {
+    getPreferenceScope,
+    getStoredDisplayPreferences,
+    persistCartConfirmationPreference,
+} from '@/lib/display-preferences';
+import {
+    ConfirmationDialog,
+} from '@/components/ui/confirmation-dialog';
 import { getAddQuantity, getUniteQuantity, normalizeQuantity } from './cart-quantity-rules';
+
+type CartConfirmationKind = 'removeItem' | 'clearCart';
 
 const getCsrfToken = (): string => {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -51,7 +61,7 @@ export type CartContextType = {
     updateComment: (productId: number, comment: string) => void;
     orderComment: string;
     setOrderComment: (comment: string) => void;
-    clearCart: () => void;
+    clearCart: (options?: { skipConfirmation?: boolean }) => void;
     refreshCart: () => Promise<void>;
 };
 
@@ -140,7 +150,7 @@ const serializeCart = (items: CartItem[]): string => {
 };
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const { auth, cart, cart_refresh_token } = usePage<SharedData & {
+    const { auth, cart, cart_refresh_token, appearancePreferences } = usePage<SharedData & {
         cart?: {
             id: number;
             status: string;
@@ -150,6 +160,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         cart_refresh_token?: number | string | null;
     }>().props;
     const userId = auth?.user?.id;
+    const [confirmations, setConfirmations] = useState(() => {
+        if (typeof window === 'undefined') {
+            return { removeItem: true, clearCart: true };
+        }
+
+        return getStoredDisplayPreferences(
+            getPreferenceScope(Boolean(appearancePreferences)),
+        ).confirmations;
+    });
+    const [confirmationRequest, setConfirmationRequest] = useState<{
+        kind: CartConfirmationKind;
+        productId?: number;
+        productName?: string;
+    } | null>(null);
+
+    const getCurrentConfirmations = () =>
+        getStoredDisplayPreferences(
+            getPreferenceScope(Boolean(appearancePreferences)),
+        ).confirmations;
 
     const getCartKey = useCallback(() => {
         return userId ? `cart:${userId}` : 'cart';
@@ -366,11 +395,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         });
     };
 
-    const removeFromCart = (productId: number) => {
+    const removeFromCartImmediately = (productId: number) => {
         setItems((prev) => prev.filter((item) => item.product.id !== productId));
     };
 
+    const removeFromCart = (productId: number) => {
+        const currentConfirmations = getCurrentConfirmations();
+        setConfirmations(currentConfirmations);
+
+        if (!currentConfirmations.removeItem) {
+            removeFromCartImmediately(productId);
+            return;
+        }
+
+        const item = itemsRef.current.find(
+            (cartItem) => cartItem.product.id === productId,
+        );
+        if (!item) return;
+
+        setConfirmationRequest({
+            kind: 'removeItem',
+            productId,
+            productName: item.product.name,
+        });
+    };
+
     const updateQuantity = (productId: number, quantity: number) => {
+        const item = itemsRef.current.find(
+            (cartItem) => cartItem.product.id === productId,
+        );
+        if (item && normalizeQuantity(item.product, quantity) === null) {
+            removeFromCart(productId);
+            return;
+        }
+
         setItems((prev) => prev.flatMap((item) => {
             if (item.product.id !== productId) {
                 return [item];
@@ -393,14 +451,78 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const setOrderComment = (comment: string) => setOrderCommentState(comment.slice(0, 2000));
 
-    const clearCart = () => {
+    const clearCartImmediately = () => {
         setItems([]);
         setOrderCommentState('');
+    };
+
+    const clearCart = (options?: { skipConfirmation?: boolean }) => {
+        if (itemsRef.current.length === 0) return;
+        const currentConfirmations = getCurrentConfirmations();
+        setConfirmations(currentConfirmations);
+
+        if (options?.skipConfirmation || !currentConfirmations.clearCart) {
+            clearCartImmediately();
+            return;
+        }
+
+        setConfirmationRequest({ kind: 'clearCart' });
+    };
+
+    const updateConfirmationPreference = (enabled: boolean) => {
+        if (!confirmationRequest) return;
+
+        const key = confirmationRequest.kind;
+        setConfirmations((current) => ({ ...current, [key]: enabled }));
+        persistCartConfirmationPreference(key, enabled);
+    };
+
+    const confirmPendingAction = () => {
+        if (!confirmationRequest) return;
+
+        if (
+            confirmationRequest.kind === 'removeItem' &&
+            confirmationRequest.productId !== undefined
+        ) {
+            removeFromCartImmediately(confirmationRequest.productId);
+        } else if (confirmationRequest.kind === 'clearCart') {
+            clearCartImmediately();
+        }
+
+        setConfirmationRequest(null);
     };
 
     return (
         <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart }}>
             {children}
+            <ConfirmationDialog
+                open={confirmationRequest !== null}
+                title={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? 'Retirer ce produit ?'
+                        : 'Vider le panier ?'
+                }
+                description={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? confirmationRequest?.productName
+                            ? `Le produit « ${confirmationRequest.productName} » sera retiré du panier.`
+                            : 'Ce produit sera retiré du panier.'
+                        : 'Tous les produits et le commentaire du panier seront supprimés.'
+                }
+                confirmLabel={
+                    confirmationRequest?.kind === 'removeItem'
+                        ? 'Retirer'
+                        : 'Vider le panier'
+                }
+                confirmationEnabled={
+                    confirmationRequest
+                        ? confirmations[confirmationRequest.kind]
+                        : true
+                }
+                onConfirmationEnabledChange={updateConfirmationPreference}
+                onCancel={() => setConfirmationRequest(null)}
+                onConfirm={confirmPendingAction}
+            />
         </CartContext.Provider>
     );
 }

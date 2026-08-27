@@ -5,6 +5,7 @@ import { MenuIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { persistSidebarPreference } from "@/lib/display-preferences"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -63,6 +64,7 @@ type SidebarContext = {
   // multi-sidebar helpers
   isOpenId: (id?: SidebarId) => boolean
   toggleSidebar: (id?: SidebarId) => void
+  openSidebar: (id?: SidebarId, options?: { persist?: boolean }) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -136,6 +138,7 @@ function SidebarProvider({
       setOpenMap((m) => {
         const updated = { ...m, [id]: !m[id] }
         saveSidebarStateToCookie(updated)
+        persistSidebarPreference(id, updated[id])
         return updated
       })
     },
@@ -150,6 +153,30 @@ function SidebarProvider({
       return isMobile ? !!openMobileMap[id] : !!openMap[id]
     },
     [open, openMap, openMobileMap, isMobile]
+  )
+
+  const openSidebar = React.useCallback(
+    (id: SidebarId = "default", options?: { persist?: boolean }) => {
+      if (isMobile) {
+        setOpenMobileMap((m) => ({ ...m, [id]: true }))
+        return
+      }
+      if (id === "default") {
+        setOpen(true)
+        return
+      }
+
+      setOpenMap((m) => {
+        if (m[id]) return m
+        const updated = { ...m, [id]: true }
+        if (options?.persist !== false) {
+          saveSidebarStateToCookie(updated)
+          persistSidebarPreference(id, true)
+        }
+        return updated
+      })
+    },
+    [isMobile, setOpen]
   )
 
   // Adds a keyboard shortcut to toggle the sidebar.
@@ -183,8 +210,9 @@ function SidebarProvider({
         setOpenMobileMap((m) => ({ ...m, [id]: v })),
       isOpenId,
       toggleSidebar,
+      openSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobileMap, isOpenId, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobileMap, isOpenId, toggleSidebar, openSidebar]
   )
 
   return (

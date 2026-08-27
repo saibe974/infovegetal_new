@@ -35,7 +35,6 @@ export default withAppLayout<MediaPageProps>(breadcrumbs, true, () => {
     }, []);
 
     const mediaUrl = useMemo(() => `/admin/media?theme=${libraryTheme}`, [libraryTheme]);
-    const missingImagesUrl = '/admin/media-manager/images';
 
     return (
         <div>
@@ -49,12 +48,6 @@ export default withAppLayout<MediaPageProps>(breadcrumbs, true, () => {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button asChild variant="outline" className="gap-2">
-                        <a href="/admin/media-manager">{t('Library')}</a>
-                    </Button>
-                    <Button asChild variant="outline" className="gap-2">
-                        <a href={missingImagesUrl}>{t('Missing images')}</a>
-                    </Button>
                     <Button asChild variant="outline" className="gap-2">
                         <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-4 w-4" />

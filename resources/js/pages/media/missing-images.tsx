@@ -1,5 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { MissingImagesFailuresDetails } from '@/components/media/missing-images-failures-details';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,9 +13,14 @@ import {
 } from '@/components/ui/select';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { withAppLayout } from '@/layouts/app-layout';
+import {
+    getPreferenceScope,
+    persistCartConfirmationPreference,
+    getStoredDisplayPreferences,
+} from '@/lib/display-preferences';
 import { useI18n } from '@/lib/i18n';
-import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     CheckCircle2,
@@ -38,7 +45,7 @@ import {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Media library', href: '/admin/media-manager' },
-    { title: 'Missing images', href: '/admin/media-manager/images' },
+    { title: 'Missing images', href: '/products/images' },
 ];
 
 type Option = { id: number; name: string };
@@ -69,10 +76,24 @@ type ActionResponse = {
     ok: boolean;
     message?: string;
     downloaded?: boolean;
+    http_status?: number | null;
     thumb_url?: string | null;
     product?: MissingImage;
 };
 type RunFailure = { id: number; message: string; product?: MissingImage };
+type MissingImageConfirmationRequest =
+    | {
+        kind: 'removeMissingImageLink';
+        failure: RunFailure;
+    }
+    | {
+        kind: 'removeSingleItemMissingImageLink';
+        item: MissingImage;
+    }
+    | {
+        kind: 'removeAllMissingImageLinks';
+        failures: RunFailure[];
+    };
 type RunStatus =
     | 'idle'
     | 'running'
@@ -181,7 +202,7 @@ async function fetchItems(
     signal?: AbortSignal,
 ): Promise<ItemsResponse> {
     const response = await fetch(
-        `/admin/media-manager/images/items?${filtersQuery(filters, after, limit, withTotal)}`,
+        `/products/images/items?${filtersQuery(filters, after, limit, withTotal)}`,
         {
             headers: { Accept: 'application/json' },
             signal,
@@ -217,6 +238,16 @@ async function postAction(
     return payload as ActionResponse;
 }
 
+function withHttpStatus(message: string, httpStatus?: number | null): string {
+    if (typeof httpStatus !== 'number') {
+        return message;
+    }
+
+    const normalizedMessage = message.replace(/\s*\(\d{3}\)\s*$/, '');
+
+    return `erreur ${httpStatus} : ${normalizedMessage}`;
+}
+
 function ImagePreview({ src, label }: { src: string | null; label: string }) {
     const [broken, setBroken] = useState(false);
     useEffect(() => setBroken(false), [src]);
@@ -249,6 +280,7 @@ export default withAppLayout<MissingImagesPageProps>(
     true,
     ({ dbProducts, categories }) => {
         const { t } = useI18n();
+        const { appearancePreferences } = usePage<SharedData>().props;
         const [run, setRun] = useState<RunState>(restoreRun);
         const restoredFilters = run.filters;
         const [draftFilters, setDraftFilters] = useState<Filters>(() => ({
@@ -269,11 +301,27 @@ export default withAppLayout<MissingImagesPageProps>(
         const [failureActions, setFailureActions] = useState<
             Record<number, 'retry' | 'remove'>
         >({});
+        const [isBulkRemovingFailures, setIsBulkRemovingFailures] =
+            useState(false);
         const [refreshKey, setRefreshKey] = useState(0);
         const [showCompletionSummary, setShowCompletionSummary] =
             useState(false);
         const [globalCardDismissed, setGlobalCardDismissed] = useState(false);
         const [isGlobalCardSticky, setIsGlobalCardSticky] = useState(false);
+        const [confirmMissingImageLink, setConfirmMissingImageLink] =
+            useState(() =>
+                getStoredDisplayPreferences(
+                    getPreferenceScope(Boolean(appearancePreferences)),
+                ).confirmations.removeMissingImageLink,
+            );
+        const [confirmMissingImageLinks, setConfirmMissingImageLinks] =
+            useState(() =>
+                getStoredDisplayPreferences(
+                    getPreferenceScope(Boolean(appearancePreferences)),
+                ).confirmations.removeMissingImageLinks,
+            );
+        const [confirmationRequest, setConfirmationRequest] =
+            useState<MissingImageConfirmationRequest | null>(null);
         const runRef = useRef(run);
         const filtersRef = useRef(filters);
         const runnerActiveRef = useRef(false);
@@ -281,6 +329,14 @@ export default withAppLayout<MissingImagesPageProps>(
         const browseAbortRef = useRef<AbortController | null>(null);
         const completionTimersRef = useRef<Map<number, number>>(new Map());
         const completionEffectInitializedRef = useRef(false);
+
+        useEffect(() => {
+            const stored = getStoredDisplayPreferences(
+                getPreferenceScope(Boolean(appearancePreferences)),
+            ).confirmations;
+            setConfirmMissingImageLink(stored.removeMissingImageLink);
+            setConfirmMissingImageLinks(stored.removeMissingImageLinks);
+        }, [appearancePreferences]);
 
         const commitRun = useCallback((next: RunState) => {
             runRef.current = next;
@@ -488,7 +544,7 @@ export default withAppLayout<MissingImagesPageProps>(
                                 return {
                                     id,
                                     result: await postAction(
-                                        '/admin/media-manager/images/action/download',
+                                        '/products/images/action/download',
                                         id,
                                     ),
                                 };
@@ -525,8 +581,11 @@ export default withAppLayout<MissingImagesPageProps>(
                             );
                             const failure = {
                                 id,
-                                message:
-                                    result.message || 'Échec du téléchargement',
+                                message: withHttpStatus(
+                                    result.message ||
+                                    'Échec du téléchargement',
+                                    result.http_status,
+                                ),
                                 product: result.product,
                             };
                             if (existing >= 0) failures[existing] = failure;
@@ -632,8 +691,8 @@ export default withAppLayout<MissingImagesPageProps>(
             try {
                 const path =
                     action === 'download'
-                        ? '/admin/media-manager/images/action/download'
-                        : '/admin/media-manager/images/action/remove-missing-img-link';
+                        ? '/products/images/action/download'
+                        : '/products/images/action/remove-missing-img-link';
                 const result = await postAction(path, item.id);
                 if (!result.ok)
                     throw new Error(result.message || 'Action impossible');
@@ -646,6 +705,18 @@ export default withAppLayout<MissingImagesPageProps>(
                 }));
                 return;
             }
+        };
+
+        const requestSingleItemRemoval = (item: MissingImage) => {
+            if (!confirmMissingImageLink) {
+                void runIndividualAction(item, 'remove');
+                return;
+            }
+
+            setConfirmationRequest({
+                kind: 'removeSingleItemMissingImageLink',
+                item,
+            });
         };
 
         const removeResolvedFailure = useCallback(
@@ -672,7 +743,7 @@ export default withAppLayout<MissingImagesPageProps>(
 
             try {
                 const result = await postAction(
-                    '/admin/media-manager/images/action/download',
+                    '/products/images/action/download',
                     failure.id,
                 );
                 if (!result.ok) {
@@ -680,12 +751,15 @@ export default withAppLayout<MissingImagesPageProps>(
                     const failures = current.failures.map((candidate) =>
                         candidate.id === failure.id
                             ? {
-                                  ...candidate,
-                                  message:
-                                      result.message ||
-                                      'Échec du téléchargement',
-                                  product: result.product ?? candidate.product,
-                              }
+                                ...candidate,
+                                message:
+                                    withHttpStatus(
+                                        result.message ||
+                                        'Échec du téléchargement',
+                                        result.http_status,
+                                    ),
+                                product: result.product ?? candidate.product,
+                            }
                             : candidate,
                     );
                     commitRun({
@@ -706,12 +780,12 @@ export default withAppLayout<MissingImagesPageProps>(
                 const failures = current.failures.map((candidate) =>
                     candidate.id === failure.id
                         ? {
-                              ...candidate,
-                              message:
-                                  error instanceof Error
-                                      ? error.message
-                                      : 'Erreur réseau',
-                          }
+                            ...candidate,
+                            message:
+                                error instanceof Error
+                                    ? error.message
+                                    : 'Erreur réseau',
+                        }
                         : candidate,
                 );
                 commitRun({ ...current, failures, failed: failures.length });
@@ -724,15 +798,7 @@ export default withAppLayout<MissingImagesPageProps>(
             }
         };
 
-        const removeFailureImgLink = async (failure: RunFailure) => {
-            if (
-                !window.confirm(
-                    `Supprimer définitivement img_link et les médias du produit #${failure.id} ?`,
-                )
-            ) {
-                return;
-            }
-
+        const executeRemoveFailureImgLink = async (failure: RunFailure) => {
             setFailureActions((current) => ({
                 ...current,
                 [failure.id]: 'remove',
@@ -740,7 +806,7 @@ export default withAppLayout<MissingImagesPageProps>(
 
             try {
                 const result = await postAction(
-                    '/admin/media-manager/images/action/remove-missing-img-link',
+                    '/products/images/action/remove-missing-img-link',
                     failure.id,
                     { force: true },
                 );
@@ -757,12 +823,12 @@ export default withAppLayout<MissingImagesPageProps>(
                 const failures = current.failures.map((candidate) =>
                     candidate.id === failure.id
                         ? {
-                              ...candidate,
-                              message:
-                                  error instanceof Error
-                                      ? error.message
-                                      : 'Erreur réseau',
-                          }
+                            ...candidate,
+                            message:
+                                error instanceof Error
+                                    ? error.message
+                                    : 'Erreur réseau',
+                        }
                         : candidate,
                 );
                 commitRun({ ...current, failures, failed: failures.length });
@@ -775,6 +841,135 @@ export default withAppLayout<MissingImagesPageProps>(
             }
         };
 
+        const executeRemoveAllFailureImgLinks = async (
+            pendingFailures: RunFailure[],
+        ) => {
+            setIsBulkRemovingFailures(true);
+            setFailureActions((current) => {
+                const next = { ...current };
+                for (const failure of pendingFailures) {
+                    next[failure.id] = 'remove';
+                }
+
+                return next;
+            });
+
+            try {
+                for (const failure of pendingFailures) {
+                    try {
+                        const result = await postAction(
+                            '/products/images/action/remove-missing-img-link',
+                            failure.id,
+                            { force: true },
+                        );
+
+                        if (!result.ok) {
+                            throw new Error(
+                                result.message || 'Suppression impossible',
+                            );
+                        }
+
+                        removeResolvedFailure(failure.id, false);
+                        markItemCompleted(
+                            failure.id,
+                            sameFilters(
+                                runRef.current.filters,
+                                filtersRef.current,
+                            ),
+                        );
+                    } catch (error) {
+                        const current = runRef.current;
+                        const failures = current.failures.map((candidate) =>
+                            candidate.id === failure.id
+                                ? {
+                                    ...candidate,
+                                    message:
+                                        error instanceof Error
+                                            ? error.message
+                                            : 'Erreur réseau',
+                                }
+                                : candidate,
+                        );
+                        commitRun({
+                            ...current,
+                            failures,
+                            failed: failures.length,
+                        });
+                    } finally {
+                        setFailureActions((current) => {
+                            const next = { ...current };
+                            delete next[failure.id];
+
+                            return next;
+                        });
+                    }
+                }
+            } finally {
+                setIsBulkRemovingFailures(false);
+            }
+        };
+
+        const removeFailureImgLink = (failure: RunFailure) => {
+            if (!confirmMissingImageLink) {
+                void executeRemoveFailureImgLink(failure);
+
+                return;
+            }
+
+            setConfirmationRequest({
+                kind: 'removeMissingImageLink',
+                failure,
+            });
+        };
+
+        const removeAllFailureImgLinks = () => {
+            const pendingFailures = runRef.current.failures.filter(
+                (failure) => !failureActions[failure.id],
+            );
+
+            if (pendingFailures.length === 0) {
+                return;
+            }
+
+            if (!confirmMissingImageLinks) {
+                void executeRemoveAllFailureImgLinks(pendingFailures);
+
+                return;
+            }
+
+            setConfirmationRequest({
+                kind: 'removeAllMissingImageLinks',
+                failures: pendingFailures,
+            });
+        };
+
+        const handleConfirmDialogCancel = () => {
+            setConfirmationRequest(null);
+        };
+
+        const handleConfirmDialogConfirm = () => {
+            const request = confirmationRequest;
+            if (!request) {
+                return;
+            }
+
+            setConfirmationRequest(null);
+
+            if (request.kind === 'removeMissingImageLink') {
+                void executeRemoveFailureImgLink(request.failure);
+
+                return;
+            }
+
+            if (request.kind === 'removeSingleItemMissingImageLink') {
+                void runIndividualAction(request.item, 'remove');
+
+                return;
+            }
+
+            void executeRemoveAllFailureImgLinks(request.failures);
+        };
+
         const progress =
             run.total && run.total > 0
                 ? Math.min(100, Math.round((run.processed / run.total) * 100))
@@ -785,14 +980,146 @@ export default withAppLayout<MissingImagesPageProps>(
         const hasImagesToProcess = total === null || total > 0;
         const runDbName = run.filters.db_products_id
             ? (dbProducts.find(
-                  (option) => option.id === run.filters.db_products_id,
-              )?.name ?? `Base #${run.filters.db_products_id}`)
+                (option) => option.id === run.filters.db_products_id,
+            )?.name ?? `Base #${run.filters.db_products_id}`)
             : 'Toutes les bases';
         const runCategoryName = run.filters.category_products_id
             ? (categories.find(
-                  (option) => option.id === run.filters.category_products_id,
-              )?.name ?? `Catégorie #${run.filters.category_products_id}`)
+                (option) => option.id === run.filters.category_products_id,
+            )?.name ?? `Catégorie #${run.filters.category_products_id}`)
             : 'Toutes les catégories';
+        const failureCards = (
+            <div className="grid gap-3">
+                {run.failures.map((failure) => {
+                    const product =
+                        failure.product;
+                    const action =
+                        failureActions[
+                        failure.id
+                        ];
+
+                    return (
+                        <div
+                            key={failure.id}
+                            className="grid gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 sm:grid-cols-[6rem_minmax(0,1fr)] lg:grid-cols-[6rem_minmax(0,1fr)_auto]"
+                        >
+                            <ImagePreview
+                                src={
+                                    product?.source_url ??
+                                    null
+                                }
+                                label="Image distante"
+                            />
+                            <div className="min-w-0 space-y-1">
+                                <p className="font-medium">
+                                    {product?.name ??
+                                        `Produit #${failure.id}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    #
+                                    {failure.id}
+                                    {product?.sku
+                                        ? ` · SKU ${product.sku}`
+                                        : ''}
+                                    {product?.ref
+                                        ? ` · Réf. ${product.ref}`
+                                        : ''}
+                                </p>
+                                {(product?.db_name ||
+                                    product?.category_name) && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {product.db_name ??
+                                                'Sans base'}{' '}
+                                            ·{' '}
+                                            {product.category_name ??
+                                                'Sans catégorie'}
+                                        </p>
+                                    )}
+                                <p className="text-sm text-destructive">
+                                    {
+                                        failure.message
+                                    }
+                                </p>
+                                {product?.source_url && (
+                                    <p
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={
+                                            product.source_url
+                                        }
+                                    >
+                                        {
+                                            product.source_url
+                                        }
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap content-start gap-2 sm:col-span-2 lg:col-span-1 lg:max-w-64 lg:justify-end">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        void retryFailure(
+                                            failure,
+                                        )
+                                    }
+                                    disabled={
+                                        !!action ||
+                                        isBulkRemovingFailures
+                                    }
+                                    className="gap-2"
+                                >
+                                    {action ===
+                                        'retry' ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RefreshCw className="h-4 w-4" />
+                                    )}
+                                    Réessayer
+                                </Button>
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <a
+                                        href={`/admin/products/${failure.id}/edit`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Voir le
+                                        produit
+                                    </a>
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() =>
+                                        void removeFailureImgLink(
+                                            failure,
+                                        )
+                                    }
+                                    disabled={
+                                        !!action ||
+                                        isBulkRemovingFailures
+                                    }
+                                    className="gap-2"
+                                >
+                                    {action ===
+                                        'remove' ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="h-4 w-4" />
+                                    )}
+                                    Supprimer
+                                    img_link
+                                </Button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
         const showGlobalCard =
             !globalCardDismissed &&
             (activeRun ||
@@ -919,84 +1246,100 @@ export default withAppLayout<MissingImagesPageProps>(
                         <Card
                             className={`${isGlobalCardSticky ? 'block' : 'hidden'} w-full gap-0 py-2`}
                         >
-                            <CardContent className="flex items-center gap-3 px-3 sm:px-4">
-                                <p className="min-w-0 truncate text-xs text-muted-foreground sm:text-sm">
-                                    Base : {runDbName} · Catégorie :{' '}
-                                    {runCategoryName}
-                                    {run.filters.q && (
-                                        <> · Recherche : « {run.filters.q} »</>
-                                    )}
-                                </p>
-                                <div className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-muted sm:min-w-28">
-                                    <div
-                                        className="h-full bg-primary transition-[width]"
-                                        style={{ width: `${progress}%` }}
-                                    />
+                            <CardContent className="space-y-2 px-3 sm:px-4">
+                                <div className="flex items-center gap-3">
+                                    <p className="min-w-0 truncate text-xs text-muted-foreground sm:text-sm">
+                                        Base : {runDbName} · Catégorie :{' '}
+                                        {runCategoryName}
+                                        {run.filters.q && (
+                                            <> · Recherche : « {run.filters.q} »</>
+                                        )}
+                                    </p>
+                                    <div className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-muted sm:min-w-28">
+                                        <div
+                                            className="h-full bg-primary transition-[width]"
+                                            style={{ width: `${progress}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex shrink-0 gap-2">
+                                        {!activeRun && hasImagesToProcess && (
+                                            <Button
+                                                size="sm"
+                                                onClick={startRun}
+                                                className="gap-2"
+                                            >
+                                                <Play className="h-4 w-4" />
+                                                <span className="hidden sm:inline">
+                                                    {run.failures.length > 0
+                                                        ? 'Relancer'
+                                                        : 'Tout télécharger'}
+                                                </span>
+                                            </Button>
+                                        )}
+                                        {run.status === 'running' && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    commitRun({
+                                                        ...runRef.current,
+                                                        status: 'paused',
+                                                    })
+                                                }
+                                                className="gap-2"
+                                            >
+                                                <Pause className="h-4 w-4" />
+                                                <span className="hidden sm:inline">
+                                                    Pause
+                                                </span>
+                                            </Button>
+                                        )}
+                                        {run.status === 'paused' && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    commitRun({
+                                                        ...runRef.current,
+                                                        status: 'running',
+                                                    })
+                                                }
+                                                className="gap-2"
+                                            >
+                                                <Play className="h-4 w-4" />
+                                                <span className="hidden sm:inline">
+                                                    Reprendre
+                                                </span>
+                                            </Button>
+                                        )}
+                                        {controllableRun && (
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={requestCancellation}
+                                                className="gap-2"
+                                            >
+                                                <Square className="h-4 w-4" />
+                                                <span className="hidden sm:inline">
+                                                    Annuler
+                                                </span>
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex shrink-0 gap-2">
-                                    {!activeRun && hasImagesToProcess && (
-                                        <Button
-                                            size="sm"
-                                            onClick={startRun}
-                                            className="gap-2"
-                                        >
-                                            <Play className="h-4 w-4" />
-                                            <span className="hidden sm:inline">
-                                                {run.failures.length > 0
-                                                    ? 'Relancer'
-                                                    : 'Tout télécharger'}
-                                            </span>
-                                        </Button>
-                                    )}
-                                    {run.status === 'running' && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                commitRun({
-                                                    ...runRef.current,
-                                                    status: 'paused',
-                                                })
-                                            }
-                                            className="gap-2"
-                                        >
-                                            <Pause className="h-4 w-4" />
-                                            <span className="hidden sm:inline">
-                                                Pause
-                                            </span>
-                                        </Button>
-                                    )}
-                                    {run.status === 'paused' && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                commitRun({
-                                                    ...runRef.current,
-                                                    status: 'running',
-                                                })
-                                            }
-                                            className="gap-2"
-                                        >
-                                            <Play className="h-4 w-4" />
-                                            <span className="hidden sm:inline">
-                                                Reprendre
-                                            </span>
-                                        </Button>
-                                    )}
-                                    {controllableRun && (
-                                        <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={requestCancellation}
-                                            className="gap-2"
-                                        >
-                                            <Square className="h-4 w-4" />
-                                            <span className="hidden sm:inline">
-                                                Annuler
-                                            </span>
-                                        </Button>
-                                    )}
-                                </div>
+                                {run.failures.length > 0 && (
+                                    <MissingImagesFailuresDetails
+                                        variant="compact"
+                                        title="Fichiers en erreur"
+                                        failureCount={run.failures.length}
+                                        removeAllLabel="Supprimer tout"
+                                        isBulkRemoving={isBulkRemovingFailures}
+                                        onRemoveAll={() => {
+                                            void removeAllFailureImgLinks();
+                                        }}
+                                    >
+                                        {failureCards}
+                                    </MissingImagesFailuresDetails>
+                                )}
                             </CardContent>
                         </Card>
                         <Card
@@ -1011,8 +1354,8 @@ export default withAppLayout<MissingImagesPageProps>(
                                         run.status === 'completed'
                                             ? 'default'
                                             : run.failed > 0
-                                              ? 'destructive'
-                                              : 'secondary'
+                                                ? 'destructive'
+                                                : 'secondary'
                                     }
                                 >
                                     {run.status === 'running' && 'En cours'}
@@ -1122,147 +1465,18 @@ export default withAppLayout<MissingImagesPageProps>(
                                     )}
                                 </div>
                                 {run.failures.length > 0 && (
-                                    <details className="group rounded-lg border border-destructive/30 bg-destructive/5">
-                                        <summary className="cursor-pointer px-3 py-2 font-semibold text-destructive marker:text-destructive">
-                                            Produits à corriger (
-                                            {run.failures.length})
-                                        </summary>
-                                        <div className="max-h-[35svh] space-y-3 overflow-y-auto overscroll-contain border-t border-destructive/20 p-3 sm:max-h-[45svh]">
-                                            <p className="text-sm text-muted-foreground">
-                                                Réessayez le téléchargement ou
-                                                retirez définitivement un lien
-                                                invalide.
-                                            </p>
-                                            <div className="grid gap-3">
-                                                {run.failures.map((failure) => {
-                                                    const product =
-                                                        failure.product;
-                                                    const action =
-                                                        failureActions[
-                                                            failure.id
-                                                        ];
-
-                                                    return (
-                                                        <div
-                                                            key={failure.id}
-                                                            className="grid gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 sm:grid-cols-[6rem_minmax(0,1fr)] lg:grid-cols-[6rem_minmax(0,1fr)_auto]"
-                                                        >
-                                                            <ImagePreview
-                                                                src={
-                                                                    product?.source_url ??
-                                                                    null
-                                                                }
-                                                                label="Image distante"
-                                                            />
-                                                            <div className="min-w-0 space-y-1">
-                                                                <p className="font-medium">
-                                                                    {product?.name ??
-                                                                        `Produit #${failure.id}`}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    #
-                                                                    {failure.id}
-                                                                    {product?.sku
-                                                                        ? ` · SKU ${product.sku}`
-                                                                        : ''}
-                                                                    {product?.ref
-                                                                        ? ` · Réf. ${product.ref}`
-                                                                        : ''}
-                                                                </p>
-                                                                {(product?.db_name ||
-                                                                    product?.category_name) && (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        {product.db_name ??
-                                                                            'Sans base'}{' '}
-                                                                        ·{' '}
-                                                                        {product.category_name ??
-                                                                            'Sans catégorie'}
-                                                                    </p>
-                                                                )}
-                                                                <p className="text-sm text-destructive">
-                                                                    {
-                                                                        failure.message
-                                                                    }
-                                                                </p>
-                                                                {product?.source_url && (
-                                                                    <p
-                                                                        className="truncate text-xs text-muted-foreground"
-                                                                        title={
-                                                                            product.source_url
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            product.source_url
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex flex-wrap content-start gap-2 sm:col-span-2 lg:col-span-1 lg:max-w-64 lg:justify-end">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={() =>
-                                                                        void retryFailure(
-                                                                            failure,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        !!action
-                                                                    }
-                                                                    className="gap-2"
-                                                                >
-                                                                    {action ===
-                                                                    'retry' ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <RefreshCw className="h-4 w-4" />
-                                                                    )}
-                                                                    Réessayer
-                                                                </Button>
-                                                                <Button
-                                                                    asChild
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                >
-                                                                    <a
-                                                                        href={`/admin/products/${failure.id}/edit`}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                    >
-                                                                        <ExternalLink className="h-4 w-4" />
-                                                                        Voir le
-                                                                        produit
-                                                                    </a>
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="destructive"
-                                                                    onClick={() =>
-                                                                        void removeFailureImgLink(
-                                                                            failure,
-                                                                        )
-                                                                    }
-                                                                    disabled={
-                                                                        !!action
-                                                                    }
-                                                                    className="gap-2"
-                                                                >
-                                                                    {action ===
-                                                                    'remove' ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    )}
-                                                                    Supprimer
-                                                                    img_link
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </details>
+                                    <MissingImagesFailuresDetails
+                                        variant="full"
+                                        title="Produits à corriger"
+                                        failureCount={run.failures.length}
+                                        removeAllLabel="Supprimer tous les liens invalides"
+                                        isBulkRemoving={isBulkRemovingFailures}
+                                        onRemoveAll={() => {
+                                            void removeAllFailureImgLinks();
+                                        }}
+                                    >
+                                        {failureCards}
+                                    </MissingImagesFailuresDetails>
                                 )}
                             </CardContent>
                         </Card>
@@ -1308,17 +1522,18 @@ export default withAppLayout<MissingImagesPageProps>(
                         return (
                             <Card
                                 key={item.id}
-                                className={`gap-4 py-4 transition-colors ${
-                                    isCompleted
-                                        ? 'border-emerald-500 bg-emerald-500/10'
-                                        : ''
-                                }`}
+                                className={`gap-4 py-4 transition-colors ${isCompleted
+                                    ? 'border-emerald-500 bg-emerald-500/10'
+                                    : ''
+                                    }`}
                             >
                                 <CardHeader className="px-4 sm:px-5">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <CardTitle className="truncate text-base">
-                                                {item.name}
+                                                {item.name
+                                                    ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
+                                                    : 'Produit sans nom'}
                                             </CardTitle>
                                             <p className="mt-1 text-xs text-muted-foreground">
                                                 #{item.id} ·{' '}
@@ -1335,10 +1550,10 @@ export default withAppLayout<MissingImagesPageProps>(
                                             )}
                                             {item.missing_reason ===
                                                 'missing_file' && (
-                                                <Badge variant="destructive">
-                                                    Fichier local absent
-                                                </Badge>
-                                            )}
+                                                    <Badge variant="destructive">
+                                                        Fichier local absent
+                                                    </Badge>
+                                                )}
                                             {item.db_name && (
                                                 <Badge variant="outline">
                                                     {item.db_name}
@@ -1388,12 +1603,9 @@ export default withAppLayout<MissingImagesPageProps>(
                                             </Button>
                                             <Button
                                                 size="sm"
-                                                variant="outline"
+                                                variant="destructive"
                                                 onClick={() =>
-                                                    void runIndividualAction(
-                                                        item,
-                                                        'remove',
-                                                    )
+                                                    requestSingleItemRemoval(item)
                                                 }
                                                 disabled={isBusy || isCompleted}
                                                 className="gap-2"
@@ -1446,6 +1658,57 @@ export default withAppLayout<MissingImagesPageProps>(
                         </Button>
                     </div>
                 )}
+
+                <ConfirmationDialog
+                    open={confirmationRequest !== null}
+                    title={
+                        confirmationRequest?.kind === 'removeMissingImageLink' ||
+                            confirmationRequest?.kind === 'removeSingleItemMissingImageLink'
+                            ? 'Supprimer ce lien invalide ?'
+                            : 'Supprimer tous les liens invalides ?'
+                    }
+                    description={
+                        confirmationRequest?.kind === 'removeMissingImageLink'
+                            ? `Le lien image invalide du produit « ${confirmationRequest.failure.product?.name ??
+                            `Produit #${confirmationRequest.failure.id}`
+                            } » sera supprimé.`
+                            : confirmationRequest?.kind === 'removeSingleItemMissingImageLink'
+                                ? `Le lien image invalide du produit « ${confirmationRequest.item.name || `Produit #${confirmationRequest.item.id}`} » sera supprimé.`
+                                : `Les liens image invalides seront supprimés pour ${confirmationRequest?.failures.length ?? 0
+                                } produit(s).`
+                    }
+                    confirmLabel={
+                        confirmationRequest?.kind === 'removeMissingImageLink' ||
+                            confirmationRequest?.kind === 'removeSingleItemMissingImageLink'
+                            ? 'Supprimer le lien'
+                            : 'Supprimer les liens'
+                    }
+                    confirmationEnabled={
+                        confirmationRequest?.kind === 'removeSingleItemMissingImageLink'
+                            ? confirmMissingImageLink
+                            : confirmMissingImageLinks
+                    }
+                    onConfirmationEnabledChange={(enabled) => {
+                        if (
+                            confirmationRequest?.kind === 'removeSingleItemMissingImageLink'
+                        ) {
+                            setConfirmMissingImageLink(enabled);
+                            persistCartConfirmationPreference(
+                                'removeMissingImageLink',
+                                enabled,
+                            );
+                            return;
+                        }
+
+                        setConfirmMissingImageLinks(enabled);
+                        persistCartConfirmationPreference(
+                            'removeMissingImageLinks',
+                            enabled,
+                        );
+                    }}
+                    onCancel={handleConfirmDialogCancel}
+                    onConfirm={handleConfirmDialogConfirm}
+                />
             </div>
         );
     },

@@ -2,6 +2,22 @@
 
 Date de reference: 2026-07-16
 
+### Session du 2026-08-27
+
+- Import base products (ecran Database): le bouton Fermer de la modale de traitement ne redirige plus automatiquement vers la page Products, il ferme la modale et conserve la page courante.
+- Fin de traitement import base products: ajout d un lien Missing image dans le footer de la modale, positionne a gauche de Fermer, vers `/products/images`.
+- Homogeneisation import page Products: meme comportement applique (pas de redirection automatique au clic sur Fermer, lien Missing image affiche a gauche de Fermer a la fin du traitement).
+- Missing images (bloc Produits a corriger): ajout d une action de masse "Supprimer tous les liens invalides" qui supprime `img_link` (mode force) pour toutes les erreurs restantes, avec confirmation et etat de progression visuel.
+- Missing images: le service media remonte maintenant `http_status` (ex: 404/503) sur les echecs de telechargement et l interface affiche ce code a cote du statut d echec (ex: "Image deja presente ou echec (404)").
+- Appearance: ajout d une preference de confirmation `removeMissingImageLinks` (suppression d un lien invalide ou de tous les liens invalides). La page Missing images respecte ce reglage.
+- Missing images: remplacement des `window.confirm` par le composant de confirmation (meme UX que panier) pour la suppression unitaire et globale des `img_link`, avec option "Toujours demander une confirmation" branchee sur `removeMissingImageLinks`.
+- Refactor UI: extraction d un composant generique `resources/js/components/ui/confirmation-dialog.tsx` pour les confirmations destructives reutilisables; migration des usages panier et Missing images vers ce composant; suppression de l ancien composant specifique panier.
+- Missing images: normalisation du format d erreur HTTP en front (`erreur <code> : <message>`) et suppression du suffixe `(code)` cote service pour eviter les doublons comme `(404) (404)`.
+- Missing images (UX erreurs): deplacement du bouton "Supprimer tous les liens invalides" dans le trigger d ouverture du bloc d erreurs, et suppression du texte d entete "Reessayez le telechargement...".
+- Missing images (refactor): extraction d un composant partage `resources/js/components/media/missing-images-failures-details.tsx` reutilise en mode compact (sticky) et complet (deploie), pour garantir les memes actions et simplifier la maintenance.
+- Missing images (sticky): le trigger compact affiche maintenant la meme liste complete de fichiers en erreur que la version non sticky (plus seulement un apercu), via un contenu partage unique.
+- Missing images (coherence visuelle): action "Retirer le lien invalide" en rouge (destructive) sur les cartes en attente pour alignement avec les actions de suppression.
+
 ### Session du 2026-07-28
 
 - Prise en compte du nouveau format transport multi-options: `t` peut maintenant etre un JSON (liste de couples `carrier_id`/`zone_id`, `tva` optionnelle) en plus du format historique entier.

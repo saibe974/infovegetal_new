@@ -297,6 +297,7 @@ export default withAppLayout(
                         modes={['table', 'tree']}
                     /> */}
                     <SearchSelect
+                        className="w-auto flex-1"
                         value={search}
                         onChange={handleSearch}
                         onSubmit={onSelect}
@@ -304,6 +305,7 @@ export default withAppLayout(
                         loading={fetching}
                         // count={collection.meta.total}
                         count={allItems.length}
+                        compactMobile
                         query={q ?? ''}
                     />
 
