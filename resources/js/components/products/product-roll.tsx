@@ -784,16 +784,16 @@ export function ProductRoll({
 
 
                                             <div
-                                                className={cn('relative', 'border-2 border-t-0 p-1', 'rounded-b-md', rollBorder, rollBg)}
+                                                className={cn('relative isolate z-0', 'border-2 border-t-0 p-1', 'rounded-b-md', rollBorder, rollBg)}
                                                 style={{ width: rollWidth + 12, height: rollHeight + 12 }}
                                             >
-                                                <div className="absolute left-[-20px] top-2 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
+                                                <div className="absolute left-[-20px] top-2 z-20 rounded-full border border-slate-900 bg-white px-1.5 py-0.5 shadow-sm">
                                                     <CountryFlag countryCode={supplier.country} className="w-6" />
                                                 </div>
 
                                                 <div
                                                     className={cn(
-                                                        'absolute right-[-14px] top-2 w-9 border border-slate-900 bg-white text-[11px] font-semibold text-center shadow-sm',
+                                                        'absolute right-[-14px] top-2 z-20 w-9 border border-slate-900 bg-white text-[11px] font-semibold text-center shadow-sm',
                                                         'bg-transparent'
                                                     )}
                                                 >
@@ -802,7 +802,7 @@ export function ProductRoll({
                                                     </span>
                                                 </div>
 
-                                                <div className="absolute left-1/2 -translate-x-1/2 -top-[20px] flex items-center gap-2 text-[11px]">
+                                                <div className="absolute left-1/2 -translate-x-1/2 -top-[20px] z-20 flex items-center gap-2 text-[11px]">
                                                     <span className="rounded-full border border-slate-900 bg-white px-2 py-0.5 font-semibold text-slate-900 shadow-sm">
                                                         {rollPrice !== null ? formatCurrency(rollPrice) : 'devis'}
                                                     </span>

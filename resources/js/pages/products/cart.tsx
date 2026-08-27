@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, RefreshCw, Trash2, TruckIcon } from 'lucide-react';
+import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, Trash2, TruckIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/datePicker';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -226,7 +226,7 @@ export default withAppLayout<Props>(
         }, []);
         const getStoredDiscounts = useCallback((): Record<number, DbDiscountDraft> =>
             Object.fromEntries(
-                Object.entries(storedDiscounts).map(([dbId, discount]) => [
+                Object.entries(storedDiscounts as Record<string, { type: DiscountType; value: number }>).map(([dbId, discount]) => [
                     Number(dbId),
                     {
                         type: discount.type === 'percent' ? 'percent' : 'fixed',
@@ -254,7 +254,7 @@ export default withAppLayout<Props>(
         }, [discountsByDb, discountsStorageKey, getStoredDiscounts]);
         const getStoredTransportSelection = useCallback((): CarrierOverrides =>
             Object.fromEntries(
-                Object.entries(storedTransportSelection).map(([supplierId, choice]) => [
+                Object.entries(storedTransportSelection as Record<string, { carrier_id: number; zone_id: number }>).map(([supplierId, choice]) => [
                     Number(supplierId),
                     { carrierId: Number(choice.carrier_id), zoneId: Number(choice.zone_id) },
                 ]),
@@ -559,11 +559,11 @@ export default withAppLayout<Props>(
                     borderBottom={false}
                     className='mb-4 sticky-bar-cart'
                 >
-                    <div className='flex items-center justify-between w-full py-2'>
-                        <div className="flex items-center gap-3">
+                    <div className='flex w-full flex-wrap items-center justify-between gap-y-2 py-2'>
+                        <div className="flex shrink-0 items-center gap-3">
                             <Link
                                 href="#"
-                                onClick={(e) => {
+                                onClick={(e: MouseEvent<Element>) => {
                                     e.preventDefault();
                                     window.history.back();
                                 }}
@@ -589,21 +589,13 @@ export default withAppLayout<Props>(
                         </div>
 
                         {items.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleRefreshCart}
-                                    disabled={isRefreshingCart || isSaving}
-                                >
-                                    <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshingCart ? 'animate-spin' : '')} />
-                                    {t('Rafraichir')}
-                                </Button>
+                            <div className="ml-auto flex shrink-0 items-center gap-2">
                                 <ButtonsActions
+                                    refresh={handleRefreshCart}
                                     save={() => void handleSaveCart(orderOverrides)}
                                     delete={clearCart}
                                     saving={isSaving}
+                                    refreshing={isRefreshingCart}
                                 />
                             </div>
                         )}
@@ -629,21 +621,43 @@ export default withAppLayout<Props>(
                             <div key={group.id}>
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>
-                                            {<CountryFlag countryCode={group.country} className="inline-block w-6" />}
-                                            &nbsp; {group.items.length} <FlowerIcon className='inline size-4' /> : {formatCurrency(group.itemsTotal)}
-                                            &nbsp;-&nbsp;{<TruckIcon className='inline size-4' />}
-                                            &nbsp;:&nbsp;{formatCurrency(group.deliveryTotal)}
-                                            &nbsp;-&nbsp;Total : {formatCurrency(group.orderTotal)}
+                                        <CardTitle className="text-base">
+                                            <div className="space-y-1 md:grid md:grid-cols-3 md:items-center md:gap-4 md:space-y-0">
+                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-0 md:py-0 md:pr-3 md:text-left md:border-r md:border-border/60">
+                                                    <p className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:block">{t('Produits')}</p>
+                                                    <div className="inline-flex items-center gap-2 text-sm font-semibold md:mt-1">
+                                                        <CountryFlag countryCode={group.country} className="w-5 shrink-0 md:w-6" />
+                                                        {group.items.length} <FlowerIcon className="inline size-4" />
+                                                        <span className="hidden md:inline">: {formatCurrency(group.itemsTotal)}</span>
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-right md:hidden">{formatCurrency(group.itemsTotal)}</span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-3 md:py-0 md:text-center md:border-r md:border-border/60">
+                                                    <p className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:block">{t('Transport')}</p>
+                                                    <div className="inline-flex items-center gap-2 text-sm font-semibold md:mt-1 md:justify-center">
+                                                        <TruckIcon className="size-4 shrink-0" />
+                                                        <span className="hidden md:inline">{formatCurrency(group.deliveryTotal)}</span>
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-right md:hidden">{formatCurrency(group.deliveryTotal)}</span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-0 md:py-0 md:pl-3 md:text-right">
+                                                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('Total')}</p>
+                                                    <p className="text-lg font-bold leading-none text-right md:mt-1">{formatCurrency(group.orderTotal)}</p>
+                                                </div>
+                                            </div>
                                         </CardTitle>
                                     </CardHeader>
 
                                     <CardContent className="space-y-6">
                                         {/* Produits */}
                                         <div className="overflow-hidden rounded-lg border">
-                                            <div className="hidden grid-cols-[5rem_minmax(0,1fr)_7rem_11rem_7rem_5rem] items-center gap-3 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground md:grid">
+                                            <div className="hidden grid-cols-[5rem_minmax(0,1fr)_4rem_7rem_4.5rem_4rem] items-center gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground md:grid xl:grid-cols-[5rem_minmax(0,1fr)_5rem_6rem_7rem_9rem_6rem_5rem] xl:gap-3">
                                                 <span>{t('Photo')}</span>
                                                 <span>{t('Désignation')}</span>
+                                                <span className="hidden text-right xl:block">{t('Pot')}</span>
+                                                <span className="hidden text-right xl:block">{t('Hauteur')}</span>
                                                 <span className="text-right">{t('Prix')}</span>
                                                 <span className="text-center">{t('Quantité')}</span>
                                                 <span className="text-right">{t('Total')}</span>
@@ -662,8 +676,117 @@ export default withAppLayout<Props>(
                                                         key={product.id}
                                                         className="border-b last:border-b-0"
                                                     >
-                                                        <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 p-3 md:grid-cols-[5rem_minmax(0,1fr)_7rem_11rem_7rem_5rem]">
-                                                            <div className="relative row-span-5 h-20 w-20 shrink-0 overflow-hidden rounded md:row-span-1">
+                                                        <div className="md:hidden space-y-3 p-3">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border">
+                                                                    <img
+                                                                        src={getProductCartImage(product)}
+                                                                        alt={product.name}
+                                                                        className="h-full w-full object-cover"
+                                                                    />
+                                                                    <Badge
+                                                                        className={cn(
+                                                                            "absolute -top-1 -right-1 rounded-full text-xs",
+                                                                            quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                                        )}
+                                                                    >
+                                                                        {quantity}
+                                                                    </Badge>
+                                                                </div>
+                                                                <div className="min-w-0 flex-1 space-y-1">
+                                                                    <p className="line-clamp-2 text-sm font-semibold leading-tight capitalize">
+                                                                        {product.name}
+                                                                    </p>
+                                                                    {toText(product.ref) ? (
+                                                                        <p className="text-xs text-muted-foreground">
+                                                                            Ref: {toText(product.ref)}
+                                                                        </p>
+                                                                    ) : null}
+                                                                    {(product.pot || product.height) ? (
+                                                                        <p className="flex flex-wrap gap-x-2 text-sm font-medium leading-tight">
+                                                                            {product.pot ? <span>Pot : {String(product.pot)} cm</span> : null}
+                                                                            {product.height ? <span>H : {String(product.height)} cm</span> : null}
+                                                                        </p>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-sm">
+                                                                <div>
+                                                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('Prix')}</p>
+                                                                    <p className="font-medium">{formatCurrency(unitPrice)}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('Total')}</p>
+                                                                    <p className="font-semibold">{formatCurrency(lineTotal)}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <div className="flex items-center gap-2 rounded-lg bg-muted p-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8"
+                                                                        onClick={() =>
+                                                                            handleQuantityChange(product.id, quantity - step)
+                                                                        }
+                                                                    >
+                                                                        <Minus className="h-4 w-4" />
+                                                                    </Button>
+
+                                                                    <Input
+                                                                        type="text"
+                                                                        min={unite}
+                                                                        value={quantity}
+                                                                        onChange={(e) =>
+                                                                            handleQuantityChange(
+                                                                                product.id,
+                                                                                parseInt(e.target.value, 10)
+                                                                            )
+                                                                        }
+                                                                        className="h-8 w-14 border-0 bg-transparent text-center"
+                                                                    />
+
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8"
+                                                                        onClick={() =>
+                                                                            handleQuantityChange(product.id, quantity + step)
+                                                                        }
+                                                                    >
+                                                                        <Plus className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className={cn('h-8 w-8', (hasComment || isCommentOpen) && 'text-primary')}
+                                                                        onClick={() => toggleProductComment(product.id)}
+                                                                        aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                                                        title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                                                    >
+                                                                        <Pencil className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                        onClick={() => removeFromCart(product.id)}
+                                                                        aria-label={t('Retirer du panier')}
+                                                                        title={t('Retirer du panier')}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="hidden items-center gap-2 p-3 md:grid md:grid-cols-[5rem_minmax(0,1fr)_4rem_7rem_4.5rem_4rem] xl:grid-cols-[5rem_minmax(0,1fr)_5rem_6rem_7rem_9rem_6rem_5rem] xl:gap-3">
+                                                            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded md:row-span-1">
                                                                 <img
                                                                     src={getProductCartImage(product)}
                                                                     alt={product.name}
@@ -690,17 +813,31 @@ export default withAppLayout<Props>(
                                                                     </p>
                                                                 ) : null}
 
-                                                                <p className="text-xs text-muted-foreground">
+                                                                {(product.pot || product.height) ? (
+                                                                    <p className="flex flex-wrap gap-x-2 text-sm font-medium leading-tight xl:hidden">
+                                                                        {product.pot ? <span>Pot : {String(product.pot)} cm</span> : null}
+                                                                        {product.height ? <span>H : {String(product.height)} cm</span> : null}
+                                                                    </p>
+                                                                ) : null}
+
+                                                                <p className="line-clamp-1 text-xs text-muted-foreground xl:line-clamp-none">
                                                                     {product.description}
                                                                 </p>
                                                             </div>
 
-                                                            <div className="text-sm font-medium md:text-right">
-                                                                <span className="mr-2 text-xs text-muted-foreground md:hidden">{t('Prix')} :</span>
+                                                            <div className="hidden text-right text-sm font-medium leading-tight xl:block">
+                                                                {product.pot ? `${String(product.pot)} cm` : '—'}
+                                                            </div>
+
+                                                            <div className="hidden text-right text-sm font-medium leading-tight xl:block">
+                                                                {product.height ? `${String(product.height)} cm` : '—'}
+                                                            </div>
+
+                                                            <div className="text-sm font-medium text-right">
                                                                 {formatCurrency(unitPrice)}
                                                             </div>
 
-                                                            <div className="flex w-fit items-center gap-2 rounded-lg bg-muted p-1 md:justify-self-center">
+                                                            <div className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1 md:justify-self-center">
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
@@ -722,7 +859,7 @@ export default withAppLayout<Props>(
                                                                             parseInt(e.target.value, 10)
                                                                         )
                                                                     }
-                                                                    className="h-8 w-16 border-0 text-center"
+                                                                    className="h-8 w-8 border-0 text-center"
                                                                 />
 
                                                                 <Button
@@ -737,8 +874,7 @@ export default withAppLayout<Props>(
                                                                 </Button>
                                                             </div>
 
-                                                            <div className="text-sm font-semibold md:text-right">
-                                                                <span className="mr-2 text-xs font-normal text-muted-foreground md:hidden">{t('Total')} :</span>
+                                                            <div className="text-sm font-semibold text-right">
                                                                 {formatCurrency(lineTotal)}
                                                             </div>
 
@@ -886,7 +1022,7 @@ export default withAppLayout<Props>(
                                                         <span>{t('Transporteur')}</span>
                                                         <Select
                                                             value={value}
-                                                            onValueChange={(value) =>
+                                                            onValueChange={(value: string) =>
                                                                 handleCarrierChange(group.id, group.carrierOptions!, value)
                                                             }
                                                         >
