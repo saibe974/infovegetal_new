@@ -3,6 +3,7 @@
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\Settings\AppearanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -19,6 +20,8 @@ Route::get('/search-propositions', [SearchController::class, 'propositions'])->n
 Route::get('/csrf-refresh', function () {
     return response()->noContent();
 });
+
+Route::get('/appearance', [AppearanceController::class, 'editGuest'])->name('appearance.guest');
 
 require __DIR__ . '/products.php';
 require __DIR__ . '/cart.php';

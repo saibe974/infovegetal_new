@@ -1,7 +1,8 @@
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from '@/lib/i18n';
 import { type Product } from '@/types';
-import { router } from "@inertiajs/react";
-import { ProductCard } from "./product-card";
+import { router } from '@inertiajs/react';
+import { ProductCard } from './product-card';
+import './products-cards-list.css';
 
 type Props = {
     limit?: number | null; // undefined/null = afficher tout
@@ -24,7 +25,7 @@ export function ProductsCardsList({
 
     const editProduct = (productId: number) => {
         router.visit(`/admin/products/${productId}/edit`);
-    }
+    };
 
     const deleteProduct = (productId: number) => {
         if (confirm(t('Êtes-vous sûr de vouloir supprimer ce produit ?'))) {
@@ -32,10 +33,10 @@ export function ProductsCardsList({
                 method: 'delete',
             });
         }
-    }
+    };
 
     return (
-        <div className="flex gap-10 flex-wrap justify-center max-w-full">
+        <div className="products-cards-list flex max-w-full flex-wrap justify-center gap-10">
             {productsToShow.map((product) => (
                 <ProductCard
                     key={product.id}
@@ -45,10 +46,10 @@ export function ProductsCardsList({
                     editProduct={editProduct}
                     deleteProduct={deleteProduct}
                     showStatusBadge={showStatusBadge}
-                    className="w-80"
+                    className="w-full"
+                    linkClassName="products-cards-list__item"
                 />
             ))}
-
         </div>
     );
 }

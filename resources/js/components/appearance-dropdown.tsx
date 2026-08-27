@@ -3,12 +3,16 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useI18n } from '@/lib/i18n';
-import { ChevronDownIcon, EllipsisVertical, Monitor, Moon, Sun } from 'lucide-react';
+import { edit as editSettingsAppearance } from '@/routes/settings/appearance';
+import { ChevronDownIcon, EllipsisVertical, Monitor, Moon, Settings2, Sun } from 'lucide-react';
 import { HTMLAttributes } from 'react';
+import { Link, usePage } from '@inertiajs/react';
+import type { SharedData } from '@/types';
 
 export default function AppearanceToggleDropdown({
     className = '',
@@ -16,6 +20,8 @@ export default function AppearanceToggleDropdown({
 }: HTMLAttributes<HTMLDivElement>) {
     const { appearance, updateAppearance } = useAppearance();
     const { t } = useI18n();
+    const { auth } = usePage<SharedData>().props;
+    const appearanceHref = auth.user ? editSettingsAppearance().url : '/appearance';
 
     const getCurrentIcon = () => {
         switch (appearance) {
@@ -64,12 +70,19 @@ export default function AppearanceToggleDropdown({
                             {t('System')}
                         </span>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href={appearanceHref} className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4 opacity-70" />
+                            <span className="text-muted-foreground text-xs">+ {t('Appearance settings')}</span>
+                        </Link>
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
 
 
             </DropdownMenu>
-            
-            
+
+
         </div>
     );
 }

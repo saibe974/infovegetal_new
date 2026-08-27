@@ -5,11 +5,13 @@ export type AccentColor = 'brand' | 'green' | 'blue' | 'neutral';
 export type DisplayDensity = 'comfortable' | 'compact';
 export type PreferenceScope = 'local' | 'account';
 export type PreferencePage = 'products' | 'users';
+export type CartConfirmationPreference = 'removeItem' | 'clearCart';
 
 export type PageDisplayPreference = {
     enabled: boolean;
     view: ViewMode;
     rightSidebarOpen: boolean;
+    autoOpenCartOnAdd?: boolean;
 };
 
 export type DisplayPreferences = {
@@ -18,6 +20,10 @@ export type DisplayPreferences = {
         theme: Appearance;
         accent: AccentColor;
         density: DisplayDensity;
+    };
+    confirmations: {
+        removeItem: boolean;
+        clearCart: boolean;
     };
     pages: Record<PreferencePage, PageDisplayPreference>;
 };
@@ -33,11 +39,16 @@ export const defaultDisplayPreferences: DisplayPreferences = {
         accent: 'brand',
         density: 'comfortable',
     },
+    confirmations: {
+        removeItem: true,
+        clearCart: true,
+    },
     pages: {
         products: {
             enabled: true,
             view: 'table',
             rightSidebarOpen: false,
+            autoOpenCartOnAdd: true,
         },
         users: {
             enabled: true,
@@ -55,6 +66,9 @@ export function normalizeDisplayPreferences(
 ): DisplayPreferences {
     const input = isRecord(value) ? value : {};
     const general = isRecord(input.general) ? input.general : {};
+    const confirmations = isRecord(input.confirmations)
+        ? input.confirmations
+        : {};
     const pages = isRecord(input.pages) ? input.pages : {};
     const products = isRecord(pages.products) ? pages.products : {};
     const users = isRecord(pages.users) ? pages.users : {};
@@ -74,6 +88,16 @@ export function normalizeDisplayPreferences(
     return {
         version: 1,
         general: { theme, accent, density },
+        confirmations: {
+            removeItem:
+                typeof confirmations.removeItem === 'boolean'
+                    ? confirmations.removeItem
+                    : true,
+            clearCart:
+                typeof confirmations.clearCart === 'boolean'
+                    ? confirmations.clearCart
+                    : true,
+        },
         pages: {
             products: {
                 enabled:
@@ -87,6 +111,10 @@ export function normalizeDisplayPreferences(
                     typeof products.rightSidebarOpen === 'boolean'
                         ? products.rightSidebarOpen
                         : false,
+                autoOpenCartOnAdd:
+                    typeof products.autoOpenCartOnAdd === 'boolean'
+                        ? products.autoOpenCartOnAdd
+                        : true,
             },
             users: {
                 enabled:
@@ -343,6 +371,26 @@ export function persistThemePreference(theme: Appearance): void {
     const preferences = getStoredDisplayPreferences(scope);
     if (preferences.general.theme === theme) return;
     preferences.general.theme = theme;
+    storeDisplayPreferences(preferences, scope);
+
+    if (scope === 'account') {
+        void saveAccountDisplayPreferences(preferences).catch(() => undefined);
+    }
+}
+
+export function persistCartConfirmationPreference(
+    key: CartConfirmationPreference,
+    enabled: boolean,
+): void {
+    if (typeof window === 'undefined') return;
+
+    const scope = getPreferenceScope(
+        Boolean(readJson(ACCOUNT_PREFERENCES_KEY)),
+    );
+    const preferences = getStoredDisplayPreferences(scope);
+    if (preferences.confirmations[key] === enabled) return;
+
+    preferences.confirmations[key] = enabled;
     storeDisplayPreferences(preferences, scope);
 
     if (scope === 'account') {

@@ -412,6 +412,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     onViewModeChange={setViewMode}
                     pageKey="products"
                     modes={['table', 'list', 'grid']}
+                    mobileMenuModes={['list', 'grid']}
                 />
                 {/* <div className="w-200 flex-1"> */}
                 <SearchSelect
@@ -423,6 +424,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     propositions={searchPropositionsState}
                     loading={fetching}
                     count={collection.meta.total}
+                    compactMobile
                     query={q ?? ''}
                     fixedFilters={singleFilters}
                     filters={(

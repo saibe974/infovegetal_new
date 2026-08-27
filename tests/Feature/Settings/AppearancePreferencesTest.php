@@ -13,6 +13,10 @@ function appearancePreferencesPayload(array $overrides = []): array
             'accent' => 'green',
             'density' => 'compact',
         ],
+        'confirmations' => [
+            'removeItem' => true,
+            'clearCart' => false,
+        ],
         'pages' => [
             'products' => [
                 'enabled' => true,
@@ -23,6 +27,7 @@ function appearancePreferencesPayload(array $overrides = []): array
                 'enabled' => false,
                 'view' => 'accordion',
                 'rightSidebarOpen' => false,
+                'autoOpenCartOnAdd' => false,
             ],
         ],
     ], $overrides);
@@ -47,7 +52,9 @@ test('appearance preferences can be stored on the user account', function () {
     $this->actingAs($user)
         ->putJson(route('settings.appearance.update'), $preferences)
         ->assertOk()
-        ->assertJsonPath('preferences.general.theme', 'dark');
+        ->assertJsonPath('preferences.general.theme', 'dark')
+        ->assertJsonPath('preferences.confirmations.clearCart', false)
+        ->assertJsonPath('preferences.pages.products.autoOpenCartOnAdd', false);
 
     $meta = $user->usersMeta()->where('key', 'appearance_preferences')->firstOrFail();
 

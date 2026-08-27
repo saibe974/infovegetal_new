@@ -1,5 +1,6 @@
 import HeadingSmall from '@/components/heading-small';
 import {
+    AppearanceConfirmationSettings,
     AppearanceGeneralSettings,
     AppearancePageSettings,
 } from '@/components/settings/appearance-options';
@@ -96,6 +97,18 @@ export default function Appearance() {
         }));
     };
 
+    const updateConfirmation = <
+        K extends keyof DisplayPreferences['confirmations'],
+    >(
+        key: K,
+        value: DisplayPreferences['confirmations'][K],
+    ) => {
+        setPreferences((current) => ({
+            ...current,
+            confirmations: { ...current.confirmations, [key]: value },
+        }));
+    };
+
     const selectScope = (nextScope: PreferenceScope) => {
         if (nextScope === scope) return;
         if (
@@ -175,6 +188,10 @@ export default function Appearance() {
                         <AppearanceGeneralSettings
                             preferences={preferences.general}
                             onChange={updateGeneral}
+                        />
+                        <AppearanceConfirmationSettings
+                            confirmations={preferences.confirmations}
+                            onChange={updateConfirmation}
                         />
                         <AppearancePageSettings
                             pages={preferences.pages}

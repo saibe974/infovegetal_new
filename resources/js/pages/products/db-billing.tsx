@@ -43,7 +43,14 @@ import {
     type SharedData,
 } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    FormEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 
 type Props = {
     dbProduct: dbProduct;
@@ -1126,50 +1133,60 @@ export default withAppLayout<Props>(
                             onSave={() => formRef.current?.requestSubmit()}
                             saving={processing}
                             title={
-                                <Breadcrumb>
-                                    <BreadcrumbList>
-                                        <BreadcrumbItemUI>
-                                            <BreadcrumbPage className="text-3xl font-bold capitalize">
-                                                {dbProduct.name ||
-                                                    t('Database')}
-                                            </BreadcrumbPage>
-                                        </BreadcrumbItemUI>
-                                        {activeBillingRule && (
-                                            <>
-                                                <BreadcrumbSeparator />
+                                <>
+                                    <span className="block truncate text-lg sm:hidden">
+                                        {dbProduct.name || t('Database')}
+                                    </span>
+                                    <div className="hidden sm:block">
+                                        <Breadcrumb>
+                                            <BreadcrumbList>
                                                 <BreadcrumbItemUI>
-                                                    <BreadcrumbPage className="text-3xl font-bold">
-                                                        {billingLabel}
+                                                    <BreadcrumbPage className="text-3xl font-bold capitalize">
+                                                        {dbProduct.name ||
+                                                            t('Database')}
                                                     </BreadcrumbPage>
                                                 </BreadcrumbItemUI>
-                                            </>
-                                        )}
-                                        {activePanelItem && (
-                                            <>
-                                                <BreadcrumbSeparator />
-                                                <BreadcrumbItemUI>
-                                                    <BreadcrumbPage className="text-3xl font-bold">
-                                                        {activePanelItem.type ===
-                                                        'profile'
-                                                            ? (currentProfile?.name ??
-                                                              t('Profile'))
-                                                            : activePanelItem.type ===
-                                                                'file'
-                                                              ? (currentFile?.name ??
-                                                                t('Fichier'))
-                                                              : (userOptionById.get(
-                                                                    Number(
-                                                                        activePanelItem.id,
-                                                                    ),
-                                                                )?.label ??
-                                                                t(
-                                                                    'Commercial',
-                                                                ))}
-                                                    </BreadcrumbPage>
-                                                </BreadcrumbItemUI>
-                                            </>
-                                        )}
-                                        {/* {activeSellerProfileId &&
+                                                {activeBillingRule && (
+                                                    <>
+                                                        <BreadcrumbSeparator />
+                                                        <BreadcrumbItemUI>
+                                                            <BreadcrumbPage className="text-3xl font-bold">
+                                                                {billingLabel}
+                                                            </BreadcrumbPage>
+                                                        </BreadcrumbItemUI>
+                                                    </>
+                                                )}
+                                                {activePanelItem && (
+                                                    <>
+                                                        <BreadcrumbSeparator />
+                                                        <BreadcrumbItemUI>
+                                                            <BreadcrumbPage className="text-3xl font-bold">
+                                                                {activePanelItem.type ===
+                                                                'profile'
+                                                                    ? (currentProfile?.name ??
+                                                                      t(
+                                                                          'Profile',
+                                                                      ))
+                                                                    : activePanelItem.type ===
+                                                                        'file'
+                                                                      ? (currentFile?.name ??
+                                                                        t(
+                                                                            'Fichier',
+                                                                        ))
+                                                                      : (userOptionById.get(
+                                                                            Number(
+                                                                                activePanelItem.id,
+                                                                            ),
+                                                                        )
+                                                                            ?.label ??
+                                                                        t(
+                                                                            'Commercial',
+                                                                        ))}
+                                                            </BreadcrumbPage>
+                                                        </BreadcrumbItemUI>
+                                                    </>
+                                                )}
+                                                {/* {activeSellerProfileId &&
                                             currentSellerProfile && (
                                                 <>
                                                     <BreadcrumbSeparator />
@@ -1182,8 +1199,10 @@ export default withAppLayout<Props>(
                                                     </BreadcrumbItemUI>
                                                 </>
                                             )} */}
-                                    </BreadcrumbList>
-                                </Breadcrumb>
+                                            </BreadcrumbList>
+                                        </Breadcrumb>
+                                    </div>
+                                </>
                             }
                         />
 

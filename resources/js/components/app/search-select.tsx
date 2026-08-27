@@ -39,6 +39,7 @@ interface SearchBarProps {
     placeholder?: string;
     filters?: ReactNode;
     search?: boolean;
+    compactMobile?: boolean;
     selection?: (string | Option)[];
     multiple?: boolean;
     fixedFilters?: {
@@ -98,6 +99,7 @@ export default function SearchSelect({
     placeholder,
     filters = undefined,
     search = true,
+    compactMobile = false,
     selection = undefined,
     multiple = true,
     fixedFilters = undefined,
@@ -350,6 +352,7 @@ export default function SearchSelect({
                             className={cn(
                                 'flex items-center gap-1 rounded-xl border border-brand-main/30 bg-brand-main/10 px-2 text-sm text-foreground',
                                 Flag ? 'py-1.5' : 'py-0.5',
+                                compactMobile && 'hidden sm:flex',
                             )}
                         >
                             {Flag ? (
@@ -545,7 +548,10 @@ export default function SearchSelect({
                     <button
                         type="button"
                         onClick={handleSearch}
-                        className="px-1 text-muted-foreground hover:text-foreground"
+                        className={cn(
+                            'px-1 text-muted-foreground hover:text-foreground',
+                            compactMobile && 'hidden sm:inline-flex',
+                        )}
                     >
                         <SearchIcon size={16} />
                     </button>
@@ -553,7 +559,12 @@ export default function SearchSelect({
 
                 {/* Petit compteur d'occurrences */}
                 {typeof count === 'number' && (
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span
+                        className={cn(
+                            'ml-2 text-xs text-muted-foreground',
+                            compactMobile && 'hidden sm:inline',
+                        )}
+                    >
                         {count > 1
                             ? `${count} ${t('results')}`
                             : count === 0

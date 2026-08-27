@@ -215,7 +215,7 @@ export function CartSidebarHeader() {
                 return;
             }
 
-            clearCart();
+            clearCart({ skipConfirmation: true });
             setNewCartMessage(t("Panier actif vide. Enregistrez pour creer un nouvel identifiant."));
             router.reload({ only: ["cart", "cart_refresh_token"] });
         } catch (error) {
@@ -267,7 +267,7 @@ export function CartSidebarHeader() {
                                             <button
                                                 type="button"
                                                 className="p-2 rounded hover:bg-muted"
-                                                onClick={clearCart}
+                                                onClick={() => clearCart()}
                                             >
                                                 <Trash2Icon className="size-5 text-destructive" />
                                             </button>

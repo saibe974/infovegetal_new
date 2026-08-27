@@ -170,6 +170,70 @@ export function AppearanceGeneralSettings({
     );
 }
 
+type ConfirmationsProps = {
+    confirmations: DisplayPreferences['confirmations'];
+    onChange: <K extends keyof DisplayPreferences['confirmations']>(
+        key: K,
+        value: DisplayPreferences['confirmations'][K],
+    ) => void;
+};
+
+export function AppearanceConfirmationSettings({
+    confirmations,
+    onChange,
+}: ConfirmationsProps) {
+    const options: Array<{
+        key: keyof DisplayPreferences['confirmations'];
+        label: string;
+        description: string;
+    }> = [
+        {
+            key: 'removeItem',
+            label: 'Retrait d’un produit',
+            description:
+                'Demander une confirmation avant de retirer un produit du panier.',
+        },
+        {
+            key: 'clearCart',
+            label: 'Vidage du panier',
+            description:
+                'Demander une confirmation avant de vider complètement le panier.',
+        },
+    ];
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Confirmations du panier</CardTitle>
+                <CardDescription>
+                    Choisissez les actions qui nécessitent votre confirmation.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+                {options.map((option) => (
+                    <label
+                        key={option.key}
+                        className="flex cursor-pointer items-start gap-3 rounded-xl border p-4"
+                    >
+                        <Checkbox
+                            checked={confirmations[option.key]}
+                            onCheckedChange={(checked) =>
+                                onChange(option.key, checked === true)
+                            }
+                        />
+                        <span className="grid gap-1">
+                            <span className="font-medium">{option.label}</span>
+                            <span className="text-sm text-muted-foreground">
+                                {option.description}
+                            </span>
+                        </span>
+                    </label>
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
+
 type PagesProps = {
     pages: DisplayPreferences['pages'];
     onChange: (
@@ -250,19 +314,51 @@ export function AppearancePageSettings({ pages, onChange }: PagesProps) {
                                             )}
                                         </div>
                                     </div>
-                                    <label className="flex min-w-48 items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-                                        <Checkbox
-                                            checked={setting.rightSidebarOpen}
-                                            onCheckedChange={(checked) =>
-                                                onChange(page, {
-                                                    rightSidebarOpen:
-                                                        checked === true,
-                                                })
-                                            }
-                                        />
-                                        <PanelRight className="size-4" />
-                                        Volet ouvert
-                                    </label>
+                                    <div className="grid min-w-56 gap-2">
+                                        <label className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                                            <Checkbox
+                                                checked={
+                                                    setting.rightSidebarOpen
+                                                }
+                                                onCheckedChange={(checked) =>
+                                                    onChange(page, {
+                                                        rightSidebarOpen:
+                                                            checked === true,
+                                                    })
+                                                }
+                                            />
+                                            <PanelRight className="size-4" />
+                                            Volet ouvert
+                                        </label>
+                                        {page === 'products' && (
+                                            <label className="flex items-start gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                                                <Checkbox
+                                                    checked={
+                                                        setting.autoOpenCartOnAdd
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        onChange(page, {
+                                                            autoOpenCartOnAdd:
+                                                                checked ===
+                                                                true,
+                                                        })
+                                                    }
+                                                />
+                                                <span className="grid gap-1">
+                                                    <span>
+                                                        Ouvrir le panier après
+                                                        un ajout
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Sur ordinateur
+                                                        uniquement
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>

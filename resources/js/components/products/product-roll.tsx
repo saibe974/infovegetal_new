@@ -714,11 +714,8 @@ export function ProductRoll({
 
     const removeProduct = (product: Product) => {
         if (!onRemoveProduct) return;
-
-        if (window.confirm(`Supprimer complètement « ${product.name} » du panier ?`)) {
-            onRemoveProduct(product.id);
-            closeCartonEvent();
-        }
+        onRemoveProduct(product.id);
+        closeCartonEvent();
     };
 
     const suppliers = Object.values(distribution.suppliers);

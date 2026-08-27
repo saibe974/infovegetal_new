@@ -1,5 +1,5 @@
 import { CartContext } from '@/components/cart/cart.context';
-import { useSidebar } from '@/components/ui/sidebar';
+import { useCartAutoOpen } from '@/components/cart/use-cart-auto-open';
 import { useI18n } from '@/lib/i18n';
 import { addCartonIcon, addEtageIcon, addRollIcon } from '@/lib/icon';
 import { resolveProductPrices } from '@/lib/resolve-product-prices';
@@ -15,7 +15,7 @@ type Props = {
 export function ProductOrderButtons({ product, className }: Props) {
     const { t } = useI18n();
     const { addToCart } = useContext(CartContext);
-    const { toggleSidebar, isOpenId } = useSidebar();
+    const openCartAfterAdd = useCartAutoOpen();
     const {
         price,
         price_floor: priceFloor,
@@ -77,7 +77,7 @@ export function ProductOrderButtons({ product, className }: Props) {
                         event.preventDefault();
                         event.stopPropagation();
                         addToCart(product, action.quantity);
-                        if (!isOpenId('right')) toggleSidebar('right');
+                        openCartAfterAdd();
                     }}
                     title={action.title}
                 >

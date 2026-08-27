@@ -60,9 +60,15 @@ const defaultColumnVisibility: ColumnVisibility = {
     actions: true,
 };
 
-const accordionGridClass = 'grid items-center';
+const accordionGridClass =
+    'grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center sm:grid-cols-[var(--accordion-grid-columns)] sm:min-w-[var(--accordion-grid-min-width)]';
 
-function getAccordionGridStyle(columns: ColumnVisibility): CSSProperties {
+type AccordionGridStyle = CSSProperties & {
+    '--accordion-grid-columns': string;
+    '--accordion-grid-min-width': string;
+};
+
+function getAccordionGridStyle(columns: ColumnVisibility): AccordionGridStyle {
     const tracks = ['128px', 'minmax(180px, 1.1fr)'];
     let minWidth = 340;
 
@@ -84,8 +90,8 @@ function getAccordionGridStyle(columns: ColumnVisibility): CSSProperties {
     }
 
     return {
-        gridTemplateColumns: tracks.join(' '),
-        minWidth,
+        '--accordion-grid-columns': tracks.join(' '),
+        '--accordion-grid-min-width': `${minWidth}px`,
     };
 }
 
@@ -218,7 +224,7 @@ function UsersAccordionHeader({
     return (
         <StickyBar
             zIndex={19}
-            className="users-accordion-columns"
+            className="users-accordion-columns hidden sm:block"
             stickyClassName="bg-card shadow-md"
             topOffsetElement=".top-sticky, .users-search-sticky"
         >
@@ -422,13 +428,13 @@ function UserAccordionItem({
                         </CollapsibleTrigger>
 
                         {visibleColumns.email && (
-                            <span className="truncate pr-4 text-sm text-muted-foreground">
+                            <span className="hidden truncate pr-4 text-sm text-muted-foreground sm:block">
                                 {isGroup ? '—' : item.email || '—'}
                             </span>
                         )}
 
                         {visibleColumns.roles && (
-                            <span className="flex flex-wrap gap-1 pr-4">
+                            <span className="hidden flex-wrap gap-1 pr-4 sm:flex">
                                 {(item.roles ?? []).map((role) => (
                                     <Badge
                                         key={role.id}
@@ -447,7 +453,7 @@ function UserAccordionItem({
                         )}
 
                         {visibleColumns.created_at && (
-                            <span className="text-sm text-muted-foreground">
+                            <span className="hidden text-sm text-muted-foreground sm:block">
                                 {item.created_at
                                     ? new Date(
                                           item.created_at,
@@ -457,7 +463,7 @@ function UserAccordionItem({
                         )}
 
                         {visibleColumns.actions && (
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="hidden items-center justify-end gap-2 sm:flex">
                                 {showImpersonate && (
                                     <Button
                                         size="icon"
@@ -628,10 +634,15 @@ function UserAccordionItem({
                                         </Link>
                                     </Button>
                                 )}
-                                {!visibleColumns.actions && showImpersonate && (
+                                {showImpersonate && (
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        className={
+                                            visibleColumns.actions
+                                                ? 'sm:hidden'
+                                                : undefined
+                                        }
                                         onClick={() => onImpersonate?.(item.id)}
                                     >
                                         <UserCheck className="size-4" />
@@ -648,18 +659,21 @@ function UserAccordionItem({
                                         {t('Edit')}
                                     </Button>
                                 )}
-                                {!visibleColumns.actions &&
-                                    showDelete &&
-                                    onDelete && (
-                                        <Button
-                                            size="sm"
-                                            variant="destructive-outline"
-                                            onClick={() => onDelete(item.id)}
-                                        >
-                                            <TrashIcon className="size-4" />
-                                            {t('Delete')}
-                                        </Button>
-                                    )}
+                                {showDelete && onDelete && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive-outline"
+                                        className={
+                                            visibleColumns.actions
+                                                ? 'sm:hidden'
+                                                : undefined
+                                        }
+                                        onClick={() => onDelete(item.id)}
+                                    >
+                                        <TrashIcon className="size-4" />
+                                        {t('Delete')}
+                                    </Button>
+                                )}
                                 <Button size="sm" asChild>
                                     <Link href={`/admin/users/${item.id}`}>
                                         {t('View user')}
@@ -736,13 +750,13 @@ function StickyParentRow({
                 </button>
 
                 {visibleColumns.email && (
-                    <span className="truncate pr-4 text-sm text-muted-foreground">
+                    <span className="hidden truncate pr-4 text-sm text-muted-foreground sm:block">
                         {isGroup ? '—' : user.email || '—'}
                     </span>
                 )}
 
                 {visibleColumns.roles && (
-                    <span className="flex flex-nowrap gap-1 overflow-hidden pr-4">
+                    <span className="hidden flex-nowrap gap-1 overflow-hidden pr-4 sm:flex">
                         {(user.roles ?? []).map((role) => (
                             <Badge
                                 key={role.id}
@@ -759,7 +773,7 @@ function StickyParentRow({
                 )}
 
                 {visibleColumns.created_at && (
-                    <span className="text-sm text-muted-foreground">
+                    <span className="hidden text-sm text-muted-foreground sm:block">
                         {user.created_at
                             ? new Date(user.created_at).toLocaleDateString()
                             : '—'}
@@ -767,7 +781,7 @@ function StickyParentRow({
                 )}
 
                 {visibleColumns.actions && (
-                    <div className="flex justify-end">
+                    <div className="hidden justify-end sm:flex">
                         <Badge variant="outline">{t('Parent')}</Badge>
                     </div>
                 )}

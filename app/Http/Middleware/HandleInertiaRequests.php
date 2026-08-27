@@ -66,7 +66,13 @@ class HandleInertiaRequests extends Middleware
         $impersonationStrictMode = false;
 
         $formatUser = function (User $user) {
-            $user->loadMissing(['roles', 'permissions']);
+            $user->loadMissing([
+                'roles',
+                'permissions',
+                'usersMeta' => fn ($query) => $query
+                    ->where('key', 'logo')
+                    ->select(['id', 'user_id', 'key', 'value']),
+            ]);
 
             $allPermissions = $user->getAllPermissions()
                 ->map(fn ($permission) => $permission->only(['id', 'name']))
@@ -78,6 +84,14 @@ class HandleInertiaRequests extends Middleware
                 ->map(fn ($role) => $role->only(['id', 'name']))
                 ->values();
             $userArray['permissions'] = $allPermissions;
+            $logo = $user->usersMeta->firstWhere('key', 'logo');
+            $logoValue = $logo?->value
+                ? json_decode($logo->value, true)
+                : null;
+            $userArray['logo_url'] = is_array($logoValue)
+                ? ($logoValue['url'] ?? null)
+                : null;
+            unset($userArray['users_meta']);
 
             return $userArray;
         };

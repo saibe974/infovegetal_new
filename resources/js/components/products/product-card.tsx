@@ -20,6 +20,7 @@ type Props = {
     editProduct?: (productId: number) => void;
     deleteProduct?: (productId: number) => void;
     className?: string;
+    linkClassName?: string;
     showStatusBadge?: boolean;
 };
 
@@ -30,6 +31,7 @@ export function ProductCard({
     editProduct,
     deleteProduct,
     className,
+    linkClassName,
     showStatusBadge = false,
 }: Props) {
     const { t } = useI18n();
@@ -83,7 +85,10 @@ export function ProductCard({
         <Link
             key={product.id}
             href={buildShowUrl(product.id)}
-            className="no-underline group hover:no-underline hover:scale-102 transition-transform duration-300"
+            className={cn(
+                "no-underline group hover:no-underline hover:scale-102 transition-transform duration-300",
+                linkClassName,
+            )}
             aria-label={`Voir ${name}`}
         >
             <Card
@@ -220,7 +225,7 @@ export function ProductCard({
 
                 {canOrder && (
                     <CardFooter className="w-full p-0">
-                        <ProductOrderButtons product={product} className="flex w-full flex-col lg:flex-row" />
+                        <ProductOrderButtons product={product} className="grid w-full grid-flow-col auto-cols-fr" />
                     </CardFooter>
                 )}
             </Card>

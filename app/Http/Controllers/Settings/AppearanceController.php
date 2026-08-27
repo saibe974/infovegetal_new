@@ -41,6 +41,11 @@ class AppearanceController extends Controller
         return is_array($preferences) ? $preferences : null;
     }
 
+    public function editGuest(): Response
+    {
+        return Inertia::render('appearance');
+    }
+
     public function edit(Request $request, ?User $user = null): Response
     {
         $target = $user ?? $request->user();
@@ -69,11 +74,15 @@ class AppearanceController extends Controller
             'general.theme' => ['required', Rule::in(['light', 'dark', 'system'])],
             'general.accent' => ['required', Rule::in(['brand', 'green', 'blue', 'neutral'])],
             'general.density' => ['required', Rule::in(['comfortable', 'compact'])],
+            'confirmations' => ['required', 'array'],
+            'confirmations.removeItem' => ['required', 'boolean'],
+            'confirmations.clearCart' => ['required', 'boolean'],
             'pages' => ['required', 'array'],
             'pages.products' => ['required', 'array'],
             'pages.products.enabled' => ['required', 'boolean'],
             'pages.products.view' => ['required', Rule::in(['table', 'list', 'grid'])],
             'pages.products.rightSidebarOpen' => ['required', 'boolean'],
+            'pages.products.autoOpenCartOnAdd' => ['required', 'boolean'],
             'pages.users' => ['required', 'array'],
             'pages.users.enabled' => ['required', 'boolean'],
             'pages.users.view' => ['required', Rule::in(['accordion', 'grid'])],
