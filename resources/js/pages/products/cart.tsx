@@ -38,6 +38,43 @@ import {
 
 type Props = Record<string, never>;
 
+const useCartSidebarTopOffset = () => {
+    const [topOffset, setTopOffset] = useState(0);
+
+    useEffect(() => {
+        const elements = Array.from(
+            document.querySelectorAll<HTMLElement>('.top-sticky, .sticky-bar-cart'),
+        );
+
+        const update = () => {
+            const nextOffset = elements.reduce((total, element) => {
+                const marginBottom = element.classList.contains('sticky-bar-cart')
+                    ? Number.parseFloat(window.getComputedStyle(element).marginBottom) || 0
+                    : 0;
+
+                return total + Math.ceil(element.getBoundingClientRect().height + marginBottom);
+            }, 0);
+
+            setTopOffset(nextOffset);
+        };
+
+        update();
+        window.addEventListener('resize', update);
+
+        const resizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(update)
+            : null;
+        elements.forEach((element) => resizeObserver?.observe(element));
+
+        return () => {
+            window.removeEventListener('resize', update);
+            resizeObserver?.disconnect();
+        };
+    }, []);
+
+    return topOffset;
+};
+
 const parseDiscountValue = (value: string): number => {
     const parsed = Number(value.replace(',', '.'));
     return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
@@ -175,6 +212,7 @@ export default withAppLayout<Props>(
     false,
     () => {
         const { t } = useI18n();
+        const cartSidebarTopOffset = useCartSidebarTopOffset();
         const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {}, cart_discounts: storedDiscounts = {} } = usePage<SharedData & {
             cart_contacts?: Record<string, {
                 fact?: { id: number; name: string; email: string } | null;
@@ -972,15 +1010,16 @@ export default withAppLayout<Props>(
                     </div>
 
                     <BasicSticky
-                        topOffset={0}
-                        wrapperClassName="relative z-30"
-                        stickyClassName="z-30"
-                        stickyStyle={{ top: 0, zIndex: 30 }}
+                        topOffset={-cartSidebarTopOffset}
+                        wrapperClassName="relative z-10"
+                        stickyClassName="z-10"
+                        stickyStyle={{ top: cartSidebarTopOffset, zIndex: 10 }}
                     >
                         <Card
-                            className="sidebar max-h-screen overflow-y-auto overscroll-auto"
+                            className="sidebar flex flex-col gap-0 overflow-hidden py-0"
+                            style={{ maxHeight: `calc(100svh - ${cartSidebarTopOffset}px)` }}
                         >
-                            <CardHeader>
+                            <CardHeader className="shrink-0 py-6">
                                 <CardTitle>{t('Récapitulatif')}</CardTitle>
                                 {saveMessage && (
                                     <div
@@ -997,7 +1036,7 @@ export default withAppLayout<Props>(
                                     </div>
                                 )}
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-auto pb-6">
                                 <div className="space-y-3">
                                     {groupedItems.map((group) => (
                                         <div key={group.id} className="relative rounded-md border px-3 py-2">
@@ -1193,20 +1232,17 @@ export default withAppLayout<Props>(
                                         <span>{formatCurrency(orderTotal)}</span>
                                     </div>
                                 </div>
-
-
-
-                                <div className="grid grid-cols-1 gap-2">
-                                    <Button
-                                        className="w-full bg-brand-main hover:bg-brand-main-hover"
-                                        size="lg"
-                                        disabled={items.length === 0 || isSaving}
-                                        onClick={() => void handleGenerateTcpdf(orderOverrides)}
-                                    >
-                                        {t('Commander')}
-                                    </Button>
-                                </div>
                             </CardContent>
+                            <div className="shrink-0 border-t bg-card p-6 pt-4">
+                                <Button
+                                    className="w-full bg-brand-main hover:bg-brand-main-hover"
+                                    size="lg"
+                                    disabled={items.length === 0 || isSaving}
+                                    onClick={() => void handleGenerateTcpdf(orderOverrides)}
+                                >
+                                    {t('Commander')}
+                                </Button>
+                            </div>
                         </Card>
                     </BasicSticky>
                 </div>
