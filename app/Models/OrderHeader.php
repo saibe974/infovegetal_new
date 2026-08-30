@@ -22,6 +22,8 @@ class OrderHeader extends Model
         'items_total_ht',
         'shipping_total_ht',
         'discount_total_ht',
+        'promotion_coupon_id',
+        'coupon_code',
         'total_ht',
         'total_tva',
         'total_ttc',
@@ -70,6 +72,11 @@ class OrderHeader extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(OrderLine::class, 'order_header_id');
+    }
+
+    public function promotionCoupon(): BelongsTo
+    {
+        return $this->belongsTo(PromotionCoupon::class);
     }
 
     public function scopeCurrentMonth(Builder $query): Builder

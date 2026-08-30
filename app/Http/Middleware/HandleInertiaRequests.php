@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Cart;
 use App\Models\User;
 use App\Services\UserManagementAuthorizationService;
+use App\Services\PromotionAuthorizationService;
 use App\Http\Controllers\Settings\AppearanceController;
 // use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -143,6 +144,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user ? $userArray : null,
                 'can_access_contracts' => $user?->canInvoiceAnyDbProduct() ?? false,
+                'can_manage_promotions' => $user
+                    ? app(PromotionAuthorizationService::class)->canViewModule($user)
+                    : false,
                 'impersonate_from' => $impersonatorId,
                 'impersonator' => $impersonatorArray,
                 'impersonation_strict_mode' => $impersonationStrictMode,

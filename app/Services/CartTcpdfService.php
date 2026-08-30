@@ -26,7 +26,7 @@ class CartTcpdfService
 
         return response($binary, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -48,7 +48,7 @@ class CartTcpdfService
 
             $pdf->SetFont('dejavusans', '', 7.4);
             $pdf->SetTextColor(100, 116, 139);
-            $pdf->Cell(0, 4, 'Page ' . $pdf->getAliasNumPage() . '/' . $pdf->getAliasNbPages(), 0, 0, 'R');
+            $pdf->Cell(0, 4, 'Page '.$pdf->getAliasNumPage().'/'.$pdf->getAliasNbPages(), 0, 0, 'R');
         });
         $pdf->SetAutoPageBreak(true, 16);
         $pdf->SetImageScale(1.25);
@@ -80,13 +80,13 @@ class CartTcpdfService
 
         $pdf->SetTextColor(55, 65, 81);
         $pdf->SetFont('dejavusans', '', 8.5);
-        if (!empty($payload['order_number'])) {
+        if (! empty($payload['order_number'])) {
             $pdf->SetX($left);
-            $pdf->Cell($width, 4, 'Commande n' . (string) $payload['order_number'], 0, 1, 'C');
+            $pdf->Cell($width, 4, 'Commande n'.(string) $payload['order_number'], 0, 1, 'C');
         }
 
         $pdf->SetX($left);
-        $pdf->Cell($width, 4, 'Date : ' . now()->format('d/m/Y H:i'), 0, 1, 'C');
+        $pdf->Cell($width, 4, 'Date : '.now()->format('d/m/Y H:i'), 0, 1, 'C');
 
         return $y + 18.0;
     }
@@ -96,7 +96,7 @@ class CartTcpdfService
         $facturant = $payload['facturant'] ?? null;
         $commercial = $payload['commercial'] ?? null;
 
-        if (!$facturant && !$commercial) {
+        if (! $facturant && ! $commercial) {
             return $y;
         }
 
@@ -117,7 +117,7 @@ class CartTcpdfService
         $pdf->SetLineWidth(0.2);
         $pdf->Rect($x, $y, $w, $h);
 
-        if (!$contact) {
+        if (! $contact) {
             return;
         }
 
@@ -141,17 +141,17 @@ class CartTcpdfService
         $pdf->SetFont('dejavusans', '', 8);
         $pdf->SetTextColor(55, 65, 81);
         $lines = [];
-        if (!empty($contact->address_road)) {
+        if (! empty($contact->address_road)) {
             $lines[] = (string) $contact->address_road;
         }
-        $zipTown = trim((string) ($contact->address_zip ?? '') . ' ' . (string) ($contact->address_town ?? ''));
+        $zipTown = trim((string) ($contact->address_zip ?? '').' '.(string) ($contact->address_town ?? ''));
         if ($zipTown !== '') {
             $lines[] = $zipTown;
         }
-        if (!empty($contact->phone)) {
+        if (! empty($contact->phone)) {
             $lines[] = (string) $contact->phone;
         }
-        if (!empty($contact->email)) {
+        if (! empty($contact->email)) {
             $lines[] = (string) $contact->email;
         }
 
@@ -177,11 +177,11 @@ class CartTcpdfService
         $pdf->SetFont('dejavusans', 'B', 8.5);
         $pdf->SetTextColor(17, 24, 39);
         $pdf->SetXY($x + 2, $y + 2.2);
-        $pdf->Cell($w - 4, 4, 'Client : ' . (string) ($user->name ?? ''), 0, 1, 'L');
+        $pdf->Cell($w - 4, 4, 'Client : '.(string) ($user->name ?? ''), 0, 1, 'L');
 
         $pdf->SetFont('dejavusans', '', 8.5);
         $pdf->SetXY($x + 2, $y + 6.8);
-        $pdf->Cell($w - 4, 4, 'Email : ' . (string) ($user->email ?? ''), 0, 1, 'L');
+        $pdf->Cell($w - 4, 4, 'Email : '.(string) ($user->email ?? ''), 0, 1, 'L');
 
         return $y + $h;
     }
@@ -268,7 +268,7 @@ class CartTcpdfService
                 $pdf->SetFont('dejavusans', '', 7.4);
                 $pdf->SetTextColor(75, 85, 99);
                 $pdf->SetXY($tx + 1.0, $y + 6.2);
-                $pdf->Cell($cols[2] - 2, 3.4, 'Ref: ' . $this->truncateText($ref, 22), 0, 0, 'L');
+                $pdf->Cell($cols[2] - 2, 3.4, 'Ref: '.$this->truncateText($ref, 22), 0, 0, 'L');
             }
 
             if ($potHeight !== null) {
@@ -327,7 +327,7 @@ class CartTcpdfService
                 $pdf->MultiCell(
                     $tableWidth,
                     $commentH,
-                    'Commentaire produit : ' . $productComment,
+                    'Commentaire produit : '.$productComment,
                     1,
                     'L',
                     true,
@@ -353,7 +353,10 @@ class CartTcpdfService
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Total produits', (float) ($payload['items_total'] ?? 0.0), false);
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Frais de transport', (float) ($payload['shipping_total'] ?? 0.0), false);
         if ((float) ($payload['discount_total'] ?? 0.0) > 0) {
-            $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Remise', -(float) $payload['discount_total'], false);
+            $discountLabel = ! empty($payload['coupon']['code'])
+                ? 'Coupon '.$payload['coupon']['code']
+                : 'Remise';
+            $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, $discountLabel, -(float) $payload['discount_total'], false);
         }
         $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Total general', (float) ($payload['total'] ?? 0.0), true);
 
@@ -401,7 +404,7 @@ class CartTcpdfService
             $pdf->MultiCell(
                 194.0,
                 0,
-                $comment['label'] . "\n" . $comment['text'],
+                $comment['label']."\n".$comment['text'],
                 1,
                 'L',
                 true,
@@ -455,7 +458,8 @@ class CartTcpdfService
             $pdf->SetTextColor(100, 116, 139);
             $pdf->SetFont('dejavusans', '', 7.8);
             $pdf->SetXY(8, $y + 3);
-            $pdf->Cell(194, 4, 'Document genere le ' . now()->format('d/m/Y H:i'), 0, 1, 'L');
+            $pdf->Cell(194, 4, 'Document genere le '.now()->format('d/m/Y H:i'), 0, 1, 'L');
+
             return;
         }
 
@@ -496,7 +500,7 @@ class CartTcpdfService
             $pdf->SetFont('dejavusans', '', 8.0);
             $pdf->SetTextColor(55, 65, 81);
             $pdf->SetXY($x + 118, $y + 1.7);
-            $pdf->Cell(74, 4, 'Rolls: ' . (int) ($supplier['roll_count'] ?? 0) . '  |  Coef moy: ' . number_format((float) ($supplier['coef_avg'] ?? 0), 1, ',', ' ') . '%', 0, 0, 'R');
+            $pdf->Cell(74, 4, 'Rolls: '.(int) ($supplier['roll_count'] ?? 0).'  |  Coef moy: '.number_format((float) ($supplier['coef_avg'] ?? 0), 1, ',', ' ').'%', 0, 0, 'R');
             $y += 9.5;
 
             $country = strtoupper((string) ($supplier['country'] ?? ''));
@@ -504,11 +508,11 @@ class CartTcpdfService
 
             $pdf->SetTextColor(75, 85, 99);
             $pdf->SetFont('dejavusans', '', 7.8);
-            $meta = 'Pays: ' . ($country !== '' ? $country : '-')
-                . '  |  Mini: ' . (int) ($supplier['mini'] ?? 0)
-                . '  |  Etages: ' . (int) ($supplier['floor_count'] ?? 0)
-                . '  |  Cartons: ' . (int) ($supplier['carton_count'] ?? 0)
-                . '  |  Perte: ' . number_format((float) ($supplier['loss_total'] ?? 0), 1, ',', ' ');
+            $meta = 'Pays: '.($country !== '' ? $country : '-')
+                .'  |  Mini: '.(int) ($supplier['mini'] ?? 0)
+                .'  |  Etages: '.(int) ($supplier['floor_count'] ?? 0)
+                .'  |  Cartons: '.(int) ($supplier['carton_count'] ?? 0)
+                .'  |  Perte: '.number_format((float) ($supplier['loss_total'] ?? 0), 1, ',', ' ');
             $pdf->SetXY($x + 9.0, $y + 1.0);
             $pdf->Cell($contentW - 10, 4, $meta, 0, 0, 'L');
             $y += 7.0;
@@ -519,6 +523,7 @@ class CartTcpdfService
                 $pdf->SetXY($x + 1.0, $y + 1.0);
                 $pdf->Cell($contentW - 2, 4, 'Mode hors roll pour ce fournisseur.', 0, 0, 'L');
                 $y += 7.5;
+
                 continue;
             }
 
@@ -529,7 +534,7 @@ class CartTcpdfService
         $pdf->SetTextColor(100, 116, 139);
         $pdf->SetFont('dejavusans', '', 7.8);
         $pdf->SetXY(8, $y + 3);
-        $pdf->Cell(194, 4, 'Document genere le ' . now()->format('d/m/Y H:i') , 0, 1, 'L');
+        $pdf->Cell(194, 4, 'Document genere le '.now()->format('d/m/Y H:i'), 0, 1, 'L');
     }
 
     private function drawSupplierRollCards($pdf, float $x, float $y, float $contentW, array $supplier): float
@@ -555,7 +560,7 @@ class CartTcpdfService
                 $pdf->SetTextColor(22, 101, 52);
                 $pdf->SetFont('dejavusans', 'B', 10.0);
                 $pdf->SetXY($x, $startY);
-                $pdf->Cell($contentW, 5, 'Rolls - ' . $this->truncateText((string) ($supplier['name'] ?? '-'), 52), 0, 1, 'L');
+                $pdf->Cell($contentW, 5, 'Rolls - '.$this->truncateText((string) ($supplier['name'] ?? '-'), 52), 0, 1, 'L');
                 $startY += 6.5;
             }
 
@@ -569,6 +574,7 @@ class CartTcpdfService
         }
 
         $rows = (int) ceil($idx / $perRow);
+
         return $startY + ($rows > 1 ? 0 : 0) + $cardH;
     }
 
@@ -587,12 +593,12 @@ class CartTcpdfService
         $pdf->SetTextColor(17, 24, 39);
         $pdf->SetFont('dejavusans', 'B', 7.8);
         $pdf->SetXY($x + 1.4, $y + 2.0);
-        $pdf->Cell($w - 2.8, 3.8, 'Roll #' . $index . '  ' . $coef . '%', 0, 0, 'L');
+        $pdf->Cell($w - 2.8, 3.8, 'Roll #'.$index.'  '.$coef.'%', 0, 0, 'L');
 
         $pdf->SetFont('dejavusans', '', 6.8);
         $pdf->SetTextColor(75, 85, 99);
         $pdf->SetXY($x + 1.4, $y + 5.4);
-        $pdf->Cell($w - 2.8, 3.2, 'perte ' . $perte . ' - etages ' . (int) ($roll['nbetages'] ?? 0), 0, 0, 'L');
+        $pdf->Cell($w - 2.8, 3.2, 'perte '.$perte.' - etages '.(int) ($roll['nbetages'] ?? 0), 0, 0, 'L');
 
         $shellX = $x + 4.0;
         $shellY = $y + 11.0;
@@ -609,6 +615,7 @@ class CartTcpdfService
             $pdf->SetFont('dejavusans', '', 7.0);
             $pdf->SetXY($shellX, $shellY + ($shellH / 2) - 2);
             $pdf->Cell($shellW, 4, 'Aucun etage', 0, 0, 'C');
+
             return;
         }
 
@@ -645,7 +652,7 @@ class CartTcpdfService
             $pdf->Rect($drawX, $fy, $usedW, $floorH, 'DF');
 
             $cartons = is_array($etage['cartons'] ?? null) ? $etage['cartons'] : [];
-            if (empty($cartons) && !empty($etage['items']) && is_array($etage['items'])) {
+            if (empty($cartons) && ! empty($etage['items']) && is_array($etage['items'])) {
                 foreach ($etage['items'] as $itemId) {
                     $cartons[] = ['product_id' => $itemId, 'x' => 1.0, 'y' => $etageUnits];
                 }
@@ -730,7 +737,7 @@ class CartTcpdfService
         }
 
         $cartons = is_array($etage['cartons'] ?? null) ? $etage['cartons'] : [];
-        if (!empty($cartons)) {
+        if (! empty($cartons)) {
             $max = 0.0;
             foreach ($cartons as $carton) {
                 $max = max($max, (float) ($carton['y'] ?? 0));
@@ -759,6 +766,7 @@ class CartTcpdfService
         ];
 
         $idx = abs($productId) % count($palette);
+
         return $palette[$idx];
     }
 
@@ -825,12 +833,12 @@ class CartTcpdfService
 
     private function resolveUserLogoPath($user): ?string
     {
-        if (!$user || !isset($user->usersMeta)) {
+        if (! $user || ! isset($user->usersMeta)) {
             return null;
         }
 
         $logo = $user->usersMeta->firstWhere('key', 'logo');
-        if (!$logo || empty($logo->value)) {
+        if (! $logo || empty($logo->value)) {
             return null;
         }
 
@@ -850,12 +858,12 @@ class CartTcpdfService
 
     private function resolveProductThumbPath($product): ?string
     {
-        if (!method_exists($product, 'getFirstMedia')) {
+        if (! method_exists($product, 'getFirstMedia')) {
             return null;
         }
 
         $media = $product->getFirstMedia('images');
-        if (!$media) {
+        if (! $media) {
             return null;
         }
 
@@ -880,7 +888,7 @@ class CartTcpdfService
             return $text;
         }
 
-        return rtrim(mb_substr($text, 0, max(1, $max - 1))) . '…';
+        return rtrim(mb_substr($text, 0, max(1, $max - 1))).'…';
     }
 
     private function normalizeEan13(string $eanDigits): ?string
@@ -908,10 +916,10 @@ class CartTcpdfService
 
         $parts = [];
         if ($pot > 0) {
-            $parts[] = 'Pot ' . number_format($pot, 1, ',', ' ') . ' cm';
+            $parts[] = 'Pot '.number_format($pot, 1, ',', ' ').' cm';
         }
         if ($height > 0) {
-            $parts[] = 'Ht ' . number_format($height, 1, ',', ' ') . ' cm';
+            $parts[] = 'Ht '.number_format($height, 1, ',', ' ').' cm';
         }
 
         return implode(' - ', $parts);
@@ -919,6 +927,6 @@ class CartTcpdfService
 
     private function eur(float $value): string
     {
-        return number_format($value, 2, ',', ' ') . ' EUR';
+        return number_format($value, 2, ',', ' ').' EUR';
     }
 }

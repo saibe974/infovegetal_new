@@ -24,6 +24,7 @@ Route::get('/csrf-refresh', function () {
 Route::get('/appearance', [AppearanceController::class, 'editGuest'])->name('appearance.guest');
 
 require __DIR__ . '/products.php';
+require __DIR__ . '/promotions.php';
 require __DIR__ . '/cart.php';
 require __DIR__ . '/users.php';
 require __DIR__ . '/admin.php';

@@ -124,6 +124,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         price_floor: string;
         price_promo: string;
         price_roll: string;
+        available_from: string;
+        available_until: string;
     }>({
         name: product.name || '',
         sku: String(product.sku || ''),
@@ -140,6 +142,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         price_floor: String(product.price_floor ?? ''),
         price_promo: String(product.price_promo ?? ''),
         price_roll: String(product.price_roll ?? ''),
+        available_from: product.available_from ?? '',
+        available_until: product.available_until ?? '',
     });
 
     const handleSubmit = (e: FormEvent) => {
@@ -378,6 +382,38 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 value={data.price_promo}
                                                 onChange={(e) => setData('price_promo', e.target.value)}
                                                 aria-invalid={!!currentErrors['price_promo']}
+                                            />
+                                        </FormField>
+                                    </div>
+                                </Card>
+
+                                <Card className="p-4 space-y-4">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-muted-foreground">Disponibilité commerciale</h3>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Le produit reste administrativement actif, mais ne peut être commandé qu’à l’intérieur de cette période.
+                                        </p>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <FormField label="Disponible à partir du" htmlFor="available_from" error={currentErrors['available_from']}>
+                                            <Input
+                                                id="available_from"
+                                                name="available_from"
+                                                type="datetime-local"
+                                                value={data.available_from}
+                                                onChange={(e) => setData('available_from', e.target.value)}
+                                                aria-invalid={!!currentErrors['available_from']}
+                                            />
+                                        </FormField>
+                                        <FormField label="Disponible jusqu’au" htmlFor="available_until" error={currentErrors['available_until']}>
+                                            <Input
+                                                id="available_until"
+                                                name="available_until"
+                                                type="datetime-local"
+                                                min={data.available_from || undefined}
+                                                value={data.available_until}
+                                                onChange={(e) => setData('available_until', e.target.value)}
+                                                aria-invalid={!!currentErrors['available_until']}
                                             />
                                         </FormField>
                                     </div>

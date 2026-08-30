@@ -12,7 +12,7 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Files, FlowerIcon, Folder, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck } from 'lucide-react';
+import { BookOpen, Files, FlowerIcon, Folder, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck, Megaphone } from 'lucide-react';
 import { DatabaseAccessIcon } from '@/lib/icons';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
@@ -52,6 +52,7 @@ export function AppSidebar() {
     const canManageMedia = isAdmin(effectiveUser);
     const canManageDbProducts = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'users.db_products.manage.all') || hasPermission(effectiveUser, 'users.db_products.manage.his');
     const canViewMissingImages = isDev(effectiveUser) || canManageDbProducts;
+    const canManagePromotions = auth?.can_manage_promotions ?? false;
 
     const title: string = '';
     let mainNavItems: NavItemExtended[] = [];
@@ -154,6 +155,14 @@ export function AppSidebar() {
             mainNavItems.push(userMenu);
         }
 
+        if (canManagePromotions) {
+            mainNavItems.push({
+                title: t('Promotions'),
+                href: '/promotions',
+                icon: Megaphone,
+            });
+        }
+
         if (canManageCarriers) {
             mainNavItems.push({
                 title: t('Carriers'),
@@ -214,6 +223,8 @@ export function AppSidebar() {
             legalRoutes,
         ];
     }
+    mainNavItems.push({ title: 'Offres et sélections', href: '/offres', icon: Megaphone });
+
     return (
         <Sidebar collapsible="icon" variant="inset" id='main'>
             <SidebarHeader>

@@ -77,6 +77,11 @@ class RoleSeeder extends Seeder
             'users.db_products.manage.all',
             'db_products.billing.manage_sellers',
             'db_products.billing.delegate_manage',
+            'promo.view',
+            'promo.manage',
+            'promo.manage.all',
+            'promo.publish',
+            'promo.send',
         ];
 
         foreach ($permissions as $permission) {
@@ -135,6 +140,8 @@ class RoleSeeder extends Seeder
             'users.assign_permissions.branch',
             'users.db_products.manage.his',
             'db_products.billing.manage_sellers',
+            'promo.view',
+            'promo.manage',
         ]);
 
         // Fournisseur peut travailler avec produits et ses commerciaux

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, Trash2, TruckIcon } from 'lucide-react';
+import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, TicketPercent, Trash2, TruckIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/datePicker';
 import { useI18n } from '@/lib/i18n';
@@ -213,7 +213,7 @@ export default withAppLayout<Props>(
     () => {
         const { t } = useI18n();
         const cartSidebarTopOffset = useCartSidebarTopOffset();
-        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {}, cart_discounts: storedDiscounts = {} } = usePage<SharedData & {
+        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {}, cart_discounts: storedDiscounts = {}, cart_coupon_code: storedCouponCode = '' } = usePage<SharedData & {
             cart_contacts?: Record<string, {
                 fact?: { id: number; name: string; email: string } | null;
                 com?: { id: number; name: string; email: string } | null;
@@ -235,6 +235,7 @@ export default withAppLayout<Props>(
                 type: DiscountType;
                 value: number;
             }>;
+            cart_coupon_code?: string | null;
         }>().props;
         const cartId = cart?.id;
         const carrierOverridesStorageKey = getCarrierOverridesStorageKey(auth?.user?.id, cartId);
@@ -339,6 +340,10 @@ export default withAppLayout<Props>(
             handleGenerateTcpdf,
         } = useCartOrder();
         const [pageMessage, setPageMessage] = useState<string | null>(null);
+        const [couponDraft, setCouponDraft] = useState(storedCouponCode ?? '');
+        const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_ht: number; funded_by: string } | null>(null);
+        const [couponMessage, setCouponMessage] = useState<string | null>(null);
+        const [isCheckingCoupon, setIsCheckingCoupon] = useState(false);
         const hasRefreshedCartRef = useRef(false);
 
         useEffect(() => {
@@ -461,7 +466,61 @@ export default withAppLayout<Props>(
         const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
         const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
         const discountTotal = groupedItems.reduce((sum, group) => sum + group.discountAmount, 0);
-        const orderTotal = Math.max(0, itemsTotal + deliveryTotal - discountTotal);
+        const effectiveDiscountTotal = appliedCoupon?.discount_ht ?? discountTotal;
+        const orderTotal = Math.max(0, itemsTotal + deliveryTotal - effectiveDiscountTotal);
+
+        useEffect(() => {
+            setAppliedCoupon(null);
+            setCouponMessage(null);
+        }, [itemsTotal, deliveryTotal]);
+
+        const applyCoupon = async () => {
+            const code = couponDraft.trim().toUpperCase();
+            if (!code) {
+                setAppliedCoupon(null);
+                setCouponMessage(null);
+                return;
+            }
+            if (discountTotal > 0) {
+                setCouponMessage('Supprimez les remises manuelles avant d’appliquer un coupon.');
+                return;
+            }
+
+            setIsCheckingCoupon(true);
+            setCouponMessage(null);
+            try {
+                const response = await fetch('/cart/coupon/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '',
+                    },
+                    body: JSON.stringify({
+                        coupon_code: code,
+                        items: groupedItems.flatMap((group) => group.items.map((item) => ({
+                            id: item.product.id,
+                            quantity: item.quantity,
+                            line_total: item.pricing.lineTotal,
+                        }))),
+                        shipping_total: deliveryTotal,
+                    }),
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    setAppliedCoupon(null);
+                    setCouponMessage(result?.errors?.coupon_code?.[0] ?? result?.message ?? 'Coupon invalide.');
+                    return;
+                }
+                setCouponDraft(result.code);
+                setAppliedCoupon(result);
+                setCouponMessage(`Coupon appliqué : ${formatCurrency(result.discount_ht)} de remise HT.`);
+            } catch {
+                setCouponMessage('Impossible de vérifier le coupon pour le moment.');
+            } finally {
+                setIsCheckingCoupon(false);
+            }
+        };
 
         const orderOverrides = useMemo(() => ({
             transportSelection: Object.fromEntries(
@@ -480,7 +539,9 @@ export default withAppLayout<Props>(
             shippingByDb: Object.fromEntries(
                 groupedItems.map((group) => [group.id, group.deliveryTotal]),
             ),
-            discounts: canEditDiscount
+            discounts: appliedCoupon
+                ? {}
+                : canEditDiscount
                 ? Object.fromEntries(
                     groupedItems
                         .map((group) => {
@@ -492,7 +553,8 @@ export default withAppLayout<Props>(
                         .filter((entry): entry is [number, { type: DiscountType; value: number }] => entry !== null),
                 )
                 : undefined,
-        }), [carrierOverrides, groupedItems, deliveryTotal, canEditDiscount, discountsByDb]);
+            couponCode: appliedCoupon?.code ?? '',
+        }), [carrierOverrides, groupedItems, deliveryTotal, canEditDiscount, discountsByDb, appliedCoupon]);
 
         const handleQuantityChange = (productId: number, next: number) => {
             updateQuantity(productId, next);
@@ -1212,6 +1274,30 @@ export default withAppLayout<Props>(
                                     </p>
                                 </div>
 
+                                <div className="space-y-2 rounded-lg border p-3">
+                                    <label htmlFor="coupon-code" className="flex items-center gap-2 text-sm font-medium">
+                                        <TicketPercent className="size-4" />Code promotionnel
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="coupon-code"
+                                            value={couponDraft}
+                                            onChange={(event) => {
+                                                setCouponDraft(event.target.value.toUpperCase());
+                                                setAppliedCoupon(null);
+                                                setCouponMessage(null);
+                                            }}
+                                            placeholder="VOTRE-CODE"
+                                            maxLength={64}
+                                        />
+                                        <Button type="button" variant="outline" onClick={() => void applyCoupon()} disabled={isCheckingCoupon || items.length === 0}>
+                                            {isCheckingCoupon ? 'Vérification…' : 'Appliquer'}
+                                        </Button>
+                                    </div>
+                                    {couponMessage && <p className={cn('text-xs', appliedCoupon ? 'text-emerald-700' : 'text-destructive')}>{couponMessage}</p>}
+                                    {appliedCoupon && <button type="button" className="text-xs text-muted-foreground underline" onClick={() => { setCouponDraft(''); setAppliedCoupon(null); setCouponMessage(null); }}>Retirer le coupon</button>}
+                                </div>
+
                                 <div className="rounded-lg border p-3 space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <span>{t('Total produits')}</span>
@@ -1221,10 +1307,10 @@ export default withAppLayout<Props>(
                                         <span>{t('Frais de transport')}</span>
                                         <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
                                     </div>
-                                    {discountTotal > 0 && (
+                                    {effectiveDiscountTotal > 0 && (
                                         <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                            <span>{t('Remise')}</span>
-                                            <span className="font-semibold">- {formatCurrency(discountTotal)}</span>
+                                            <span>{appliedCoupon ? `Coupon ${appliedCoupon.code}` : t('Remise')}</span>
+                                            <span className="font-semibold">- {formatCurrency(effectiveDiscountTotal)}</span>
                                         </div>
                                     )}
                                     <div className="flex items-center justify-between text-base font-semibold">

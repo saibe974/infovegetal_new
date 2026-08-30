@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use App\Domain\Sales\Services\ProductPriceFallbackResolver;
-use App\Models\CategoryProducts;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -15,8 +16,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Product extends Model implements HasMedia
 {
     use HasFactory;
-    use Traits\HasSortable;
     use InteractsWithMedia;
+    use Traits\HasSortable;
 
     protected $fillable = [
         'sku',
@@ -25,6 +26,8 @@ class Product extends Model implements HasMedia
         'img_link',
         'price',
         'active',
+        'available_from',
+        'available_until',
         'attributes',
         'category_products_id',
         'db_products_id',
@@ -40,7 +43,7 @@ class Product extends Model implements HasMedia
         'cond',
         'floor',
         'roll',
-        'unite'
+        'unite',
     ];
 
     /** @var array<string> */
@@ -65,12 +68,14 @@ class Product extends Model implements HasMedia
         'cond',
         'floor',
         'roll',
-        'unite'
+        'unite',
     ];
 
     protected $casts = [
         'attributes' => 'array',
         'active' => 'boolean',
+        'available_from' => 'immutable_datetime',
+        'available_until' => 'immutable_datetime',
         'price' => 'decimal:2',
         'price_floor' => 'decimal:2',
         'price_roll' => 'decimal:2',
@@ -149,7 +154,6 @@ class Product extends Model implements HasMedia
         return $query;
     }
 
-
     public function category()
     {
         return $this->belongsTo(CategoryProducts::class, 'category_products_id');
@@ -176,6 +180,65 @@ class Product extends Model implements HasMedia
         return $this->hasMany(OrderLine::class, 'product_id');
     }
 
+    public function promotions(): BelongsToMany
+    {
+        return $this->belongsToMany(Promotion::class, 'promotion_product')
+            ->withPivot([
+                'position',
+                'featured',
+                'show_before_availability',
+                'custom_title',
+                'custom_description',
+            ])
+            ->withTimestamps();
+    }
+
+    public function scopeOrderableAt(Builder $query, ?CarbonInterface $moment = null): Builder
+    {
+        $moment ??= now();
+
+        return $query
+            ->where('active', true)
+            ->where(function (Builder $availableFromQuery) use ($moment): void {
+                $availableFromQuery
+                    ->whereNull('available_from')
+                    ->orWhere('available_from', '<=', $moment);
+            })
+            ->where(function (Builder $availableUntilQuery) use ($moment): void {
+                $availableUntilQuery
+                    ->whereNull('available_until')
+                    ->orWhere('available_until', '>=', $moment);
+            });
+    }
+
+    public function isOrderableAt(?CarbonInterface $moment = null): bool
+    {
+        $moment ??= now();
+
+        return (bool) $this->active
+            && ($this->available_from === null || $this->available_from->lessThanOrEqualTo($moment))
+            && ($this->available_until === null || $this->available_until->greaterThanOrEqualTo($moment));
+    }
+
+    public function availabilityStatusAt(?CarbonInterface $moment = null): string
+    {
+        $moment ??= now();
+
+        if (! $this->active) {
+            return 'inactive';
+        }
+
+        if ($this->available_from?->greaterThan($moment)) {
+            return 'upcoming';
+        }
+
+        if ($this->available_until?->lessThan($moment)) {
+            return 'ended';
+        }
+
+        return 'available';
+    }
+
     /**
      * Backwards-compatible accessor expected by API: price_ex_vat
      */
@@ -186,7 +249,7 @@ class Product extends Model implements HasMedia
 
     public function getPriceRollAttribute(mixed $value): ?string
     {
-        $resolved = (new ProductPriceFallbackResolver())->resolve(
+        $resolved = (new ProductPriceFallbackResolver)->resolve(
             is_numeric($this->attributes['price'] ?? null) ? (float) $this->attributes['price'] : 0.0,
             is_numeric($this->attributes['price_floor'] ?? null) ? (float) $this->attributes['price_floor'] : 0.0,
             is_numeric($value) ? (float) $value : 0.0,

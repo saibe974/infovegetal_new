@@ -500,7 +500,9 @@
             </tr>
             @if(($discount_total ?? 0) > 0)
             <tr>
-                <td colspan="5" class="text-right">Remise :</td>
+                <td colspan="5" class="text-right">
+                    {{ !empty($coupon['code'] ?? null) ? 'Coupon '.$coupon['code'] : 'Remise' }} :
+                </td>
                 <td class="text-right">- {{ number_format($discount_total, 2, ',', ' ') }} €</td>
             </tr>
             @endif

@@ -7,10 +7,11 @@ use App\Models\Product;
 use App\Models\CategoryProducts;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\PromotionProductCatalogService;
 
 class SearchController extends Controller
 {
-    public function propositions(Request $request)
+    public function propositions(Request $request, PromotionProductCatalogService $catalog)
     {
         $context = $request->string('context')->toString();
         $search = trim($request->string('q')->toString());
@@ -19,6 +20,25 @@ class SearchController extends Controller
         }
 
         $limit = (int)($request->integer('limit') ?: 10);
+
+        if ($context === 'promotion-products') {
+            $user = $request->user();
+
+            if (! $user instanceof User) {
+                return response()->json(['propositions' => []]);
+            }
+
+            $query = $catalog->selectableQuery($user);
+            $categoryItems = $this->productCategoryPropositions($search, $limit, $catalog->categoryOptions($user));
+            $remaining = max(0, $limit - count($categoryItems));
+            $productItems = $remaining > 0
+                ? array_slice(ProductController::getSearchPropositions($query, $search), 0, $remaining)
+                : [];
+
+            return response()->json([
+                'propositions' => array_merge($categoryItems, $productItems),
+            ]);
+        }
 
         if ($context === 'products') {
             $query = Product::with(['category','tags'])->orderFromRequest($request);
@@ -125,11 +145,22 @@ class SearchController extends Controller
         return response()->json(['propositions' => []]);
     }
 
-    private function productCategoryPropositions(string $search, int $limit): array
+    private function productCategoryPropositions(string $search, int $limit, ?array $allowedCategories = null): array
     {
         $tokens = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         $query = CategoryProducts::query();
+
+        if ($allowedCategories !== null) {
+            $allowedIds = array_column($allowedCategories, 'id');
+
+            if ($allowedIds === []) {
+                return [];
+            }
+
+            $query->whereIntegerInRaw('id', $allowedIds);
+        }
+
         foreach ($tokens as $token) {
             $query->where('name', 'like', '%' . $token . '%');
         }

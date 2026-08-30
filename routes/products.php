@@ -19,12 +19,19 @@ Route::prefix('products')->name('products.')->group(function () {
 
 // API publique pour récupérer un produit (pour l'ajout au panier après login)
 Route::get('/api/products/{product}', function (Product $product) {
+    abort_unless($product->isOrderableAt(), 404);
+
     return new ProductResource($product->load(['category', 'tags', 'dbProduct']));
 });
 
 // API authentifiée pour le panier (prix calculés selon le user courant)
 Route::middleware(['auth'])->get('/api/auth/products/{product}', function (Request $request, Product $product) {
     $user = $request->user();
+    $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
+    $isAdminView = $user && $user->hasRole('admin') && ! $isImpersonated;
+
+    abort_unless($isAdminView || $product->isOrderableAt(), 404);
+
     $dbProductId = (int) ($product->db_products_id ?? 0);
 
     if ($user && $dbProductId > 0) {

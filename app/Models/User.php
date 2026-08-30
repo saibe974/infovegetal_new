@@ -209,6 +209,16 @@ class User extends Authenticatable implements HasMedia
         return $this->hasMany(OrderHeader::class, 'seller_user_id');
     }
 
+    public function createdPromotions(): HasMany
+    {
+        return $this->hasMany(Promotion::class, 'created_by_id');
+    }
+
+    public function responsiblePromotions(): HasMany
+    {
+        return $this->hasMany(Promotion::class, 'responsible_user_id');
+    }
+
     /**
      * Media collections for user profile assets.
      */

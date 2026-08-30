@@ -2,17 +2,18 @@
 
 namespace App\Services;
 
-use App\Domain\Sales\DTO\ProductComponentBreakdown;
-use App\Domain\Sales\DTO\ProductPriceReference;
-use App\Domain\Sales\DTO\SalesLineBreakdown;
+use App\Domain\Sales\DTO\ActorChain;
 use App\Domain\Sales\DTO\ExpectedSettlementCollection;
 use App\Domain\Sales\DTO\LineCalculationInput;
-use App\Domain\Sales\DTO\TransportCalculationResult;
 use App\Domain\Sales\DTO\OrderTransportBreakdown;
-use App\Domain\Sales\DTO\ActorChain;
+use App\Domain\Sales\DTO\ProductComponentBreakdown;
+use App\Domain\Sales\DTO\ProductPriceReference;
 use App\Domain\Sales\DTO\ProductTaxContext;
+use App\Domain\Sales\DTO\ProductVatResolutionInput;
 use App\Domain\Sales\DTO\ResolvedCondition;
 use App\Domain\Sales\DTO\ResolvedConditionCollection;
+use App\Domain\Sales\DTO\SalesLineBreakdown;
+use App\Domain\Sales\DTO\TransportCalculationResult;
 use App\Domain\Sales\Enums\ActorType;
 use App\Domain\Sales\Enums\ApplicationScope;
 use App\Domain\Sales\Enums\CalculationBaseType;
@@ -21,23 +22,19 @@ use App\Domain\Sales\Enums\PriceSourceType;
 use App\Domain\Sales\Enums\RoundingRule;
 use App\Domain\Sales\Enums\SalesMode;
 use App\Domain\Sales\Services\CustomerInvoiceProjector;
+use App\Domain\Sales\Services\OrderActorResolver;
 use App\Domain\Sales\Services\OrderCalculationBreakdownAssembler;
 use App\Domain\Sales\Services\ProductSalesPriceCalculator;
-use App\Domain\Sales\Services\SalesCalculationSnapshotBuilder;
-use App\Domain\Sales\DTO\ProductVatResolutionInput;
-use App\Domain\Sales\Enums\ProductVatSource;
 use App\Domain\Sales\Services\ProductVatResolver;
+use App\Domain\Sales\Services\SalesCalculationSnapshotBuilder;
+use App\Domain\Sales\Services\SalesConditionRelationResolver;
+use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
 use App\Domain\Sales\ValueObjects\Currency;
 use App\Domain\Sales\ValueObjects\Money;
 use App\Domain\Sales\ValueObjects\Percentage;
 use App\Domain\Sales\ValueObjects\Quantity;
-use App\Domain\Sales\Services\OrderActorResolver;
-use App\Domain\Sales\Services\SalesConditionRelationResolver;
-use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
 use App\Models\Cart;
 use App\Models\DbProductBillingUser;
-use App\Models\ClientSalesCondition;
-use App\Models\DbProductSellerUser;
 use App\Models\OrderHeader;
 use App\Models\OrderLine;
 use App\Models\Product;
@@ -49,7 +46,52 @@ use Illuminate\Support\Str;
 class OrderSnapshotService
 {
     /**
-     * @param array{items: Collection<int, array{product: Product, quantity: int, unit_price: float|int, line_total: float|int}>, items_total: float|int, shipping_total: float|int, discount_total?: float|int, discounts?: array, total: float|int} $payload
+     * Estimate the existing sales-engine margins for the supplied priced lines.
+     *
+     * @param  Collection<int, array{product: Product, quantity: int, line_total: float|int}>  $items
+     * @return array{billing_user: float, seller: float}
+     */
+    public function estimateActorMargins(User $client, Collection $items): array
+    {
+        $billingTotal = 0.0;
+        $sellerTotal = 0.0;
+
+        foreach ($items as $item) {
+            $product = $item['product'];
+            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+            $lineTotal = max(0, (float) ($item['line_total'] ?? 0));
+            $purchaseUnitPrice = max(0, (float) ($product->price ?? 0));
+            $actors = $this->resolveActors($client, collect([$item]));
+            $conditions = $this->resolveConditionsSnapshot(
+                $actors['db_product_id'],
+                $actors['billing_user_id'],
+                $actors['seller_user_id'],
+                $actors['client_user_id'],
+            );
+            $billingGain = max(0, $this->resolveBillingGain(
+                product: $product,
+                quantity: $quantity,
+                purchaseUnitPrice: $purchaseUnitPrice,
+                tvaRate: 0,
+                actors: $actors,
+                conditionsSnapshot: $conditions,
+            ));
+            $grossMargin = max(0, $lineTotal - ($purchaseUnitPrice * $quantity));
+
+            $billingTotal += min($grossMargin, $billingGain);
+            $sellerTotal += $actors['seller_user_id'] !== null
+                ? max(0, $grossMargin - $billingGain)
+                : 0;
+        }
+
+        return [
+            'billing_user' => round($billingTotal, 2),
+            'seller' => round($sellerTotal, 2),
+        ];
+    }
+
+    /**
+     * @param  array{items: Collection<int, array{product: Product, quantity: int, unit_price: float|int, line_total: float|int}>, items_total: float|int, shipping_total: float|int, discount_total?: float|int, discounts?: array, total: float|int}  $payload
      */
     public function createFromPayload(
         Cart $cart,
@@ -78,7 +120,6 @@ class OrderSnapshotService
 
         $header = DB::transaction(function () use (
             $cart,
-            $client,
             $items,
             $itemsTotal,
             $shippingTotal,
@@ -106,6 +147,8 @@ class OrderSnapshotService
                 'items_total_ht' => $itemsTotal,
                 'shipping_total_ht' => $shippingTotal,
                 'discount_total_ht' => $discountTotal,
+                'promotion_coupon_id' => $cart->promotion_coupon_id,
+                'coupon_code' => $cart->coupon_code,
                 'total_ht' => round($itemsTotal + $shippingTotal - $discountTotal, 2),
                 'total_tva' => 0,
                 'total_ttc' => 0,
@@ -114,6 +157,7 @@ class OrderSnapshotService
                     'source' => $options['source'] ?? 'cart_validation',
                     'cart_status' => (string) ($cart->status ?? ''),
                     'discounts' => $payload['discounts'] ?? [],
+                    'coupon' => $payload['coupon'] ?? null,
                     'resolved_actors' => [
                         'db_product_id' => $actors['db_product_id'],
                         'client_user_id' => $actors['client_user_id'],
@@ -217,7 +261,7 @@ class OrderSnapshotService
             }
 
             ['breakdown' => $breakdown, 'invoice' => $invoice] = $this->projectSnapshotInvoiceTotals($lineBreakdowns);
-            $snapshot = (new SalesCalculationSnapshotBuilder())->build(
+            $snapshot = (new SalesCalculationSnapshotBuilder)->build(
                 breakdown: $breakdown,
                 invoice: $invoice,
                 settlements: new ExpectedSettlementCollection([]),
@@ -230,6 +274,7 @@ class OrderSnapshotService
                     'items_total_ht' => $itemsTotal,
                     'shipping_total_ht' => $shippingTotal,
                     'discount_total_ht' => $discountTotal,
+                    'coupon_code' => $cart->coupon_code,
                     'source' => $options['source'] ?? 'cart_validation',
                 ],
                 generatedAtUtc: $orderDate->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
@@ -258,17 +303,17 @@ class OrderSnapshotService
 
     private function resolveActors(User $client, Collection $items): array
     {
-        return (new OrderActorResolver())->resolve($client, $items);
+        return (new OrderActorResolver)->resolve($client, $items);
     }
 
     private function resolveConditionsSnapshot(?int $dbProductId, ?int $billingUserId, ?int $sellerUserId, ?int $clientUserId = null): array
     {
-        if (!$dbProductId || !$billingUserId) {
+        if (! $dbProductId || ! $billingUserId) {
             return [];
         }
 
-        $conditionsResolver = new SalesConditionSnapshotResolver();
-        $relationResolver = new SalesConditionRelationResolver();
+        $conditionsResolver = new SalesConditionSnapshotResolver;
+        $relationResolver = new SalesConditionRelationResolver;
 
         $rule = DbProductBillingUser::query()
             ->where('db_product_id', $dbProductId)
@@ -307,12 +352,12 @@ class OrderSnapshotService
         }
 
         try {
-            $resolution = (new ProductVatResolver())->resolve(new ProductVatResolutionInput(
-            productId: (int) $product->id,
-            categoryId: $categoryId,
-            productVatRate: $productVatRate,
-            categoryVatRate: $categoryVatRate,
-        ));
+            $resolution = (new ProductVatResolver)->resolve(new ProductVatResolutionInput(
+                productId: (int) $product->id,
+                categoryId: $categoryId,
+                productVatRate: $productVatRate,
+                categoryVatRate: $categoryVatRate,
+            ));
 
             return round($resolution->vatRate->basisPoints / 100, 2);
         } catch (\DomainException) {
@@ -337,17 +382,17 @@ class OrderSnapshotService
 
     private function buildOrderNumber(Cart $cart): string
     {
-        return 'ORD-' . now()->format('Ymd-His') . '-' . str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT) . '-' . Str::upper(Str::random(4));
+        return 'ORD-'.now()->format('Ymd-His').'-'.str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT).'-'.Str::upper(Str::random(4));
     }
 
     /**
-     * @param list<SalesLineBreakdown> $lineBreakdowns
+     * @param  list<SalesLineBreakdown>  $lineBreakdowns
      */
     private function projectSnapshotInvoiceTotals(array $lineBreakdowns): array
     {
         $currency = Currency::EUR;
         $zero = Money::zero($currency);
-        $breakdown = (new OrderCalculationBreakdownAssembler())->assemble(
+        $breakdown = (new OrderCalculationBreakdownAssembler)->assemble(
             $lineBreakdowns,
             new TransportCalculationResult(
                 new OrderTransportBreakdown(
@@ -371,7 +416,7 @@ class OrderSnapshotService
 
         return [
             'breakdown' => $breakdown,
-            'invoice' => (new CustomerInvoiceProjector())->project($breakdown),
+            'invoice' => (new CustomerInvoiceProjector)->project($breakdown),
         ];
     }
 
@@ -414,8 +459,8 @@ class OrderSnapshotService
     }
 
     /**
-     * @param array{db_product_id:int|null, client_user_id:int|null, billing_user_id:int|null, seller_user_id:int|null} $actors
-     * @param array<string, mixed> $conditionsSnapshot
+     * @param  array{db_product_id:int|null, client_user_id:int|null, billing_user_id:int|null, seller_user_id:int|null}  $actors
+     * @param  array<string, mixed>  $conditionsSnapshot
      */
     private function resolveBillingGain(
         Product $product,
@@ -442,7 +487,7 @@ class OrderSnapshotService
             return 0.0;
         }
 
-        $result = (new ProductSalesPriceCalculator())->calculate(new LineCalculationInput(
+        $result = (new ProductSalesPriceCalculator)->calculate(new LineCalculationInput(
             lineId: (int) ($product->id ?? 0),
             priceReference: new ProductPriceReference(
                 productId: (int) ($product->id ?? 0),
@@ -472,7 +517,7 @@ class OrderSnapshotService
     }
 
     /**
-     * @param array<string, mixed> $conditions
+     * @param  array<string, mixed>  $conditions
      */
     private function buildBillingResolvedConditions(array $conditions, int $billingUserId, Product $product): ResolvedConditionCollection
     {
@@ -529,7 +574,7 @@ class OrderSnapshotService
     }
 
     /**
-     * @param array<string, mixed> $conditions
+     * @param  array<string, mixed>  $conditions
      */
     private function tierMarginForProduct(array $conditions, Product $product): ?float
     {
@@ -553,7 +598,7 @@ class OrderSnapshotService
     }
 
     /**
-     * @param array<string, mixed> $conditions
+     * @param  array<string, mixed>  $conditions
      */
     private function minimumMarginPerLine(array $conditions, Product $product): ?float
     {

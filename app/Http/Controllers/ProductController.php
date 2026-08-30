@@ -5,23 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Requests\FormProductRequest;
 use App\Http\Resources\CategoryProductsResource;
 use App\Http\Resources\ProductResource;
-use App\Models\CategoryProducts;
 use App\Models\Carrier;
+use App\Models\CategoryProducts;
 use App\Models\Product;
 use App\Services\ProductImportService;
 use App\Services\ProductMediaService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 use League\Csv\Reader;
-
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -50,7 +48,7 @@ class ProductController extends Controller
         // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
         if ($request->get('cart') === '1') {
             $cartIds = $request->session()->get('cart_filter_ids', []);
-            if (!empty($cartIds) && is_array($cartIds)) {
+            if (! empty($cartIds) && is_array($cartIds)) {
                 $baseQuery->whereIn('products.id', $cartIds);
             }
         }
@@ -62,9 +60,13 @@ class ProductController extends Controller
 
         $user = $request->user();
         $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
-        $isAdminView = $user && $user->hasRole('admin') && !$isImpersonated;
+        $isAdminView = $user && $user->hasRole('admin') && ! $isImpersonated;
 
-        if ($user && !$isAdminView) {
+        if (! $isAdminView) {
+            $baseQuery->orderableAt();
+        }
+
+        if ($user && ! $isAdminView) {
             $allowedDbIds = $user->dbProducts()->pluck('db_products.id')->toArray();
             $baseQuery->whereIn('db_products_id', $allowedDbIds);
         }
@@ -99,6 +101,7 @@ class ProductController extends Controller
 
             if ($refCandidate) {
                 $q->where('products.ref', '=', $refCandidate);
+
                 return;
             }
 
@@ -116,7 +119,7 @@ class ProductController extends Controller
                 // Et toujours proposer une recherche sur le nom qui contient tous les termes
                 $qq->orWhere(function ($qqq) use ($tokens) {
                     foreach ($tokens as $t) {
-                        $qqq->where('products.name', 'like', '%' . $t . '%');
+                        $qqq->where('products.name', 'like', '%'.$t.'%');
                     }
                 });
 
@@ -159,29 +162,29 @@ class ProductController extends Controller
         ];
 
         $applyFilters = function ($q, array $filters, array $skip = []) {
-            if (!in_array('category', $skip, true) && $filters['category']) {
+            if (! in_array('category', $skip, true) && $filters['category']) {
                 $q->whereIn('category_products_id', $filters['category_branch_ids']);
             }
 
-            if (!in_array('country', $skip, true) && !empty($filters['country'])) {
+            if (! in_array('country', $skip, true) && ! empty($filters['country'])) {
                 $q->whereHas('dbProduct', function ($db) use ($filters) {
                     $db->whereIn('country', $filters['country']);
                 });
             }
 
-            if (!in_array('pot', $skip, true) && !empty($filters['pot'])) {
+            if (! in_array('pot', $skip, true) && ! empty($filters['pot'])) {
                 $q->whereIn('pot', $filters['pot']);
             }
 
-            if (!in_array('height', $skip, true) && !empty($filters['height'])) {
+            if (! in_array('height', $skip, true) && ! empty($filters['height'])) {
                 $q->whereIn('height', $filters['height']);
             }
 
-            if (!in_array('image', $skip, true)) {
+            if (! in_array('image', $skip, true)) {
                 $q->imageAvailability($filters['image']);
             }
 
-            if (!in_array('promo', $skip, true) && $filters['promo']) {
+            if (! in_array('promo', $skip, true) && $filters['promo']) {
                 $q->whereNotNull('price_promo')
                     ->where('price_promo', '>', 0)
                     ->where(function ($promoQuery) {
@@ -191,7 +194,7 @@ class ProductController extends Controller
                     });
             }
         };
-        
+
         $optionsBaseQuery = clone $baseQuery;
         $applySearch($optionsBaseQuery, $search);
 
@@ -244,8 +247,6 @@ class ProductController extends Controller
         $applySearch($query, $search);
         $applyFilters($query, $filters);
 
-        
-
         if ($request->filled('sort')) {
             $query->orderFromRequest($request);
         } else {
@@ -256,12 +257,12 @@ class ProductController extends Controller
         $user = $request->user();
         $dbUserAttributesByDbId = [];
         $dbUserTransportByDbId = [];
-        
+
         if ($user) {
             $userDbProducts = $user->dbProducts()->get();
             foreach ($userDbProducts as $dbProduct) {
                 $pivotAttributes = $dbProduct->pivot?->attributes;
-                if (!$pivotAttributes) {
+                if (! $pivotAttributes) {
                     continue;
                 }
 
@@ -287,7 +288,7 @@ class ProductController extends Controller
                 }
             }
 
-            if (!empty($carrierIds) && !empty($zoneIds)) {
+            if (! empty($carrierIds) && ! empty($zoneIds)) {
                 $carrierIds = array_values(array_unique($carrierIds));
                 $zoneIds = array_values(array_unique($zoneIds));
 
@@ -303,7 +304,7 @@ class ProductController extends Controller
                 $zoneMap = [];
                 foreach ($carriers as $carrier) {
                     foreach ($carrier->zones as $zone) {
-                        $zoneMap[$carrier->id . ':' . $zone->id] = [
+                        $zoneMap[$carrier->id.':'.$zone->id] = [
                             'carrier_id' => (int) $carrier->id,
                             'zone_id' => (int) $zone->id,
                             'zone_name' => (string) ($zone->name ?? ''),
@@ -322,14 +323,14 @@ class ProductController extends Controller
                         continue;
                     }
 
-                    $key = $carrierId . ':' . $zoneId;
+                    $key = $carrierId.':'.$zoneId;
                     if (isset($zoneMap[$key])) {
                         $dbUserTransportByDbId[(int) $dbId] = $zoneMap[$key];
                     }
                 }
             }
         }
-        
+
         // Les prix sont calculés dans ProductResource (toArray) pour éviter un double calcul.
         if ($user) {
             $products->getCollection()->transform(function ($product) use ($dbUserAttributesByDbId, $dbUserTransportByDbId) {
@@ -338,14 +339,16 @@ class ProductController extends Controller
                     $product->setAttribute('db_user_attributes', $dbUserAttributesByDbId[(int) $dbId] ?? null);
                     $product->setAttribute('db_user_transport', $dbUserTransportByDbId[(int) $dbId] ?? null);
                 }
+
                 return $product;
             });
         }
-        
+
         $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description', 'country'])->orderBy('name')->get();
+
         return Inertia::render('products/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => ProductResource::collection($products)),
+            'collection' => Inertia::scroll(fn () => ProductResource::collection($products)),
             'filters' => [
                 'active' => $activeFilter,
                 'category' => $categoryId,
@@ -366,7 +369,7 @@ class ProductController extends Controller
             'countryOptions' => $countryOptions,
             'potOptions' => $potOptions,
             'heightOptions' => $heightOptions,
-            'searchPropositions' => Inertia::optional(fn() => $this->getSearchPropositions(
+            'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions(
                 tap(clone $baseQuery, fn ($q) => $applyFilters($q, $filters)),
                 $search
             )),
@@ -377,7 +380,6 @@ class ProductController extends Controller
     /**
      * Traite le fichier CSV précédemment uploadé (calcul progress côté cache).
      */
-
     public function importProcess(Request $request, ProductImportService $importService)
     {
         $data = $request->validate([
@@ -394,15 +396,15 @@ class ProductController extends Controller
                 : null);
 
         $this->authorizeImportDb($request, $dbProductsId);
-        
-        if (!$state || empty($state['path'])) {
+
+        if (! $state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
-        if (!is_string($fullPath) || !is_file($fullPath)) {
+        if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
@@ -449,7 +451,7 @@ class ProductController extends Controller
         $id = $data['id'];
 
         $state = Cache::get("import:$id");
-        if (!$state || empty($state['path'])) {
+        if (! $state || empty($state['path'])) {
             return response()->json(['message' => 'Import inconnu'], 404);
         }
 
@@ -458,7 +460,7 @@ class ProductController extends Controller
         $path = $state['path'];
         $fullPath = Storage::path($path);
 
-        if (!is_string($fullPath) || !is_file($fullPath)) {
+        if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
         }
 
@@ -480,7 +482,6 @@ class ProductController extends Controller
         return response()->json($final);
     }
 
-    
     /**
      * Renvoie la progression (upload/processing/done) pour l'id d'import.
      */
@@ -492,7 +493,7 @@ class ProductController extends Controller
             $this->authorizeImportDb(request(), isset($progress['db_products_id']) ? (int) $progress['db_products_id'] : null);
         }
 
-        if (!$progress) {
+        if (! $progress) {
             return response()->json(['status' => 'waiting', 'progress' => 0]);
         }
 
@@ -519,13 +520,13 @@ class ProductController extends Controller
             $this->authorizeImportDb(request(), isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
         }
 
-        $reportPath = 'imports/reports/' . $id . '.csv';
-        if (!Storage::exists($reportPath)) {
+        $reportPath = 'imports/reports/'.$id.'.csv';
+        if (! Storage::exists($reportPath)) {
             return response()->json(['message' => 'Rapport introuvable'], 404);
         }
 
         $full = Storage::path($reportPath);
-        $filename = 'import_report_' . $id . '.csv';
+        $filename = 'import_report_'.$id.'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -533,7 +534,7 @@ class ProductController extends Controller
 
         $callback = function () use ($full) {
             $h = fopen($full, 'r');
-            while (!feof($h)) {
+            while (! feof($h)) {
                 echo fread($h, 8192);
             }
             fclose($h);
@@ -555,7 +556,8 @@ class ProductController extends Controller
         $this->authorizeImportDb($request, isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
 
         Cache::put("import:$id:cancel", true, now()->addHour());
-        Cache::put("import:$id", array_merge($state, [ 'status' => 'cancelling' ]), now()->addHour());
+        Cache::put("import:$id", array_merge($state, ['status' => 'cancelling']), now()->addHour());
+
         return response()->json(['status' => 'cancelling']);
     }
 
@@ -564,9 +566,9 @@ class ProductController extends Controller
      */
     public function export(Request $request)
     {
-    Gate::authorize('manage-products');
+        Gate::authorize('manage-products');
 
-        $filename = 'products_export_' . date('Ymd_His') . '.csv';
+        $filename = 'products_export_'.date('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -612,7 +614,7 @@ class ProductController extends Controller
     public function store(FormProductRequest $request)
     {
         // Log::info('[STORE] Method called - Request data:', ['data' => $request->all()]);
-        
+
         $data = $request->validated();
         $data['ref'] = $data['ref'] ?? '';
         $data['ean13'] = $data['ean13'] ?? '';
@@ -636,8 +638,14 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
+        $user = request()->user();
+        $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
+        $isAdminView = $user && $user->hasRole('admin') && ! $isImpersonated;
+
+        abort_unless($isAdminView || $product->isOrderableAt(), 404);
+
         $product->load(['category', 'tags']);
-        
+
         return Inertia::render('products/show', [
             'product' => new ProductResource($product),
         ]);
@@ -649,6 +657,7 @@ class ProductController extends Controller
     public function edit(Product $product)
     {
         $product->load(['tags']);
+
         return Inertia::render('products/form', [
             'product' => new ProductResource($product),
         ]);
@@ -660,22 +669,22 @@ class ProductController extends Controller
     public function update(FormProductRequest $request, Product $product)
     {
         // Log::info('[UPDATE] Method called - Product ID: ' . $product->id . ' - Request data:', ['data' => $request->all()]);
-        
+
         $data = $request->validated();
         $data['ref'] = $data['ref'] ?? '';
         $data['ean13'] = $data['ean13'] ?? '';
 
         // Log::info("[UPDATE] Updating product ID {$product->id} with validated data:", $data);
-        
+
         $product->update($data);
         $this->handleFormRequest($product, $request);
         app(ProductMediaService::class)->syncFromImgLink(
             $product,
             $data['img_link'] ?? $product->getRawOriginal('img_link')
         );
-        
+
         // Log::info("[UPDATE] Product {$product->id} updated successfully");
-        
+
         return redirect()->back()->with('success', 'Produit mis à jour');
     }
 
@@ -685,6 +694,7 @@ class ProductController extends Controller
     public function destroy(Product $product)
     {
         $product->delete();
+
         return redirect()->back()->with('success', 'Produit supprimé');
     }
 
@@ -696,14 +706,14 @@ class ProductController extends Controller
             $names = [];
             if (is_array($raw)) {
                 $names = array_filter(array_map(function ($v) {
-                    return trim((string)$v);
-                }, $raw), fn($s) => $s !== '');
+                    return trim((string) $v);
+                }, $raw), fn ($s) => $s !== '');
             } else {
                 // support d'un champ texte séparé par virgules
-                $names = array_filter(array_map('trim', preg_split('/[,;\n]+/', (string)$raw) ?: []), fn($s) => $s !== '');
+                $names = array_filter(array_map('trim', preg_split('/[,;\n]+/', (string) $raw) ?: []), fn ($s) => $s !== '');
             }
 
-            if (!empty($names)) {
+            if (! empty($names)) {
                 // crée/retourne les tags, puis sync sur le pivot
                 $ids = [];
                 foreach ($names as $name) {
@@ -722,7 +732,7 @@ class ProductController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             abort(403, 'Unauthorized');
         }
 
@@ -734,11 +744,11 @@ class ProductController extends Controller
             return;
         }
 
-        if (!$user->hasPermissionTo('users.db_products.manage.his')) {
+        if (! $user->hasPermissionTo('users.db_products.manage.his')) {
             abort(403, 'Unauthorized');
         }
 
-        if (!$dbProductsId || $dbProductsId <= 0) {
+        if (! $dbProductsId || $dbProductsId <= 0) {
             abort(403, 'Unauthorized');
         }
 
@@ -748,14 +758,11 @@ class ProductController extends Controller
             $relation->where('db_product_user.can_sell', true);
         }
 
-        if (!$relation->exists()) {
+        if (! $relation->exists()) {
             abort(403, 'Unauthorized');
         }
     }
 
-
-
-    
     /**
      * Génère les propositions triées selon la logique de recherche.
      */
@@ -764,7 +771,7 @@ class ProductController extends Controller
         if (empty($search)) {
             return [];
         }
-        
+
         $lowerSearch = mb_strtolower($search);
 
         $applyNameSearch = function ($q, string $search) {
@@ -779,7 +786,7 @@ class ProductController extends Controller
 
                 $qq->orWhere(function ($qqq) use ($tokens) {
                     foreach ($tokens as $t) {
-                        $qqq->where('products.name', 'like', '%' . $t . '%');
+                        $qqq->where('products.name', 'like', '%'.$t.'%');
                     }
                 });
             });
@@ -789,12 +796,11 @@ class ProductController extends Controller
         $clonedQuery = clone $query;
         $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
         $applyNameSearch($clonedQuery, $search);
-        
+
         $propositions = $clonedQuery
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
             ->pluck('name');
-
 
         // --- 🧹 Nettoyage et déduplication ---
         $clean = function (string $str): string {
@@ -803,13 +809,14 @@ class ProductController extends Controller
             $str = preg_replace('/[^\p{L}\s-]/u', ' ', $str);
             // espaces multiples → un seul
             $str = trim(preg_replace('/\s+/', ' ', $str));
+
             return $str;
         };
 
         // Applique le nettoyage
         $cleaned = $propositions
-            ->map(fn($name) => $clean($name))
-            ->filter(fn($name) => !empty($name))
+            ->map(fn ($name) => $clean($name))
+            ->filter(fn ($name) => ! empty($name))
             ->unique()
             ->values();
 
@@ -820,7 +827,7 @@ class ProductController extends Controller
             $refSuggestions = $refQuery
                 ->whereNotNull('ref')
                 ->where('ref', '!=', '')
-                ->where('ref', 'like', '%' . $search . '%')
+                ->where('ref', 'like', '%'.$search.'%')
                 ->select(['ref', 'name', 'pot', 'height'])
                 ->distinct()
                 ->get()
@@ -834,19 +841,20 @@ class ProductController extends Controller
                     }
                     $extras = [];
                     if ($pot !== '') {
-                        $extras[] = 'pot ' . $pot;
+                        $extras[] = 'pot '.$pot;
                     }
                     if ($height !== '') {
-                        $extras[] = 'h ' . $height;
+                        $extras[] = 'h '.$height;
                     }
 
-                    $suffix = !empty($extras) ? ' (' . implode(', ', $extras) . ')' : '';
+                    $suffix = ! empty($extras) ? ' ('.implode(', ', $extras).')' : '';
+
                     return [
                         'value' => $ref,
-                        'label' => $ref . ' : ' . $name . $suffix,
+                        'label' => $ref.' : '.$name.$suffix,
                     ];
                 })
-                ->filter(fn ($value) => !empty($value))
+                ->filter(fn ($value) => ! empty($value))
                 ->unique()
                 ->values()
                 ->all();
@@ -858,11 +866,15 @@ class ProductController extends Controller
                 $pa = str_starts_with($aLabel, $lowerSearch) ? 1 : (str_contains($aLabel, $lowerSearch) ? 2 : 3);
                 $pb = str_starts_with($bLabel, $lowerSearch) ? 1 : (str_contains($bLabel, $lowerSearch) ? 2 : 3);
 
-                if ($pa !== $pb) return $pa <=> $pb;
+                if ($pa !== $pb) {
+                    return $pa <=> $pb;
+                }
 
                 $la = mb_strlen($aLabel);
                 $lb = mb_strlen($bLabel);
-                if ($la !== $lb) return $la <=> $lb;
+                if ($la !== $lb) {
+                    return $la <=> $lb;
+                }
 
                 return strnatcmp($aLabel, $bLabel);
             });
@@ -880,25 +892,29 @@ class ProductController extends Controller
             // 3 = contient le terme ailleurs
             // 4 = autres
             $pa = (
-                !preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
+                ! preg_match('/[-\s]/', $a) && str_starts_with($a, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($a, $lowerSearch) ? 2 : (
-                str_contains($a, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($a, $lowerSearch) ? 3 : 4
+                ));
 
             $pb = (
-                !preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
+                ! preg_match('/[-\s]/', $b) && str_starts_with($b, $lowerSearch)
             ) ? 1 : (
                 str_starts_with($b, $lowerSearch) ? 2 : (
-                str_contains($b, $lowerSearch) ? 3 : 4
-            ));
+                    str_contains($b, $lowerSearch) ? 3 : 4
+                ));
 
-            if ($pa !== $pb) return $pa <=> $pb;
+            if ($pa !== $pb) {
+                return $pa <=> $pb;
+            }
 
             // Second critère : longueur
             $la = mb_strlen($a);
             $lb = mb_strlen($b);
-            if ($la !== $lb) return $la <=> $lb;
+            if ($la !== $lb) {
+                return $la <=> $lb;
+            }
 
             // Troisième : ordre alphabétique
             return strnatcmp($a, $b);
@@ -908,6 +924,7 @@ class ProductController extends Controller
         // Prend les 7 premiers
         return $items;
     }
+
     private function updateImportState(string $id, array $payload): void
     {
         $existing = Cache::get("import:$id", []);
@@ -931,7 +948,7 @@ class ProductController extends Controller
 
         foreach ($reader->getRecords() as $row) {
             $mapped = $this->mapRow($row, $keyMap, $normalizeKey);
-            if (!$this->rowHasContent($mapped)) {
+            if (! $this->rowHasContent($mapped)) {
                 continue;
             }
 
@@ -975,7 +992,7 @@ class ProductController extends Controller
 
     private function writeReportLine(mixed $handle, int $line, string $message, array $rawRow, array $mapped): void
     {
-        if (!$handle) {
+        if (! $handle) {
             return;
         }
 
@@ -989,7 +1006,4 @@ class ProductController extends Controller
             $rawValues,
         ], ';');
     }
-
-
-
 }

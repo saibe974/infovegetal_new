@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Sales\Services\ProductVolumePriceSelector;
 use App\Domain\Sales\Services\ProductPriceFallbackResolver;
+use App\Domain\Sales\Services\ProductVolumePriceSelector;
 use App\Domain\Sales\Services\TransportDeparturePricingService;
 use App\Domain\Sales\Services\TransportZoneTariffResolver;
 use App\Models\Cart;
 use App\Models\Product;
-use App\Support\RenderedTransportCalculator;
-use App\Services\PdfRollDistributionService;
 use App\Services\CartTcpdfService;
-use App\Services\OrderSnapshotService;
 use App\Services\OrderCsvService;
+use App\Services\OrderSnapshotService;
+use App\Services\PdfRollDistributionService;
 use App\Services\PriceCalculatorService;
 use App\Services\ProductMediaService;
+use App\Services\PromotionCouponApplicationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Spatie\LaravelPdf\Facades\Pdf;
 
@@ -32,6 +33,7 @@ class CartController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $cart = $user->cart()->with('products')->firstOrCreate([]);
+
         return response()->json($cart->load('products'));
     }
 
@@ -52,9 +54,12 @@ class CartController extends Controller
             'discounts' => 'nullable|array',
             'discounts.*.type' => 'required|in:fixed,percent',
             'discounts.*.value' => 'required|numeric|min:0',
+            'coupon_code' => 'nullable|string|max:64',
             'transport_selection' => 'nullable|array',
             'choice' => 'nullable|in:append,new',
         ]);
+
+        $this->assertProductsOrderable(collect($data['items'])->pluck('id')->all());
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -68,7 +73,7 @@ class CartController extends Controller
 
         $choice = $data['choice'] ?? null;
 
-        if ($existingProcessing && !$choice) {
+        if ($existingProcessing && ! $choice) {
             return response()->json([
                 'requires_choice' => true,
                 'existing_order' => [
@@ -82,7 +87,7 @@ class CartController extends Controller
         $cart = null;
         if ($existingProcessing && $choice === 'append') {
             $cart = $existingProcessing;
-        } elseif (!$existingProcessing || $choice === 'new') {
+        } elseif (! $existingProcessing || $choice === 'new') {
             $cart = Cart::create([
                 'user_id' => $user->id,
                 'status' => 'processing',
@@ -143,11 +148,17 @@ class CartController extends Controller
             $discounts,
             $shippingByDb,
             $data['comment'] ?? null,
+            $data['coupon_code'] ?? $cart->coupon_code,
+            $cart,
         );
 
         $cart->items_total = round((float) ($pdfPayload['items_total'] ?? 0), 2);
         $cart->shipping_total = round((float) ($pdfPayload['shipping_total'] ?? $shippingTotal), 2);
+        $cart->promotion_coupon_id = $pdfPayload['coupon']['id'] ?? null;
+        $cart->coupon_code = $pdfPayload['coupon']['code'] ?? null;
         $cart->save();
+
+        $this->persistOrderSnapshotAndConsumeCoupon($cart, $user, $pdfPayload, $orderSnapshotService, 'place_order');
 
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $pdfPayload['order_number'] = $orderNumber;
@@ -180,27 +191,12 @@ class CartController extends Controller
             $csvFiles,
         );
 
-        $existingSnapshot = \App\Models\OrderHeader::query()
-            ->where('cart_id', $cart->id)
-            ->latest('id')
-            ->first();
-
-        if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb, $data['comment'] ?? null);
-            $orderSnapshotService->createFromPayload(
-                $cart,
-                $user,
-                $payloadForSnapshot,
-                ['source' => 'place_order']
-            );
-        }
-
         return response()->json([
             'status' => 'ok',
             'order_id' => $cart->id,
             'order_number' => $orderNumber,
             'pdf_filename' => $pdfFilename,
-            'pdf_download_url' => asset('storage/' . $pdfRelativePath),
+            'pdf_download_url' => asset('storage/'.$pdfRelativePath),
             'csv_files_count' => count($csvFiles),
             'mail_recipients_count' => $mailCount,
             'message' => 'Commande enregistree, PDF genere et emails envoyes.',
@@ -230,12 +226,12 @@ class CartController extends Controller
                 ? $row->attributes
                 : json_decode((string) $row->attributes, true);
 
-            if (!is_array($attrs)) {
+            if (! is_array($attrs)) {
                 continue;
             }
 
-            $factId = !empty($attrs['fact']) ? (int) $attrs['fact'] : null;
-            $comId = !empty($attrs['com']) ? (int) $attrs['com'] : null;
+            $factId = ! empty($attrs['fact']) ? (int) $attrs['fact'] : null;
+            $comId = ! empty($attrs['com']) ? (int) $attrs['com'] : null;
 
             $contactIdsByDbProductId[$dbProductId] = [
                 'fact' => $factId,
@@ -293,7 +289,7 @@ class CartController extends Controller
             $fact = null;
             $com = null;
 
-            if (!empty($ids['fact'])) {
+            if (! empty($ids['fact'])) {
                 $factUser = $usersById->get((int) $ids['fact']);
                 if ($factUser) {
                     $fact = [
@@ -304,7 +300,7 @@ class CartController extends Controller
                 }
             }
 
-            if (!empty($ids['com'])) {
+            if (! empty($ids['com'])) {
                 $comUser = $usersById->get((int) $ids['com']);
                 if ($comUser) {
                     $com = [
@@ -354,16 +350,20 @@ class CartController extends Controller
                 ? json_decode($attrs['t'], true)
                 : ($attrs['t'] ?? null);
             $options = is_array($parsed) ? $parsed : [];
-            if (!is_array($parsed) && !empty($attrs['t']) && is_numeric($attrs['t']) && !empty($attrs['z'])) {
+            if (! is_array($parsed) && ! empty($attrs['t']) && is_numeric($attrs['t']) && ! empty($attrs['z'])) {
                 $options[] = ['carrier_id' => (int) $attrs['t'], 'zone_id' => (int) $attrs['z']];
             }
             foreach ($options as $option) {
-                if (!is_array($option)) continue;
+                if (! is_array($option)) {
+                    continue;
+                }
                 $cid = (int) ($option['carrier_id'] ?? 0);
                 $zid = (int) ($option['zone_id'] ?? 0);
-                if ($cid <= 0 || $zid <= 0) continue;
-                $key = $cid . ':' . $zid;
-                if (!isset($seenPairs[$key])) {
+                if ($cid <= 0 || $zid <= 0) {
+                    continue;
+                }
+                $key = $cid.':'.$zid;
+                if (! isset($seenPairs[$key])) {
                     $seenPairs[$key] = true;
                     $carrierZonePairs[] = ['carrier_id' => $cid, 'zone_id' => $zid];
                 }
@@ -371,7 +371,7 @@ class CartController extends Controller
         }
 
         $transportOptions = [];
-        if (!empty($carrierZonePairs)) {
+        if (! empty($carrierZonePairs)) {
             $carrierIds = array_unique(array_map(fn ($p) => $p['carrier_id'], $carrierZonePairs));
             $zoneIds = array_unique(array_map(fn ($p) => $p['zone_id'], $carrierZonePairs));
             $carriersData = \App\Models\Carrier::query()
@@ -385,8 +385,10 @@ class CartController extends Controller
             foreach ($carrierZonePairs as $pair) {
                 $carrier = $carriersData->get($pair['carrier_id']);
                 $zone = $zonesData->get($pair['carrier_id'])?->firstWhere('id', $pair['zone_id']);
-                if (!$carrier || !$zone) continue;
-                $key = $pair['carrier_id'] . ':' . $pair['zone_id'];
+                if (! $carrier || ! $zone) {
+                    continue;
+                }
+                $key = $pair['carrier_id'].':'.$pair['zone_id'];
                 $transportOptions[$key] = [
                     'carrier_id' => (int) $carrier->id,
                     'zone_id' => (int) $zone->id,
@@ -410,6 +412,7 @@ class CartController extends Controller
             'cart_transport_options' => $transportOptions,
             'cart_transport_selection' => $activeCart?->transport_selection ?? [],
             'cart_discounts' => $activeCart?->discounts ?? [],
+            'cart_coupon_code' => $activeCart?->coupon_code,
         ]);
     }
 
@@ -419,13 +422,15 @@ class CartController extends Controller
             'product_id' => 'required|exists:products,id',
             'quantity' => 'integer|min:1',
         ]);
+        $this->assertProductsOrderable([(int) $request->product_id], 'product_id');
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $cart = $user->cart()->firstOrCreate([]);
         $quantity = $request->input('quantity', 1);
         $cart->products()->syncWithoutDetaching([
-            $request->product_id => ['quantity' => $quantity]
+            $request->product_id => ['quantity' => $quantity],
         ]);
+
         return response()->json(['message' => 'Produit ajouté au panier']);
     }
 
@@ -438,7 +443,41 @@ class CartController extends Controller
         if ($cart) {
             $cart->products()->detach($request->product_id);
         }
+
         return response()->json(['message' => 'Produit retiré du panier']);
+    }
+
+    public function previewCoupon(Request $request, PromotionCouponApplicationService $coupons)
+    {
+        $data = $request->validate([
+            'coupon_code' => ['required', 'string', 'max:64'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.id' => ['required', 'integer', 'exists:products,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'items.*.line_total' => ['required', 'numeric', 'min:0'],
+            'shipping_total' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        $products = Product::query()
+            ->whereIn('id', collect($data['items'])->pluck('id'))
+            ->get()
+            ->keyBy('id');
+        $items = collect($data['items'])->map(fn (array $item) => [
+            'product' => $products[(int) $item['id']],
+            'quantity' => (int) $item['quantity'],
+            'line_total' => (float) $item['line_total'],
+        ]);
+        $coupon = $coupons->findByCode($data['coupon_code']);
+        $result = $coupons->evaluate($coupon, $user, $items, (float) ($data['shipping_total'] ?? 0));
+
+        return response()->json([
+            'code' => $result['code'],
+            'discount_ht' => $result['discount_ht'],
+            'eligible_ht' => $result['eligible_ht'],
+            'funded_by' => $result['funded_by'],
+        ]);
     }
 
     public function save(Request $request, CartTcpdfService $cartTcpdfService)
@@ -457,8 +496,11 @@ class CartController extends Controller
             'discounts' => 'nullable|array',
             'discounts.*.type' => 'required|in:fixed,percent',
             'discounts.*.value' => 'required|numeric|min:0',
+            'coupon_code' => 'nullable|string|max:64',
             'transport_selection' => 'nullable|array',
         ]);
+
+        $this->assertProductsOrderable(collect($data['items'])->pluck('id')->all());
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -471,7 +513,7 @@ class CartController extends Controller
             ->latest('updated_at')
             ->first();
 
-        if (!$cart) {
+        if (! $cart) {
             $cart = Cart::create([
                 'user_id' => $user->id,
                 'status' => 'current',
@@ -508,6 +550,7 @@ class CartController extends Controller
             $transportSelection,
             $discounts,
             $shippingByDb,
+            $data['coupon_code'] ?? $cart->coupon_code,
         );
 
         $request->session()->forget('cart_filter_ids');
@@ -550,7 +593,7 @@ class CartController extends Controller
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (!$user || (!$user->hasRole('admin') && $cart->user_id !== $user->id)) {
+        if (! $user || (! $user->hasRole('admin') && $cart->user_id !== $user->id)) {
             abort(403, 'Unauthorized');
         }
 
@@ -567,7 +610,7 @@ class CartController extends Controller
     {
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        if (!$user || (!$user->hasRole('admin') && $cart->user_id !== $user->id)) {
+        if (! $user || (! $user->hasRole('admin') && $cart->user_id !== $user->id)) {
             abort(403, 'Unauthorized');
         }
 
@@ -609,6 +652,8 @@ class CartController extends Controller
             'group_key' => 'nullable|integer|min:0',
         ]);
 
+        $this->assertProductsOrderable(collect($data['items'])->pluck('id')->all());
+
         // Récupérer les produits avec leurs détails
         $productIds = collect($data['items'])->pluck('id')->toArray();
         $products = Product::with(['category', 'tags', 'media', 'dbProduct'])->whereIn('id', $productIds)->get()->keyBy('id');
@@ -617,9 +662,9 @@ class CartController extends Controller
         $mediaService = app(ProductMediaService::class);
         foreach ($products as $product) {
             try {
-                if (!$product->getFirstMedia('images')) {
+                if (! $product->getFirstMedia('images')) {
                     $result = $mediaService->downloadMissing($product);
-                    if (!($result['ok'] ?? false)) {
+                    if (! ($result['ok'] ?? false)) {
                         Log::info('Cart PDF media sync skipped for product', [
                             'product_id' => $product->id,
                             'reason' => $result['message'] ?? 'unknown',
@@ -678,7 +723,7 @@ class CartController extends Controller
                 ->value('attributes');
             $attrs = is_string($pivot) ? json_decode($pivot, true) : (is_array($pivot) ? $pivot : []);
 
-            if (!is_array($attrs)) {
+            if (! is_array($attrs)) {
                 $attrs = [];
             }
 
@@ -699,9 +744,9 @@ class CartController extends Controller
             }
 
             $factId = isset($attrs['fact']) ? (int) $attrs['fact'] : null;
-            $comId  = isset($attrs['com'])  ? (int) $attrs['com']  : null;
+            $comId = isset($attrs['com']) ? (int) $attrs['com'] : null;
             if ($factId) {
-                $facturant  = \App\Models\User::with('usersMeta')->find($factId);
+                $facturant = \App\Models\User::with('usersMeta')->find($factId);
             }
             if ($comId) {
                 $commercial = \App\Models\User::with('usersMeta')->find($comId);
@@ -711,7 +756,7 @@ class CartController extends Controller
         // Générer le PDF avec Spatie
         $label = isset($data['group_label']) ? trim((string) $data['group_label']) : '';
         $safeLabel = $label !== '' ? Str::slug($label) : 'panier';
-        $suffix = $dbProductId > 0 ? '-' . $dbProductId : '';
+        $suffix = $dbProductId > 0 ? '-'.$dbProductId : '';
 
         return Pdf::view('pdf.cart', [
             'items' => $items,
@@ -725,7 +770,7 @@ class CartController extends Controller
             'comment' => trim((string) ($data['comment'] ?? '')),
         ])
             ->format('a4')
-            ->name($safeLabel . $suffix . '-' . now()->format('Y-m-d-His') . '.pdf')
+            ->name($safeLabel.$suffix.'-'.now()->format('Y-m-d-His').'.pdf')
             ->download();
     }
 
@@ -748,10 +793,13 @@ class CartController extends Controller
             'discounts' => 'nullable|array',
             'discounts.*.type' => 'required|in:fixed,percent',
             'discounts.*.value' => 'required|numeric|min:0',
+            'coupon_code' => 'nullable|string|max:64',
             'transport_selection' => 'nullable|array',
             'group_label' => 'nullable|string|max:190',
             'group_key' => 'nullable|integer|min:0',
         ]);
+
+        $this->assertProductsOrderable(collect($data['items'])->pluck('id')->all());
 
         /** @var \App\Models\User $user */
         $user = Auth::user();
@@ -772,7 +820,11 @@ class CartController extends Controller
             ->latest('updated_at')
             ->first();
 
-        if (!$cart) {
+        if ($cart && $cart->orderHeaders()->exists()) {
+            $cart = null;
+        }
+
+        if (! $cart) {
             $cart = Cart::create([
                 'user_id' => $user->id,
                 'status' => 'processing',
@@ -815,26 +867,12 @@ class CartController extends Controller
             $transportSelection,
             $discounts,
             $shippingByDb,
+            $data['coupon_code'] ?? null,
         );
-
-        $existingSnapshot = \App\Models\OrderHeader::query()
-            ->where('cart_id', $cart->id)
-            ->latest('id')
-            ->first();
-
-        if (!$existingSnapshot) {
-            $payloadForSnapshot = $this->buildPdfPayload($data['items'], $user, $shippingTotal, false, $transportSelection, $discounts, $shippingByDb, $data['comment'] ?? null);
-            $orderSnapshotService->createFromPayload(
-                $cart,
-                $user,
-                $payloadForSnapshot,
-                ['source' => 'generate_pdf_tcpdf']
-            );
-        }
 
         return response($result['pdf_binary'], 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $result['pdf_filename'] . '"',
+            'Content-Disposition' => 'attachment; filename="'.$result['pdf_filename'].'"',
             'X-Generated-Csv-Count' => (string) count($result['csv_files'] ?? []),
         ]);
     }
@@ -851,7 +889,7 @@ class CartController extends Controller
         $rollSize = $cond > 0 && $floor > 0 && $roll > 0 ? $cond * $floor * $roll : 0;
 
         [$price, $priceFloor, $priceRoll, $pricePromo] = $this->resolveProductPrices($product, $user, $priceCalculator);
-        $volumePriceSelector = new ProductVolumePriceSelector();
+        $volumePriceSelector = new ProductVolumePriceSelector;
 
         $unitPrice = $volumePriceSelector->selectUnitPrice(
             quantity: $qty,
@@ -884,7 +922,7 @@ class CartController extends Controller
             $pricePromo = (float) ($prices[3] ?? $pricePromo);
         }
 
-        return (new ProductPriceFallbackResolver())->resolve(
+        return (new ProductPriceFallbackResolver)->resolve(
             standardUnitPrice: $price,
             floorUnitPrice: $priceFloor,
             rollUnitPrice: $priceRoll,
@@ -901,8 +939,9 @@ class CartController extends Controller
         array $discountSelections = [],
         array $shippingByDb = [],
         ?string $comment = null,
-    ): array
-    {
+        ?string $couponCode = null,
+        ?Cart $cart = null,
+    ): array {
         $productIds = collect($itemsInput)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
         $products = Product::with(['category', 'tags', 'media', 'dbProduct'])
             ->whereIn('id', $productIds)
@@ -912,7 +951,7 @@ class CartController extends Controller
         $mediaService = app(ProductMediaService::class);
         foreach ($products as $product) {
             try {
-                if (!$product->getFirstMedia('images')) {
+                if (! $product->getFirstMedia('images')) {
                     $mediaService->downloadMissing($product);
                 }
 
@@ -988,7 +1027,7 @@ class CartController extends Controller
 
             $attrs = is_string($pivot) ? json_decode($pivot, true) : (is_array($pivot) ? $pivot : []);
 
-            if (!is_array($attrs)) {
+            if (! is_array($attrs)) {
                 $attrs = [];
             }
 
@@ -1028,11 +1067,11 @@ class CartController extends Controller
 
             $pivotsByDbProductId[(int) $dbProductId] = $attrs;
 
-            if (!empty($attrs['fact'])) {
+            if (! empty($attrs['fact'])) {
                 $facturantIds[] = (int) $attrs['fact'];
             }
 
-            if (!empty($attrs['com'])) {
+            if (! empty($attrs['com'])) {
                 $commercialIds[] = (int) $attrs['com'];
             }
         }
@@ -1046,7 +1085,7 @@ class CartController extends Controller
         $mailRecipients = collect([$user])
             ->merge($facturantUsers)
             ->merge($commercialUsers)
-            ->filter(fn ($u) => !empty($u?->email))
+            ->filter(fn ($u) => ! empty($u?->email))
             ->unique(fn ($u) => strtolower((string) $u->email))
             ->values();
 
@@ -1057,6 +1096,28 @@ class CartController extends Controller
             $shippingByDb,
         );
         $discountTotal = $discountSummary['total'];
+        $couponSummary = null;
+        if (trim((string) $couponCode) !== '') {
+            if ($discountSelections !== []) {
+                throw ValidationException::withMessages([
+                    'coupon_code' => 'Un coupon ne peut pas être combiné avec une remise manuelle.',
+                ]);
+            }
+
+            $couponService = app(PromotionCouponApplicationService::class);
+            $coupon = $couponService->findByCode((string) $couponCode);
+            $couponResult = $couponService->evaluate($coupon, $user, $items, $effectiveShipping, $cart);
+            $discountTotal = $couponResult['discount_ht'];
+            $couponSummary = [
+                'id' => $coupon->id,
+                'code' => $couponResult['code'],
+                'discount_ht' => $couponResult['discount_ht'],
+                'eligible_ht' => $couponResult['eligible_ht'],
+                'funded_by' => $couponResult['funded_by'],
+                'funder_margin_ht' => $couponResult['funder_margin_ht'],
+                'funder_margin_after_ht' => $couponResult['funder_margin_after_ht'],
+            ];
+        }
         $total = max(0, round($itemsTotal + $effectiveShipping - $discountTotal, 2));
 
         return [
@@ -1065,6 +1126,7 @@ class CartController extends Controller
             'shipping_total' => $effectiveShipping,
             'discounts' => $discountSummary['by_db'],
             'discount_total' => $discountTotal,
+            'coupon' => $couponSummary,
             'total' => $total,
             'roll_distribution' => $rollDistribution,
             'user' => $user,
@@ -1089,8 +1151,7 @@ class CartController extends Controller
         string $disk = 'public',
         ?string $attachmentName = null,
         array $generatedFiles = [],
-    ): int
-    {
+    ): int {
         $sent = 0;
         $pdfAbsolutePath = Storage::disk($disk)->path($pdfRelativePath);
         $attachmentFilename = $attachmentName ?: $this->buildOrderPdfFilename((int) $orderNumber);
@@ -1151,6 +1212,7 @@ class CartController extends Controller
         array $transportSelection = [],
         array $discountSelections = [],
         array $shippingByDb = [],
+        ?string $couponCode = null,
     ): array {
         $payload = $this->buildPdfPayload(
             $itemsInput,
@@ -1161,15 +1223,29 @@ class CartController extends Controller
             $discountSelections,
             $shippingByDb,
             $cart->comment,
+            $couponCode,
+            $cart,
         );
         $cart->transport_selection = $transportSelection;
         $cart->discounts = $discountSelections;
+        $cart->promotion_coupon_id = $payload['coupon']['id'] ?? null;
+        $cart->coupon_code = $payload['coupon']['code'] ?? null;
         $orderNumber = $this->formatOrderNumber((int) $cart->id);
         $payload['order_number'] = $orderNumber;
 
         $cart->items_total = round((float) ($payload['items_total'] ?? 0), 2);
         $cart->shipping_total = round((float) ($payload['shipping_total'] ?? 0), 2);
         $cart->save();
+
+        if ($sendEmails) {
+            $this->persistOrderSnapshotAndConsumeCoupon(
+                $cart,
+                $user,
+                $payload,
+                app(OrderSnapshotService::class),
+                'generate_pdf_tcpdf',
+            );
+        }
 
         $storageFilename = $this->buildOrderPdfFilename((int) $cart->id);
         $filename = app(OrderCsvService::class)->resolveOrderPdfFilename(
@@ -1228,7 +1304,7 @@ class CartController extends Controller
             'order_number' => $orderNumber,
             'pdf_filename' => $filename,
             'pdf_relative_path' => $pdfRelativePath,
-            'pdf_download_url' => asset('storage/' . $pdfRelativePath),
+            'pdf_download_url' => asset('storage/'.$pdfRelativePath),
             'items_total' => $cart->items_total,
             'shipping_total' => $cart->shipping_total,
             'discount_total' => $payload['discount_total'] ?? 0,
@@ -1238,14 +1314,56 @@ class CartController extends Controller
         ];
     }
 
+    private function persistOrderSnapshotAndConsumeCoupon(
+        Cart $cart,
+        \App\Models\User $user,
+        array $payload,
+        OrderSnapshotService $orderSnapshotService,
+        string $source,
+    ): void {
+        DB::transaction(function () use ($cart, $user, $payload, $orderSnapshotService, $source): void {
+            $existingSnapshot = \App\Models\OrderHeader::query()
+                ->where('cart_id', $cart->id)
+                ->latest('id')
+                ->first();
+
+            $couponId = (int) ($payload['coupon']['id'] ?? 0);
+            if ($existingSnapshot && $couponId > 0) {
+                throw ValidationException::withMessages([
+                    'coupon_code' => 'Une commande déjà validée avec un coupon ne peut pas être complétée. Créez une nouvelle commande.',
+                ]);
+            }
+
+            if ($couponId > 0) {
+                $coupon = app(PromotionCouponApplicationService::class)->findByCode((string) $payload['coupon']['code']);
+                app(PromotionCouponApplicationService::class)->consume(
+                    $coupon,
+                    $user,
+                    $cart,
+                    collect($payload['items'] ?? []),
+                    (float) ($payload['shipping_total'] ?? 0),
+                );
+            }
+
+            if (! $existingSnapshot) {
+                $orderSnapshotService->createFromPayload(
+                    $cart,
+                    $user,
+                    $payload,
+                    ['source' => $source],
+                );
+            }
+        });
+    }
+
     private function computeShippingFromRollDistribution(array $rollDistribution, array $pivotsByDbProductId): float
     {
-        return (new TransportDeparturePricingService())->calculate($rollDistribution, $pivotsByDbProductId);
+        return (new TransportDeparturePricingService)->calculate($rollDistribution, $pivotsByDbProductId);
     }
 
     private function pickZoneTariff(int $rollCount, array $tariffs): float
     {
-        return (new TransportZoneTariffResolver())->resolve($rollCount, $tariffs);
+        return (new TransportZoneTariffResolver)->resolve($rollCount, $tariffs);
     }
 
     private function parseTariffRange(string $key): ?array
@@ -1261,7 +1379,7 @@ class CartController extends Controller
         }
         $toVal = fn (string $v) => (float) str_replace(',', '.', $v);
         $min = $toVal($parts[0]);
-        if (!is_finite($min)) {
+        if (! is_finite($min)) {
             return null;
         }
         $max = isset($parts[1]) ? (is_finite($toVal($parts[1])) ? $toVal($parts[1]) : null) : null;
@@ -1279,14 +1397,17 @@ class CartController extends Controller
         }
         if (is_string($value)) {
             $parsed = (float) str_replace(',', '.', trim($value));
+
             return is_finite($parsed) ? $parsed : 0.0;
         }
+
         return 0.0;
     }
 
     private function tariffToFillRatio(float $coef): float
     {
         $normalized = $coef > 1.0 ? $coef / 100.0 : $coef;
+
         return max(0.0, min(1.0, $normalized));
     }
 
@@ -1309,7 +1430,7 @@ class CartController extends Controller
      */
     private function normalizeShippingByDb(mixed $rawShipping): array
     {
-        if (!is_array($rawShipping)) {
+        if (! is_array($rawShipping)) {
             return [];
         }
 
@@ -1330,18 +1451,18 @@ class CartController extends Controller
      */
     private function normalizeDiscounts(mixed $rawDiscounts, \App\Models\User $user): array
     {
-        if (!is_array($rawDiscounts) || $rawDiscounts === []) {
+        if (! is_array($rawDiscounts) || $rawDiscounts === []) {
             return [];
         }
 
-        if (!$user->hasAnyRole(['dev', 'admin', 'commercial']) && !$user->can('order.remise')) {
+        if (! $user->hasAnyRole(['dev', 'admin', 'commercial']) && ! $user->can('order.remise')) {
             abort(403, 'Vous n’êtes pas autorisé à appliquer une remise.');
         }
 
         $normalized = [];
         foreach ($rawDiscounts as $dbProductId => $discount) {
             $dbId = (int) $dbProductId;
-            if ($dbId <= 0 || !is_array($discount)) {
+            if ($dbId <= 0 || ! is_array($discount)) {
                 continue;
             }
 
@@ -1349,7 +1470,7 @@ class CartController extends Controller
             $value = isset($discount['value']) && is_numeric($discount['value'])
                 ? (float) $discount['value']
                 : 0.0;
-            if (!is_finite($value)) {
+            if (! is_finite($value)) {
                 $value = 0.0;
             }
 
@@ -1363,9 +1484,9 @@ class CartController extends Controller
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, array{product:Product, line_total:float|int}> $items
-     * @param array<int, array{type:string, value:float}> $discountSelections
-     * @param array<int, float> $shippingByDb
+     * @param  \Illuminate\Support\Collection<int, array{product:Product, line_total:float|int}>  $items
+     * @param  array<int, array{type:string, value:float}>  $discountSelections
+     * @param  array<int, float>  $shippingByDb
      * @return array{total:float, by_db:array<int, array{type:string, value:float, base:float, amount:float}>}
      */
     private function calculateDiscountSummary(
@@ -1410,7 +1531,7 @@ class CartController extends Controller
 
         $byDb = [];
         foreach ($discountSelections as $dbId => $discount) {
-            if (!$productTotals->has($dbId)) {
+            if (! $productTotals->has($dbId)) {
                 continue;
             }
 
@@ -1436,19 +1557,18 @@ class CartController extends Controller
     }
 
     /**
-     * @param mixed $rawSelection
      * @return array<int, array{carrier_id:int, zone_id:int, tva?:float}>
      */
     private function normalizeTransportSelection(mixed $rawSelection): array
     {
-        if (!is_array($rawSelection)) {
+        if (! is_array($rawSelection)) {
             return [];
         }
 
         $normalized = [];
         foreach ($rawSelection as $dbProductId => $choice) {
             $dbId = (int) $dbProductId;
-            if ($dbId <= 0 || !is_array($choice)) {
+            if ($dbId <= 0 || ! is_array($choice)) {
                 continue;
             }
 
@@ -1473,6 +1593,30 @@ class CartController extends Controller
         return $normalized;
     }
 
+    private function assertProductsOrderable(iterable $productIds, string $field = 'items'): void
+    {
+        $requestedIds = collect($productIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $orderableIds = Product::query()
+            ->orderableAt()
+            ->whereIn('id', $requestedIds->all())
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id);
+
+        $unavailableIds = $requestedIds->diff($orderableIds)->values();
+        if ($unavailableIds->isEmpty()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $field => 'Un ou plusieurs produits ne sont pas encore disponibles ou ne peuvent plus être commandés.',
+        ]);
+    }
+
     private function formatOrderNumber(int $cartId): string
     {
         return str_pad((string) $cartId, 5, '0', STR_PAD_LEFT);
@@ -1480,7 +1624,6 @@ class CartController extends Controller
 
     private function buildOrderPdfFilename(int $cartId): string
     {
-        return $this->formatOrderNumber($cartId) . '_' . now()->format('Y_m_d') . '.pdf';
+        return $this->formatOrderNumber($cartId).'_'.now()->format('Y_m_d').'.pdf';
     }
-
 }

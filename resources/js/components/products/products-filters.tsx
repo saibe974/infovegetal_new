@@ -1,21 +1,14 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ProductCategory } from "@/types";
-import { ChevronDown, Zap } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
+import { Zap } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { MultiSelectDropdown } from "../ui/multi-select-dropdown";
+import { CategoryAccordion } from "./category-accordion";
 
 type FilterActive = 'all' | 'active' | 'inactive';
 type ImageFilter = 'all' | 'with' | 'without';
@@ -28,107 +21,6 @@ type ProductsFilterValues = {
     image: ImageFilter;
     promo: boolean;
 };
-
-type MultiSelectOption = {
-    value: string;
-    text: string;
-    label: ReactNode;
-};
-
-function MultiSelectDropdown({
-    label,
-    allLabel,
-    options,
-    selected,
-    onApply,
-    applyLabel,
-    clearLabel,
-}: {
-    label: string;
-    allLabel: string;
-    options: MultiSelectOption[];
-    selected: string[];
-    onApply: (values: string[]) => void;
-    applyLabel: string;
-    clearLabel: string;
-}) {
-    const [open, setOpen] = useState(false);
-    const [draft, setDraft] = useState<string[]>(selected);
-
-    useEffect(() => {
-        if (!open) {
-            setDraft(selected);
-        }
-    }, [selected, open]);
-
-    const summaryValues = selected
-        .map((value) => options.find((option) => option.value === value)?.text ?? value);
-    const summary = summaryValues.length === 0
-        ? allLabel
-        : summaryValues.length <= 2
-            ? summaryValues.join(', ')
-            : `${summaryValues.slice(0, 2).join(', ')} +${summaryValues.length - 2}`;
-
-    return (
-        <div className="w-full space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <DropdownMenu
-                modal={false}
-                open={open}
-                onOpenChange={(nextOpen) => {
-                    if (nextOpen) {
-                        setDraft(selected);
-                    }
-                    setOpen(nextOpen);
-                }}
-            >
-                <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" className="w-full justify-between rounded-md border border-input">
-                        <span className="truncate">{summary}</span>
-                        <ChevronDown className="size-5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                    align="start"
-                    className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[var(--radix-dropdown-menu-trigger-width)]"
-                >
-                    <div className="max-h-60 overflow-y-auto">
-                        {options.map((option) => (
-                            <DropdownMenuCheckboxItem
-                                key={option.value}
-                                checked={draft.includes(option.value)}
-                                onCheckedChange={() => {
-                                    setDraft((current) => current.includes(option.value)
-                                        ? current.filter((value) => value !== option.value)
-                                        : [...current, option.value]);
-                                }}
-                                onSelect={(event) => event.preventDefault()}
-                            >
-                                {option.label}
-                            </DropdownMenuCheckboxItem>
-                        ))}
-                    </div>
-                    <DropdownMenuSeparator />
-                    <div className="flex items-center justify-end gap-2 p-1">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setDraft([])}>
-                            {clearLabel}
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => {
-                                onApply(draft);
-                                setOpen(false);
-                            }}
-                        >
-                            {applyLabel}
-                        </Button>
-                    </div>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
-    );
-}
 
 type ProductsFiltersProps = {
     categories: ProductCategory[];
@@ -318,73 +210,6 @@ export function ProductsFilters({
         ? categories.filter((category) => categoryOptions.includes(category.id))
         : categories;
 
-    const categoryById = new Map(categories.map((category) => [category.id, category]));
-    const childrenByParent = new Map<number | null, ProductCategory[]>();
-    const visibleCategoryIds = new Set<number>();
-
-    if (categoryOptions.length > 0) {
-        categoryOptions.forEach((id) => {
-            visibleCategoryIds.add(id);
-
-            let current = categoryById.get(id);
-            while (current?.parent_id) {
-                visibleCategoryIds.add(current.parent_id);
-                current = categoryById.get(current.parent_id);
-            }
-        });
-    } else {
-        categories.forEach((category) => visibleCategoryIds.add(category.id));
-    }
-
-    categories.forEach((category) => {
-        const parentId = category.parent_id ?? null;
-        const list = childrenByParent.get(parentId) ?? [];
-        list.push(category);
-        childrenByParent.set(parentId, list);
-    });
-
-    childrenByParent.forEach((list, parentId) => {
-        childrenByParent.set(parentId, list.sort((a, b) => a.name.localeCompare(b.name)));
-    });
-
-    const taxonomyRootId = categoryById.has(1) ? 1 : null;
-    const rootCategories = (taxonomyRootId !== null
-        ? childrenByParent.get(taxonomyRootId)
-        : childrenByParent.get(null))?.filter((category) => visibleCategoryIds.has(category.id)) ?? [];
-
-    const getDescendants = (categoryId: number): ProductCategory[] => {
-        const descendants: ProductCategory[] = [];
-        const stack = [...(childrenByParent.get(categoryId) ?? [])];
-
-        while (stack.length) {
-            const current = stack.shift();
-            if (!current) continue;
-            if (visibleCategoryIds.has(current.id)) {
-                descendants.push(current);
-            }
-            const currentChildren = childrenByParent.get(current.id) ?? [];
-            stack.unshift(...currentChildren);
-        }
-
-        return descendants;
-    };
-
-    const isCategoryInBranch = (currentId: string, parentId: number): boolean => {
-        if (currentId === String(parentId)) {
-            return true;
-        }
-
-        let current = categoryById.get(Number(currentId));
-        while (current?.parent_id) {
-            if (current.parent_id === parentId) {
-                return true;
-            }
-            current = categoryById.get(current.parent_id);
-        }
-
-        return false;
-    };
-
     const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
 
     return (
@@ -392,110 +217,12 @@ export function ProductsFilters({
             <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2 md:border-r md:pr-6">
                     {!singleCategory && (
-                        <>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Category')}</p>
-                            <div className="space-y-2">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className={cn(
-                                        "w-full justify-start rounded-md border border-input",
-                                        localCategory === ALL_CATEGORIES ? "bg-accent" : undefined
-                                    )}
-                                    onClick={() => setLocalCategory(ALL_CATEGORIES)}
-                                >
-                                    {t('All categories')}
-                                </Button>
-
-                                {rootCategories.map((parent) => {
-                                    const descendants = getDescendants(parent.id);
-                                    const hasChildren = descendants.length > 0;
-                                    const isSelected = localCategory === String(parent.id);
-                                    const isBranchSelected = isCategoryInBranch(localCategory, parent.id);
-                                    const parentLabel = parent.name.charAt(0).toUpperCase() + parent.name.slice(1);
-
-                                    if (!hasChildren) {
-                                        return (
-                                            <Button
-                                                key={parent.id}
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className={cn(
-                                                    "w-full justify-start rounded-md border border-input",
-                                                    isSelected ? "bg-accent" : undefined
-                                                )}
-                                                onClick={() => setLocalCategory(String(parent.id))}
-                                            >
-                                                {parentLabel}
-                                            </Button>
-                                        );
-                                    }
-
-                                    return (
-                                        <Collapsible key={parent.id} defaultOpen={isBranchSelected} className="rounded-md border border-input">
-                                            <CollapsibleTrigger asChild>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={cn(
-                                                        "group w-full justify-between rounded-md",
-                                                        isBranchSelected ? "bg-accent" : undefined
-                                                    )}
-                                                >
-                                                    <span className="truncate">{parentLabel}</span>
-                                                    <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                                                </Button>
-                                            </CollapsibleTrigger>
-                                            <CollapsibleContent className="border-t border-border p-1">
-                                                <div className="space-y-1">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className={cn(
-                                                            "w-full justify-start font-medium",
-                                                            isSelected ? "bg-accent" : undefined
-                                                        )}
-                                                        onClick={() => setLocalCategory(String(parent.id))}
-                                                    >
-                                                        <span className="truncate">{parentLabel}</span>
-                                                    </Button>
-                                                    {descendants.map((child) => {
-                                                        const childSelected = localCategory === String(child.id);
-                                                        const relativeDepth = Math.max(
-                                                            0,
-                                                            (child.depth ?? 0) - (parent.depth ?? 0) - 1
-                                                        );
-
-                                                        return (
-                                                            <Button
-                                                                key={child.id}
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className={cn(
-                                                                    "w-full justify-start",
-                                                                    childSelected ? "bg-accent" : undefined
-                                                                )}
-                                                                style={{ paddingLeft: `${0.75 + relativeDepth * 0.75}rem` }}
-                                                                onClick={() => setLocalCategory(String(child.id))}
-                                                            >
-                                                                <span className="truncate">
-                                                                    {child.name.charAt(0).toUpperCase() + child.name.slice(1)}
-                                                                </span>
-                                                            </Button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </CollapsibleContent>
-                                        </Collapsible>
-                                    );
-                                })}
-                            </div>
-                        </>
+                        <CategoryAccordion
+                            categories={categories}
+                            categoryOptions={categoryOptions}
+                            value={localCategory}
+                            onChange={setLocalCategory}
+                        />
                     )}
                 </div>
 

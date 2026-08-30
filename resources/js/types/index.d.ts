@@ -218,6 +218,9 @@ export interface Product {
     price: number;
     price_ttc?: number | null;
     active: boolean;
+    available_from?: string | null;
+    available_until?: string | null;
+    availability_status?: 'available' | 'upcoming' | 'ended' | 'inactive';
     db_products_id?: number | null;
     ref?: string | null;
     ean13?: string | null;
@@ -250,6 +253,85 @@ export interface Product {
     [key: string]: unknown; // This allows for additional properties...
 }
 
+export type PromotionStatus = 'draft' | 'ready' | 'scheduled' | 'active' | 'suspended' | 'ended' | 'cancelled';
+export type PromotionVisibility = 'public' | 'authenticated' | 'targeted' | 'unlisted';
+
+export interface Promotion {
+    presentation_title?: string | null;
+    presentation_body?: string | null;
+    terms?: string | null;
+    show_coupons?: boolean;
+    public_url?: string;
+    id: number;
+    title: string;
+    slug: string;
+    description?: string | null;
+    status: PromotionStatus;
+    visibility: PromotionVisibility;
+    created_by_id?: number | null;
+    responsible_user_id?: number | null;
+    creator?: Pick<User, 'id' | 'name'> | null;
+    responsible?: Pick<User, 'id' | 'name'> | null;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+}
+
+export interface PromotionProductSelection {
+    id: number;
+    name: string;
+    ref?: string | null;
+    sku?: string | null;
+    img_link?: string | null;
+    active: boolean;
+    available_from?: string | null;
+    available_until?: string | null;
+    availability_status: 'available' | 'upcoming' | 'ended' | 'inactive';
+    database?: { id: number; name: string } | null;
+    category?: { id: number; name: string } | null;
+    featured?: boolean;
+    show_before_availability?: boolean;
+    custom_title?: string | null;
+    custom_description?: string | null;
+}
+
+export type CouponDiscountType = 'percent' | 'fixed';
+export type CouponScope = 'cart' | 'promotion_products';
+export type CouponFunder = 'seller' | 'billing_user';
+
+export interface PromotionCoupon {
+    id: number;
+    code: string;
+    discount_type: CouponDiscountType;
+    discount_value: number;
+    scope: CouponScope;
+    funded_by: CouponFunder;
+    minimum_order_ht: number;
+    maximum_discount_ht?: number | null;
+    usage_limit?: number | null;
+    usage_limit_per_customer: number;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    effective_starts_at?: string | null;
+    effective_ends_at?: string | null;
+    stackable_with_promo_price: boolean;
+    active: boolean;
+}
+
+export type PromotionAudienceMode = 'all_accessible' | 'selected';
+
+export interface PromotionAudienceUser {
+    id: number;
+    name: string;
+    email: string;
+    ref?: string | null;
+    address_town?: string | null;
+    mailing: boolean;
+    parent?: { id: number; name: string } | null;
+    selected: boolean;
+}
+
 export type ProductDetailed = Product;
 
 export interface BreadcrumbItem {
@@ -277,6 +359,7 @@ export interface NavItemExtended extends NavItem {
 export interface Auth {
     user?: User | null;
     can_access_contracts?: boolean;
+    can_manage_promotions?: boolean;
     impersonate_from?: number | null;
     impersonator?: User | null;
     impersonation_strict_mode?: boolean;

@@ -5,13 +5,13 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 
 class FormProductRequest extends FormRequest
 {
     public function authorize(): bool
     {
         Log::info('[FORM_REQUEST] Authorization check for user:', ['user_id' => Auth::id()]);
+
         return true;
     }
 
@@ -23,6 +23,7 @@ class FormProductRequest extends FormRequest
     public function rules(): array
     {
         Log::info('[FORM_REQUEST] Validation rules applied');
+
         return [
             'name' => ['required', 'string', 'min:3'],
             'sku' => ['required', 'string', 'max:255'],
@@ -40,6 +41,8 @@ class FormProductRequest extends FormRequest
             'price_floor' => ['nullable', 'numeric', 'min:0'],
             'price_promo' => ['nullable', 'numeric', 'min:0'],
             'price_roll' => ['nullable', 'numeric', 'min:0'],
+            'available_from' => ['nullable', 'date'],
+            'available_until' => ['nullable', 'date', 'after:available_from'],
         ];
     }
 }

@@ -12,6 +12,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
         Route::post('/add', [CartController::class, 'addProduct'])->name('add');
         Route::post('/remove', [CartController::class, 'removeProduct'])->name('remove');
+        Route::post('/coupon/preview', [CartController::class, 'previewCoupon'])->name('coupon.preview');
         Route::post('/save', [CartController::class, 'save'])->name('save');
         Route::post('/order', [CartController::class, 'placeOrder'])->name('order');
         Route::post('/generate-pdf', [CartController::class, 'generatePdf'])->name('generate-pdf');
@@ -55,7 +56,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $date = optional($cart->created_at)->format('Y_m_d')
                 ?: optional($cart->updated_at)->format('Y_m_d')
                 ?: now()->format('Y_m_d');
-            $cart->pdf_filename = $orderNumber . '_' . $date . '.pdf';
+            $cart->pdf_filename = $orderNumber.'_'.$date.'.pdf';
 
             return $cart;
         });

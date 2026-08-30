@@ -3,17 +3,15 @@
 namespace App\Http\Resources;
 
 use App\Domain\Sales\DTO\ProductVatResolutionInput;
+use App\Domain\Sales\Services\ProductVatResolver;
 use App\Domain\Sales\Services\SalesConditionRelationResolver;
 use App\Domain\Sales\Services\SalesConditionSnapshotResolver;
-use App\Domain\Sales\Services\ProductVatResolver;
 use App\Domain\Sales\ValueObjects\Percentage;
-use App\Models\ClientSalesCondition;
-use App\Models\Product;
 use App\Models\Carrier;
+use App\Models\ClientSalesCondition;
 use App\Models\DbProductBillingUser;
-use App\Http\Resources\DbProductsResource;
+use App\Models\Product;
 use App\Services\PriceCalculatorService;
-
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
@@ -34,7 +32,7 @@ class ProductResource extends JsonResource
         }
 
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return null;
         }
 
@@ -51,7 +49,7 @@ class ProductResource extends JsonResource
         $dbProduct = $user->dbProducts()->where('db_product_id', $dbProductId)->first();
         $pivotAttributes = $dbProduct?->pivot?->attributes;
 
-        if (!$pivotAttributes) {
+        if (! $pivotAttributes) {
             return null;
         }
 
@@ -59,7 +57,7 @@ class ProductResource extends JsonResource
             ? json_decode($pivotAttributes, true)
             : $pivotAttributes;
 
-            // dd($decoded);
+        // dd($decoded);
 
         return is_array($decoded) ? $decoded : null;
     }
@@ -72,7 +70,7 @@ class ProductResource extends JsonResource
         }
 
         $attrs = $dbUserAttributes ?? $this->resolveDbUserAttributes($request);
-        if (!$attrs) {
+        if (! $attrs) {
             return null;
         }
 
@@ -94,7 +92,7 @@ class ProductResource extends JsonResource
             ->first(['id', 'taxgo']);
 
         $zone = $carrier?->zones?->first();
-        if (!$carrier || !$zone) {
+        if (! $carrier || ! $zone) {
             return null;
         }
 
@@ -108,7 +106,7 @@ class ProductResource extends JsonResource
     }
 
     /**
-     * @param array<string, mixed> $attrs
+     * @param  array<string, mixed>  $attrs
      * @return array{carrier_id:int,zone_id:int}
      */
     public static function resolveTransportChoiceFromAttributes(array $attrs): array
@@ -125,7 +123,7 @@ class ProductResource extends JsonResource
 
         $raw = $attrs['t'] ?? null;
         $parsed = is_string($raw) ? json_decode($raw, true) : $raw;
-        if (!is_array($parsed) || empty($parsed)) {
+        if (! is_array($parsed) || empty($parsed)) {
             return [
                 'carrier_id' => 0,
                 'zone_id' => 0,
@@ -136,7 +134,7 @@ class ProductResource extends JsonResource
         $selected = null;
 
         foreach ($parsed as $option) {
-            if (!is_array($option)) {
+            if (! is_array($option)) {
                 continue;
             }
 
@@ -156,7 +154,7 @@ class ProductResource extends JsonResource
             }
         }
 
-        if (!is_array($selected)) {
+        if (! is_array($selected)) {
             return [
                 'carrier_id' => 0,
                 'zone_id' => 0,
@@ -187,7 +185,7 @@ class ProductResource extends JsonResource
         }
 
         try {
-            $resolution = (new ProductVatResolver())->resolve(new ProductVatResolutionInput(
+            $resolution = (new ProductVatResolver)->resolve(new ProductVatResolutionInput(
                 productId: (int) $this->resource->id,
                 categoryId: $categoryId,
                 productVatRate: $productVatRate,
@@ -217,7 +215,7 @@ class ProductResource extends JsonResource
 
     protected function extractPositiveMargin(?array $conditions): ?float
     {
-        if (!is_array($conditions) || !array_key_exists('m', $conditions) || !is_numeric($conditions['m'])) {
+        if (! is_array($conditions) || ! array_key_exists('m', $conditions) || ! is_numeric($conditions['m'])) {
             return null;
         }
 
@@ -236,7 +234,7 @@ class ProductResource extends JsonResource
             $billingUserId = isset($dbUserAttributes['fact']) ? (int) $dbUserAttributes['fact'] : null;
             $sellerUserId = isset($dbUserAttributes['com']) ? (int) $dbUserAttributes['com'] : null;
 
-            if (!$billingUserId || !$sellerUserId) {
+            if (! $billingUserId || ! $sellerUserId) {
                 $clientRule = ClientSalesCondition::query()
                     ->where('client_user_id', (int) $user->id)
                     ->where('db_product_id', $dbProductId)
@@ -258,8 +256,8 @@ class ProductResource extends JsonResource
                     ->first();
 
                 $defaults = is_array($billingRule?->defaults) ? $billingRule->defaults : [];
-                $relationResolver = new SalesConditionRelationResolver();
-                $snapshotResolver = new SalesConditionSnapshotResolver();
+                $relationResolver = new SalesConditionRelationResolver;
+                $snapshotResolver = new SalesConditionSnapshotResolver;
 
                 $sellerRuleData = $relationResolver->resolveSellerRuleData($dbProductId, $billingUserId, $sellerUserId ?: null);
                 $clientOverride = $relationResolver->resolveClientOverride($dbProductId, $billingUserId, $sellerUserId ?: null, (int) $user->id);
@@ -272,7 +270,7 @@ class ProductResource extends JsonResource
                 );
 
                 $commercialMargin = null;
-                if (!empty($sellerRuleData)) {
+                if (! empty($sellerRuleData)) {
                     if ((bool) ($sellerRuleData['use_billing_profile'] ?? true)) {
                         $commercialMargin = $this->extractPositiveMargin(
                             $snapshotResolver->extractDefaultConditions(
@@ -311,14 +309,14 @@ class ProductResource extends JsonResource
         $dbUserAttributes = $this->resolveDbUserAttributes($request);
         $user = $request->user();
         $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
-        $isAdminView = $user && $user->hasRole('admin') && !$isImpersonated;
+        $isAdminView = $user && $user->hasRole('admin') && ! $isImpersonated;
 
         $price = $this->price;
         $priceFloor = $this->price_floor;
         $priceRoll = $this->price_roll;
         $pricePromo = $this->price_promo;
 
-        if ($user && $this->resource->db_products_id && (!$isAdminView || $dbUserAttributes)) {
+        if ($user && $this->resource->db_products_id && (! $isAdminView || $dbUserAttributes)) {
             $calculator = app(PriceCalculatorService::class);
             $prices = $calculator->calculatePrice($this->resource, $user, (int) $this->resource->db_products_id);
             $price = $prices[0] ?? $price;
@@ -354,6 +352,9 @@ class ProductResource extends JsonResource
             'price' => $price,
             'price_ttc' => $priceTtc,
             'active' => $this->active,
+            'available_from' => $this->available_from?->format('Y-m-d\TH:i'),
+            'available_until' => $this->available_until?->format('Y-m-d\TH:i'),
+            'availability_status' => $this->resource->availabilityStatusAt(),
             'attributes' => $this->attributes,
             'category_products_id' => $this->category_products_id,
             'db_products_id' => $this->db_products_id,

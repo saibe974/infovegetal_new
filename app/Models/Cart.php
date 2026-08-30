@@ -14,6 +14,8 @@ class Cart extends Model
         'shipping_total',
         'transport_selection',
         'discounts',
+        'promotion_coupon_id',
+        'coupon_code',
         'comment',
     ];
 
@@ -39,5 +41,15 @@ class Cart extends Model
     public function orderHeaders(): HasMany
     {
         return $this->hasMany(OrderHeader::class, 'cart_id');
+    }
+
+    public function promotionCoupon()
+    {
+        return $this->belongsTo(PromotionCoupon::class);
+    }
+
+    public function couponRedemption()
+    {
+        return $this->hasOne(PromotionCouponRedemption::class);
     }
 }

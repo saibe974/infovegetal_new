@@ -12,6 +12,7 @@ export type CartOrderOverrides = {
     shippingTotal?: number;
     shippingByDb?: Record<number, number>;
     discounts?: DiscountSelection;
+    couponCode?: string;
 };
 
 export type PdfResult = {
@@ -131,6 +132,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 shipping_total: deliveryTotal,
                 ...(overrides.shippingByDb !== undefined ? { shipping_by_db: overrides.shippingByDb } : {}),
                 ...(overrides.discounts !== undefined ? { discounts: overrides.discounts } : {}),
+                ...(overrides.couponCode !== undefined ? { coupon_code: overrides.couponCode } : {}),
                 transport_selection: buildTransportSelection(overrides.transportSelection),
             },
             itemsTotal: itemsPricing.reduce((sum, { pricing }) => sum + pricing.lineTotal, 0),

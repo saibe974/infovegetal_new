@@ -2,7 +2,7 @@ import { AppFooter } from '@/components/app/app-footer';
 import ScrollToTopButton from '@/components/ui/scroll-to-top-btn';
 import { Toaster } from '@/components/ui/sonner';
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
-import type { SharedData, BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { type FC, type ReactNode, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -34,7 +34,11 @@ const AppLayout = ({
     }, [page.props]);
 
     return (
-        <AppLayoutTemplate breadcrumbs={breadcrumbs} showRightSidebar={showRightSidebar} {...props}>
+        <AppLayoutTemplate
+            breadcrumbs={breadcrumbs}
+            showRightSidebar={showRightSidebar}
+            {...props}
+        >
             {children}
             <AppFooter hideOnInfiniteScroll={hideFooterOnInfiniteScroll} />
 
@@ -47,36 +51,34 @@ export function withAppLayout<T>(
     breadcrumbs: BreadcrumbItem[] | (() => BreadcrumbItem[]),
     hideFooterOnInfiniteScroll: boolean | ((props: T) => boolean) = false,
     component: FC<T>,
-    layoutOptions: Pick<AppLayoutProps, 'showRightSidebar'> = {}
+    layoutOptions: Pick<AppLayoutProps, 'showRightSidebar'> = {},
 ) {
+    const LayoutWrapper = ({ children }: { children: ReactNode }) => {
+        const pageProps = usePage().props as unknown as T;
+        const resolvedBreadcrumbs =
+            typeof breadcrumbs === 'function' ? breadcrumbs() : breadcrumbs;
 
-
-    // @ts-expect-error layout exists for inertia
-    component.layout = (page: ReactNode) => {
-        const BreadcrumbWrapper = () => {
-            const pageProps = usePage().props as unknown as T;
-            const resolvedBreadcrumbs = typeof breadcrumbs === 'function'
-                ? breadcrumbs()
-                : breadcrumbs;
-
-            const resolvedHideFooter = typeof hideFooterOnInfiniteScroll === 'function'
+        const resolvedHideFooter =
+            typeof hideFooterOnInfiniteScroll === 'function'
                 ? hideFooterOnInfiniteScroll(pageProps)
                 : hideFooterOnInfiniteScroll;
 
-            return <AppLayout
+        return (
+            <AppLayout
                 breadcrumbs={resolvedBreadcrumbs}
                 hideFooterOnInfiniteScroll={resolvedHideFooter}
                 {...layoutOptions}
             >
-                <div className={`p-2 lg:p-4`}>
-                    {page}
-                </div>
+                <div className={`p-2 lg:p-4`}>{children}</div>
                 <ScrollToTopButton />
-            </AppLayout>;
-        };
-
-        return <BreadcrumbWrapper />;
+            </AppLayout>
+        );
     };
+
+    // @ts-expect-error layout exists for inertia
+    component.layout = (page: ReactNode) => (
+        <LayoutWrapper>{page}</LayoutWrapper>
+    );
     return component;
 }
 
