@@ -8,6 +8,8 @@ use App\Http\Resources\ProductResource;
 use App\Models\Carrier;
 use App\Models\CategoryProducts;
 use App\Models\Product;
+use App\Services\ProductCatalogQuery;
+use App\Services\ProductExportService;
 use App\Services\ProductImportService;
 use App\Services\ProductMediaService;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +21,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use League\Csv\Reader;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -44,156 +45,19 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $baseQuery = Product::query();
-        // Filtre panier (cart) - seulement appliqué si le paramètre ?cart=1 est présent
-        if ($request->get('cart') === '1') {
-            $cartIds = $request->session()->get('cart_filter_ids', []);
-            if (! empty($cartIds) && is_array($cartIds)) {
-                $baseQuery->whereIn('products.id', $cartIds);
-            }
-        }
-
-        $search = $request->get('q');
-
-        $activeInput = $request->get('active');
-        $activeFilter = null;
-
-        $user = $request->user();
-        $isImpersonated = $user && method_exists($user, 'isImpersonated') && $user->isImpersonated();
-        $isAdminView = $user && $user->hasRole('admin') && ! $isImpersonated;
-
-        if (! $isAdminView) {
-            $baseQuery->orderableAt();
-        }
-
-        if ($user && ! $isAdminView) {
-            $allowedDbIds = $user->dbProducts()->pluck('db_products.id')->toArray();
-            $baseQuery->whereIn('db_products_id', $allowedDbIds);
-        }
-
-        if ($activeInput !== null && $activeInput !== '') {
-            $activeFilter = match (strtolower((string) $activeInput)) {
-                '1', 'true', 'yes', 'on', 'active' => true,
-                '0', 'false', 'no', 'off', 'inactive' => false,
-                default => null,
-            };
-
-            if ($activeFilter !== null) {
-                $baseQuery->where('active', $activeFilter);
-            }
-        } else {
-            $activeFilter = true;
-            $baseQuery->where('active', true);
-        }
-
-        $applySearch = function ($q, ?string $search) {
-            if (empty($search)) {
-                return;
-            }
-
-            $refCandidate = null;
-            if (str_contains($search, ':')) {
-                $refCandidate = trim((string) strtok($search, ':'));
-                if ($refCandidate === '') {
-                    $refCandidate = null;
-                }
-            }
-
-            if ($refCandidate) {
-                $q->where('products.ref', '=', $refCandidate);
-
-                return;
-            }
-
-            $normalized = trim($search);
-            $tokens = preg_split('/\s+/', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $isSingleNumeric = count($tokens) === 1 && ctype_digit($tokens[0]);
-            $isSingleToken = count($tokens) === 1;
-
-            $q->where(function ($qq) use ($tokens, $isSingleNumeric, $isSingleToken) {
-                // Si un seul terme numerique, tenter l'ID exact
-                if ($isSingleNumeric) {
-                    $qq->where('products.id', '=', (int) $tokens[0]);
-                }
-
-                // Et toujours proposer une recherche sur le nom qui contient tous les termes
-                $qq->orWhere(function ($qqq) use ($tokens) {
-                    foreach ($tokens as $t) {
-                        $qqq->where('products.name', 'like', '%'.$t.'%');
-                    }
-                });
-
-                if ($isSingleToken) {
-                    $qq->orWhere('products.ref', '=', $tokens[0]);
-                }
-            });
-        };
-
-        $multiValue = function (string $key) use ($request): array {
-            $values = $request->input($key, []);
-            $values = is_array($values) ? $values : [$values];
-
-            return array_values(array_unique(array_filter(
-                array_map(fn ($value) => trim((string) $value), $values),
-                fn ($value) => $value !== ''
-            )));
-        };
-
-        $categoryId = $request->filled('category') ? (int) $request->input('category') : null;
-        $country = $multiValue('country');
-        $pot = $multiValue('pot');
-        $height = $multiValue('height');
-        $image = in_array($request->input('image'), ['with', 'without'], true)
-            ? (string) $request->input('image')
-            : null;
-        $promo = $request->boolean('promo');
-        $categoryBranchIds = $categoryId
-            ? CategoryProducts::descendantsAndSelf($categoryId)->pluck('id')->map(fn ($id) => (int) $id)->all()
-            : [];
-
-        $filters = [
-            'category' => $categoryId,
-            'category_branch_ids' => $categoryBranchIds,
-            'country' => $country,
-            'pot' => $pot,
-            'height' => $height,
-            'image' => $image,
-            'promo' => $promo,
-        ];
-
-        $applyFilters = function ($q, array $filters, array $skip = []) {
-            if (! in_array('category', $skip, true) && $filters['category']) {
-                $q->whereIn('category_products_id', $filters['category_branch_ids']);
-            }
-
-            if (! in_array('country', $skip, true) && ! empty($filters['country'])) {
-                $q->whereHas('dbProduct', function ($db) use ($filters) {
-                    $db->whereIn('country', $filters['country']);
-                });
-            }
-
-            if (! in_array('pot', $skip, true) && ! empty($filters['pot'])) {
-                $q->whereIn('pot', $filters['pot']);
-            }
-
-            if (! in_array('height', $skip, true) && ! empty($filters['height'])) {
-                $q->whereIn('height', $filters['height']);
-            }
-
-            if (! in_array('image', $skip, true)) {
-                $q->imageAvailability($filters['image']);
-            }
-
-            if (! in_array('promo', $skip, true) && $filters['promo']) {
-                $q->whereNotNull('price_promo')
-                    ->where('price_promo', '>', 0)
-                    ->where(function ($promoQuery) {
-                        $promoQuery
-                            ->whereNull('price_roll')
-                            ->orWhereColumn('price_promo', '<>', 'price_roll');
-                    });
-            }
-        };
+        $catalog = new ProductCatalogQuery($request);
+        $baseQuery = $catalog->baseQuery;
+        $search = $catalog->search;
+        $activeFilter = $catalog->activeFilter;
+        $filters = $catalog->filters;
+        $categoryId = $filters['category'];
+        $country = $filters['country'];
+        $pot = $filters['pot'];
+        $height = $filters['height'];
+        $image = $filters['image'];
+        $promo = $filters['promo'];
+        $applySearch = $catalog->applySearch(...);
+        $applyFilters = $catalog->applyFilters(...);
 
         $optionsBaseQuery = clone $baseQuery;
         $applySearch($optionsBaseQuery, $search);
@@ -243,15 +107,7 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        $query = (clone $baseQuery)->with(['category', 'tags', 'dbProduct']);
-        $applySearch($query, $search);
-        $applyFilters($query, $filters);
-
-        if ($request->filled('sort')) {
-            $query->orderFromRequest($request);
-        } else {
-            $query->orderBy('name');
-        }
+        $query = $catalog->query()->with(['category', 'tags', 'dbProduct']);
 
         $products = $query->paginate(24);
         $user = $request->user();
@@ -348,6 +204,7 @@ class ProductController extends Controller
 
         return Inertia::render('products/index', [
             'q' => $search,
+            'exportOptions' => ProductExportService::options(),
             'collection' => Inertia::scroll(fn () => ProductResource::collection($products)),
             'filters' => [
                 'active' => $activeFilter,
@@ -561,43 +418,11 @@ class ProductController extends Controller
         return response()->json(['status' => 'cancelling']);
     }
 
-    /**
-     * Export products as CSV.
-     */
-    public function export(Request $request)
+    public function export(Request $request, ProductExportService $exporter)
     {
         Gate::authorize('manage-products');
 
-        $filename = 'products_export_'.date('Ymd_His').'.csv';
-
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
-
-        $callback = function () {
-            $handle = fopen('php://output', 'w');
-            // header (séparateur ';')
-            fputcsv($handle, ['sku', 'name', 'img_link', 'category', 'description', 'price', 'active'], ';');
-
-            Product::with('category')->chunk(100, function ($products) use ($handle) {
-                foreach ($products as $p) {
-                    fputcsv($handle, [
-                        $p->sku,
-                        $p->name,
-                        $p->img_link,
-                        $p->category?->name,
-                        $p->description,
-                        $p->price,
-                        $p->active ? 1 : 0,
-                    ], ';');
-                }
-            });
-
-            fclose($handle);
-        };
-
-        return new StreamedResponse($callback, 200, $headers);
+        return $exporter->download($request);
     }
 
     /**

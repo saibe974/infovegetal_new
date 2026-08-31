@@ -17,6 +17,7 @@ import { Button } from './ui/button';
 type Props = {
     import?: ReactNode;
     export?: string | (() => void);
+    exportLabel?: string;
     preview?: () => void;
     refresh?: () => void;
     save?: () => void;
@@ -35,6 +36,7 @@ type Props = {
 export function ButtonsActions({
     import: onImport,
     export: onExport,
+    exportLabel,
     preview: onPreview,
     refresh: onRefresh,
     save: onSave,
@@ -91,7 +93,8 @@ export function ButtonsActions({
                         if (typeof onExport === 'function') onExport();
                     }}
                     variant={'outline'}
-                    title={t('Export CSV')}
+                    title={exportLabel ?? t('Export CSV')}
+                    aria-label={exportLabel ?? t('Export CSV')}
                     disabled={saving}
                     size={'icon'}
                 >

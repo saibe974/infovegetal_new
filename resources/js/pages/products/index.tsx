@@ -19,6 +19,7 @@ import { ProductsFilters } from '@/components/products/products-filters';
 import ProductDetails from '@/components/products/product-details';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { useCart } from '@/components/cart/use-cart';
+import { ProductsExportDialog, type ProductExportOptions } from '@/components/products/products-export-dialog';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -52,6 +53,7 @@ type CartFilter = { cart?: string };
 import { dbProduct } from '@/types';
 
 type Props = {
+    exportOptions: ProductExportOptions;
     collection: PaginatedCollection<Product>;
     q: string | null;
     filters?: RawFilters;
@@ -83,7 +85,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [] }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], exportOptions }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -91,6 +93,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
     const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
     const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
+    const canExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'export products');
+    const [exportOpen, setExportOpen] = useState(false);
 
     const page = usePage<{ searchPropositions?: Array<string | SearchOption> }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -470,11 +474,30 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                                 buttonLabel=''
                             />
                         }
-                        export={'/admin/products/export'}
+                        export={canExport ? () => setExportOpen(true) : undefined}
+                        exportLabel={t('Exporter')}
                         add={() => { }}
                     />
                 )}
+                {canExport && (
+                    <ButtonsActions
+                        className="md:hidden"
+                        export={() => setExportOpen(true)}
+                        exportLabel={t('Exporter')}
+                    />
+                )}
             </StickyBar>
+
+            {canExport && (
+                <ProductsExportDialog
+                    open={exportOpen}
+                    onOpenChange={setExportOpen}
+                    total={collection.meta.total}
+                    options={exportOptions}
+                    catalogUrl={page.url}
+                    exportUrl={products.admin.export.url()}
+                />
+            )}
 
             {collection.data.length === 0 ? (
                 <div className='w-full flex flex-col items-center justify-center gap-4'>

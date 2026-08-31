@@ -299,12 +299,8 @@ class ProductResource extends JsonResource
         return $this->extractPositiveMargin($dbUserAttributes);
     }
 
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
-    public function toArray(Request $request): array
+    /** Prices shared by catalogue rendering and exports, with the same user context. */
+    public function resolvedPrices(Request $request): array
     {
         $dbUserAttributes = $this->resolveDbUserAttributes($request);
         $user = $request->user();
@@ -324,6 +320,18 @@ class ProductResource extends JsonResource
             $priceRoll = $prices[2] ?? $priceRoll;
             $pricePromo = $prices[3] ?? $pricePromo;
         }
+
+        return ['price' => $price, 'price_floor' => $priceFloor, 'price_roll' => $priceRoll, 'price_promo' => $pricePromo, 'db_user_attributes' => $dbUserAttributes];
+    }
+
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        ['price' => $price, 'price_floor' => $priceFloor, 'price_roll' => $priceRoll, 'price_promo' => $pricePromo, 'db_user_attributes' => $dbUserAttributes] = $this->resolvedPrices($request);
 
         $effectivePrice = (float) $price;
 

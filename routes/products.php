@@ -69,10 +69,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('edit');
         Route::put('/{product}', [ProductController::class, 'update'])->name('update');
         Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
-
-        // CSV import/export endpoints
-        Route::get('/export', [ProductController::class, 'export'])->name('export');
     });
+
+    Route::get('/admin/products/export', [ProductController::class, 'export'])
+        ->middleware(['role_or_permission_or_impersonator:admin|export products'])
+        ->name('products.admin.export');
 
     // Product import endpoints: admin ou permissions users.db_products.manage.*
     Route::prefix('admin/products/import')->name('products.admin.import.')->middleware([
