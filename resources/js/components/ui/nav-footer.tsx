@@ -12,6 +12,9 @@ import {
 import { NavItemExtended, type NavItem } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react';
+
+const ACCORDION_EVENT = 'sidebar-nav-accordion';
 
 const areNumberRecordsEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
     const aKeys = Object.keys(a);
@@ -168,6 +171,64 @@ export function NavFooterExtended({
         }
     }, [openMap]);
 
+    // accordion behavior: opening an item collapses all others (across nav groups)
+    const setOpenExclusive = (title: string, open: boolean) => {
+        setOpenMap(() => {
+            const next: Record<string, boolean> = {};
+            (items as NavItemExtended[]).forEach((it) => {
+                next[it.title] = it.title === title ? open : false;
+            });
+            return next;
+        });
+        if (open) {
+            window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-footer', title } }));
+        }
+    };
+
+    const closeOthersKeeping = (keepTitle: string) => {
+        setOpenMap((m) => {
+            const next: Record<string, boolean> = {};
+            let changed = false;
+            (items as NavItemExtended[]).forEach((it) => {
+                next[it.title] = it.title === keepTitle ? !!m[it.title] : false;
+                if (next[it.title] !== !!m[it.title]) changed = true;
+            });
+            return changed ? next : m;
+        });
+        window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-footer', title: keepTitle } }));
+    };
+
+    const collapseAll = () => {
+        setOpenMap((m) => {
+            const next: Record<string, boolean> = {};
+            let changed = false;
+            (items as NavItemExtended[]).forEach((it) => {
+                next[it.title] = false;
+                if (m[it.title]) changed = true;
+            });
+            return changed ? next : m;
+        });
+        window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-footer', title: '' } }));
+    };
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent).detail as { source: string; title: string };
+            if (detail.source === 'nav-footer') return;
+            setOpenMap((m) => {
+                const hasOpen = (items as NavItemExtended[]).some((it) => !!m[it.title]);
+                if (!hasOpen) return m;
+                const next: Record<string, boolean> = {};
+                (items as NavItemExtended[]).forEach((it) => {
+                    next[it.title] = false;
+                });
+                return next;
+            });
+        };
+        window.addEventListener(ACCORDION_EVENT, handler);
+        return () => window.removeEventListener(ACCORDION_EVENT, handler);
+    }, [items]);
+
     const isExternal = (href: NavItem['href'] | undefined) => {
         const url = getCandidateUrl(href);
         return /^(https?:\/\/|mailto:|tel:)/.test(url);
@@ -220,12 +281,14 @@ export function NavFooterExtended({
                                     <>
                                         <SidebarMenuButton
                                             asChild
-                                            onClick={() => setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }))}
+                                            onClick={() => setOpenExclusive(item.title, !isOpen)}
                                             className={menuButtonClassName}
                                             tooltip={!isOpenId('main') ? item.title : undefined}
                                         >
-                                            <button type="button" className="w-full text-left flex items-center gap-2">
+                                            <button type="button" className="relative w-full text-left flex items-center gap-2">
                                                 {label}
+                                                <ChevronRight className={`ml-auto size-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+                                                <ChevronRight className={`absolute left-5 bottom-2 size-3 opacity-60 transition-transform duration-200 hidden group-data-[collapsible=icon]:block ${isOpen ? 'rotate-90' : ''}`} />
                                             </button>
                                         </SidebarMenuButton>
 
@@ -243,6 +306,7 @@ export function NavFooterExtended({
                                                             tooltip={!isOpenId('main') ? sub.title : undefined}
                                                             asChild
                                                             className={menuButtonClassName}
+                                                            onClick={() => closeOthersKeeping(item.title)}
                                                         >
                                                             {renderLink(sub.href, (
                                                                 <>
@@ -257,7 +321,7 @@ export function NavFooterExtended({
                                         </div>
                                     </>
                                 ) : (
-                                    <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild className={menuButtonClassName}>
+                                    <SidebarMenuButton tooltip={!isOpenId('main') ? item.title : undefined} asChild className={menuButtonClassName} onClick={collapseAll}>
                                         {renderLink(item.href ?? (item as NavItem).href, label, item.target)}
                                     </SidebarMenuButton>
                                 )}

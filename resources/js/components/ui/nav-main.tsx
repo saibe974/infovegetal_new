@@ -10,6 +10,9 @@ import {
 import { type NavItem, type NavItemExtended } from '@/types';
 import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
+
+const ACCORDION_EVENT = 'sidebar-nav-accordion';
 
 const areNumberRecordsEqual = (a: Record<string, number>, b: Record<string, number>): boolean => {
     const aKeys = Object.keys(a);
@@ -158,6 +161,63 @@ export function NavMainExtended({
         }
     }, [openMap]);
 
+    // accordion behavior: opening an item collapses all others (across nav groups)
+    const setOpenExclusive = (title: string, open: boolean) => {
+        setOpenMap(() => {
+            const next: Record<string, boolean> = {};
+            items.forEach((it) => {
+                next[it.title] = it.title === title ? open : false;
+            });
+            return next;
+        });
+        if (open) {
+            window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-main', title } }));
+        }
+    };
+
+    const closeOthersKeeping = (keepTitle: string) => {
+        setOpenMap((m) => {
+            const next: Record<string, boolean> = {};
+            let changed = false;
+            items.forEach((it) => {
+                next[it.title] = it.title === keepTitle ? !!m[it.title] : false;
+                if (next[it.title] !== !!m[it.title]) changed = true;
+            });
+            return changed ? next : m;
+        });
+        window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-main', title: keepTitle } }));
+    };
+
+    const collapseAll = () => {
+        setOpenMap((m) => {
+            const next: Record<string, boolean> = {};
+            let changed = false;
+            items.forEach((it) => {
+                next[it.title] = false;
+                if (m[it.title]) changed = true;
+            });
+            return changed ? next : m;
+        });
+        window.dispatchEvent(new CustomEvent(ACCORDION_EVENT, { detail: { source: 'nav-main', title: '' } }));
+    };
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent).detail as { source: string; title: string };
+            if (detail.source === 'nav-main') return;
+            setOpenMap((m) => {
+                const hasOpen = items.some((it) => !!m[it.title]);
+                if (!hasOpen) return m;
+                const next: Record<string, boolean> = {};
+                items.forEach((it) => {
+                    next[it.title] = false;
+                });
+                return next;
+            });
+        };
+        window.addEventListener(ACCORDION_EVENT, handler);
+        return () => window.removeEventListener(ACCORDION_EVENT, handler);
+    }, [items]);
 
     return (
         <SidebarGroup className="px-2 py-0">
@@ -185,20 +245,23 @@ export function NavMainExtended({
                                         <Link
                                             href={item.href}
                                             prefetch
+                                            className="relative"
                                             onClick={(e) => {
                                                 const itemUrl = typeof item.href === 'string' ? item.href : item.href.url;
                                                 // Si on est déjà sur cette URL, basculer les sous-éléments sans naviguer
                                                 if (page.url === itemUrl || page.url.startsWith(itemUrl)) {
                                                     e.preventDefault();
-                                                    setOpenMap((m) => ({ ...m, [item.title]: !m[item.title] }));
+                                                    setOpenExclusive(item.title, !isOpen);
                                                 } else {
                                                     // Sinon, ouvrir les sous-éléments lors de la navigation
-                                                    setOpenMap((m) => ({ ...m, [item.title]: true }));
+                                                    setOpenExclusive(item.title, true);
                                                 }
                                             }}
                                         >
                                             {item.icon && <item.icon />}
                                             <span>{item.title}</span>
+                                            <ChevronRight className={`ml-auto size-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+                                            <ChevronRight className={`absolute left-5 bottom-2 size-3 opacity-60 transition-transform duration-200 hidden group-data-[collapsible=icon]:block ${isOpen ? 'rotate-90' : ''}`} />
                                         </Link>
                                     </SidebarMenuButton>
 
@@ -222,7 +285,7 @@ export function NavMainExtended({
                                                         className={menuButtonClassName}
                                                         tooltip={!isOpenId('main') ? { children: subItem.title } : undefined}
                                                     >
-                                                        <Link href={subItem.href} prefetch>
+                                                        <Link href={subItem.href} prefetch onClick={() => closeOthersKeeping(item.title)}>
                                                             {subItem.icon && <subItem.icon className='group-data-[collapsible=icon]:size-3.5' />}
                                                             <span>{subItem.title}</span>
                                                         </Link>
@@ -239,7 +302,7 @@ export function NavMainExtended({
                                     className={menuButtonClassName}
                                     tooltip={!isOpenId('main') ? { children: item.title } : undefined}
                                 >
-                                    <Link href={item.href} prefetch>
+                                    <Link href={item.href} prefetch onClick={collapseAll}>
                                         {item.icon && <item.icon />}
                                         <span>{item.title}</span>
                                     </Link>
