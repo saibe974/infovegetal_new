@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Badge } from '@/components/ui/badge';
@@ -75,7 +76,7 @@ export default withAppLayout<Props>(
             <>
                 <Head title={promotion ? promotion.title : 'Créer une promotion'} />
 
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <PromotionPageHeader><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
                             <h1 className="text-2xl font-semibold">{promotion?.title || 'Nouvelle promotion'}</h1>
@@ -89,9 +90,9 @@ export default withAppLayout<Props>(
                             <Check />{processing ? 'Enregistrement…' : 'Enregistrer'}
                         </Button>
                     </div>
-                </div>
+                </div></PromotionPageHeader>
 
-                <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
                     <PromotionWorkspaceNav promotionId={promotion?.id} active="general" />
 
                     <form id="promotion-general-form" onSubmit={submit} className="space-y-6">

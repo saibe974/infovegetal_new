@@ -216,7 +216,7 @@ test('mailing routes reject foreign promotions and cross promotion mailing ident
 });
 
 test('preparation and send recheck the commercial scope', function (): void {
-    $owner = mailingUser('commercial');
+    $owner = mailingUser('commercial', ['id' => 2]);
     $owner->saveAsRoot();
     $client = mailingUser();
     $client->appendToNode($owner)->save();
@@ -231,6 +231,26 @@ test('preparation and send recheck the commercial scope', function (): void {
     $this->actingAs($owner->fresh())->postJson(route('promotions.mailings.send-batch', [$promotion, $mailing], false))->assertOk()->assertJsonPath('skipped_count', 1);
     Mail::assertNothingSent();
 });
+
+test('mailing honors the privileged responsible audience without relaxing opt in', function (int $id, string $role): void {
+    $responsible = mailingUser($role, ['id' => $id]);
+    $editor = mailingUser('commercial');
+    $recipient = mailingUser('seller');
+    $optout = mailingUser('seller', ['mailing' => false]);
+    foreach ([$responsible, $editor, $recipient, $optout] as $user) {
+        $user->saveAsRoot();
+    }
+    $promotion = mailingPromotion($responsible);
+    $promotion->update(['created_by_id' => $editor->id]);
+    $promotion->audienceUsers()->sync([$recipient->id, $optout->id]);
+    $mailing = mailingDraft($promotion);
+    $this->actingAs($editor)->post(route('promotions.mailings.prepare', [$promotion, $mailing], false))->assertSessionHasNoErrors();
+    expect($mailing->fresh()->recipient_count)->toBe(1);
+    $this->postJson(route('promotions.mailings.send-batch', [$promotion, $mailing], false))
+        ->assertOk()->assertJsonPath('sent_count', 1);
+    Mail::assertSent(PromotionMailMessage::class, fn (PromotionMailMessage $message) => $message->hasTo($recipient->email));
+    Mail::assertSent(PromotionMailMessage::class, 1);
+})->with([[1, 'commercial'], [2, 'admin']]);
 
 test('unsubscribe requires a valid signed link and confirmation without authentication', function (): void {
     $client = mailingUser();

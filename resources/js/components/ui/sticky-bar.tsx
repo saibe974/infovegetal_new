@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, ReactNode, useEffect, useRef, useState } from 'react';
 import BasicSticky from 'react-sticky-el';
 
 interface StickyBarProps {
@@ -9,6 +9,8 @@ interface StickyBarProps {
     className?: string;
     topOffsetElement?: string;
     onFixedToggle?: (isFixed: boolean) => void;
+    disabled?: boolean;
+    boundaryElement?: string;
 }
 
 export function StickyBar({
@@ -19,6 +21,8 @@ export function StickyBar({
     className = '',
     topOffsetElement = '.top-sticky',
     onFixedToggle,
+    disabled = false,
+    boundaryElement,
 }: StickyBarProps) {
     const [topOffset, setTopOffset] = useState<number>(0);
     const [width, setWidth] = useState<number>(0);
@@ -74,8 +78,10 @@ export function StickyBar({
     // console.log(topOffset)
 
     return (
-        <div ref={containerRef}>
+        <div ref={containerRef} style={{ '--sticky-top-offset': `${topOffset}px` } as CSSProperties}>
             <BasicSticky
+                disabled={disabled}
+                boundaryElement={boundaryElement}
                 topOffset={-topOffset}
                 stickyClassName={`z-${zIndex} bg-background ${stickyClassName}`}
                 wrapperClassName={`relative z-${zIndex} ${className}`}

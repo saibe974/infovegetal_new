@@ -102,6 +102,14 @@ export function AppSidebar() {
 
         const productsMenu = mainNavItems[1];
 
+        if (productsMenu?.subItems) {
+            productsMenu.subItems.push({
+                title: 'Offres et sélections',
+                href: '/offres',
+                icon: Megaphone
+            });
+        }
+
         if (canManageCategories && productsMenu?.subItems) {
             productsMenu.subItems.push({
                 title: t('Categories'),
@@ -223,7 +231,6 @@ export function AppSidebar() {
             legalRoutes,
         ];
     }
-    mainNavItems.push({ title: 'Offres et sélections', href: '/offres', icon: Megaphone });
 
     return (
         <Sidebar collapsible="icon" variant="inset" id='main'>

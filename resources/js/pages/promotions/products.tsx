@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
 import { PromotionProductFilters, type PromotionProductFilterValues } from '@/components/promotions/promotion-product-filters';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
@@ -470,7 +471,7 @@ export default withAppLayout<Props>(
             <>
                 <Head title={`Produits — ${promotion.title}`} />
 
-                <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <PromotionPageHeader><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
                             <h1 className="text-2xl font-semibold">{promotion.title}</h1>
@@ -484,9 +485,9 @@ export default withAppLayout<Props>(
                             <Check />{processing ? 'Enregistrement…' : 'Enregistrer la sélection'}
                         </Button>
                     </div>
-                </div>
+                </div></PromotionPageHeader>
 
-                <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
                     <PromotionWorkspaceNav promotionId={promotion.id} active="products" />
 
                     <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(420px,1.1fr)]">

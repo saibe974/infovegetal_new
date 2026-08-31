@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,8 +139,8 @@ export default withAppLayout<Props>(
         const [editing, setEditing] = useState<Mailing | null | undefined>(undefined);
         return <>
             <Head title={`Mailing — ${promotion.title}`} />
-            <div className="mb-5 flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">{promotion.title}</h1><p className="text-sm text-muted-foreground">Mailings promotionnels</p></div><Button onClick={() => setEditing(null)}>Nouveau mailing</Button></div>
-            <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="mailing" /><div className="space-y-6">
+            <PromotionPageHeader><div className="flex items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">{promotion.title}</h1><p className="text-sm text-muted-foreground">Mailings promotionnels</p></div><Button onClick={() => setEditing(null)}>Nouveau mailing</Button></div></PromotionPageHeader>
+            <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="mailing" /><div className="space-y-6">
                 <div className="rounded-lg border bg-muted/30 p-4 text-sm">L’envoi se fait depuis cette page, sans jobs ni cron. Préparez l’audience, puis lancez l’envoi manuellement. Une fermeture arrête les requêtes suivantes ; la progression reste enregistrée. Les clients inactifs ou désinscrits sont ignorés au moment de l’envoi.</div>
                 {['log', 'array'].includes(mailTransport) && <p className="rounded-lg border border-amber-500 p-4 text-sm">Mode de test ({mailTransport}) : aucun email ne sera livré. Configurez le transport email de l’hébergeur avant de lancer un mailing réel.</p>}
                 {editing !== undefined && <MailingEditor key={editing?.id ?? 'new'} promotionId={promotion.id} mailing={editing} onClose={() => setEditing(undefined)} />}

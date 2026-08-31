@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +63,7 @@ export default withAppLayout(
             <>
                 <Head title="Promotions" />
 
-                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <PromotionPageHeader><div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Promotions</h1>
                         <p className="text-sm text-muted-foreground">Préparez les sélections, coupons et campagnes destinés à vos clients.</p>
@@ -72,7 +73,7 @@ export default withAppLayout(
                             <Link href="/promotions/create"><Plus />Créer une promotion</Link>
                         </Button>
                     )}
-                </div>
+                </div></PromotionPageHeader>
 
                 <form onSubmit={applyFilters} className="mb-4 grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_220px_220px_auto]">
                     <div className="relative">

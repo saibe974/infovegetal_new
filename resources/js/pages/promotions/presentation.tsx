@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,8 +20,8 @@ export default withAppLayout<{ promotion: Promotion }>(
         }, [form.isDirty]);
         return <>
             <Head title={`Présentation — ${promotion.title}`} />
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold">{promotion.title}</h1><Button asChild variant="outline"><a href={`/promotions/${promotion.id}/preview`} target="_blank" rel="noopener noreferrer">Aperçu enregistré</a></Button></div>
-            <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="presentation" /><Card><CardHeader><CardTitle>Contenu visible par les clients</CardTitle></CardHeader><CardContent>
+            <PromotionPageHeader><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold">{promotion.title}</h1><Button asChild variant="outline"><a href={`/promotions/${promotion.id}/preview`} target="_blank" rel="noopener noreferrer">Aperçu enregistré</a></Button></div></PromotionPageHeader>
+            <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="presentation" /><Card><CardHeader><CardTitle>Contenu visible par les clients</CardTitle></CardHeader><CardContent>
                 <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); form.put(`/promotions/${promotion.id}/presentation`, { preserveScroll: true, onSuccess: () => form.setDefaults() }); }}>
                     {['active', 'scheduled'].includes(promotion.status) && <p className="rounded border border-amber-500 p-3 text-sm">Cette promotion est publiée. Les modifications enregistrées s’appliquent immédiatement. Suspendez-la dans Publication si nécessaire.</p>}
                     <div className="space-y-2"><Label htmlFor="presentation_title">Titre de la page</Label><Input id="presentation_title" placeholder={promotion.title} value={form.data.presentation_title} onChange={(event) => form.setData('presentation_title', event.target.value)} /><p className="text-xs text-muted-foreground">Laissez vide pour reprendre le titre général.</p></div>

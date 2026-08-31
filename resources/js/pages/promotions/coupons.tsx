@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -193,8 +194,8 @@ export default withAppLayout<Props>(
 
         return <>
             <Head title={`Coupons — ${promotion.title}`} />
-            <div className="mb-5"><h1 className="text-2xl font-semibold">{promotion.title}</h1><p className="text-sm text-muted-foreground">Créez plusieurs codes et vérifiez leur impact avant de les rendre utilisables.</p></div>
-            <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <PromotionPageHeader><div className=""><h1 className="text-2xl font-semibold">{promotion.title}</h1><p className="text-sm text-muted-foreground">Créez plusieurs codes et vérifiez leur impact avant de les rendre utilisables.</p></div></PromotionPageHeader>
+            <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
                 <PromotionWorkspaceNav promotionId={promotion.id} active="coupons" />
                 <div className="space-y-6">
                     {Object.keys(errors).length > 0 && <Alert variant="destructive"><AlertCircle /><AlertTitle>Coupon non enregistré</AlertTitle><AlertDescription>Vérifiez les champs signalés.</AlertDescription></Alert>}

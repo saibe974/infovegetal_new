@@ -57,6 +57,9 @@ Route::middleware(['auth', 'verified'])
         Route::put('/{promotion}/audience', [PromotionAudienceController::class, 'update'])
             ->whereNumber('promotion')
             ->name('audience.update');
+        Route::get('/{promotion}/audience/propositions', [PromotionAudienceController::class, 'propositions'])
+            ->whereNumber('promotion')
+            ->name('audience.propositions');
         Route::get('/{promotion}/edit/mailing', [PromotionMailingController::class, 'edit'])->whereNumber('promotion')->name('edit.mailing');
         Route::post('/{promotion}/mailings', [PromotionMailingController::class, 'store'])->whereNumber('promotion')->name('mailings.store');
         Route::put('/{promotion}/mailings/{mailing}', [PromotionMailingController::class, 'update'])->whereNumber(['promotion', 'mailing'])->name('mailings.update');

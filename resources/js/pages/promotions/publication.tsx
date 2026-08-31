@@ -1,3 +1,4 @@
+import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +22,8 @@ export default withAppLayout<Props>(
         };
         return <>
             <Head title={`Publication — ${promotion.title}`} />
-            <h1 className="mb-5 text-2xl font-semibold">{promotion.title}</h1>
-            <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="publication" /><div className="space-y-6">
+            <PromotionPageHeader><h1 className="text-2xl font-semibold">{promotion.title}</h1></PromotionPageHeader>
+            <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]"><PromotionWorkspaceNav promotionId={promotion.id} active="publication" /><div className="space-y-6">
                 <Card><CardHeader><CardTitle>Publication : {statusLabels[promotion.status]}</CardTitle></CardHeader><CardContent className="space-y-4">
                     <dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-sm text-muted-foreground">Accès</dt><dd>{visibilityLabels[promotion.visibility]}</dd></div><div><dt className="text-sm text-muted-foreground">Produits visibles maintenant</dt><dd>{visibleProductCount}</dd></div><div><dt className="text-sm text-muted-foreground">Début</dt><dd>{promotion.starts_at ? new Date(promotion.starts_at).toLocaleString('fr-FR') : 'Dès validation'}</dd></div><div><dt className="text-sm text-muted-foreground">Fin</dt><dd>{promotion.ends_at ? new Date(promotion.ends_at).toLocaleString('fr-FR') : 'Sans date de fin'}</dd></div></dl>
                     <p className="rounded-lg bg-muted p-4 text-sm">Après validation, les dates sont vérifiées à chaque consultation et à chaque utilisation d’un coupon. Aucun job ni cron n’est nécessaire. Le mailing reste une action séparée et manuelle.</p>

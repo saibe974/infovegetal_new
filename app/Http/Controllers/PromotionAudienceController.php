@@ -8,8 +8,10 @@ use App\Models\Promotion;
 use App\Models\User;
 use App\Services\PromotionAudienceService;
 use App\Services\PromotionWorkspaceDataService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -33,7 +35,7 @@ class PromotionAudienceController extends Controller
         $selectedIds = $promotion->audienceUsers()->pluck('users.id')->map(fn ($id) => (int) $id);
 
         $candidates = $this->audience
-            ->filteredQuery($request->user(), $filters)
+            ->filteredQuery($request->user(), $promotion, $filters)
             ->with('parent:id,name')
             ->orderBy('name')
             ->paginate(25)
@@ -46,14 +48,14 @@ class PromotionAudienceController extends Controller
             ->orderBy('name')
             ->get()
             ->map(fn (User $user) => $this->userData($user, true));
-        $eligibleQuery = $this->audience->eligibleQuery($request->user());
+        $eligibleQuery = $this->audience->eligibleQuery($request->user(), $promotion);
 
         return Inertia::render('promotions/audience', [
             'promotion' => $this->workspaceData->for($promotion),
             'audienceMode' => $promotion->audience_mode->value,
             'audienceUpdatedAt' => $promotion->audience_updated_at?->toIso8601String(),
             'selectedUsers' => $selectedUsers,
-            'candidates' => $candidates,
+            'candidates' => JsonResource::collection($candidates),
             'counts' => [
                 'eligible' => (clone $eligibleQuery)->count(),
                 'eligible_mailing' => (clone $eligibleQuery)->where('mailing', true)->count(),
@@ -72,11 +74,11 @@ class PromotionAudienceController extends Controller
         $data = $request->validated();
         $mode = PromotionAudienceMode::from($data['audience_mode']);
         $ids = $mode === PromotionAudienceMode::AllAccessible
-            ? $this->audience->eligibleQuery($request->user())->pluck('users.id')->all()
+            ? $this->audience->eligibleQuery($request->user(), $promotion)->pluck('users.id')->all()
             : array_map('intval', $data['user_ids']);
 
         if ($mode === PromotionAudienceMode::Selected) {
-            $this->audience->assertEligibleIds($request->user(), $ids);
+            $this->audience->assertEligibleIds($request->user(), $promotion, $ids);
         }
 
         DB::transaction(function () use ($promotion, $mode, $ids): void {
@@ -88,6 +90,28 @@ class PromotionAudienceController extends Controller
         });
 
         return back()->with('success', 'Audience enregistrée.');
+    }
+
+    public function propositions(Request $request, Promotion $promotion): JsonResponse
+    {
+        $this->authorize('update', $promotion);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'mailing' => ['nullable', Rule::in(['all', 'yes', 'no'])],
+        ]);
+
+        $propositions = mb_strlen(trim($filters['q'] ?? '')) < 2
+            ? []
+            : $this->audience->filteredQuery($request->user(), $promotion, $filters)
+                ->orderBy('name')->orderBy('id')->limit(10)
+                ->get(['id', 'name', 'email', 'ref', 'address_town'])
+                ->map(fn (User $user) => [
+                    'value' => $user->email,
+                    'label' => $user->name,
+                    'description' => collect([$user->email, $user->ref, $user->address_town])->filter()->implode(' · '),
+                ])->all();
+
+        return response()->json(['propositions' => $propositions])->header('Cache-Control', 'private, no-store');
     }
 
     private function userData(User $user, bool $selected): array

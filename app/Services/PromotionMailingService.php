@@ -23,7 +23,7 @@ final class PromotionMailingService
         DB::transaction(function () use ($mailing, $actor, $scheduledAt): void {
             $mailing = PromotionMailing::query()->lockForUpdate()->findOrFail($mailing->id);
             $this->assertDraft($mailing);
-            $users = $this->audience->eligibleQuery($actor)
+            $users = $this->audience->eligibleQuery($actor, $mailing->promotion)
                 ->whereIn('users.id', $mailing->promotion->audienceUsers()->select('users.id'))
                 ->where('mailing', true)
                 ->orderBy('users.id')->get(['users.id', 'users.name', 'users.email']);
@@ -79,7 +79,7 @@ final class PromotionMailingService
                 ! $user->active => 'Compte inactif',
                 ! $user->mailing => 'Désinscrit des mailings',
                 $user->email !== $recipient->email_snapshot => 'Adresse email modifiée depuis la préparation',
-                ! $this->audience->eligibleQuery($actor)->whereKey($user->id)->exists() => 'Client hors du périmètre actuel',
+                ! $this->audience->eligibleQuery($actor, $mailing->promotion()->firstOrFail())->whereKey($user->id)->exists() => 'Utilisateur hors du périmètre actuel',
                 default => null,
             };
 
