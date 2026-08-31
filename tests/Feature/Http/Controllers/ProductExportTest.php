@@ -68,6 +68,15 @@ function readProductExportCsv(string $content): array
     return $rows;
 }
 
+function customProductExportTemplate(array $rules): array
+{
+    $template = \App\Services\ProductExportService::options()['template'];
+    $template['blocks'][0]['columns'] = collect(array_keys($rules))->map(fn ($key) => ['id' => $key, 'name' => $key])->all();
+    $template['blocks'][0]['rows'][0]['cells'] = $rules;
+
+    return $template;
+}
+
 it('exports every matching page with the same category, multi filters, promotion and sort as the catalogue', function () {
     config(['product-export.chunk_size' => 10]);
     $parent = CategoryProducts::create(['name' => 'Parent']);
@@ -137,6 +146,12 @@ it('checks permissions and exports only accessible, orderable products at the di
         ->and((float) $rows[1][1])->toBe((float) $displayed['price'])
         ->and((float) $rows[1][2])->toBe((float) $displayed['price_roll'])
         ->and((float) $rows[1][3])->toBe((float) $displayed['price_promo']);
+
+    $preview = $this->postJson(route('products.admin.export'), [
+        'format' => 'csv', 'template' => customProductExportTemplate(['id' => '%product.id%', 'price' => '%product.price%']), 'preview' => true,
+    ])->assertOk()->assertJsonPath('total', 1);
+    expect($preview->json('values')['product.id'])->toBe($product->id)
+        ->and($preview->json('values')['product.price'])->toEqual((float) $displayed['price']);
 });
 
 it('enforces format, columns and synchronous limits on checks and actual downloads', function () {
@@ -218,4 +233,129 @@ it('embeds only existing thumbnails in a real Excel file without generating or f
         $book->disconnectWorksheets();
         unlink($path);
     }
+});
+
+it('renders filtered custom blocks and calculations identically in preview and native CSV download', function () {
+    $this->travelTo(now()->setDate(2026, 8, 31));
+    exportProduct($this->dbId, 'A');
+    exportProduct($this->dbId, 'B');
+    exportProduct($this->dbId, 'excluded', ['pot' => 20]);
+    $template = customProductExportTemplate([
+        'Article' => '  %product.sku% — %product.name%  ',
+        'Prix majoré' => '%calc:product.price*1.2+2|decimal:2%',
+        'Sans date' => '%product.available_until|date:dmy%',
+        'Calcul impossible' => '%calc:product.price/0%',
+    ]);
+    $template['filename'] = 'Catalogue_%export.count%_%export.date|date:dmy%';
+    $template['blocks'][0]['rows'][] = ['id' => 'details', 'cells' => ['Article' => 'Suite %product.sku%']];
+    $fixed = [
+        'id' => 'start', 'name' => 'Entête', 'type' => 'header', 'enabled' => true, 'show_headers' => false,
+        'columns' => [['id' => 'text', 'name' => 'Texte']],
+        'rows' => [['id' => 'summary', 'cells' => ['text' => '%export.count% produits au %export.date|date:dmy%']]],
+    ];
+    array_unshift($template['blocks'], $fixed);
+    $template['blocks'][] = array_replace($fixed, ['id' => 'end', 'type' => 'footer']);
+    $url = route('products.admin.export').'?pot[]=12&sort=sku&dir=desc&page=2';
+    $preview = $this->postJson($url, ['format' => 'csv', 'template' => $template, 'preview' => true]);
+    $preview->assertOk()->assertJsonPath('total', 2)->assertJsonPath('sample_count', 2)
+        ->assertJsonPath('line_count', 6)->assertJsonPath('filename', 'Catalogue_2_31-08-2026.csv');
+    $response = $this->post($url, ['format' => 'csv', 'template' => json_encode($template)]);
+    $response->assertOk()->assertDownload();
+    $rows = readProductExportCsv($response->streamedContent());
+    expect($rows)->toBe(array_map(fn ($row) => array_column($row['cells'], 'value'), $preview->json('rows')))
+        ->and($rows[2])->toBe(['  000B — Plante B  ', '17.00', '', ''])
+        ->and($rows[3][0])->toBe('Suite 000B')
+        ->and($rows[6][0])->toBe('2 produits au 31/08/2026');
+});
+
+it('samples only five products while reporting all resulting rows and guarding image slots', function () {
+    foreach (range(1, 7) as $index) {
+        exportProduct($this->dbId, (string) $index);
+    }
+    $template = customProductExportTemplate(['Image 1' => '%product.image%', 'Image 2' => '%product.image%']);
+    $template['blocks'][0]['rows'][] = ['id' => 'second', 'cells' => []];
+    config(['product-export.xlsx_image_max_rows' => 13]);
+    $payload = ['format' => 'xlsx', 'template' => $template];
+    $this->postJson(route('products.admin.export'), $payload + ['preview' => true])
+        ->assertOk()->assertJsonPath('total', 7)->assertJsonPath('sample_count', 5)
+        ->assertJsonPath('line_count', 14)->assertJsonPath('image_count', 14)
+        ->assertJsonPath('too_large', true)->assertJsonCount(11, 'rows');
+    foreach ([false, true] as $check) {
+        $this->postJson(route('products.admin.export'), $payload + ['check' => $check])
+            ->assertUnprocessable()->assertJsonValidationErrors('export');
+    }
+    config(['product-export.csv_max_rows' => 13]);
+    $this->postJson(route('products.admin.export'), array_replace($payload, ['format' => 'csv']))
+        ->assertUnprocessable()->assertJsonValidationErrors('export');
+});
+
+it('keeps text identifiers and literal formulas while writing calculated Excel numbers', function () {
+    exportProduct($this->dbId, '001', ['name' => '=1+1']);
+    $template = customProductExportTemplate([
+        'Code' => '%product.sku%', 'Nom' => '%product.name%',
+        'Prix' => '%calc:product.price*1.2|decimal:3%', 'Négatif' => '%calc:1-3%',
+    ]);
+    $response = $this->postJson(route('products.admin.export'), ['format' => 'xlsx', 'template' => $template]);
+    $response->assertOk()->assertDownload();
+    $path = $response->baseResponse->getFile()->getPathname();
+    $book = IOFactory::load($path);
+    try {
+        $sheet = $book->getActiveSheet();
+        expect($sheet->getCell('A2')->getValue())->toBe('000001')
+            ->and($sheet->getCell('B2')->getValue())->toBe('=1+1')
+            ->and($sheet->getCell('B2')->getDataType())->toBe(DataType::TYPE_STRING)
+            ->and($sheet->getCell('C2')->getValue())->toEqual(15)
+            ->and($sheet->getCell('C2')->getDataType())->toBe(DataType::TYPE_NUMERIC)
+            ->and($sheet->getStyle('C2')->getNumberFormat()->getFormatCode())->toBe('0.000')
+            ->and($sheet->getCell('D2')->getValue())->toEqual(-2);
+    } finally {
+        $book->disconnectWorksheets();
+        unlink($path);
+    }
+    $response = $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template]);
+    expect(readProductExportCsv($response->streamedContent())[1])->toBe(['000001', "'=1+1", '15.000', '-2']);
+});
+
+it('preserves tab delimiters and whitespace in rules posted as JSON', function () {
+    exportProduct($this->dbId, 'tab');
+    $template = customProductExportTemplate(['A' => '  %product.sku%  ', 'B' => 'constant']);
+    $template['delimiter'] = "\t";
+    $response = $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template]);
+    $response->assertOk();
+    expect($response->streamedContent())->toContain("A\tB\n", '"  000tab  "'."\tconstant\n");
+});
+
+it('bounds memory for wide Excel templates while leaving streamed CSV available', function () {
+    exportProduct($this->dbId, 'one');
+    exportProduct($this->dbId, 'two');
+    config(['product-export.xlsx_max_cells' => 8]);
+    $template = customProductExportTemplate(['ID' => '%product.id%', 'SKU' => '%product.sku%', 'Nom' => '%product.name%']);
+    $this->postJson(route('products.admin.export'), ['format' => 'xlsx', 'template' => $template, 'preview' => true])
+        ->assertOk()->assertJsonPath('too_large', true)->assertJsonPath('limit', 1);
+    $this->postJson(route('products.admin.export'), ['format' => 'xlsx', 'template' => $template])
+        ->assertUnprocessable()->assertJsonValidationErrors('export');
+    $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template, 'check' => true])->assertOk();
+});
+
+it('rejects unavailable variables unsafe calculations incompatible formats and composite images', function (string $rule) {
+    exportProduct($this->dbId, 'one');
+    $template = customProductExportTemplate(['Test' => $rule]);
+    $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template])
+        ->assertUnprocessable()->assertJsonValidationErrors('template');
+})->with(['%user.password%', '%product.secret%', '%calc:product.name*2%', '%calc:product.price/0;phpinfo()%', '%calc:product.price++2%', '%product.name|decimal:2%', '%product.price|date:dmy%', 'image: %product.image%']);
+
+it('rejects product variables outside product blocks and unbounded templates', function () {
+    exportProduct($this->dbId, 'one');
+    $template = customProductExportTemplate(['Test' => '%product.id%']);
+    $template['filename'] = '%product.sku%';
+    $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template])
+        ->assertUnprocessable()->assertJsonValidationErrors('template');
+    $template['filename'] = 'valid';
+    $header = array_replace($template['blocks'][0], ['id' => 'header', 'type' => 'header']);
+    $template['blocks'][] = $header;
+    $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template])
+        ->assertUnprocessable()->assertJsonValidationErrors('template');
+    $template['blocks'] = array_fill(0, 6, $template['blocks'][0]);
+    $this->postJson(route('products.admin.export'), ['format' => 'csv', 'template' => $template])
+        ->assertUnprocessable()->assertJsonValidationErrors('blocks');
 });

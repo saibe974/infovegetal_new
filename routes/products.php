@@ -71,7 +71,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{product}', [ProductController::class, 'destroy'])->name('destroy');
     });
 
-    Route::get('/admin/products/export', [ProductController::class, 'export'])
+    Route::match(['get', 'post'], '/admin/products/export', [ProductController::class, 'export'])
         ->middleware(['role_or_permission_or_impersonator:admin|export products'])
         ->name('products.admin.export');
 

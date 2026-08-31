@@ -50,48 +50,94 @@ class ProductExportService
     public static function options(): array
     {
         return [
-            'columns' => collect(self::COLUMNS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values()->all(),
+            'columns' => array_values(self::metadata()),
             'defaults' => ['id', 'sku', 'name', 'price'],
+            'template' => self::defaultTemplate(['id', 'sku', 'name', 'price']),
             'limits' => [
                 'csv' => (int) config('product-export.csv_max_rows'),
                 'xlsx' => (int) config('product-export.xlsx_max_rows'),
+                'xlsx_cells' => (int) config('product-export.xlsx_max_cells'),
                 'xlsx_images' => (int) config('product-export.xlsx_image_max_rows'),
             ],
         ];
     }
 
+    public static function metadata(): array
+    {
+        return collect(self::COLUMNS)->map(fn ($label, $key) => [
+            'key' => $key, 'label' => $label,
+            'type' => match (true) {
+                $key === 'image' => 'image',
+                in_array($key, ['available_from', 'available_until'], true) => 'date',
+                in_array($key, [...self::PRICES, 'id', 'pot', 'cond', 'floor', 'roll', 'unite', 'active'], true) => 'decimal',
+                default => 'text',
+            },
+        ])->all();
+    }
+
+    private static function defaultTemplate(array $columns): array
+    {
+        return [
+            'name' => 'Catalogue produits', 'filename' => 'products_export_%export.date%', 'delimiter' => ';',
+            'blocks' => [[
+                'id' => 'products', 'name' => 'Produits', 'type' => 'items', 'enabled' => true, 'show_headers' => true,
+                'columns' => array_map(fn ($key) => ['id' => $key, 'name' => self::COLUMNS[$key]], $columns),
+                'rows' => [['id' => 'product', 'cells' => array_combine($columns, array_map(fn ($key) => '%product.'.$key.'%', $columns))]],
+            ]],
+        ];
+    }
+
     public function download(Request $request)
     {
+        if (is_string($request->input('template'))) {
+            $decoded = json_decode($request->input('template'), true);
+            if (! is_array($decoded)) {
+                throw ValidationException::withMessages(['template' => 'Modèle de fichier invalide.']);
+            }
+            $request->merge(['template' => $decoded]);
+        }
         $data = $request->validate([
             'format' => ['required', Rule::in(['csv', 'xlsx'])],
-            'columns' => ['required', 'array', 'min:1', 'max:'.count(self::COLUMNS)],
+            'template' => ['sometimes', 'array'],
+            'columns' => ['required_without:template', 'array', 'min:1', 'max:'.count(self::COLUMNS)],
             'columns.*' => ['required', 'string', 'distinct', Rule::in(array_keys(self::COLUMNS))],
             'check' => ['sometimes', 'boolean'],
+            'preview' => ['sometimes', 'boolean'],
         ]);
 
-        $columns = $data['columns'];
+        $template = new ProductExportTemplate($data['template'] ?? self::defaultTemplate($data['columns']), self::metadata());
+        $columns = $template->fields;
         $format = $data['format'];
         $query = (new ProductCatalogQuery($request))->query();
-        $limitKey = $format === 'xlsx' && in_array('image', $columns, true) ? 'xlsx_image' : $format;
+        $limitKey = $format === 'xlsx' && $template->imageCount(1) > 0 ? 'xlsx_image' : $format;
         $limit = (int) config("product-export.{$limitKey}_max_rows");
+        if ($format === 'xlsx') {
+            // Wide templates also consume memory: bound the workbook, not only its rows.
+            $headings = count(array_filter($template->blocks, fn ($block) => $block['show_headers']));
+            $limit = min($limit, max(0, intdiv((int) config('product-export.xlsx_max_cells'), $template->width()) - $headings));
+        }
         $total = (clone $query)->reorder()->count();
+        $context = ['export.date' => now()->format('Y-m-d'), 'export.count' => (string) $total];
+        $lineCount = $template->rowCount($total);
+        $imageCount = $format === 'xlsx' ? $template->imageCount($total) : 0;
+        $tooLarge = $lineCount > $limit || $imageCount > (int) config('product-export.xlsx_image_max_rows');
 
-        if ($total === 0 || $total > $limit) {
+        if (! $request->boolean('preview') && ($total === 0 || $tooLarge)) {
             throw ValidationException::withMessages([
                 'export' => $total === 0
                     ? 'Aucun produit ne correspond aux filtres actuels.'
-                    : "Cet export est limité à {$limit} produits ({$total} sélectionnés). Affinez les filtres ou choisissez le CSV.",
+                    : "Cet export dépasse la limite de {$limit} lignes ou de ".config('product-export.xlsx_image_max_rows')." miniatures ({$total} produits, {$lineCount} lignes). Affinez les filtres, simplifiez le modèle ou choisissez le CSV.",
             ]);
         }
 
         if ($request->boolean('check')) {
-            return response()->json(['total' => $total, 'limit' => $limit]);
+            return response()->json(['total' => $total, 'rows' => $lineCount, 'limit' => $limit]);
         }
 
         // Match the index's preloaded pivot attributes (including an explicit
         // empty array), and resolve missing contexts only once per database.
         $this->attributesByDbId = [];
-        if (array_intersect(self::PRICES, $columns) && $request->user()) {
+        if (($request->boolean('preview') || array_intersect(self::PRICES, $columns)) && $request->user()) {
             foreach ($request->user()->dbProducts()->get() as $database) {
                 $raw = $database->pivot?->attributes;
                 $attributes = is_string($raw) ? json_decode($raw, true) : $raw;
@@ -112,17 +158,47 @@ class ProductExportService
             $relations[] = 'media';
         }
         $query->with($relations);
-        $filename = 'products_export_'.now()->format('Ymd_His').'.'.$format;
+        $filename = $template->filename($context, $format);
+
+        if ($request->boolean('preview')) {
+            $sample = (clone $query)->with(['category', 'dbProduct', 'media'])->limit(5)->get();
+            $rows = [];
+            $temporaryImages = [];
+            try {
+                foreach ($this->rows($query, $template, $request, $context, $sample) as $row) {
+                    $rows[] = [
+                        'heading' => $row['heading'],
+                        'cells' => array_pad(array_map(function ($cell) use (&$temporaryImages) {
+                            $product = $cell['image'];
+                            $image = $product && $this->existingThumbnail($product, $temporaryImages)
+                                ? $product->getFirstMedia('images')->getUrl('thumb') : null;
+
+                            return ['value' => $cell['display'], 'image' => $image];
+                        }, $row['cells']), $template->width(), ['value' => '', 'image' => null]),
+                    ];
+                }
+            } finally {
+                foreach ($temporaryImages as $path) {
+                    @unlink($path);
+                }
+            }
+
+            return response()->json([
+                'total' => $total, 'rows' => $rows, 'sample_count' => $sample->count(),
+                'line_count' => $lineCount, 'image_count' => $imageCount,
+                'limit' => $limit, 'too_large' => $tooLarge, 'filename' => $filename,
+                'values' => $sample->isNotEmpty() ? $this->variables($sample->first(), array_keys(self::metadata()), $request) + $context : $context,
+            ]);
+        }
 
         if ($format === 'csv') {
-            return response()->streamDownload(function () use ($query, $columns, $request): void {
+            return response()->streamDownload(function () use ($query, $template, $request, $context): void {
                 $handle = fopen('php://output', 'wb');
                 try {
                     fwrite($handle, "\xEF\xBB\xBF");
-                    fputcsv($handle, array_map(fn ($key) => self::COLUMNS[$key], $columns), ';', '"', '');
-                    foreach ($query->lazy((int) config('product-export.chunk_size')) as $product) {
-                        $values = $this->values($product, $columns, $request);
-                        fputcsv($handle, array_map($this->safeCsvCell(...), $values), ';', '"', '');
+                    foreach ($this->rows($query, $template, $request, $context) as $row) {
+                        $values = array_map(fn ($cell) => is_int($cell['value']) || is_float($cell['value']) ? $cell['display'] : $this->safeCsvCell($cell['display']), $row['cells']);
+                        fputcsv($handle, array_pad($values, $template->width(), ''), $template->definition['delimiter'], '"', '');
                     }
                 } finally {
                     fclose($handle);
@@ -130,7 +206,56 @@ class ProductExportService
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8', 'X-Accel-Buffering' => 'no']);
         }
 
-        return $this->excel($query, $columns, $request, $filename, $limit);
+        return $this->excel($query, $template, $request, $context, $filename, $limit);
+    }
+
+    private function variables(Product $product, array $columns, Request $request): array
+    {
+        $values = array_combine(array_map(fn ($key) => 'product.'.$key, $columns), $this->values($product, $columns, $request));
+        if (array_key_exists('product.ref', $values)) {
+            $values['product.reference'] = $values['product.ref'];
+        }
+
+        return $values;
+    }
+
+    private function rows(Builder $query, ProductExportTemplate $template, Request $request, array $context, ?iterable $sample = null): \Generator
+    {
+        $renderer = app(FileRuleRenderer::class);
+        $metadata = self::metadata();
+        foreach ($template->blocks as $block) {
+            if ($block['show_headers']) {
+                yield ['heading' => true, 'cells' => array_map(fn ($column) => ['value' => $column['name'], 'display' => $column['name'], 'format' => null, 'image' => null], $block['columns'])];
+            }
+            $products = $block['type'] === 'items' ? ($sample ?? (clone $query)->lazy((int) config('product-export.chunk_size'))) : [null];
+            foreach ($products as $product) {
+                $variables = ($product ? $this->variables($product, $template->fields, $request) : []) + $context;
+                foreach ($block['rows'] as $row) {
+                    $cells = [];
+                    foreach ($block['columns'] as $column) {
+                        $rule = (string) ($row['cells'][$column['id']] ?? '');
+                        $display = $renderer->render($rule, $variables, true);
+                        $value = $display;
+                        $format = null;
+                        if (preg_match('/^%(product\.[a-z_0-9]+|export.count)(?:\|decimal:([0-4]))?%$/', $rule, $match)) {
+                            $key = substr($match[1], 8);
+                            if (($match[1] === 'export.count' || ($metadata[$key]['type'] ?? '') === 'decimal') && is_numeric($display)) {
+                                $value = (float) $display;
+                                $decimals = $match[2] ?? (in_array($key, self::PRICES, true) ? '2' : null);
+                                $format = $decimals === null ? null : ($decimals === '0' ? '0' : '0.'.str_repeat('0', (int) $decimals));
+                            }
+                        } elseif (preg_match('/^%calc:[^%]+%$/', $rule) && is_numeric($display)) {
+                            $value = (float) $display;
+                            if (preg_match('/\|decimal:([0-4])%$/', $rule, $match)) {
+                                $format = $match[1] === '0' ? '0' : '0.'.str_repeat('0', (int) $match[1]);
+                            }
+                        }
+                        $cells[] = ['value' => $value, 'display' => $display, 'format' => $format, 'image' => $request->input('format') === 'xlsx' && $rule === '%product.image%' ? $product : null];
+                    }
+                    yield ['heading' => false, 'cells' => $cells];
+                }
+            }
+        }
     }
 
     private function values(Product $product, array $columns, Request $request): array
@@ -176,7 +301,7 @@ class ProductExportService
         return $value;
     }
 
-    private function excel(Builder $query, array $columns, Request $request, string $filename, int $limit)
+    private function excel(Builder $query, ProductExportTemplate $template, Request $request, array $context, string $filename, int $limit)
     {
         $spreadsheet = new Spreadsheet;
         $temporaryImages = [];
@@ -190,27 +315,24 @@ class ProductExportService
             $sheet->setTitle('Produits');
             $sheet->freezePane('A2');
             $sheet->getDefaultRowDimension()->setRowHeight(20);
-            foreach ($columns as $index => $key) {
-                $letter = Coordinate::stringFromColumnIndex($index + 1);
-                $sheet->setCellValueExplicit($letter.'1', self::COLUMNS[$key], DataType::TYPE_STRING);
-                $sheet->getColumnDimension($letter)->setWidth(match ($key) {
-                    'name', 'description' => 45,
-                    'image' => 14,
-                    default => 22,
-                });
+            for ($index = 1; $index <= $template->width(); $index++) {
+                $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($index))->setWidth(24);
             }
-
-            $row = 2;
-            foreach ($query->lazy((int) config('product-export.chunk_size')) as $product) {
-                // Recheck while generating in case the catalogue grew after the count.
-                if ($row > $limit + 1) {
+            $row = 1;
+            $dataRows = 0;
+            $images = 0;
+            foreach ($this->rows($query, $template, $request, $context) as $output) {
+                if (! $output['heading'] && ++$dataRows > $limit) {
                     throw ValidationException::withMessages(['export' => 'Le catalogue a changé. Affinez les filtres puis relancez l’export.']);
                 }
-                foreach ($this->values($product, $columns, $request) as $index => $value) {
+                foreach ($output['cells'] as $index => $data) {
                     $letter = Coordinate::stringFromColumnIndex($index + 1);
                     $cell = $letter.$row;
-                    $key = $columns[$index];
-                    if ($key === 'image') {
+                    $value = $data['value'];
+                    if ($product = $data['image']) {
+                        if (++$images > (int) config('product-export.xlsx_image_max_rows')) {
+                            throw ValidationException::withMessages(['export' => 'Trop de miniatures pour un export synchrone.']);
+                        }
                         $thumbnail = $this->existingThumbnail($product, $temporaryImages);
                         if ($thumbnail !== null) {
                             $drawing = new Drawing;
@@ -225,21 +347,20 @@ class ProductExportService
 
                         continue;
                     }
-                    if ($value !== null) {
-                        $numeric = is_int($value) || is_float($value);
-                        $sheet->setCellValueExplicit($cell, $value, $numeric ? DataType::TYPE_NUMERIC : DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit($cell, $value, is_int($value) || is_float($value) ? DataType::TYPE_NUMERIC : DataType::TYPE_STRING);
+                    if ($data['format']) {
+                        $sheet->getStyle($cell)->getNumberFormat()->setFormatCode($data['format']);
                     }
-                    if (in_array($key, self::PRICES, true)) {
-                        $sheet->getStyle($cell)->getNumberFormat()->setFormatCode('0.00');
+                    if ($output['heading']) {
+                        $sheet->getStyle($cell)->getFont()->setBold(true);
+                        $sheet->getRowDimension($row)->setRowHeight(26);
                     }
                 }
                 $row++;
             }
-
-            $lastColumn = Coordinate::stringFromColumnIndex(count($columns));
-            $sheet->getStyle("A1:{$lastColumn}1")->getFont()->setBold(true);
-            $sheet->getRowDimension(1)->setRowHeight(26);
-            $sheet->setAutoFilter("A1:{$lastColumn}".($row - 1));
+            if (count($template->blocks) === 1 && $template->blocks[0]['show_headers']) {
+                $sheet->setAutoFilter('A1:'.Coordinate::stringFromColumnIndex($template->width()).($row - 1));
+            }
             $writer = new Xlsx($spreadsheet);
             $writer->setPreCalculateFormulas(false);
             $writer->save($path);

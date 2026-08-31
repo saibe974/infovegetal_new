@@ -19,7 +19,7 @@ import { ProductsFilters } from '@/components/products/products-filters';
 import ProductDetails from '@/components/products/product-details';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { useCart } from '@/components/cart/use-cart';
-import { ProductsExportDialog, type ProductExportOptions } from '@/components/products/products-export-dialog';
+import { ProductsExportPanel, type ProductExportOptions } from '@/components/products/products-template-export-panel';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -94,7 +94,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
     const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
     const canExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'export products');
-    const [exportOpen, setExportOpen] = useState(false);
+    const [exportView, setExportView] = useState(false);
 
     const page = usePage<{ searchPropositions?: Array<string | SearchOption> }>();
     const searchPropositions = page.props.searchPropositions ?? [];
@@ -254,7 +254,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
 
         setFiltersState(mergedFilters);
         router.get(window.location.pathname, buildQueryParams(mergedFilters), {
-            preserveState: false,
+            preserveState: exportView,
+            reset: exportView ? ['collection'] : [],
             replace: true,
             preserveScroll: false,
         });
@@ -320,7 +321,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         }
 
         router.get(window.location.pathname, buildQueryParams(nextFilters, null), {
-            preserveState: false,
+            preserveState: exportView,
+            reset: exportView ? ['collection'] : [],
             replace: true,
             preserveScroll: false,
         });
@@ -356,7 +358,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         if (options?.force && trimmed.length === 0) {
             setSearch('');
             router.get(window.location.pathname, buildQueryParams(filtersState, null), {
-                preserveState: false,
+                preserveState: exportView,
+                reset: exportView ? ['collection'] : [],
                 replace: true,
                 preserveScroll: false,
             });
@@ -371,7 +374,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         setSearch('');
         // Validation: navigation complète pour réactualiser la page
         router.get(window.location.pathname, buildQueryParams(filtersState, trimmed), {
-            preserveState: false,
+            preserveState: exportView,
+            reset: exportView ? ['collection'] : [],
             replace: true,
             preserveScroll: false,
         });
@@ -411,13 +415,15 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             <StickyBar
                 className='header-search z-25 mb-4'
             >
-                <ViewModeToggle
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    pageKey="products"
-                    modes={['table', 'list', 'grid']}
-                    mobileMenuModes={['list', 'grid']}
-                />
+                {!exportView && (
+                    <ViewModeToggle
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        pageKey="products"
+                        modes={['table', 'list', 'grid']}
+                        mobileMenuModes={['list', 'grid']}
+                    />
+                )}
                 {/* <div className="w-200 flex-1"> */}
                 <SearchSelect
                     className='w-auto flex-1'
@@ -454,7 +460,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 />
                 {/* </div> */}
 
-                {canImportExport && (
+                {canImportExport && !exportView && (
                     <ButtonsActions
                         className='hidden md:flex'
                         import={
@@ -474,32 +480,29 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                                 buttonLabel=''
                             />
                         }
-                        export={canExport ? () => setExportOpen(true) : undefined}
+                        export={canExport ? () => setExportView(true) : undefined}
                         exportLabel={t('Exporter')}
                         add={() => { }}
                     />
                 )}
-                {canExport && (
+                {canExport && !exportView && (
                     <ButtonsActions
                         className="md:hidden"
-                        export={() => setExportOpen(true)}
+                        export={() => setExportView(true)}
                         exportLabel={t('Exporter')}
                     />
                 )}
             </StickyBar>
 
-            {canExport && (
-                <ProductsExportDialog
-                    open={exportOpen}
-                    onOpenChange={setExportOpen}
+            {canExport && exportView ? (
+                <ProductsExportPanel
+                    onBack={() => setExportView(false)}
                     total={collection.meta.total}
                     options={exportOptions}
                     catalogUrl={page.url}
                     exportUrl={products.admin.export.url()}
                 />
-            )}
-
-            {collection.data.length === 0 ? (
+            ) : collection.data.length === 0 ? (
                 <div className='w-full flex flex-col items-center justify-center gap-4'>
                     {q ? (
                         <>
@@ -546,7 +549,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 </InfiniteScroll>
             }
 
-            {singleProduct === null && uniqueCount < collection.meta.total &&
+            {!exportView && singleProduct === null && uniqueCount < collection.meta.total &&
                 <div className='w-full h-50 flex items-center justify-center mt-4'>
                     <Loader2Icon size={50} className='animate-spin text-brand-main' />
                 </div>
