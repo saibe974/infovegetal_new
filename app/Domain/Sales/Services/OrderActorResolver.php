@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Sales\Services;
 
+use App\Models\ClientSalesCondition;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,12 +12,12 @@ use Illuminate\Support\Facades\DB;
 final class OrderActorResolver
 {
     /**
-        * BR-013
+     * BR-013
      * BR-011
      * BR-012
      *
-     * @param Collection<int, array{product: object, line_total?: float|int}> $items
-        * @return array{client_user_id: int, db_product_id: int|null, billing_user_id: int|null, seller_user_id: int|null}
+     * @param  Collection<int, array{product: object, line_total?: float|int}>  $items
+     * @return array{client_user_id: int, db_product_id: int|null, billing_user_id: int|null, seller_user_id: int|null}
      */
     public function resolve(User $client, Collection $items): array
     {
@@ -54,11 +55,27 @@ final class OrderActorResolver
             : json_decode((string) $attributes, true);
         $attrs = is_array($attrs) ? $attrs : [];
 
+        // Match the price calculator: explicit legacy actors take priority,
+        // otherwise use the latest active client sales conditions for this base.
+        $clientRule = null;
+        if (! isset($attrs['fact']) || ! isset($attrs['com'])) {
+            $clientRule = ClientSalesCondition::query()
+                ->where('client_user_id', (int) $client->id)
+                ->where('db_product_id', $primaryDbProductId)
+                ->where('active', true)
+                ->latest('updated_at')
+                ->latest('id')
+                ->first(['billing_user_id', 'seller_user_id']);
+        }
+
+        $billingUserId = (int) ($attrs['fact'] ?? $clientRule?->billing_user_id ?? 0);
+        $sellerUserId = (int) ($attrs['com'] ?? $clientRule?->seller_user_id ?? 0);
+
         return [
             'client_user_id' => (int) $client->id,
             'db_product_id' => $primaryDbProductId,
-            'billing_user_id' => !empty($attrs['fact']) ? (int) $attrs['fact'] : null,
-            'seller_user_id' => !empty($attrs['com']) ? (int) $attrs['com'] : null,
+            'billing_user_id' => $billingUserId ?: null,
+            'seller_user_id' => $sellerUserId ?: null,
         ];
     }
 }

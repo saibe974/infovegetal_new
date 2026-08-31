@@ -90,19 +90,19 @@ function CouponFields({ data, setData, errors }: {
                     </Select>
                 </label>
             </div>
-            <label className="space-y-1 text-sm">Portée
+            {/* <label className="space-y-1 text-sm">Portée
                 <Select value={data.scope} onValueChange={(value: CouponScope) => setData('scope', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="promotion_products">Produits de la promotion</SelectItem><SelectItem value="cart">Panier complet</SelectItem></SelectContent>
                 </Select>
-            </label>
+            </label> */}
             <label className="space-y-1 text-sm">Remise financée par
                 <Select value={data.funded_by} onValueChange={(value: CouponFunder) => setData('funded_by', value)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="seller">Vendeur</SelectItem><SelectItem value="billing_user">Facturant</SelectItem></SelectContent>
                 </Select>
             </label>
-            <label className="space-y-1 text-sm">Minimum de commande HT
+            {/* <label className="space-y-1 text-sm">Minimum de commande HT
                 <Input type="number" min="0" step="0.01" value={data.minimum_order_ht} onChange={(e) => setData('minimum_order_ht', e.target.value)} />
                 <FieldError message={errors.minimum_order_ht} />
             </label>
@@ -113,7 +113,7 @@ function CouponFields({ data, setData, errors }: {
             <label className="space-y-1 text-sm">Limite globale <span className="text-muted-foreground">(vide = illimitée)</span>
                 <Input type="number" min="1" step="1" value={data.usage_limit} onChange={(e) => setData('usage_limit', e.target.value)} />
                 <FieldError message={errors.usage_limit} />
-            </label>
+            </label> */}
             <label className="space-y-1 text-sm">Utilisations par client
                 <Input type="number" min="1" step="1" value={data.usage_limit_per_customer} onChange={(e) => setData('usage_limit_per_customer', e.target.value)} />
                 <FieldError message={errors.usage_limit_per_customer} />

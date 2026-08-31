@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CartController;
 use App\Models\Cart;
+use App\Models\ClientSalesCondition;
 use App\Models\DbProducts;
 use App\Models\Product;
 use App\Models\Promotion;
@@ -141,6 +142,53 @@ test('a billing-funded coupon uses only the billing user margin', function (): v
         ->and($result['discount_ht'])->toBe(0.5)
         ->and($result['funder_margin_after_ht'])->toBe(0.5);
 });
+
+test('coupons resolve the funder from client sales conditions when legacy actors are missing', function (string $funder): void {
+    $fixture = couponApplicationFixture(['funded_by' => $funder, 'discount_value' => 0.5]);
+    $fixture['client']->dbProducts()->detach($fixture['database']->id);
+    ClientSalesCondition::create([
+        'client_user_id' => $fixture['client']->id,
+        'db_product_id' => $fixture['database']->id,
+        'billing_user_id' => $fixture['billing']->id,
+        'seller_user_id' => $fixture['seller']->id,
+        'conditions_override' => [],
+        'active' => true,
+    ]);
+    DB::table('db_product_billing_user')->insert([
+        'db_product_id' => $fixture['database']->id,
+        'billing_user_id' => $fixture['billing']->id,
+        'defaults' => json_encode(['m' => 10]),
+        'active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $service = app(PromotionCouponApplicationService::class);
+    $items = pricedCouponItems($fixture['product']);
+    $result = $service->evaluate($fixture['coupon'], $fixture['client'], $items, 0);
+
+    expect($result['funder_margin_ht'])->toBe(1.0)
+        ->and($result['discount_ht'])->toBe(0.5)
+        ->and($result['funder_margin_after_ht'])->toBe(0.5);
+
+    $this->actingAs($fixture['client'])
+        ->postJson(route('cart.coupon.preview', [], false), [
+            'coupon_code' => $fixture['coupon']->code,
+            'items' => [['id' => $fixture['product']->id, 'quantity' => 1, 'line_total' => 12]],
+            'shipping_total' => 0,
+        ])
+        ->assertOk()
+        ->assertJson(['discount_ht' => 0.5, 'funded_by' => $funder]);
+
+    // The other actor's margin must not fund an excessive discount.
+    $fixture['coupon']->discount_value = 1.5;
+    expect(fn () => $service->evaluate($fixture['coupon'], $fixture['client'], $items, 0))
+        ->toThrow(ValidationException::class, 'La remise dépasse la marge disponible du financeur.');
+
+    $cart = Cart::create(['user_id' => $fixture['client']->id, 'status' => 'processing']);
+    $redemption = $service->consume($fixture['coupon']->fresh(), $fixture['client'], $cart, $items, 0);
+    expect((float) $redemption->discount_amount_ht)->toBe(0.5);
+})->with(['billing_user', 'seller']);
 
 test('a promotion-products coupon requires an eligible product', function (): void {
     $fixture = couponApplicationFixture();
