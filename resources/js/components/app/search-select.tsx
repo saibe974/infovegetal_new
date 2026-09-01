@@ -576,7 +576,7 @@ export default function SearchSelect({
 
             {/* Panneau combiné filtres + propositions */}
             {(openFilters || (open && value.length >= minQueryLength)) && (
-                <div className="absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover px-2 py-4 shadow-lg">
+                <div className="absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover pt-0 pb-4 shadow-lg">
                     <div
                         className={cn(
                             'flex flex-col gap-4 md:flex-row',
@@ -589,7 +589,7 @@ export default function SearchSelect({
                         {open && value.length >= minQueryLength && (
                             <div
                                 className={cn(
-                                    'px-4',
+                                    'px-6',
                                     openFilters && renderedFilters
                                         ? 'md:w-1/2 md:border-r md:border-r-accent'
                                         : 'w-full',
@@ -654,7 +654,7 @@ export default function SearchSelect({
                         {openFilters && renderedFilters && (
                             <div
                                 className={cn(
-                                    'px-4',
+                                    'px-6',
                                     open && value.length >= minQueryLength
                                         ? 'md:w-1/2'
                                         : 'w-full',

@@ -356,9 +356,7 @@ export function AppSidebarHeader({
                                     height={filtersState.height}
                                     image={filtersState.image}
                                     promo={filtersState.promo}
-                                    onChange={setFiltersState}
                                     onApply={applyFiltersAndNavigate}
-                                    autoApply={false}
                                 />
                             )}
                             filtersActive={filtersActive}

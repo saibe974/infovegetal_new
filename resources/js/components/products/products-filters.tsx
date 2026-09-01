@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "../ui/button";
 import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ProductCategory } from "@/types";
-import { Zap } from "lucide-react";
+import { Camera, CameraOff, Diameter, MoveVertical, X, Zap } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
-import { MultiSelectDropdown } from "../ui/multi-select-dropdown";
 import { CategoryAccordion } from "./category-accordion";
+import { BadgeMultiSelect } from "../ui/badge-multi-select";
 
 type FilterActive = 'all' | 'active' | 'inactive';
 type ImageFilter = 'all' | 'with' | 'without';
@@ -36,10 +36,31 @@ type ProductsFiltersProps = {
     image?: ImageFilter | null;
     promo?: boolean | null;
     onApply: (filters: ProductsFilterValues) => void;
-    onChange?: (filters: ProductsFilterValues) => void;
     closeFilters?: () => void;
-    autoApply?: boolean;
 };
+
+function SummaryFilterBadge({
+    children,
+    title,
+    onRemove,
+}: {
+    children: ReactNode;
+    title: string;
+    onRemove: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            title={title}
+            aria-label={title}
+            onClick={onRemove}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-main/30 bg-brand-main/10 px-2 py-1 text-xs text-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10"
+        >
+            {children}
+            <X className="size-3 text-muted-foreground" aria-hidden="true" />
+        </button>
+    );
+}
 
 export function ProductsFilters({
     active,
@@ -55,9 +76,7 @@ export function ProductsFilters({
     image,
     promo,
     onApply,
-    onChange,
     closeFilters,
-    autoApply = true,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
     const { locale } = usePage<SharedData>().props;
@@ -69,10 +88,14 @@ export function ProductsFilters({
     const [localHeight, setLocalHeight] = useState<string[]>(height ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
     const [localPromo, setLocalPromo] = useState(Boolean(promo));
-    const didInitRef = useRef(false);
-    const lastAppliedRef = useRef<string>(
-        `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`
-    );
+    const [autoApply, setAutoApply] = useState(() => (
+        typeof window !== 'undefined'
+        && window.localStorage.getItem('products.filters.auto-apply') === '1'
+    ));
+    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${image ?? 'all'}|${Boolean(promo)}`;
+    const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`;
+    const lastAutoAppliedRef = useRef(incomingKey);
+    const previousIncomingKeyRef = useRef(incomingKey);
 
     useEffect(() => {
         setLocalActive(active);
@@ -85,33 +108,23 @@ export function ProductsFilters({
     }, [active, categoryId, country, pot, height, image, promo]);
 
     useEffect(() => {
-        onChange?.({
-            active: localActive,
-            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: localCountry,
-            pot: localPot,
-            height: localHeight,
-            image: localImage,
-            promo: localPromo,
-        });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onChange]);
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('products.filters.auto-apply', autoApply ? '1' : '0');
+        }
+    }, [autoApply]);
 
     useEffect(() => {
-        if (!autoApply) {
+        if (previousIncomingKeyRef.current !== incomingKey) {
+            previousIncomingKeyRef.current = incomingKey;
+            lastAutoAppliedRef.current = incomingKey;
             return;
         }
 
-        if (!didInitRef.current) {
-            didInitRef.current = true;
+        if (!autoApply || localKey === incomingKey || lastAutoAppliedRef.current === localKey) {
             return;
         }
 
-        const nextKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`;
-        if (nextKey === lastAppliedRef.current) {
-            return;
-        }
-        lastAppliedRef.current = nextKey;
-
+        lastAutoAppliedRef.current = localKey;
         onApply({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
@@ -121,7 +134,7 @@ export function ProductsFilters({
             image: localImage,
             promo: localPromo,
         });
-    }, [localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onApply, autoApply]);
+    }, [autoApply, incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
@@ -146,6 +159,8 @@ export function ProductsFilters({
     };
 
     const reset = () => {
+        const resetKey = `all|${ALL_CATEGORIES}||||all|false`;
+
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
         setLocalCountry([]);
@@ -153,27 +168,9 @@ export function ProductsFilters({
         setLocalHeight([]);
         setLocalImage('all');
         setLocalPromo(false);
+        lastAutoAppliedRef.current = resetKey;
         onApply({ active: 'all', category: null, country: [], pot: [], height: [], image: 'all', promo: false });
         closeFilters?.();
-    };
-
-    const applyMultiFilter = (key: 'country' | 'pot' | 'height', values: string[]) => {
-        const next: ProductsFilterValues = {
-            active: localActive,
-            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: key === 'country' ? values : localCountry,
-            pot: key === 'pot' ? values : localPot,
-            height: key === 'height' ? values : localHeight,
-            image: localImage,
-            promo: localPromo,
-        };
-
-        if (key === 'country') setLocalCountry(values);
-        if (key === 'pot') setLocalPot(values);
-        if (key === 'height') setLocalHeight(values);
-
-        lastAppliedRef.current = `${next.active}|${next.category ?? ALL_CATEGORIES}|${next.country.join(',')}|${next.pot.join(',')}|${next.height.join(',')}|${next.image}|${next.promo}`;
-        onApply(next);
     };
 
     const normalizeCountry = (value?: string | null) => {
@@ -211,9 +208,92 @@ export function ProductsFilters({
         : categories;
 
     const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
+    const selectedCategory = localCategory !== ALL_CATEGORIES
+        ? categories.find((category) => category.id === Number(localCategory))
+        : null;
 
     return (
-        <div className="w-full space-y-4 text-left">
+        <div className="flex min-h-full w-full flex-col gap-4 text-left">
+            <div className="sticky top-0 z-10 -mx-6 flex w-[calc(100%+3rem)] items-center gap-3 border-b bg-muted/95 px-6 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-accent/95 dark:shadow-black/40">
+                <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-1.5 lg:flex">
+                    {!hasFilters && (
+                        <span className="py-2 text-xs text-muted-foreground">{t('No filters')}</span>
+                    )}
+
+                    {localImage !== 'all' && (
+                        <SummaryFilterBadge title={localImage === 'with' ? t('With image') : t('Without image')} onRemove={() => setLocalImage('all')}>
+                            {localImage === 'with' ? <Camera className="size-3.5" /> : <CameraOff className="size-3.5" />}
+                        </SummaryFilterBadge>
+                    )}
+
+                    {localPromo && (
+                        <SummaryFilterBadge title={t('PROMO')} onRemove={() => setLocalPromo(false)}>
+                            <Zap className="size-3.5" />
+                            <span>{t('PROMO')}</span>
+                        </SummaryFilterBadge>
+                    )}
+
+                    {localActive !== 'all' && (
+                        <SummaryFilterBadge title={localActive === 'active' ? t('Active') : t('Inactive')} onRemove={() => setLocalActive('all')}>
+                            <span>{localActive === 'active' ? t('Active') : t('Inactive')}</span>
+                        </SummaryFilterBadge>
+                    )}
+
+                    {selectedCategory && (
+                        <SummaryFilterBadge title={selectedCategory.name} onRemove={() => setLocalCategory(ALL_CATEGORIES)}>
+                            <span>{selectedCategory.name}</span>
+                        </SummaryFilterBadge>
+                    )}
+
+                    {localCountry.map((code) => {
+                        const normalizedCode = normalizeCountry(code) ?? code;
+                        const countryLabel = getCountryLabel(normalizedCode);
+                        const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[normalizedCode];
+
+                        return (
+                            <SummaryFilterBadge
+                                key={`country-${normalizedCode}`}
+                                title={countryLabel}
+                                onRemove={() => setLocalCountry((values) => values.filter((value) => value !== code))}
+                            >
+                                {Flag ? <Flag title={countryLabel} className="w-4" /> : null}
+                                <span>{countryLabel}</span>
+                            </SummaryFilterBadge>
+                        );
+                    })}
+
+                    {localPot.map((value) => (
+                        <SummaryFilterBadge key={`pot-${value}`} title={value} onRemove={() => setLocalPot((values) => values.filter((item) => item !== value))}>
+                            <Diameter className="size-3.5" />
+                            <span>{value}</span>
+                        </SummaryFilterBadge>
+                    ))}
+
+                    {localHeight.map((value) => (
+                        <SummaryFilterBadge key={`height-${value}`} title={value} onRemove={() => setLocalHeight((values) => values.filter((item) => item !== value))}>
+                            <MoveVertical className="size-3.5" />
+                            <span>{value}</span>
+                        </SummaryFilterBadge>
+                    ))}
+                </div>
+
+                <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                        <Checkbox
+                            checked={autoApply}
+                            onCheckedChange={(checked) => setAutoApply(checked === true)}
+                        />
+                        <span>{t('Apply auto')}</span>
+                    </label>
+                    <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>
+                        {t('Reset')}
+                    </Button>
+                    <Button size="sm" onClick={apply} disabled={autoApply}>
+                        {t('Apply filters')}
+                    </Button>
+                </div>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-2 md:border-r md:pr-6">
                     {!singleCategory && (
@@ -261,70 +341,55 @@ export function ProductsFilters({
                     </label>
 
                     {countries.length >= 2 && (
-                        <MultiSelectDropdown
+                        <BadgeMultiSelect
+                            id="product-country-filter"
                             label={t('Country')}
-                            allLabel={t('All countries')}
+                            placeholder={t('All countries')}
                             options={countries.map((code) => {
                                 const countryLabel = getCountryLabel(code);
                                 const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
                                 return {
                                     value: code,
-                                    text: countryLabel,
-                                    label: (
-                                        <span className="flex items-center gap-2">
-                                            {Flag ? <Flag title={countryLabel} className="w-4" /> : null}
-                                            {countryLabel}
-                                        </span>
-                                    ),
+                                    label: countryLabel,
+                                    icon: Flag ? <Flag title={countryLabel} className="w-4 shrink-0" /> : undefined,
                                 };
                             })}
-                            selected={localCountry}
-                            onApply={(values) => applyMultiFilter('country', values)}
-                            applyLabel={t('Apply filters')}
-                            clearLabel={t('Reset')}
+                            value={localCountry}
+                            onChange={setLocalCountry}
+                            showAllOptionsWhenEmpty
                         />
                     )}
 
                     {availablePotOptions.length >= 2 && (
-                        <MultiSelectDropdown
+                        <BadgeMultiSelect
+                            id="product-pot-filter"
                             label={t('Pot diameter')}
-                            allLabel={t('All pot diameters')}
+                            placeholder={t('All pot diameters')}
                             options={availablePotOptions.map((value) => ({
-                                value: String(value),
-                                text: String(value),
-                                label: String(value),
+                                value,
+                                label: value,
+                                icon: <Diameter className="size-3.5 shrink-0" />,
                             }))}
-                            selected={localPot}
-                            onApply={(values) => applyMultiFilter('pot', values)}
-                            applyLabel={t('Apply filters')}
-                            clearLabel={t('Reset')}
+                            value={localPot}
+                            onChange={setLocalPot}
                         />
                     )}
 
                     {availableHeightOptions.length >= 2 && (
-                        <MultiSelectDropdown
+                        <BadgeMultiSelect
+                            id="product-height-filter"
                             label={t('Height')}
-                            allLabel={t('All heights')}
+                            placeholder={t('All heights')}
                             options={availableHeightOptions.map((value) => ({
-                                value: String(value),
-                                text: String(value),
-                                label: String(value),
+                                value,
+                                label: value,
+                                icon: <MoveVertical className="size-3.5 shrink-0" />,
                             }))}
-                            selected={localHeight}
-                            onApply={(values) => applyMultiFilter('height', values)}
-                            applyLabel={t('Apply filters')}
-                            clearLabel={t('Reset')}
+                            value={localHeight}
+                            onChange={setLocalHeight}
                         />
                     )}
 
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>
-                            {t('Reset')}
-                        </Button>
-                        <Button size="sm" onClick={apply}>
-                            {t('Apply filters')}
-                        </Button>
-                    </div>
                 </div>
             </div>
         </div>
