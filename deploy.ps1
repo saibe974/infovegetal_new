@@ -140,7 +140,7 @@ if git status --porcelain | grep -q .; then
     exit 1
 fi
 
-git pull --no-edit '__REMOTE_REPOSITORY__' master
+git pull --ff-only --no-edit '__REMOTE_REPOSITORY__' master
 rm -f public/hot
 /opt/php8.3/bin/composer install --no-dev --optimize-autoloader --no-interaction
 /opt/php8.3/bin/php artisan migrate --force
