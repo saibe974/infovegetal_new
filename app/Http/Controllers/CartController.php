@@ -1021,16 +1021,7 @@ class CartController extends Controller
             ->keyBy('db_product_id');
 
         foreach ($dbProductIds as $dbProductId) {
-            $pivot = DB::table('db_product_user')
-                ->where('user_id', $user->id)
-                ->where('db_product_id', $dbProductId)
-                ->value('attributes');
-
-            $attrs = is_string($pivot) ? json_decode($pivot, true) : (is_array($pivot) ? $pivot : []);
-
-            if (! is_array($attrs)) {
-                $attrs = [];
-            }
+            $attrs = $priceCalculator->resolveUserAttributes($user, (int) $dbProductId) ?? [];
 
             if (empty($attrs['fact']) || empty($attrs['com'])) {
                 $condition = $clientConditions->get($dbProductId);

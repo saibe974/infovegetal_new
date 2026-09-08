@@ -511,15 +511,23 @@ export const calculateCartShipping = (
         let transport = transportBySupplier[id];
         const override = overrides?.[id];
         if (override && attrs) {
-            attrs = { ...attrs, t: override.carrierId, z: override.zoneId };
-            transport =
+            const overriddenTransport =
                 transportOptions?.[
                     override.carrierId + ':' + override.zoneId
-                ] ?? transport;
+                ];
+            if (overriddenTransport) {
+                attrs = { ...attrs, t: override.carrierId, z: override.zoneId };
+                transport = overriddenTransport;
+            }
         }
         if (supplier.mod_liv !== 'roll' || !supplier.rolls.length || !attrs)
             return;
         const choice = resolveTransportChoice(attrs, transport);
+        const canonicalTransport =
+            transportOptions?.[choice.carrierId + ':' + choice.zoneId];
+        if (canonicalTransport) {
+            transport = canonicalTransport;
+        }
         if (choice.carrierId > 0 && choice.zoneId > 0 && transport) {
             const key = choice.carrierId + ':' + choice.zoneId;
             const entries = grouped.get(key) ?? [];
@@ -542,9 +550,9 @@ export const calculateCartShipping = (
             0,
         );
         const price = pickZoneTariff(count, transport.tariffs);
-        const minimumGap = Math.max(
-            0,
-            toNumber(transport.tariffs.mini) - price * count,
+        const realTransport = Math.max(
+            toNumber(transport.tariffs.mini),
+            price * count,
         );
         const rate = 1 + Math.max(0, toNumber(transport.taxgo)) / 100;
         let total = 0;
@@ -555,11 +563,14 @@ export const calculateCartShipping = (
                 toNumber(selected.supplements_by_db?.[id]),
             );
             const rendered = normalizePriceMode(attrs.p) === 1;
+            const allocatedRealTransport =
+                (realTransport * supplier.rolls.length) / count;
             const raw = supplier.rolls.map(
                 (roll) =>
-                    (price *
-                        (rendered ? 1 - toFillRatio(toNumber(roll.coef)) : 1) +
-                        minimumGap / count +
+                    (allocatedRealTransport / supplier.rolls.length -
+                        (rendered
+                            ? price * toFillRatio(toNumber(roll.coef))
+                            : 0) +
                         supplement) *
                     rate,
             );

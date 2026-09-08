@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\CartController;
 use App\Models\Carrier;
 use App\Models\CarrierZone;
+use App\Models\ClientSalesCondition;
+use App\Models\DbProductBillingUser;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -456,6 +458,105 @@ it('uses transport selection from order payload when provided', function (): voi
     );
 
     expect($payload['shipping_total'] ?? null)->toBe(400.0);
+});
+
+it('applies one common carrier minimum across two databases resolved from sales conditions', function (): void {
+    $user = User::factory()->create();
+    $billingUser = User::factory()->create();
+    $carrier = Carrier::create([
+        'name' => 'Shared sales-condition carrier',
+        'days' => 2,
+        'taxgo' => 0,
+    ]);
+    $zone = CarrierZone::create([
+        'carrier_id' => $carrier->id,
+        'name' => 'Shared zone',
+        'tariffs' => [
+            'mini' => 300,
+            'roll:1' => 100,
+            'roll:2' => 100,
+        ],
+    ]);
+
+    $dbProductIds = collect(['shared-db-a', 'shared-db-b'])->map(function (string $name): int {
+        return DB::table('db_products')->insertGetId([
+            'name' => $name,
+            'description' => null,
+            'champs' => null,
+            'categories' => null,
+            'country' => 'FR',
+            'mod_liv' => 'roll',
+            'mini' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    })->all();
+
+    $carrier->dbProducts()->attach([
+        $dbProductIds[0] => ['supplement_per_roll' => 0],
+        $dbProductIds[1] => ['supplement_per_roll' => 10],
+    ]);
+
+    foreach ($dbProductIds as $dbProductId) {
+        DbProductBillingUser::create([
+            'db_product_id' => $dbProductId,
+            'billing_user_id' => $billingUser->id,
+            'defaults' => [
+                't' => [['carrier_id' => $carrier->id, 'zone_id' => $zone->id]],
+                'z' => $zone->id,
+                'p' => 0,
+            ],
+            'active' => true,
+        ]);
+        ClientSalesCondition::create([
+            'client_user_id' => $user->id,
+            'db_product_id' => $dbProductId,
+            'billing_user_id' => $billingUser->id,
+            'seller_user_id' => null,
+            'conditions_override' => [],
+            'active' => true,
+        ]);
+        DB::table('db_product_user')->insert([
+            'db_product_id' => $dbProductId,
+            'user_id' => $user->id,
+            'attributes' => null,
+        ]);
+    }
+
+    $products = collect($dbProductIds)->map(function (int $dbProductId, int $index): Product {
+        return Product::create([
+            'sku' => 'shared-product-'.$index,
+            'name' => 'Shared product '.$index,
+            'description' => null,
+            'img_link' => null,
+            'price' => 10,
+            'active' => true,
+            'attributes' => [],
+            'category_products_id' => null,
+            'db_products_id' => $dbProductId,
+            'ref' => 'shared-product-'.$index,
+            'ean13' => '000000000001'.$index,
+            'pot' => null,
+            'height' => null,
+            'price_floor' => 8,
+            'price_roll' => 7,
+            'price_promo' => 0,
+            'producer_id' => null,
+            'tva_id' => null,
+            'cond' => 2,
+            'floor' => 2,
+            'roll' => 3,
+            'unite' => null,
+        ]);
+    });
+
+    $payload = cartControllerBuildPdfPayload(
+        $products->map(fn (Product $product) => ['id' => $product->id, 'quantity' => 12])->all(),
+        $user,
+        0.0,
+    );
+
+    expect($payload['shipping_total'] ?? null)->toBe(310.0);
 });
 
 /**

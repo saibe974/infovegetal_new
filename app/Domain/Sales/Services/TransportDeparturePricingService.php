@@ -59,11 +59,13 @@ final class TransportDeparturePricingService
             $count = array_sum(array_column($group['bases'], 'count'));
             $price = (new TransportZoneTariffResolver)->resolve($count, $group['tariffs']);
             $minimum = max(0, $this->tariffToFloat($group['tariffs']['mini'] ?? 0));
-            $minimumGap = max(0, $minimum - $price * $count);
+            $realTransport = max($minimum, $price * $count);
             $rate = 1 + max(0, $group['taxgo']) / 100;
             $groupTotal = 0;
             foreach ($group['bases'] as $base) {
-                $grid = $price * $base['count'] + $minimumGap * $base['count'] / $count;
+                // The carrier minimum belongs to the common departure. This
+                // allocation only distributes that single amount between DBs.
+                $grid = $realTransport * $base['count'] / $count;
                 $embedded = $base['rendered'] ? array_sum($base['fills']) * $price : 0;
                 $supplement = $base['count'] * $base['supplement'];
                 $amount = round((max(0, $grid - $embedded) + $supplement) * $rate, 2);
