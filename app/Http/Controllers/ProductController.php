@@ -155,7 +155,7 @@ class ProductController extends Controller
                             ->whereIn('id', $zoneIds)
                             ->select(['id', 'carrier_id', 'name', 'tariffs']),
                     ])
-                    ->get(['id', 'taxgo']);
+                    ->with('dbProducts')->get(['id', 'taxgo']);
 
                 $zoneMap = [];
                 foreach ($carriers as $carrier) {
@@ -165,6 +165,7 @@ class ProductController extends Controller
                             'zone_id' => (int) $zone->id,
                             'zone_name' => (string) ($zone->name ?? ''),
                             'taxgo' => (float) ($carrier->taxgo ?? 0),
+                            'supplements_by_db' => $carrier->supplementsByDb(),
                             'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
                         ];
                     }

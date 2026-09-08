@@ -5,31 +5,38 @@ import {
     AppearancePageSettings,
 } from '@/components/settings/appearance-options';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/app-layout';
 import {
     applyDisplayPreferences,
     defaultDisplayPreferences,
+    getAccessiblePreferencePages,
     getStoredDisplayPreferences,
     storeDisplayPreferences,
     type DisplayPreferences,
     type PreferencePage,
 } from '@/lib/display-preferences';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Apparence', href: '/appearance' }];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Apparence', href: '/appearance' },
+];
 
 export default function GuestAppearance() {
+    const { auth } = usePage<SharedData>().props;
+    const visiblePages = getAccessiblePreferencePages(auth.user);
     const [preferences, setPreferences] = useState<DisplayPreferences>(() =>
         getStoredDisplayPreferences('local'),
     );
-    const [savedPreferences, setSavedPreferences] = useState<DisplayPreferences>(() =>
-        getStoredDisplayPreferences('local'),
-    );
+    const [savedPreferences, setSavedPreferences] =
+        useState<DisplayPreferences>(() =>
+            getStoredDisplayPreferences('local'),
+        );
     const [saving, setSaving] = useState(false);
-    const dirty = JSON.stringify(preferences) !== JSON.stringify(savedPreferences);
+    const dirty =
+        JSON.stringify(preferences) !== JSON.stringify(savedPreferences);
 
     useEffect(() => {
         applyDisplayPreferences(preferences);
@@ -39,7 +46,10 @@ export default function GuestAppearance() {
         key: K,
         value: DisplayPreferences['general'][K],
     ) => {
-        setPreferences((prev) => ({ ...prev, general: { ...prev.general, [key]: value } }));
+        setPreferences((prev) => ({
+            ...prev,
+            general: { ...prev.general, [key]: value },
+        }));
     };
 
     const updatePage = (
@@ -52,7 +62,9 @@ export default function GuestAppearance() {
         }));
     };
 
-    const updateConfirmation = <K extends keyof DisplayPreferences['confirmations']>(
+    const updateConfirmation = <
+        K extends keyof DisplayPreferences['confirmations'],
+    >(
         key: K,
         value: DisplayPreferences['confirmations'][K],
     ) => {
@@ -71,7 +83,8 @@ export default function GuestAppearance() {
         setSaving(false);
     };
 
-    const reset = () => setPreferences(structuredClone(defaultDisplayPreferences));
+    const reset = () =>
+        setPreferences(structuredClone(defaultDisplayPreferences));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -85,10 +98,19 @@ export default function GuestAppearance() {
                             description="Personnalisez l'interface. Les préférences sont enregistrées sur cet appareil."
                         />
                         <div className="flex shrink-0 gap-2">
-                            <Button variant="outline" size="sm" onClick={reset} disabled={saving}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={reset}
+                                disabled={saving}
+                            >
                                 Réinitialiser
                             </Button>
-                            <Button size="sm" onClick={save} disabled={!dirty || saving}>
+                            <Button
+                                size="sm"
+                                onClick={save}
+                                disabled={!dirty || saving}
+                            >
                                 Enregistrer
                             </Button>
                         </div>
@@ -104,6 +126,7 @@ export default function GuestAppearance() {
                     />
                     <AppearancePageSettings
                         pages={preferences.pages}
+                        visiblePages={visiblePages}
                         onChange={updatePage}
                     />
                 </div>

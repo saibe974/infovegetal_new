@@ -1,23 +1,29 @@
 import { DataTable } from '@/components/data-table';
+import { BadgeMultiSelect } from '@/components/ui/badge-multi-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { SelectLang } from '@/components/ui/selectLang';
 import InputError from '@/components/ui/input-error';
-import { StickyBar } from '@/components/ui/sticky-bar';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import { withAppLayout } from '@/layouts/app-layout';
+import { useI18n } from '@/lib/i18n';
 import carriers from '@/routes/carriers';
 import carrierZones from '@/routes/carriers/zones';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
+import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
 import { FormEvent, useCallback, useMemo, useRef, useState } from 'react';
-import { useI18n } from '@/lib/i18n';
-import type { CellContext, ColumnDef } from '@tanstack/react-table';
 
 interface ZoneTier {
     roll: string;
@@ -35,6 +41,7 @@ type ZoneRow = ZoneDraft & { __index: number };
 
 type Props = {
     carrier: Carrier;
+    dbProducts: Array<{ id: number; name: string }>;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -142,10 +149,14 @@ const maskToDays = (mask: number): string[] =>
         .filter(([, bit]) => (mask & bit) === bit)
         .map(([day]) => day);
 
-const parseDays = (days: string[] | number | string | null | undefined): string[] => {
+const parseDays = (
+    days: string[] | number | string | null | undefined,
+): string[] => {
     if (!days) return [];
     if (Array.isArray(days)) {
-        return days.map((day) => String(day)).filter((day) => day >= '1' && day <= '7');
+        return days
+            .map((day) => String(day))
+            .filter((day) => day >= '1' && day <= '7');
     }
     if (typeof days === 'number') {
         return maskToDays(days);
@@ -153,7 +164,10 @@ const parseDays = (days: string[] | number | string | null | undefined): string[
     const str = String(days).trim();
     if (!str) return [];
     if (str.includes(',')) {
-        return str.split(',').map((d) => d.trim()).filter(Boolean);
+        return str
+            .split(',')
+            .map((d) => d.trim())
+            .filter(Boolean);
     }
     if (/^\d+$/.test(str)) {
         return maskToDays(Number(str));
@@ -161,554 +175,825 @@ const parseDays = (days: string[] | number | string | null | undefined): string[
     return [];
 };
 
-export default withAppLayout<Props>(breadcrumbs, true, ({ carrier }) => {
-    const { t } = useI18n();
-    const isNew = !carrier || !carrier.id;
-    const { data, setData, post, put, processing, errors, transform } = useForm({
-        name: carrier?.name ?? '',
-        country: carrier?.country ?? '',
-        days: parseDays(carrier?.days),
-        minimum_delay_hours: String(carrier?.minimum_delay_hours ?? 24),
-        order_cutoff_time: String(carrier?.order_cutoff_time ?? '12:00').slice(0, 5),
-        minimum: carrier?.minimum !== null && carrier?.minimum !== undefined ? String(carrier.minimum) : '',
-        taxgo: carrier?.taxgo !== null && carrier?.taxgo !== undefined ? String(carrier.taxgo) : '',
-        zones: mapZones(carrier?.zones),
-    });
-    const [newRoll, setNewRoll] = useState('');
-    const [importingZones, setImportingZones] = useState(false);
-    const [importZonesError, setImportZonesError] = useState<string | null>(null);
-    const importInputRef = useRef<HTMLInputElement | null>(null);
-    const errorBag = errors as Record<string, string>;
+export default withAppLayout<Props>(
+    breadcrumbs,
+    true,
+    ({ carrier, dbProducts }) => {
+        const { t } = useI18n();
+        const isNew = !carrier || !carrier.id;
+        const { data, setData, post, put, processing, errors, transform } =
+            useForm({
+                name: carrier?.name ?? '',
+                db_products: (carrier?.db_products ?? []).map((db) => ({
+                    id: db.id,
+                    supplement_per_roll: String(db.supplement_per_roll),
+                })),
+                days: parseDays(carrier?.days),
+                minimum_delay_hours: String(carrier?.minimum_delay_hours ?? 24),
+                order_cutoff_time: String(
+                    carrier?.order_cutoff_time ?? '12:00',
+                ).slice(0, 5),
+                taxgo:
+                    carrier?.taxgo !== null && carrier?.taxgo !== undefined
+                        ? String(carrier.taxgo)
+                        : '',
+                zones: mapZones(carrier?.zones),
+            });
+        const [newRoll, setNewRoll] = useState('');
+        const [importingZones, setImportingZones] = useState(false);
+        const [importZonesError, setImportZonesError] = useState<string | null>(
+            null,
+        );
+        const importInputRef = useRef<HTMLInputElement | null>(null);
+        const errorBag = errors as Record<string, string>;
 
-    const daysError = useMemo(() => {
-        if (errors.days) {
-            return errors.days as string;
-        }
-        const entry = Object.entries(errorBag).find(([key]) => key.startsWith('days.'));
-        return entry ? entry[1] : undefined;
-    }, [errorBag, errors.days]);
-
-    const getZoneNameError = useCallback((index: number) => {
-        return errorBag[`zones.${index}.name`];
-    }, [errorBag]);
-
-    const toggleDay = (day: string) => {
-        setData((current) => {
-            const days = current.days.includes(day)
-                ? current.days.filter((d) => d !== day)
-                : [...current.days, day].sort();
-
-            return { ...current, days };
-        });
-    };
-
-    const updateZone = useCallback((index: number, updates: Partial<ZoneDraft>) => {
-        setData((current) => {
-            const next = [...current.zones];
-            next[index] = { ...next[index], ...updates };
-            return { ...current, zones: next };
-        });
-    }, [setData]);
-
-    const updateTierPrice = useCallback((zoneIndex: number, roll: string, price: string) => {
-        setData((current) => {
-            const next = [...current.zones];
-            const zone = next[zoneIndex];
-            const tiers = [...zone.tiers];
-            const index = tiers.findIndex((tier) => tier.roll === roll);
-            if (index >= 0) {
-                tiers[index] = { ...tiers[index], price };
-            } else {
-                tiers.push({ roll, price });
+        const daysError = useMemo(() => {
+            if (errors.days) {
+                return errors.days as string;
             }
-            next[zoneIndex] = { ...zone, tiers };
-            return { ...current, zones: next };
-        });
-    }, [setData]);
+            const entry = Object.entries(errorBag).find(([key]) =>
+                key.startsWith('days.'),
+            );
+            return entry ? entry[1] : undefined;
+        }, [errorBag, errors.days]);
 
-    const addZone = () => {
-        setData('zones', [...data.zones, { name: '', mini: '', tiers: [] }]);
-    };
+        const getZoneNameError = useCallback(
+            (index: number) => {
+                return errorBag[`zones.${index}.name`];
+            },
+            [errorBag],
+        );
 
-    const removeZone = useCallback((index: number) => {
-        setData((current) => {
-            const next = [...current.zones];
-            next.splice(index, 1);
-            return {
-                ...current,
-                zones: next.length > 0 ? next : [{ name: '', mini: '', tiers: [] }],
-            };
-        });
-    }, [setData]);
+        const toggleDay = (day: string) => {
+            setData((current) => {
+                const days = current.days.includes(day)
+                    ? current.days.filter((d) => d !== day)
+                    : [...current.days, day].sort();
 
-    const addRoll = () => {
-        let roll = newRoll.trim();
-        const rolls = getUniqueRolls(data.zones);
-        if (!roll) {
-            roll = getNextRoll(data.zones);
-        } else if (rolls.includes(roll)) {
-            setNewRoll('');
-            return;
-        }
+                return { ...current, days };
+            });
+        };
 
-        const next = data.zones.map((zone) => {
-            if (zone.tiers.some((tier) => tier.roll === roll)) {
-                return zone;
+        const updateZone = useCallback(
+            (index: number, updates: Partial<ZoneDraft>) => {
+                setData((current) => {
+                    const next = [...current.zones];
+                    next[index] = { ...next[index], ...updates };
+                    return { ...current, zones: next };
+                });
+            },
+            [setData],
+        );
+
+        const updateTierPrice = useCallback(
+            (zoneIndex: number, roll: string, price: string) => {
+                setData((current) => {
+                    const next = [...current.zones];
+                    const zone = next[zoneIndex];
+                    const tiers = [...zone.tiers];
+                    const index = tiers.findIndex((tier) => tier.roll === roll);
+                    if (index >= 0) {
+                        tiers[index] = { ...tiers[index], price };
+                    } else {
+                        tiers.push({ roll, price });
+                    }
+                    next[zoneIndex] = { ...zone, tiers };
+                    return { ...current, zones: next };
+                });
+            },
+            [setData],
+        );
+
+        const addZone = () => {
+            setData('zones', [
+                ...data.zones,
+                { name: '', mini: '', tiers: [] },
+            ]);
+        };
+
+        const removeZone = useCallback(
+            (index: number) => {
+                setData((current) => {
+                    const next = [...current.zones];
+                    next.splice(index, 1);
+                    return {
+                        ...current,
+                        zones:
+                            next.length > 0
+                                ? next
+                                : [{ name: '', mini: '', tiers: [] }],
+                    };
+                });
+            },
+            [setData],
+        );
+
+        const addRoll = () => {
+            let roll = newRoll.trim();
+            const rolls = getUniqueRolls(data.zones);
+            if (!roll) {
+                roll = getNextRoll(data.zones);
+            } else if (rolls.includes(roll)) {
+                setNewRoll('');
+                return;
             }
-            return { ...zone, tiers: [...zone.tiers, { roll, price: '' }] };
-        });
 
-        setData('zones', next);
-        setNewRoll('');
-    };
-
-    const removeRoll = useCallback((roll: string) => {
-        setData((current) => {
-            const next = current.zones.map((zone) => ({
-                ...zone,
-                tiers: zone.tiers.filter((tier) => tier.roll !== roll),
-            }));
-
-            return { ...current, zones: next };
-        });
-    }, [setData]);
-
-    const buildPayload = () => {
-        const rolls = getUniqueRolls(data.zones);
-
-        return {
-            ...data,
-            days: data.days,
-            taxgo: normalizeDecimal(data.taxgo),
-            zones: data.zones.map((zone) => {
-                const tariffs: Record<string, string | null> = {};
-                if (zone.mini.trim() !== '') {
-                    tariffs.mini = normalizeDecimal(zone.mini);
+            const next = data.zones.map((zone) => {
+                if (zone.tiers.some((tier) => tier.roll === roll)) {
+                    return zone;
                 }
+                return { ...zone, tiers: [...zone.tiers, { roll, price: '' }] };
+            });
 
-                rolls.forEach((roll) => {
-                    const tier = zone.tiers.find((candidate) => candidate.roll === roll);
-                    if (!tier) {
-                        tariffs[`roll:${roll}`] = null;
-                        return;
+            setData('zones', next);
+            setNewRoll('');
+        };
+
+        const removeRoll = useCallback(
+            (roll: string) => {
+                setData((current) => {
+                    const next = current.zones.map((zone) => ({
+                        ...zone,
+                        tiers: zone.tiers.filter((tier) => tier.roll !== roll),
+                    }));
+
+                    return { ...current, zones: next };
+                });
+            },
+            [setData],
+        );
+
+        const buildPayload = () => {
+            const rolls = getUniqueRolls(data.zones);
+
+            return {
+                ...data,
+                days: data.days,
+                db_products: data.db_products.map((db) => ({
+                    ...db,
+                    supplement_per_roll:
+                        normalizeDecimal(db.supplement_per_roll) || '0',
+                })),
+                taxgo: normalizeDecimal(data.taxgo),
+                zones: data.zones.map((zone) => {
+                    const tariffs: Record<string, string | null> = {};
+                    if (zone.mini.trim() !== '') {
+                        tariffs.mini = normalizeDecimal(zone.mini);
                     }
 
-                    const price = normalizeDecimal(tier.price);
-                    tariffs[`roll:${roll}`] = price === '' ? null : price;
+                    rolls.forEach((roll) => {
+                        const tier = zone.tiers.find(
+                            (candidate) => candidate.roll === roll,
+                        );
+                        if (!tier) {
+                            tariffs[`roll:${roll}`] = null;
+                            return;
+                        }
+
+                        const price = normalizeDecimal(tier.price);
+                        tariffs[`roll:${roll}`] = price === '' ? null : price;
+                    });
+
+                    return {
+                        id: zone.id,
+                        name: zone.name,
+                        tariffs,
+                    };
+                }),
+            };
+        };
+
+        const rollsRef = useRef<string[]>([]);
+        const rolls = useMemo(() => {
+            const next = getUniqueRolls(data.zones);
+            if (
+                next.length === rollsRef.current.length &&
+                next.every((r, i) => r === rollsRef.current[i])
+            ) {
+                return rollsRef.current;
+            }
+            rollsRef.current = next;
+            return next;
+        }, [data.zones]);
+        const zoneRows = useMemo<ZoneRow[]>(
+            () =>
+                data.zones.map((zone, index) => ({ ...zone, __index: index })),
+            [data.zones],
+        );
+
+        const renameRoll = useCallback(
+            (columnId: string, nextValue: string) => {
+                const oldRoll = columnId.replace(/^roll-/, '');
+                const nextRoll = nextValue.trim();
+                if (!nextRoll || nextRoll === oldRoll) {
+                    return;
+                }
+
+                setData((current) => {
+                    const existing = getUniqueRolls(current.zones);
+                    if (existing.includes(nextRoll)) {
+                        return current;
+                    }
+
+                    const next = current.zones.map((zone) => ({
+                        ...zone,
+                        tiers: zone.tiers.map((tier) =>
+                            tier.roll === oldRoll
+                                ? { ...tier, roll: nextRoll }
+                                : tier,
+                        ),
+                    }));
+
+                    return { ...current, zones: next };
                 });
+            },
+            [setData],
+        );
+
+        const getZoneRowId = useCallback(
+            (row: ZoneRow) => (row.id ? `id-${row.id}` : `new-${row.__index}`),
+            [],
+        );
+
+        const getCsrfToken = useCallback(() => {
+            const meta = document.querySelector(
+                'meta[name="csrf-token"]',
+            ) as HTMLMetaElement | null;
+            if (meta?.content) {
+                return meta.content;
+            }
+
+            const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+            return match ? decodeURIComponent(match[1]) : '';
+        }, []);
+
+        const handleImportClick = () => {
+            importInputRef.current?.click();
+        };
+
+        const handleImportFile = useCallback(
+            async (event: React.ChangeEvent<HTMLInputElement>) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+
+                if (!file || !carrier.id) {
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                setImportingZones(true);
+                setImportZonesError(null);
+
+                try {
+                    const response = await fetch(
+                        carrierZones.import.url({
+                            carrier: carrier.id as number,
+                        }),
+                        {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: formData,
+                        },
+                    );
+
+                    const payload = await response.json().catch(() => null);
+
+                    if (!response.ok) {
+                        const message =
+                            typeof payload?.message === 'string'
+                                ? payload.message
+                                : (payload?.errors?.file?.[0] ??
+                                  t('Import failed'));
+                        throw new Error(message);
+                    }
+
+                    const nextZones = payload?.carrier?.zones ?? [];
+                    setData('zones', mapZones(nextZones));
+                } catch (error) {
+                    setImportZonesError(
+                        error instanceof Error
+                            ? error.message
+                            : t('Import failed'),
+                    );
+                } finally {
+                    setImportingZones(false);
+                }
+            },
+            [carrier.id, getCsrfToken, setData, t],
+        );
+
+        const headerControls = useCallback(
+            (columnId: string) => {
+                if (!columnId.startsWith('roll-')) {
+                    return null;
+                }
+                const roll = columnId.replace(/^roll-/, '');
 
                 return {
-                    id: zone.id,
-                    name: zone.name,
-                    tariffs,
+                    editable: true,
+                    deletable: true,
+                    value: roll,
+                    onChange: (value: string) => renameRoll(columnId, value),
+                    onDelete: () => removeRoll(roll),
                 };
-            }),
-        };
-    };
+            },
+            [removeRoll, renameRoll],
+        );
 
-    const rollsRef = useRef<string[]>([]);
-    const rolls = useMemo(() => {
-        const next = getUniqueRolls(data.zones);
-        if (
-            next.length === rollsRef.current.length &&
-            next.every((r, i) => r === rollsRef.current[i])
-        ) {
-            return rollsRef.current;
-        }
-        rollsRef.current = next;
-        return next;
-    }, [data.zones]);
-    const zoneRows = useMemo<ZoneRow[]>(
-        () => data.zones.map((zone, index) => ({ ...zone, __index: index })),
-        [data.zones],
-    );
+        const zonesHeader = t('Zones');
+        const minimumPriceHeader = t('Minimum price');
 
-    const renameRoll = useCallback((columnId: string, nextValue: string) => {
-        const oldRoll = columnId.replace(/^roll-/, '');
-        const nextRoll = nextValue.trim();
-        if (!nextRoll || nextRoll === oldRoll) {
-            return;
-        }
-
-        setData((current) => {
-            const existing = getUniqueRolls(current.zones);
-            if (existing.includes(nextRoll)) {
-                return current;
-            }
-
-            const next = current.zones.map((zone) => ({
-                ...zone,
-                tiers: zone.tiers.map((tier) =>
-                    tier.roll === oldRoll ? { ...tier, roll: nextRoll } : tier,
-                ),
+        const columns = useMemo<ColumnDef<ZoneRow>[]>(() => {
+            const rollColumns = rolls.map((roll) => ({
+                id: `roll-${roll}`,
+                header: roll,
+                cell: ({ row }: CellContext<ZoneRow, unknown>) => {
+                    const zone = row.original;
+                    const price =
+                        zone.tiers.find((tier) => tier.roll === roll)?.price ??
+                        '';
+                    return (
+                        <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={price}
+                            onChange={(e) =>
+                                updateTierPrice(
+                                    zone.__index,
+                                    roll,
+                                    e.target.value.replace(',', '.'),
+                                )
+                            }
+                        />
+                    );
+                },
             }));
 
-            return { ...current, zones: next };
-        });
-    }, [setData]);
-
-    const getZoneRowId = useCallback((row: ZoneRow) => (row.id ? `id-${row.id}` : `new-${row.__index}`), []);
-
-    const getCsrfToken = useCallback(() => {
-        const meta = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
-        if (meta?.content) {
-            return meta.content;
-        }
-
-        const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
-        return match ? decodeURIComponent(match[1]) : '';
-    }, []);
-
-    const handleImportClick = () => {
-        importInputRef.current?.click();
-    };
-
-    const handleImportFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-
-        if (!file || !carrier.id) {
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        setImportingZones(true);
-        setImportZonesError(null);
-
-        try {
-            const response = await fetch(carrierZones.import.url({ carrier: carrier.id as number }), {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: formData,
-            });
-
-            const payload = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                const message = typeof payload?.message === 'string'
-                    ? payload.message
-                    : (payload?.errors?.file?.[0] ?? t('Import failed'));
-                throw new Error(message);
-            }
-
-            const nextZones = payload?.carrier?.zones ?? [];
-            setData('zones', mapZones(nextZones));
-        } catch (error) {
-            setImportZonesError(error instanceof Error ? error.message : t('Import failed'));
-        } finally {
-            setImportingZones(false);
-        }
-    }, [carrier.id, getCsrfToken, setData, t]);
-
-    const headerControls = useCallback((columnId: string) => {
-        if (!columnId.startsWith('roll-')) {
-            return null;
-        }
-        const roll = columnId.replace(/^roll-/, '');
-
-        return {
-            editable: true,
-            deletable: true,
-            value: roll,
-            onChange: (value: string) => renameRoll(columnId, value),
-            onDelete: () => removeRoll(roll),
-        };
-    }, [removeRoll, renameRoll]);
-
-    const zonesHeader = t('Zones');
-    const minimumPriceHeader = t('Minimum price');
-
-    const columns = useMemo<ColumnDef<ZoneRow>[]>(() => {
-        const rollColumns = rolls.map((roll) => ({
-            id: `roll-${roll}`,
-            header: roll,
-            cell: ({ row }: CellContext<ZoneRow, unknown>) => {
-                const zone = row.original;
-                const price = zone.tiers.find((tier) => tier.roll === roll)?.price ?? '';
-                return (
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={price}
-                        onChange={(e) =>
-                            updateTierPrice(zone.__index, roll, e.target.value.replace(',', '.'))
-                        }
-                    />
-                );
-            },
-        }));
-
-        return [
-            {
-                id: 'name',
-                header: zonesHeader,
-                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
-                    <div className="space-y-1">
-                        <Input
-                            value={row.original.name}
-                            onChange={(e) => updateZone(row.original.__index, { name: e.target.value })}
-                            aria-invalid={!!getZoneNameError(row.original.__index)}
-                        />
-                        <InputError message={getZoneNameError(row.original.__index)} />
-                    </div>
-                ),
-            },
-            {
-                id: 'mini',
-                header: minimumPriceHeader,
-                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
-                    <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={row.original.mini}
-                        onChange={(e) =>
-                            updateZone(row.original.__index, { mini: e.target.value.replace(',', '.') })
-                        }
-                    />
-                ),
-            },
-            ...rollColumns,
-            {
-                id: 'actions',
-                header: '',
-                cell: ({ row }: CellContext<ZoneRow, unknown>) => (
-                    <Button
-                        type="button"
-                        variant="destructive-outline"
-                        size="icon"
-                        onClick={() => removeZone(row.original.__index)}
-                    >
-                        <TrashIcon size={16} />
-                    </Button>
-                ),
-            },
-        ];
-    }, [minimumPriceHeader, rolls, removeZone, updateTierPrice, updateZone, zonesHeader, getZoneNameError]);
-
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        transform(() => buildPayload());
-        if (isNew) {
-            post(carriers.store.url(), {
-                onFinish: () => transform((payload) => payload),
-            });
-        } else {
-            put(carriers.update.url({ carrier: carrier.id as number }), {
-                onFinish: () => transform((payload) => payload),
-            });
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-6 p-0 m-0">
-            <Head title={isNew ? t('Create carrier') : t('Edit carrier')} />
-            <StickyBar className="w-full" borderBottom={false}>
-                <div className="flex items-center justify-between w-full py-2">
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href="#"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                window.history.back();
-                            }}
-                            className="hover:text-gray-500 transition-colors duration-200"
-                        >
-                            <ArrowLeftCircle size={35} />
-                        </Link>
-                        <h2 className="text-xl font-semibold">
-                            {isNew ? t('Create carrier') : t('Edit carrier')}
-                        </h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button type="submit" disabled={processing || importingZones}>
-                            <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
-                        </Button>
-                    </div>
-                </div>
-            </StickyBar>
-
-            <div className="w-full max-w-[1200px] md:mx-auto flex flex-col gap-5">
-                <main className="space-y-6">
-                    <Card className="p-4">
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <FormField label={t('Name')} htmlFor="name" error={errors.name}>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    value={data.name}
-                                    onChange={(e) => setData('name', e.target.value)}
-                                    aria-invalid={!!errors.name}
-                                />
-                            </FormField>
-                            <FormField label={t('Country')} htmlFor="country" error={errors.country}>
-                                <SelectLang
-                                    mode="country"
-                                    id="country"
-                                    name="country"
-                                    value={data.country}
-                                    onValueChange={(country) => setData('country', country)}
-                                    className="w-full"
-                                    aria-invalid={!!errors.country}
-                                />
-                            </FormField>
-                            <FormField label={t('Minimum rolls')} htmlFor="minimum" error={errors.minimum}>
-                                <Input
-                                    id="minimum"
-                                    name="minimum"
-                                    type="number"
-                                    min="0"
-                                    value={data.minimum}
-                                    onChange={(e) => setData('minimum', e.target.value)}
-                                    aria-invalid={!!errors.minimum}
-                                />
-                            </FormField>
-
+            return [
+                {
+                    id: 'name',
+                    header: zonesHeader,
+                    cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                        <div className="space-y-1">
+                            <Input
+                                value={row.original.name}
+                                onChange={(e) =>
+                                    updateZone(row.original.__index, {
+                                        name: e.target.value,
+                                    })
+                                }
+                                aria-invalid={
+                                    !!getZoneNameError(row.original.__index)
+                                }
+                            />
+                            <InputError
+                                message={getZoneNameError(row.original.__index)}
+                            />
                         </div>
-                        <div className="grid gap-4 md:grid-cols-4">
-                            <div className="md:col-span-2">
-                                <FormField label={t('Delivery days')} htmlFor="days" error={daysError}>
-                                    <div className="flex flex-wrap gap-3">
-                                        {WEEKDAYS.map((day) => (
-                                            <div key={day.value} className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`day-${day.value}`}
-                                                    checked={data.days.includes(day.value)}
-                                                    onCheckedChange={() => toggleDay(day.value)}
-                                                />
-                                                <Label
-                                                    htmlFor={`day-${day.value}`}
-                                                    className="text-sm font-normal cursor-pointer"
-                                                >
-                                                    {day.label}
-                                                </Label>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </FormField>
-                            </div>
+                    ),
+                },
+                {
+                    id: 'mini',
+                    header: minimumPriceHeader,
+                    cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                        <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={row.original.mini}
+                            onChange={(e) =>
+                                updateZone(row.original.__index, {
+                                    mini: e.target.value.replace(',', '.'),
+                                })
+                            }
+                        />
+                    ),
+                },
+                ...rollColumns,
+                {
+                    id: 'actions',
+                    header: '',
+                    cell: ({ row }: CellContext<ZoneRow, unknown>) => (
+                        <Button
+                            type="button"
+                            variant="destructive-outline"
+                            size="icon"
+                            onClick={() => removeZone(row.original.__index)}
+                        >
+                            <TrashIcon size={16} />
+                        </Button>
+                    ),
+                },
+            ];
+        }, [
+            minimumPriceHeader,
+            rolls,
+            removeZone,
+            updateTierPrice,
+            updateZone,
+            zonesHeader,
+            getZoneNameError,
+        ]);
 
-                            <div>
-                                <FormField
-                                    label={t('Minimum delivery delay')}
-                                    htmlFor="minimum_delay_hours"
-                                    error={errors.minimum_delay_hours}
-                                >
-                                    <Select
-                                        value={data.minimum_delay_hours}
-                                        onValueChange={(value) => setData('minimum_delay_hours', value)}
-                                    >
-                                        <SelectTrigger id="minimum_delay_hours" aria-invalid={!!errors.minimum_delay_hours}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {[24, 48, 72, 96, 120, 168].map((hours) => (
-                                                <SelectItem key={hours} value={String(hours)}>
-                                                    {hours}h
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormField>
-                            </div>
+        const handleSubmit = (e: FormEvent) => {
+            e.preventDefault();
+            transform(() => buildPayload());
+            if (isNew) {
+                post(carriers.store.url(), {
+                    onFinish: () => transform((payload) => payload),
+                });
+            } else {
+                put(carriers.update.url({ carrier: carrier.id as number }), {
+                    onFinish: () => transform((payload) => payload),
+                });
+            }
+        };
 
-                            <div>
+        return (
+            <form onSubmit={handleSubmit} className="m-0 space-y-6 p-0">
+                <Head title={isNew ? t('Create carrier') : t('Edit carrier')} />
+                <StickyBar className="w-full" borderBottom={false}>
+                    <div className="flex w-full items-center justify-between py-2">
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    window.history.back();
+                                }}
+                                className="transition-colors duration-200 hover:text-gray-500"
+                            >
+                                <ArrowLeftCircle size={35} />
+                            </Link>
+                            <h2 className="text-xl font-semibold">
+                                {isNew
+                                    ? t('Create carrier')
+                                    : t('Edit carrier')}
+                            </h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="submit"
+                                disabled={processing || importingZones}
+                            >
+                                <SaveIcon className="mr-2 h-4 w-4" />{' '}
+                                {t('Save')}
+                            </Button>
+                        </div>
+                    </div>
+                </StickyBar>
+
+                <div className="flex w-full max-w-[1200px] flex-col gap-5 md:mx-auto">
+                    <main className="space-y-6">
+                        <Card className="p-4">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <FormField
-                                    label={t('Order cutoff time')}
-                                    htmlFor="order_cutoff_time"
-                                    error={errors.order_cutoff_time}
+                                    label={t('Name')}
+                                    htmlFor="name"
+                                    error={errors.name}
                                 >
                                     <Input
-                                        id="order_cutoff_time"
-                                        name="order_cutoff_time"
-                                        type="time"
-                                        value={data.order_cutoff_time}
-                                        onChange={(event) => setData('order_cutoff_time', event.target.value)}
-                                        aria-invalid={!!errors.order_cutoff_time}
+                                        id="name"
+                                        name="name"
+                                        value={data.name}
+                                        onChange={(e) =>
+                                            setData('name', e.target.value)
+                                        }
+                                        aria-invalid={!!errors.name}
                                     />
                                 </FormField>
+                                <div className="min-w-0 md:col-span-2">
+                                    <BadgeMultiSelect
+                                        id="db_products"
+                                        label="Bases livrables"
+                                        placeholder="Ajouter une base…"
+                                        options={dbProducts.map((db) => ({
+                                            value: String(db.id),
+                                            label: db.name,
+                                        }))}
+                                        value={data.db_products.map((db) =>
+                                            String(db.id),
+                                        )}
+                                        onChange={(ids) =>
+                                            setData(
+                                                'db_products',
+                                                ids.map(
+                                                    (id) =>
+                                                        data.db_products.find(
+                                                            (db) =>
+                                                                db.id ===
+                                                                Number(id),
+                                                        ) ?? {
+                                                            id: Number(id),
+                                                            supplement_per_roll:
+                                                                '0',
+                                                        },
+                                                ),
+                                            )
+                                        }
+                                        renderBadge={(option) => {
+                                            const index =
+                                                data.db_products.findIndex(
+                                                    (db) =>
+                                                        db.id ===
+                                                        Number(option.value),
+                                                );
+                                            const base =
+                                                data.db_products[index];
+                                            return (
+                                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                                    <span>{option.label}</span>
+                                                    <span className="text-muted-foreground">
+                                                        +
+                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        aria-label={
+                                                            'Supplément HT par roll pour ' +
+                                                            option.label
+                                                        }
+                                                        aria-invalid={
+                                                            !!errorBag[
+                                                                'db_products.' +
+                                                                    index +
+                                                                    '.supplement_per_roll'
+                                                            ]
+                                                        }
+                                                        value={
+                                                            base?.supplement_per_roll ??
+                                                            '0'
+                                                        }
+                                                        className="h-6 w-16 rounded border border-input bg-background px-1 text-right text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                                                        onMouseDown={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                        onTouchEnd={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                        onClick={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                        onKeyDown={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                        onChange={(event) =>
+                                                            setData(
+                                                                'db_products',
+                                                                data.db_products.map(
+                                                                    (db) =>
+                                                                        db.id ===
+                                                                        Number(
+                                                                            option.value,
+                                                                        )
+                                                                            ? {
+                                                                                  ...db,
+                                                                                  supplement_per_roll:
+                                                                                      event
+                                                                                          .target
+                                                                                          .value,
+                                                                              }
+                                                                            : db,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                    <span className="text-xs text-muted-foreground">
+                                                        €/roll
+                                                    </span>
+                                                </span>
+                                            );
+                                        }}
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Supplément HT par roll ajouté à la
+                                        grille. 0 = aucun supplément.
+                                    </p>
+                                    {Object.entries(errorBag)
+                                        .filter(
+                                            ([key]) =>
+                                                key === 'db_products' ||
+                                                key.startsWith('db_products.'),
+                                        )
+                                        .map(([key, message]) => (
+                                            <InputError
+                                                key={key}
+                                                message={message}
+                                            />
+                                        ))}
+                                </div>
                             </div>
-                        </div>
+                            <div className="grid gap-4 md:grid-cols-4">
+                                <div className="md:col-span-2">
+                                    <FormField
+                                        label={t('Delivery days')}
+                                        htmlFor="days"
+                                        error={daysError}
+                                    >
+                                        <div className="flex flex-wrap gap-3">
+                                            {WEEKDAYS.map((day) => (
+                                                <div
+                                                    key={day.value}
+                                                    className="flex items-center space-x-2"
+                                                >
+                                                    <Checkbox
+                                                        id={`day-${day.value}`}
+                                                        checked={data.days.includes(
+                                                            day.value,
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleDay(day.value)
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor={`day-${day.value}`}
+                                                        className="cursor-pointer text-sm font-normal"
+                                                    >
+                                                        {day.label}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </FormField>
+                                </div>
 
-                    </Card>
+                                <div>
+                                    <FormField
+                                        label={t('Minimum delivery delay')}
+                                        htmlFor="minimum_delay_hours"
+                                        error={errors.minimum_delay_hours}
+                                    >
+                                        <Select
+                                            value={data.minimum_delay_hours}
+                                            onValueChange={(value) =>
+                                                setData(
+                                                    'minimum_delay_hours',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                id="minimum_delay_hours"
+                                                aria-invalid={
+                                                    !!errors.minimum_delay_hours
+                                                }
+                                            >
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[24, 48, 72, 96, 120, 168].map(
+                                                    (hours) => (
+                                                        <SelectItem
+                                                            key={hours}
+                                                            value={String(
+                                                                hours,
+                                                            )}
+                                                        >
+                                                            {hours}h
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormField>
+                                </div>
 
-                    <Card className="p-4 space-y-4">
-                        {!isNew && (
-                            <input
-                                ref={importInputRef}
-                                type="file"
-                                accept=".csv,text/csv,application/csv"
-                                className="hidden"
-                                onChange={handleImportFile}
-                            />
-                        )}
-                        {importZonesError && (
-                            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                                {importZonesError}
-                            </div>
-                        )}
-                        <div className="flex flex-wrap items-end justify-between gap-3">
-                            <div className="flex flex-wrap items-end gap-6">
-                                <h3 className="pb-2 text-sm font-semibold text-muted-foreground">{t('Delivery zones')}</h3>
-                                <div className="w-40">
-                                    <FormField label={t('Taxgo')} htmlFor="taxgo" error={errors.taxgo}>
+                                <div>
+                                    <FormField
+                                        label={t('Order cutoff time')}
+                                        htmlFor="order_cutoff_time"
+                                        error={errors.order_cutoff_time}
+                                    >
                                         <Input
-                                            id="taxgo"
-                                            name="taxgo"
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={data.taxgo}
-                                            onChange={(e) => setData('taxgo', e.target.value.replace(',', '.'))}
-                                            aria-invalid={!!errors.taxgo}
+                                            id="order_cutoff_time"
+                                            name="order_cutoff_time"
+                                            type="time"
+                                            value={data.order_cutoff_time}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'order_cutoff_time',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            aria-invalid={
+                                                !!errors.order_cutoff_time
+                                            }
                                         />
                                     </FormField>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                    {!isNew && (
+                        </Card>
+
+                        <Card className="space-y-4 p-4">
+                            {!isNew && (
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".csv,text/csv,application/csv"
+                                    className="hidden"
+                                    onChange={handleImportFile}
+                                />
+                            )}
+                            {importZonesError && (
+                                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                                    {importZonesError}
+                                </div>
+                            )}
+                            <div className="flex flex-wrap items-end justify-between gap-3">
+                                <div className="flex flex-wrap items-end gap-6">
+                                    <h3 className="pb-2 text-sm font-semibold text-muted-foreground">
+                                        {t('Delivery zones')}
+                                    </h3>
+                                    <div className="w-40">
+                                        <FormField
+                                            label={t('Taxgo')}
+                                            htmlFor="taxgo"
+                                            error={errors.taxgo}
+                                        >
+                                            <Input
+                                                id="taxgo"
+                                                name="taxgo"
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={data.taxgo}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'taxgo',
+                                                        e.target.value.replace(
+                                                            ',',
+                                                            '.',
+                                                        ),
+                                                    )
+                                                }
+                                                aria-invalid={!!errors.taxgo}
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                        {!isNew && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleImportClick}
+                                                disabled={
+                                                    processing || importingZones
+                                                }
+                                            >
+                                                {importingZones
+                                                    ? t('Importing...')
+                                                    : t('Import CSV')}
+                                            </Button>
+                                        )}
+                                        <Input
+                                            value={newRoll}
+                                            onChange={(e) =>
+                                                setNewRoll(e.target.value)
+                                            }
+                                            placeholder={t('Rolls')}
+                                            className="w-24"
+                                        />
                                         <Button
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            onClick={handleImportClick}
-                                            disabled={processing || importingZones}
+                                            onClick={addRoll}
                                         >
-                                            {importingZones ? t('Importing...') : t('Import CSV')}
+                                            <PlusIcon className="mr-2 h-4 w-4" />{' '}
+                                            {t('Add tier')}
                                         </Button>
-                                    )}
-                                    <Input
-                                        value={newRoll}
-                                        onChange={(e) => setNewRoll(e.target.value)}
-                                        placeholder={t('Rolls')}
-                                        className="w-24"
-                                    />
-                                    <Button type="button" variant="outline" size="sm" onClick={addRoll}>
-                                        <PlusIcon className="mr-2 h-4 w-4" /> {t('Add tier')}
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={addZone}
+                                    >
+                                        <PlusIcon className="mr-2 h-4 w-4" />{' '}
+                                        {t('Add zone')}
                                     </Button>
                                 </div>
-                                <Button type="button" variant="outline" size="sm" onClick={addZone}>
-                                    <PlusIcon className="mr-2 h-4 w-4" /> {t('Add zone')}
-                                </Button>
                             </div>
-                        </div>
 
-                        <DataTable
-                            columns={columns}
-                            data={zoneRows}
-                            emptyMessage={t('No zones yet')}
-                            getRowId={getZoneRowId}
-                            headerControls={headerControls}
-                        />
-                    </Card>
-                </main>
-            </div>
-        </form>
-    );
-});
+                            <DataTable
+                                columns={columns}
+                                data={zoneRows}
+                                emptyMessage={t('No zones yet')}
+                                getRowId={getZoneRowId}
+                                headerControls={headerControls}
+                            />
+                        </Card>
+                    </main>
+                </div>
+            </form>
+        );
+    },
+);

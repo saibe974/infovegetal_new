@@ -41,7 +41,7 @@ it('resolves an applicable carrier and zone transport context', function (): voi
         ],
     ]);
 
-    $resource = new ProductResource(new Product());
+    $resource = new ProductResource(new Product);
     $request = Request::create('/');
 
     $transport = productResourceResolveTransport($resource, $request, [
@@ -54,6 +54,7 @@ it('resolves an applicable carrier and zone transport context', function (): voi
         'zone_id' => $zone->id,
         'zone_name' => 'Base X',
         'taxgo' => 20.0,
+        'supplements_by_db' => [],
         'tariffs' => [
             'mini' => 120,
             'roll:1-3' => 150,
@@ -74,7 +75,7 @@ it('returns null when the carrier or zone is not eligible', function (): void {
         'taxgo' => 0,
     ]);
 
-    $resource = new ProductResource(new Product());
+    $resource = new ProductResource(new Product);
     $request = Request::create('/');
 
     expect(productResourceResolveTransport($resource, $request, [
@@ -120,7 +121,7 @@ it('uses carrier taxgo even when transport options include tva', function (): vo
         'tariffs' => ['mini' => 120, 'roll:1-3' => 150],
     ]);
 
-    $resource = new ProductResource(new Product());
+    $resource = new ProductResource(new Product);
     $request = Request::create('/');
 
     $transport = productResourceResolveTransport($resource, $request, [
@@ -136,6 +137,7 @@ it('uses carrier taxgo even when transport options include tva', function (): vo
         'zone_id' => $zoneB->id,
         'zone_name' => 'Zone B',
         'taxgo' => 20.0,
+        'supplements_by_db' => [],
         'tariffs' => [
             'mini' => 120,
             'roll:1-3' => 150,

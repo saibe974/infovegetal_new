@@ -260,8 +260,7 @@ export function NavMainExtended({
                                         >
                                             {item.icon && <item.icon />}
                                             <span>{item.title}</span>
-                                            <ChevronRight className={`ml-auto size-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
-                                            <ChevronRight className={`absolute left-5 bottom-2 size-3 opacity-60 transition-transform duration-200 hidden group-data-[collapsible=icon]:block ${isOpen ? 'rotate-90' : ''}`} />
+                                            <ChevronRight className={`ml-auto size-4 shrink-0 transition-transform duration-200 group-data-[collapsible=icon]:hidden ${isOpen ? 'rotate-90' : ''}`} />
                                         </Link>
                                     </SidebarMenuButton>
 

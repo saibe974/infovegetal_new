@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Casts\DaysMask;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Carrier extends Model
 {
@@ -13,29 +13,24 @@ class Carrier extends Model
 
     protected $fillable = [
         'name',
-        'country',
         'days',
         'minimum_delay_hours',
         'order_cutoff_time',
-        'minimum',
         'taxgo',
     ];
 
     protected $casts = [
         'days' => DaysMask::class,
         'minimum_delay_hours' => 'integer',
-        'minimum' => 'integer',
         'taxgo' => 'decimal:2',
     ];
 
     protected $sortable = [
         'id',
         'name',
-        'country',
         'days',
         'minimum_delay_hours',
         'order_cutoff_time',
-        'minimum',
         'taxgo',
         'zones_count',
         'created_at',
@@ -45,5 +40,16 @@ class Carrier extends Model
     public function zones()
     {
         return $this->hasMany(CarrierZone::class);
+    }
+
+    public function dbProducts()
+    {
+        return $this->belongsToMany(DbProducts::class, 'carrier_db_product', 'carrier_id', 'db_product_id')
+            ->withPivot('supplement_per_roll');
+    }
+
+    public function supplementsByDb(): array
+    {
+        return $this->dbProducts->mapWithKeys(fn ($db) => [(int) $db->id => (float) $db->pivot->supplement_per_roll])->all();
     }
 }

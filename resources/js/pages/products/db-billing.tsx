@@ -64,6 +64,7 @@ type Props = {
     };
     currentUserId: number;
     carriers: Array<{
+        db_products?: Array<{ id: number }>;
         id: number;
         name: string;
         country?: string | null;
@@ -1308,7 +1309,11 @@ export default withAppLayout<Props>(
                                         canManageSellerProfiles
                                     }
                                     canDelegateManage={canDelegateManage}
-                                    carriers={carriers}
+                                    carriers={carriers.filter((carrier) =>
+                                        carrier.db_products?.some(
+                                            (db) => db.id === dbProduct.id,
+                                        ),
+                                    )}
                                     userOptionById={userOptionById}
                                     setActiveSellerProfileId={
                                         setActiveSellerProfileId
@@ -1350,7 +1355,11 @@ export default withAppLayout<Props>(
                                     canManageSellerProfiles={
                                         canManageSellerProfiles
                                     }
-                                    carriers={carriers}
+                                    carriers={carriers.filter((carrier) =>
+                                        carrier.db_products?.some(
+                                            (db) => db.id === dbProduct.id,
+                                        ),
+                                    )}
                                     onRenameSellerProfile={renameSellerProfile}
                                     onChangeSellerProfileConditions={
                                         changeSellerProfileConditions

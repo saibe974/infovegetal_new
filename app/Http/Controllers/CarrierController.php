@@ -17,18 +17,18 @@ class CarrierController extends Controller
     public function index(Request $request)
     {
         $search = $request->get('q');
-        $query = Carrier::query()->withCount('zones')->orderFromRequest($request);
+        $query = Carrier::query()->with('dbProducts')->withCount('zones')->orderFromRequest($request);
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('country', 'like', '%' . $search . '%');
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhereHas('dbProducts', fn ($db) => $db->where('name', 'like', '%'.$search.'%'));
             });
         }
 
         return Inertia::render('carriers/index', [
             'q' => $search,
-            'collection' => Inertia::scroll(fn() => CarrierResource::collection(
+            'collection' => Inertia::scroll(fn () => CarrierResource::collection(
                 $query->paginate(15)
             )),
         ]);
@@ -40,7 +40,8 @@ class CarrierController extends Controller
     public function create()
     {
         return Inertia::render('carriers/form', [
-            'carrier' => CarrierResource::make(new Carrier()),
+            'carrier' => CarrierResource::make(new Carrier),
+            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -52,10 +53,14 @@ class CarrierController extends Controller
         try {
             $data = $this->validateCarrier($request);
             $zones = $this->normalizeZones($data['zones'] ?? []);
-            unset($data['zones']);
+            $bases = $data['db_products'];
+            unset($data['zones'], $data['db_products']);
 
-            $carrier = Carrier::create($data);
-            $this->syncZones($carrier, $zones);
+            DB::transaction(function () use ($data, $zones, $bases) {
+                $carrier = Carrier::create($data);
+                $this->syncZones($carrier, $zones);
+                $this->syncBases($carrier, $bases);
+            });
 
             return back()
                 ->with('success', 'Transporteur cree');
@@ -80,10 +85,11 @@ class CarrierController extends Controller
      */
     public function edit(Carrier $carrier)
     {
-        $carrier->load('zones');
+        $carrier->load(['zones', 'dbProducts']);
 
         return Inertia::render('carriers/form', [
             'carrier' => CarrierResource::make($carrier),
+            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -95,10 +101,14 @@ class CarrierController extends Controller
         try {
             $data = $this->validateCarrier($request);
             $zones = $this->normalizeZones($data['zones'] ?? []);
-            unset($data['zones']);
+            $bases = $data['db_products'];
+            unset($data['zones'], $data['db_products']);
 
-            $carrier->update($data);
-            $this->syncZones($carrier, $zones);
+            DB::transaction(function () use ($carrier, $data, $zones, $bases) {
+                $carrier->update($data);
+                $this->syncZones($carrier, $zones);
+                $this->syncBases($carrier, $bases);
+            });
 
             return back()
                 ->with('success', 'Transporteur mis a jour');
@@ -181,7 +191,7 @@ class CarrierController extends Controller
                 $zoneName = trim((string) ($row[$zoneIndex] ?? ''));
                 if ($zoneName === '') {
                     throw ValidationException::withMessages([
-                        'file' => 'La ligne ' . $lineNumber . ' ne contient pas de zone.',
+                        'file' => 'La ligne '.$lineNumber.' ne contient pas de zone.',
                     ]);
                 }
 
@@ -197,7 +207,7 @@ class CarrierController extends Controller
                         continue;
                     }
 
-                    $tariffs['roll:' . $roll] = $this->normalizeDecimal($value);
+                    $tariffs['roll:'.$roll] = $this->normalizeDecimal($value);
                 }
 
                 $zones[$zoneName] = [
@@ -262,12 +272,13 @@ class CarrierController extends Controller
     {
         return $request->validate([
             'name' => ['required', 'string', 'min:2', 'max:255'],
-            'country' => ['nullable', 'string', 'max:255'],
+            'db_products' => ['required', 'array', 'min:1'],
+            'db_products.*.id' => ['required', 'integer', 'distinct', 'exists:db_products,id'],
+            'db_products.*.supplement_per_roll' => ['required', 'numeric', 'min:0', 'max:99999999.99', 'decimal:0,2'],
             'days' => ['nullable', 'array'],
             'days.*' => ['string', 'in:1,2,3,4,5,6,7'],
             'minimum_delay_hours' => ['required', 'integer', 'min:0', 'max:720'],
             'order_cutoff_time' => ['required', 'date_format:H:i'],
-            'minimum' => ['nullable', 'integer', 'min:0'],
             'taxgo' => ['nullable', 'numeric', 'min:0'],
             'zones' => ['nullable', 'array'],
             'zones.*.id' => ['nullable', 'integer', 'exists:carrier_zones,id'],
@@ -276,12 +287,20 @@ class CarrierController extends Controller
         ]);
     }
 
+    private function syncBases(Carrier $carrier, array $bases): void
+    {
+        $carrier->dbProducts()->sync(collect($bases)->mapWithKeys(fn ($base) => [
+            (int) $base['id'] => ['supplement_per_roll' => $base['supplement_per_roll']],
+        ])->all());
+    }
+
     private function normalizeZones(array $zones): array
     {
         return collect($zones)
             ->filter(fn ($zone) => is_array($zone))
             ->map(function ($zone) {
                 $tariffs = $this->normalizeTariffs($zone['tariffs'] ?? []);
+
                 return [
                     'id' => $zone['id'] ?? null,
                     'name' => (string) ($zone['name'] ?? ''),
@@ -311,6 +330,7 @@ class CarrierController extends Controller
 
             if ($value === null) {
                 $normalized[(string) $key] = null;
+
                 continue;
             }
 
@@ -376,9 +396,10 @@ class CarrierController extends Controller
                 'tariffs' => $zone['tariffs'],
             ];
 
-            if (!empty($zone['id']) && $existing->has($zone['id'])) {
+            if (! empty($zone['id']) && $existing->has($zone['id'])) {
                 $existing[$zone['id']]->update($payload);
                 $keepIds[] = (int) $zone['id'];
+
                 continue;
             }
 
@@ -388,6 +409,7 @@ class CarrierController extends Controller
 
         if (count($zones) === 0) {
             $carrier->zones()->delete();
+
             return;
         }
 

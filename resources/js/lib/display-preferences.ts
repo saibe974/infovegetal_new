@@ -1,10 +1,36 @@
 import type { ViewMode } from '@/components/ui/view-mode-toggle';
 import type { Appearance } from '@/hooks/use-appearance';
+import {
+    canAccessUsers,
+    hasAnyPermission,
+    hasPermission,
+    isAdmin,
+    isDev,
+} from '@/lib/roles';
+import type { User } from '@/types';
 
 export type AccentColor = 'brand' | 'green' | 'blue' | 'neutral';
 export type DisplayDensity = 'comfortable' | 'compact';
 export type PreferenceScope = 'local' | 'account';
-export type PreferencePage = 'products' | 'users';
+
+export const PREFERENCE_PAGES = [
+    'dashboard',
+    'products',
+    'offers',
+    'categories',
+    'tags',
+    'db-products',
+    'missing-images',
+    'users',
+    'promotions',
+    'carriers',
+    'media',
+] as const;
+
+export type PreferencePage = (typeof PREFERENCE_PAGES)[number];
+
+export const SIDEBAR_APPLY_PREFERENCE_EVENT = 'sidebar-apply-preference';
+
 export type CartConfirmationPreference =
     | 'removeItem'
     | 'clearCart'
@@ -16,6 +42,20 @@ export type PageDisplayPreference = {
     view: ViewMode;
     rightSidebarOpen: boolean;
     autoOpenCartOnAdd?: boolean;
+};
+
+const pageViewModes: Record<PreferencePage, ViewMode[]> = {
+    dashboard: ['table'],
+    products: ['table', 'list', 'grid'],
+    offers: ['table'],
+    categories: ['table'],
+    tags: ['table'],
+    'db-products': ['table'],
+    'missing-images': ['table'],
+    users: ['accordion', 'grid'],
+    promotions: ['table'],
+    carriers: ['table'],
+    media: ['table'],
 };
 
 export type DisplayPreferences = {
@@ -38,6 +78,19 @@ export const DISPLAY_PREFERENCES_KEY = 'infovegetal:display-preferences:v1';
 export const ACCOUNT_PREFERENCES_KEY = `${DISPLAY_PREFERENCES_KEY}:account`;
 export const PREFERENCE_SCOPE_KEY = `${DISPLAY_PREFERENCES_KEY}:scope`;
 
+const buildDefaultPages = (): Record<PreferencePage, PageDisplayPreference> => {
+    const pages = {} as Record<PreferencePage, PageDisplayPreference>;
+    PREFERENCE_PAGES.forEach((page) => {
+        pages[page] = {
+            enabled: true,
+            view: pageViewModes[page][0],
+            rightSidebarOpen: false,
+            ...(page === 'products' ? { autoOpenCartOnAdd: true } : {}),
+        };
+    });
+    return pages;
+};
+
 export const defaultDisplayPreferences: DisplayPreferences = {
     version: 1,
     general: {
@@ -51,19 +104,7 @@ export const defaultDisplayPreferences: DisplayPreferences = {
         removeMissingImageLink: true,
         removeMissingImageLinks: true,
     },
-    pages: {
-        products: {
-            enabled: true,
-            view: 'table',
-            rightSidebarOpen: false,
-            autoOpenCartOnAdd: true,
-        },
-        users: {
-            enabled: true,
-            view: 'accordion',
-            rightSidebarOpen: false,
-        },
-    },
+    pages: buildDefaultPages(),
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -77,9 +118,7 @@ export function normalizeDisplayPreferences(
     const confirmations = isRecord(input.confirmations)
         ? input.confirmations
         : {};
-    const pages = isRecord(input.pages) ? input.pages : {};
-    const products = isRecord(pages.products) ? pages.products : {};
-    const users = isRecord(pages.users) ? pages.users : {};
+    const pagesInput = isRecord(input.pages) ? input.pages : {};
 
     const theme = ['light', 'dark', 'system'].includes(String(general.theme))
         ? (general.theme as Appearance)
@@ -92,6 +131,30 @@ export function normalizeDisplayPreferences(
     const density = ['comfortable', 'compact'].includes(String(general.density))
         ? (general.density as DisplayDensity)
         : defaultDisplayPreferences.general.density;
+
+    const pages = {} as Record<PreferencePage, PageDisplayPreference>;
+    PREFERENCE_PAGES.forEach((page) => {
+        const raw = isRecord(pagesInput[page]) ? pagesInput[page] : {};
+        const views = pageViewModes[page];
+        pages[page] = {
+            enabled: typeof raw.enabled === 'boolean' ? raw.enabled : true,
+            view: views.includes(raw.view as ViewMode)
+                ? (raw.view as ViewMode)
+                : views[0],
+            rightSidebarOpen:
+                typeof raw.rightSidebarOpen === 'boolean'
+                    ? raw.rightSidebarOpen
+                    : false,
+            ...(page === 'products'
+                ? {
+                      autoOpenCartOnAdd:
+                          typeof raw.autoOpenCartOnAdd === 'boolean'
+                              ? raw.autoOpenCartOnAdd
+                              : true,
+                  }
+                : {}),
+        };
+    });
 
     return {
         version: 1,
@@ -109,43 +172,14 @@ export function normalizeDisplayPreferences(
                 typeof confirmations.removeMissingImageLink === 'boolean'
                     ? confirmations.removeMissingImageLink
                     : typeof confirmations.removeMissingImageLinks === 'boolean'
-                        ? confirmations.removeMissingImageLinks
-                        : true,
+                      ? confirmations.removeMissingImageLinks
+                      : true,
             removeMissingImageLinks:
                 typeof confirmations.removeMissingImageLinks === 'boolean'
                     ? confirmations.removeMissingImageLinks
                     : true,
         },
-        pages: {
-            products: {
-                enabled:
-                    typeof products.enabled === 'boolean'
-                        ? products.enabled
-                        : true,
-                view: ['table', 'list', 'grid'].includes(String(products.view))
-                    ? (products.view as ViewMode)
-                    : 'table',
-                rightSidebarOpen:
-                    typeof products.rightSidebarOpen === 'boolean'
-                        ? products.rightSidebarOpen
-                        : false,
-                autoOpenCartOnAdd:
-                    typeof products.autoOpenCartOnAdd === 'boolean'
-                        ? products.autoOpenCartOnAdd
-                        : true,
-            },
-            users: {
-                enabled:
-                    typeof users.enabled === 'boolean' ? users.enabled : true,
-                view: ['accordion', 'grid'].includes(String(users.view))
-                    ? (users.view as ViewMode)
-                    : 'accordion',
-                rightSidebarOpen:
-                    typeof users.rightSidebarOpen === 'boolean'
-                        ? users.rightSidebarOpen
-                        : false,
-            },
-        },
+        pages,
     };
 }
 
@@ -225,9 +259,25 @@ export function storeDisplayPreferences(
 }
 
 function pageFromPath(pathname: string): PreferencePage | null {
+    if (
+        pathname === '/products/images' ||
+        pathname.startsWith('/products/images/')
+    )
+        return 'missing-images';
     if (pathname === '/products' || pathname.startsWith('/products/'))
         return 'products';
     if (pathname === '/users' || pathname.startsWith('/users/')) return 'users';
+    if (pathname.startsWith('/admin/users')) return 'users';
+    if (pathname === '/' || pathname.startsWith('/dashboard'))
+        return 'dashboard';
+    if (pathname === '/offres' || pathname.startsWith('/offres/'))
+        return 'offers';
+    if (pathname.startsWith('/category-products')) return 'categories';
+    if (pathname.startsWith('/tags-products')) return 'tags';
+    if (pathname.startsWith('/db-products')) return 'db-products';
+    if (pathname.startsWith('/promotions')) return 'promotions';
+    if (pathname.startsWith('/carriers')) return 'carriers';
+    if (pathname.startsWith('/admin/media-manager')) return 'media';
     return null;
 }
 
@@ -258,6 +308,12 @@ function applySidebarPreference(
 
     states.right = preferences.pages[page].rightSidebarOpen;
     document.cookie = `sidebar_state=${encodeURIComponent(JSON.stringify(states))}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+
+    window.dispatchEvent(
+        new CustomEvent(SIDEBAR_APPLY_PREFERENCE_EVENT, {
+            detail: { id: 'right', open: states.right },
+        }),
+    );
 }
 
 export function applyDisplayPreferences(
@@ -421,4 +477,45 @@ export function persistSidebarPreference(id: string, open: boolean): void {
 
     const page = pageFromPath(window.location.pathname);
     if (page) persistPagePreference(page, { rightSidebarOpen: open });
+}
+
+/**
+ * Liste des pages de préférences réellement accessibles par l'utilisateur,
+ * en miroir de la logique de la barre latérale principale.
+ */
+export function getAccessiblePreferencePages(
+    user: User | null | undefined,
+    canManagePromotions = false,
+): PreferencePage[] {
+    if (!user) return ['products'];
+
+    const pages: PreferencePage[] = ['dashboard', 'products', 'offers'];
+
+    if (isAdmin(user) || hasPermission(user, 'products.categories.manage'))
+        pages.push('categories');
+    if (isDev(user) || hasPermission(user, 'preview')) pages.push('tags');
+
+    const canManageDbProducts =
+        isAdmin(user) ||
+        hasPermission(user, 'users.db_products.manage.all') ||
+        hasPermission(user, 'users.db_products.manage.his');
+    if (canManageDbProducts) pages.push('db-products');
+    if (isDev(user) || canManageDbProducts) pages.push('missing-images');
+
+    if (canAccessUsers(user)) pages.push('users');
+    if (canManagePromotions) pages.push('promotions');
+    if (
+        isAdmin(user) ||
+        hasAnyPermission(user, [
+            'carriers.view',
+            'carriers.create',
+            'carriers.update',
+            'carriers.delete',
+            'manage carriers',
+        ])
+    )
+        pages.push('carriers');
+    if (isAdmin(user)) pages.push('media');
+
+    return pages;
 }

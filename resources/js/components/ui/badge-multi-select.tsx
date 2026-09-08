@@ -39,6 +39,7 @@ export function BadgeMultiSelect({
     value,
     onChange,
     showAllOptionsWhenEmpty = false,
+    renderBadge,
 }: {
     id: string;
     label: string;
@@ -47,6 +48,7 @@ export function BadgeMultiSelect({
     value: string[];
     onChange: (values: string[]) => void;
     showAllOptionsWhenEmpty?: boolean;
+    renderBadge?: (option: BadgeMultiSelectOption) => ReactNode;
 }) {
     const selectedOptions = showAllOptionsWhenEmpty && value.length === 0
         ? options
@@ -77,7 +79,7 @@ export function BadgeMultiSelect({
                 isSearchable={options.length > 8}
                 controlShouldRenderValue
                 components={{ Option: BadgeOption }}
-                formatOptionLabel={(option) => (
+                formatOptionLabel={(option, context) => context.context === 'value' && renderBadge ? renderBadge(option) : (
                     <span className="flex min-w-0 items-center gap-1.5">
                         {option.icon}
                         <span className="truncate">{option.label}</span>

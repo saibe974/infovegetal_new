@@ -1,7 +1,7 @@
+import type { DisplayPreferences } from '@/lib/display-preferences';
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { DisplayPreferences } from '@/lib/display-preferences';
 
 export interface PaginatedCollection<T> {
     data: T[];
@@ -195,11 +195,14 @@ export interface CarrierZone {
 export interface Carrier {
     id?: number;
     name: string;
-    country?: string | null;
+    db_products?: Array<{
+        id: number;
+        name: string;
+        supplement_per_roll: number;
+    }>;
     days?: string[] | null;
     minimum_delay_hours?: number | null;
     order_cutoff_time?: string | null;
-    minimum?: number | null;
     taxgo?: number | null;
     zones?: CarrierZone[];
     zones_count?: number;
@@ -253,8 +256,19 @@ export interface Product {
     [key: string]: unknown; // This allows for additional properties...
 }
 
-export type PromotionStatus = 'draft' | 'ready' | 'scheduled' | 'active' | 'suspended' | 'ended' | 'cancelled';
-export type PromotionVisibility = 'public' | 'authenticated' | 'targeted' | 'unlisted';
+export type PromotionStatus =
+    | 'draft'
+    | 'ready'
+    | 'scheduled'
+    | 'active'
+    | 'suspended'
+    | 'ended'
+    | 'cancelled';
+export type PromotionVisibility =
+    | 'public'
+    | 'authenticated'
+    | 'targeted'
+    | 'unlisted';
 
 export interface Promotion {
     presentation_title?: string | null;

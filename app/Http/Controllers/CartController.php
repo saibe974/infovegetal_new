@@ -318,7 +318,7 @@ class CartController extends Controller
         }
 
         $carriers = \App\Models\Carrier::query()
-            ->get(['id', 'name', 'days', 'minimum', 'minimum_delay_hours', 'order_cutoff_time'])
+            ->get(['id', 'name', 'days', 'minimum_delay_hours', 'order_cutoff_time'])
             ->mapWithKeys(fn ($carrier) => [
                 (int) $carrier->id => [
                     'name' => (string) $carrier->name,
@@ -376,7 +376,7 @@ class CartController extends Controller
             $zoneIds = array_unique(array_map(fn ($p) => $p['zone_id'], $carrierZonePairs));
             $carriersData = \App\Models\Carrier::query()
                 ->whereIn('id', $carrierIds)
-                ->get(['id', 'taxgo'])
+                ->with('dbProducts')->get(['id', 'taxgo'])
                 ->keyBy('id');
             $zonesData = \App\Models\CarrierZone::query()
                 ->whereIn('id', $zoneIds)
@@ -394,6 +394,7 @@ class CartController extends Controller
                     'zone_id' => (int) $zone->id,
                     'zone_name' => (string) ($zone->name ?? ''),
                     'taxgo' => (float) ($carrier->taxgo ?? 0),
+                    'supplements_by_db' => $carrier->supplementsByDb(),
                     'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
                 ];
             }
@@ -1076,8 +1077,35 @@ class CartController extends Controller
             }
         }
 
-        $backendShipping = $this->computeShippingFromRollDistribution($rollDistribution, $pivotsByDbProductId);
-        $effectiveShipping = $backendShipping > 0.0 ? $backendShipping : $shippingTotal;
+        $transportBreakdown = (new TransportDeparturePricingService)->calculateBreakdown($rollDistribution, $pivotsByDbProductId);
+        $effectiveShipping = $transportBreakdown['total'];
+        $shippingByDb = $transportBreakdown['by_db'];
+        if (! $preferInputPrices) {
+            $renderedPrices = [];
+            foreach ($transportBreakdown['groups'] as $group) {
+                foreach ($group['bases'] as $base) {
+                    if ($base['rendered']) {
+                        $carrier = \App\Models\Carrier::find($group['carrier_id']);
+                        $renderedPrices[$base['id']] = $group['price_per_roll'] * (1 + max(0, (float) $carrier->taxgo) / 100);
+                    }
+                }
+            }
+            $items = $items->map(function ($item) use ($renderedPrices, $pivotsByDbProductId) {
+                $product = $item['product'];
+                $dbId = (int) $product->db_products_id;
+                $capacity = (int) $product->cond * (int) $product->floor * (int) $product->roll;
+                if (isset($renderedPrices[$dbId]) && $capacity > 0) {
+                    $attrs = $pivotsByDbProductId[$dbId];
+                    $factor = 1 - (float) ($attrs['pd'] ?? 0) / 100;
+                    $delta = ($renderedPrices[$dbId] - (float) ($attrs['l'] ?? 0)) / $capacity;
+                    $item['unit_price'] = round(max(0, $item['unit_price'] + $delta / ($factor > 0 ? $factor : 1)), 2);
+                    $item['line_total'] = $item['unit_price'] * $item['quantity'];
+                }
+
+                return $item;
+            });
+            $itemsTotal = $items->sum(fn ($item) => $item['line_total']);
+        }
 
         $facturantUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($facturantIds)))->get();
         $commercialUsers = \App\Models\User::with('usersMeta')->whereIn('id', array_values(array_unique($commercialIds)))->get();
@@ -1124,6 +1152,7 @@ class CartController extends Controller
             'items' => $items,
             'items_total' => $itemsTotal,
             'shipping_total' => $effectiveShipping,
+            'transport_breakdown' => $transportBreakdown,
             'discounts' => $discountSummary['by_db'],
             'discount_total' => $discountTotal,
             'coupon' => $couponSummary,

@@ -32,7 +32,9 @@ it('calculates the shipping total from zone tariffs and carrier tax', function (
         ],
     ]);
 
-    $service = new TransportDeparturePricingService();
+    $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+    $carrier->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    $service = new TransportDeparturePricingService;
     $shipping = $service->calculate([
         'suppliers' => [
             [
@@ -62,7 +64,7 @@ it('calculates the shipping total from zone tariffs and carrier tax', function (
  * BR-035
  */
 it('returns zero when the shipping inputs do not yield a valid tariff', function (): void {
-    $service = new TransportDeparturePricingService();
+    $service = new TransportDeparturePricingService;
 
     expect($service->calculate(['suppliers' => []], []))->toBe(0.0);
 });
@@ -90,7 +92,11 @@ it('falls back to the closest upper tier for carrier tariffs when below first ra
         ],
     ]);
 
-    $service = new TransportDeparturePricingService();
+    if (isset($carrier)) {
+        $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+        $carrier->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    }
+    $service = new TransportDeparturePricingService;
     $shipping = $service->calculate([
         'suppliers' => [
             [
@@ -153,7 +159,10 @@ it('supports multi-options transport stored as JSON in t', function (): void {
         ],
     ]);
 
-    $service = new TransportDeparturePricingService();
+    $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+    $carrierA->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    $carrierB->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    $service = new TransportDeparturePricingService;
     $shipping = $service->calculate([
         'suppliers' => [
             [
@@ -203,7 +212,11 @@ it('uses carrier taxgo instead of tva from transport option json', function (): 
         ],
     ]);
 
-    $service = new TransportDeparturePricingService();
+    if (isset($carrier)) {
+        $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+        $carrier->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    }
+    $service = new TransportDeparturePricingService;
     $shipping = $service->calculate([
         'suppliers' => [
             [
@@ -234,7 +247,11 @@ it('uses carrier taxgo instead of tva from transport option json', function (): 
  * BR-029
  */
 it('applies custom minimum lm and custom vat tvat in departure mode', function (): void {
-    $service = new TransportDeparturePricingService();
+    if (isset($carrier)) {
+        $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+        $carrier->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    }
+    $service = new TransportDeparturePricingService;
 
     $shipping = $service->calculate([
         'suppliers' => [
@@ -264,7 +281,11 @@ it('applies custom minimum lm and custom vat tvat in departure mode', function (
  * BR-030
  */
 it('applies custom minimum lm and custom vat tvat in rendered mode', function (): void {
-    $service = new TransportDeparturePricingService();
+    if (isset($carrier)) {
+        $db = \App\Models\DbProducts::firstOrCreate(['id' => 1], ['name' => 'Test base']);
+        $carrier->dbProducts()->syncWithoutDetaching([$db->id => ['supplement_per_roll' => 0]]);
+    }
+    $service = new TransportDeparturePricingService;
 
     $shipping = $service->calculate([
         'suppliers' => [

@@ -89,7 +89,7 @@ class ProductResource extends JsonResource
                     ->where('id', $zoneId)
                     ->select(['id', 'carrier_id', 'name', 'tariffs']),
             ])
-            ->first(['id', 'taxgo']);
+            ->with('dbProducts')->first(['id', 'taxgo']);
 
         $zone = $carrier?->zones?->first();
         if (! $carrier || ! $zone) {
@@ -101,6 +101,7 @@ class ProductResource extends JsonResource
             'zone_id' => (int) $zone->id,
             'zone_name' => (string) ($zone->name ?? ''),
             'taxgo' => (float) ($carrier->taxgo ?? 0),
+            'supplements_by_db' => $carrier->supplementsByDb(),
             'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
         ];
     }

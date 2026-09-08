@@ -1,18 +1,29 @@
-import { withAppLayout } from '@/layouts/app-layout';
-import carriers from '@/routes/carriers';
-import { type BreadcrumbItem, type Carrier, type PaginatedCollection } from '@/types';
-import { Head, Link, router, InfiniteScroll } from '@inertiajs/react';
-import { useRef, useState } from 'react';
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import CountryFlag from '@/components/ui/country-flag';
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { withAppLayout } from '@/layouts/app-layout';
+import carriers from '@/routes/carriers';
+import {
+    type BreadcrumbItem,
+    type Carrier,
+    type PaginatedCollection,
+} from '@/types';
+import { Head, InfiniteScroll, Link, router } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+
 import SearchSelect from '@/components/app/search-select';
-import { StickyBar } from '@/components/ui/sticky-bar';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { StickyBar } from '@/components/ui/sticky-bar';
 import { useI18n } from '@/lib/i18n';
+import { EditIcon, TrashIcon } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -36,9 +47,7 @@ const formatDays = (days?: string[] | null) => {
         return '-';
     }
 
-    const labels = days
-        .map((day) => WEEKDAY_LABELS[day])
-        .filter(Boolean);
+    const labels = days.map((day) => WEEKDAY_LABELS[day]).filter(Boolean);
 
     return labels.length > 0 ? labels.join(', ') : '-';
 };
@@ -49,13 +58,22 @@ type Props = {
 };
 
 const getCsrfToken = (): string =>
-    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+    (
+        document.querySelector(
+            'meta[name="csrf-token"]',
+        ) as HTMLMetaElement | null
+    )?.content ?? '';
 
 function TaxgoInput({ carrier }: { carrier: Carrier }) {
-    const initialValue = carrier.taxgo === null || carrier.taxgo === undefined ? '' : String(carrier.taxgo);
+    const initialValue =
+        carrier.taxgo === null || carrier.taxgo === undefined
+            ? ''
+            : String(carrier.taxgo);
     const [value, setValue] = useState(initialValue);
     const [savedValue, setSavedValue] = useState(initialValue);
-    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+        'idle',
+    );
 
     const save = async () => {
         if (status === 'saving' || value === savedValue) {
@@ -72,15 +90,18 @@ function TaxgoInput({ carrier }: { carrier: Carrier }) {
                     'X-CSRF-TOKEN': getCsrfToken(),
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-                body: JSON.stringify({ taxgo: value === '' ? null : Number(value) }),
+                body: JSON.stringify({
+                    taxgo: value === '' ? null : Number(value),
+                }),
             });
 
             if (!response.ok) {
                 throw new Error('Taxgo update failed');
             }
 
-            const result = await response.json() as { taxgo: number | null };
-            const normalizedValue = result.taxgo === null ? '' : String(result.taxgo);
+            const result = (await response.json()) as { taxgo: number | null };
+            const normalizedValue =
+                result.taxgo === null ? '' : String(result.taxgo);
             setValue(normalizedValue);
             setSavedValue(normalizedValue);
             setStatus('saved');
@@ -114,7 +135,9 @@ function TaxgoInput({ carrier }: { carrier: Carrier }) {
             disabled={status === 'saving'}
             aria-label={`Taxgo ${carrier.name}`}
             aria-invalid={status === 'error'}
-            title={status === 'error' ? 'Erreur lors de la mise à jour' : undefined}
+            title={
+                status === 'error' ? 'Erreur lors de la mise à jour' : undefined
+            }
             className={`h-8 w-24 text-right ${status === 'saved' ? 'border-green-600' : ''}`}
         />
     );
@@ -151,11 +174,15 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
 
         if (trimmed.length === 0) return;
         setSearch('');
-        router.get(window.location.pathname, { q: trimmed }, {
-            preserveState: false,
-            replace: true,
-            preserveScroll: false,
-        });
+        router.get(
+            window.location.pathname,
+            { q: trimmed },
+            {
+                preserveState: false,
+                replace: true,
+                preserveScroll: false,
+            },
+        );
     };
 
     return (
@@ -184,43 +211,96 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                     <TableHeader>
                         <TableRow>
                             <SortableTableHead field="id">ID</SortableTableHead>
-                            <SortableTableHead field="name">{t('Name')}</SortableTableHead>
-                            <SortableTableHead field="country">{t('Country')}</SortableTableHead>
-                            <SortableTableHead field="days">{t('Days')}</SortableTableHead>
-                            <SortableTableHead field="minimum">{t('Minimum')}</SortableTableHead>
-                            <SortableTableHead field="taxgo">{t('Taxgo')}</SortableTableHead>
-                            <SortableTableHead field="zones_count">{t('Zones')}</SortableTableHead>
-                            <TableHead className="text-end">{t('Actions')}</TableHead>
+                            <SortableTableHead field="name">
+                                {t('Name')}
+                            </SortableTableHead>
+                            <TableHead>Bases livrables</TableHead>
+                            <SortableTableHead field="days">
+                                {t('Days')}
+                            </SortableTableHead>
+                            <SortableTableHead field="taxgo">
+                                {t('Taxgo')}
+                            </SortableTableHead>
+                            <SortableTableHead field="zones_count">
+                                {t('Zones')}
+                            </SortableTableHead>
+                            <TableHead className="text-end">
+                                {t('Actions')}
+                            </TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {Array.from(new Map(collection.data.map((item) => [item.id, item])).values()).map((item) => (
+                        {Array.from(
+                            new Map(
+                                collection.data.map((item) => [item.id, item]),
+                            ).values(),
+                        ).map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
                                 <TableCell>
-                                    <Link href={carriers.edit(item.id as number)} className="hover:underline font-medium">
+                                    <Link
+                                        href={carriers.edit(item.id as number)}
+                                        className="font-medium hover:underline"
+                                    >
                                         {item.name}
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    <CountryFlag countryCode={item.country} className="w-6" title={item.country ?? undefined} />
+                                    <div className="flex flex-wrap gap-1">
+                                        {item.db_products?.map((db) => (
+                                            <span
+                                                key={db.id}
+                                                className="rounded-full border px-2 py-0.5 text-xs"
+                                            >
+                                                {db.name}
+                                                {db.supplement_per_roll > 0
+                                                    ? ' + ' +
+                                                      db.supplement_per_roll.toLocaleString(
+                                                          'fr-FR',
+                                                      ) +
+                                                      ' €/roll'
+                                                    : ''}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </TableCell>
                                 <TableCell>{formatDays(item.days)}</TableCell>
-                                <TableCell>{item.minimum ?? '-'}</TableCell>
-                                <TableCell><TaxgoInput carrier={item} /></TableCell>
+                                <TableCell>
+                                    <TaxgoInput carrier={item} />
+                                </TableCell>
                                 <TableCell>{item.zones_count ?? 0}</TableCell>
                                 <TableCell>
-                                    <div className="flex gap-2 justify-end">
-                                        <Button asChild size="icon" variant="outline">
-                                            <Link href={carriers.edit(item.id as number)}>
+                                    <div className="flex justify-end gap-2">
+                                        <Button
+                                            asChild
+                                            size="icon"
+                                            variant="outline"
+                                        >
+                                            <Link
+                                                href={carriers.edit(
+                                                    item.id as number,
+                                                )}
+                                            >
                                                 <EditIcon size={16} />
                                             </Link>
                                         </Button>
-                                        <Button asChild size="icon" variant="destructive-outline">
+                                        <Button
+                                            asChild
+                                            size="icon"
+                                            variant="destructive-outline"
+                                        >
                                             <Link
-                                                href={carriers.destroy(item.id as number)}
+                                                href={carriers.destroy(
+                                                    item.id as number,
+                                                )}
                                                 method="delete"
-                                                onBefore={() => confirm(t('Are you sure you want to delete this carrier?'))}
+                                                onBefore={() =>
+                                                    confirm(
+                                                        t(
+                                                            'Are you sure you want to delete this carrier?',
+                                                        ),
+                                                    )
+                                                }
                                             >
                                                 <TrashIcon size={16} />
                                             </Link>

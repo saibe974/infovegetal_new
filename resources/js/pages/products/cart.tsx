@@ -1,33 +1,10 @@
-import { withAppLayout } from '@/layouts/app-layout';
-import products from '@/routes/products';
-import { type BreadcrumbItem } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, FlowerIcon, Minus, Pencil, Plus, TicketPercent, Trash2, TruckIcon } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DatePicker } from '@/components/ui/datePicker';
-import { useI18n } from '@/lib/i18n';
-import { CartContext } from '@/components/cart/cart.context';
-import { type MouseEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { StickyBar } from '@/components/ui/sticky-bar';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import BasicSticky from 'react-sticky-el';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { buildRollDistribution, ProductRoll } from '@/components/products/product-roll';
-import { buildCartTransportContext, calculateCartShipping, getCarrierOptions, getRenderedProductDeliveryPerRoll, getSupplierRollPrices } from '@/components/cart/cart-shipping';
-import { getCartPricing } from '@/components/cart/cart-pricing';
-import { getQuantityStep, getUniteQuantity } from '@/components/cart/cart-quantity-rules';
-import { getProductCartImage } from '@/components/products/product-cart-image';
-import { formatCurrency } from '@/lib/utils';
-import { useCartOrder } from '@/components/cart/cart-order.context';
-import { SharedData } from '@/types';
-import { Separator } from '@/components/ui/separator';
-import CountryFlag from '@/components/ui/country-flag';
-import { getCarrierOverridesStorageKey, readCarrierOverrides, writeCarrierOverrides, type CarrierOverrides } from '@/components/cart/cart-carrier-storage';
-import { getEffectiveUser, hasAnyRole, hasPermission } from '@/lib/roles';
+import {
+    getCarrierOverridesStorageKey,
+    readCarrierOverrides,
+    writeCarrierOverrides,
+    type CarrierOverrides,
+} from '@/components/cart/cart-carrier-storage';
 import {
     getCartDiscountsStorageKey,
     readCartDiscounts,
@@ -35,6 +12,65 @@ import {
     type CartDiscountDraft as DbDiscountDraft,
     type CartDiscountType as DiscountType,
 } from '@/components/cart/cart-discount-storage';
+import { useCartOrder } from '@/components/cart/cart-order.context';
+import { getCartPricing } from '@/components/cart/cart-pricing';
+import {
+    getQuantityStep,
+    getUniteQuantity,
+} from '@/components/cart/cart-quantity-rules';
+import {
+    buildCartTransportContext,
+    calculateCartShipping,
+    getCarrierOptions,
+} from '@/components/cart/cart-shipping';
+import { CartContext } from '@/components/cart/cart.context';
+import { getProductCartImage } from '@/components/products/product-cart-image';
+import {
+    buildRollDistribution,
+    ProductRoll,
+} from '@/components/products/product-roll';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import CountryFlag from '@/components/ui/country-flag';
+import { DatePicker } from '@/components/ui/datePicker';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import { withAppLayout } from '@/layouts/app-layout';
+import { useI18n } from '@/lib/i18n';
+import { getEffectiveUser, hasAnyRole, hasPermission } from '@/lib/roles';
+import { cn, formatCurrency } from '@/lib/utils';
+import products from '@/routes/products';
+import { SharedData, type BreadcrumbItem } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowLeftCircle,
+    FlowerIcon,
+    Minus,
+    Pencil,
+    Plus,
+    TicketPercent,
+    Trash2,
+    TruckIcon,
+} from 'lucide-react';
+import {
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type MouseEvent,
+} from 'react';
+import BasicSticky from 'react-sticky-el';
 
 type Props = Record<string, never>;
 
@@ -43,16 +79,27 @@ const useCartSidebarTopOffset = () => {
 
     useEffect(() => {
         const elements = Array.from(
-            document.querySelectorAll<HTMLElement>('.top-sticky, .sticky-bar-cart'),
+            document.querySelectorAll<HTMLElement>(
+                '.top-sticky, .sticky-bar-cart',
+            ),
         );
 
         const update = () => {
             const nextOffset = elements.reduce((total, element) => {
-                const marginBottom = element.classList.contains('sticky-bar-cart')
-                    ? Number.parseFloat(window.getComputedStyle(element).marginBottom) || 0
+                const marginBottom = element.classList.contains(
+                    'sticky-bar-cart',
+                )
+                    ? Number.parseFloat(
+                          window.getComputedStyle(element).marginBottom,
+                      ) || 0
                     : 0;
 
-                return total + Math.ceil(element.getBoundingClientRect().height + marginBottom);
+                return (
+                    total +
+                    Math.ceil(
+                        element.getBoundingClientRect().height + marginBottom,
+                    )
+                );
             }, 0);
 
             setTopOffset(nextOffset);
@@ -61,9 +108,10 @@ const useCartSidebarTopOffset = () => {
         update();
         window.addEventListener('resize', update);
 
-        const resizeObserver = typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(update)
-            : null;
+        const resizeObserver =
+            typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(update)
+                : null;
         elements.forEach((element) => resizeObserver?.observe(element));
 
         return () => {
@@ -80,13 +128,17 @@ const parseDiscountValue = (value: string): number => {
     return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 };
 
-const calculateDiscountAmount = (grossTotal: number, discount?: DbDiscountDraft): number => {
+const calculateDiscountAmount = (
+    grossTotal: number,
+    discount?: DbDiscountDraft,
+): number => {
     if (!discount || grossTotal <= 0) return 0;
 
     const value = parseDiscountValue(discount.value);
-    const amount = discount.type === 'percent'
-        ? grossTotal * Math.min(100, value) / 100
-        : Math.min(grossTotal, value);
+    const amount =
+        discount.type === 'percent'
+            ? (grossTotal * Math.min(100, value)) / 100
+            : Math.min(grossTotal, value);
 
     return Math.round(amount * 100) / 100;
 };
@@ -98,7 +150,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const toText = (value: unknown): string => (value === undefined || value === null ? '' : String(value));
+const toText = (value: unknown): string =>
+    value === undefined || value === null ? '' : String(value);
 
 type CartCarrierTiming = {
     name: string;
@@ -119,15 +172,22 @@ const getDayOfWeek = (dateStr: string): number => {
     return ((date.getDay() + 6) % 7) + 1;
 };
 
-const getCarrierMinimumDeliveryDate = (carrier: CartCarrierTiming, now = new Date()): string => {
+const getCarrierMinimumDeliveryDate = (
+    carrier: CartCarrierTiming,
+    now = new Date(),
+): string => {
     const delayHours = Math.max(0, Number(carrier.minimum_delay_hours ?? 24));
-    const cutoffMatch = String(carrier.order_cutoff_time ?? '12:00').match(/^(\d{1,2}):(\d{2})/);
+    const cutoffMatch = String(carrier.order_cutoff_time ?? '12:00').match(
+        /^(\d{1,2}):(\d{2})/,
+    );
     const cutoffMinutes = cutoffMatch
         ? Number(cutoffMatch[1]) * 60 + Number(cutoffMatch[2])
         : 12 * 60;
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const cutoffPenaltyHours = currentMinutes >= cutoffMinutes ? 24 : 0;
-    const candidate = new Date(now.getTime() + (delayHours + cutoffPenaltyHours) * 60 * 60 * 1000);
+    const candidate = new Date(
+        now.getTime() + (delayHours + cutoffPenaltyHours) * 60 * 60 * 1000,
+    );
     const allowedDays = new Set((carrier.days ?? []).map(Number));
 
     if (allowedDays.size > 0) {
@@ -143,7 +203,10 @@ const getCarrierMinimumDeliveryDate = (carrier: CartCarrierTiming, now = new Dat
 };
 
 const getAllowedDays = (
-    groupedItems: Array<{ id: number; carrierOptions?: Array<{ carrierId: number }> }>,
+    groupedItems: Array<{
+        id: number;
+        carrierOptions?: Array<{ carrierId: number }>;
+    }>,
     carrierOverrides: Record<number, { carrierId: number }>,
     cartCarriers: Record<string, { days: string[] | null }>,
 ): Set<number> => {
@@ -169,14 +232,23 @@ const CarrierAwareDatePicker = ({
 }: {
     deliveryDate: string;
     setDeliveryDate: (v: string) => void;
-    groupedItems: Array<{ id: number; carrierOptions?: Array<{ carrierId: number }> }>;
+    groupedItems: Array<{
+        id: number;
+        carrierOptions?: Array<{ carrierId: number }>;
+    }>;
     carrierOverrides: Record<number, { carrierId: number }>;
     cartCarriers: Record<string, CartCarrierTiming>;
     t: (key: string) => string;
 }) => {
-    const allowedDays = getAllowedDays(groupedItems, carrierOverrides, cartCarriers);
+    const allowedDays = getAllowedDays(
+        groupedItems,
+        carrierOverrides,
+        cartCarriers,
+    );
     const minimumDate = groupedItems.reduce((latestDate, group) => {
-        const carrierId = carrierOverrides[group.id]?.carrierId ?? group.carrierOptions?.[0]?.carrierId;
+        const carrierId =
+            carrierOverrides[group.id]?.carrierId ??
+            group.carrierOptions?.[0]?.carrierId;
         const carrier = carrierId ? cartCarriers[String(carrierId)] : undefined;
         if (!carrier) return latestDate;
         const carrierDate = getCarrierMinimumDeliveryDate(carrier);
@@ -186,8 +258,13 @@ const CarrierAwareDatePicker = ({
     useEffect(() => {
         if (!minimumDate) return;
 
-        const deliveryWeekday = deliveryDate ? getDayOfWeek(deliveryDate) : null;
-        const invalidWeekday = deliveryWeekday !== null && allowedDays.size > 0 && !allowedDays.has(deliveryWeekday);
+        const deliveryWeekday = deliveryDate
+            ? getDayOfWeek(deliveryDate)
+            : null;
+        const invalidWeekday =
+            deliveryWeekday !== null &&
+            allowedDays.size > 0 &&
+            !allowedDays.has(deliveryWeekday);
         if (!deliveryDate || deliveryDate < minimumDate || invalidWeekday) {
             setDeliveryDate(minimumDate);
         }
@@ -195,7 +272,9 @@ const CarrierAwareDatePicker = ({
 
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium">{t('Date de livraison souhaitée')}</label>
+            <label className="text-sm font-medium">
+                {t('Date de livraison souhaitée')}
+            </label>
             <DatePicker
                 value={deliveryDate}
                 onChange={setDeliveryDate}
@@ -213,33 +292,71 @@ export default withAppLayout<Props>(
     () => {
         const { t } = useI18n();
         const cartSidebarTopOffset = useCartSidebarTopOffset();
-        const { auth, cart, cart_contacts: cartContacts = {}, cart_db_countries: cartDbCountries = {}, cart_carriers: cartCarriers = {}, cart_transport_options: cartTransportOptions = {}, cart_transport_selection: storedTransportSelection = {}, cart_discounts: storedDiscounts = {}, cart_coupon_code: storedCouponCode = '' } = usePage<SharedData & {
-            cart_contacts?: Record<string, {
-                fact?: { id: number; name: string; email: string } | null;
-                com?: { id: number; name: string; email: string } | null;
-            }>;
-            cart_db_countries?: Record<string, string | null>;
-            cart_carriers?: Record<string, CartCarrierTiming>;
-            cart_transport_options?: Record<string, {
-                carrier_id: number;
-                zone_id: number;
-                zone_name: string;
-                taxgo: number;
-                tariffs: Record<string, number | string | null>;
-            }>;
-            cart_transport_selection?: Record<string, {
-                carrier_id: number;
-                zone_id: number;
-            }>;
-            cart_discounts?: Record<string, {
-                type: DiscountType;
-                value: number;
-            }>;
-            cart_coupon_code?: string | null;
-        }>().props;
+        const {
+            auth,
+            cart,
+            cart_contacts: cartContacts = {},
+            cart_db_countries: cartDbCountries = {},
+            cart_carriers: cartCarriers = {},
+            cart_transport_options: cartTransportOptions = {},
+            cart_transport_selection: storedTransportSelection = {},
+            cart_discounts: storedDiscounts = {},
+            cart_coupon_code: storedCouponCode = '',
+        } = usePage<
+            SharedData & {
+                cart_contacts?: Record<
+                    string,
+                    {
+                        fact?: {
+                            id: number;
+                            name: string;
+                            email: string;
+                        } | null;
+                        com?: {
+                            id: number;
+                            name: string;
+                            email: string;
+                        } | null;
+                    }
+                >;
+                cart_db_countries?: Record<string, string | null>;
+                cart_carriers?: Record<string, CartCarrierTiming>;
+                cart_transport_options?: Record<
+                    string,
+                    {
+                        carrier_id: number;
+                        zone_id: number;
+                        zone_name: string;
+                        taxgo: number;
+                        tariffs: Record<string, number | string | null>;
+                    }
+                >;
+                cart_transport_selection?: Record<
+                    string,
+                    {
+                        carrier_id: number;
+                        zone_id: number;
+                    }
+                >;
+                cart_discounts?: Record<
+                    string,
+                    {
+                        type: DiscountType;
+                        value: number;
+                    }
+                >;
+                cart_coupon_code?: string | null;
+            }
+        >().props;
         const cartId = cart?.id;
-        const carrierOverridesStorageKey = getCarrierOverridesStorageKey(auth?.user?.id, cartId);
-        const discountsStorageKey = getCartDiscountsStorageKey(auth?.user?.id, cartId);
+        const carrierOverridesStorageKey = getCarrierOverridesStorageKey(
+            auth?.user?.id,
+            cartId,
+        );
+        const discountsStorageKey = getCartDiscountsStorageKey(
+            auth?.user?.id,
+            cartId,
+        );
         const {
             items,
             updateQuantity,
@@ -252,7 +369,9 @@ export default withAppLayout<Props>(
         } = useContext(CartContext);
 
         const [deliveryDate, setDeliveryDate] = useState('');
-        const [openCommentProductIds, setOpenCommentProductIds] = useState<Set<number>>(() => new Set());
+        const [openCommentProductIds, setOpenCommentProductIds] = useState<
+            Set<number>
+        >(() => new Set());
         const [isRefreshingCart, setIsRefreshingCart] = useState(false);
 
         const toggleProductComment = useCallback((productId: number) => {
@@ -263,46 +382,74 @@ export default withAppLayout<Props>(
                 return next;
             });
         }, []);
-        const getStoredDiscounts = useCallback((): Record<number, DbDiscountDraft> =>
-            Object.fromEntries(
-                Object.entries(storedDiscounts as Record<string, { type: DiscountType; value: number }>).map(([dbId, discount]) => [
-                    Number(dbId),
-                    {
-                        type: discount.type === 'percent' ? 'percent' : 'fixed',
-                        value: String(discount.value ?? 0),
-                    },
-                ]),
-            ),
-            [storedDiscounts]);
-        const [discountsByDb, setDiscountsByDb] = useState<Record<number, DbDiscountDraft>>(() =>
-            readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts(),
+        const getStoredDiscounts = useCallback(
+            (): Record<number, DbDiscountDraft> =>
+                Object.fromEntries(
+                    Object.entries(
+                        storedDiscounts as Record<
+                            string,
+                            { type: DiscountType; value: number }
+                        >,
+                    ).map(([dbId, discount]) => [
+                        Number(dbId),
+                        {
+                            type:
+                                discount.type === 'percent'
+                                    ? 'percent'
+                                    : 'fixed',
+                            value: String(discount.value ?? 0),
+                        },
+                    ]),
+                ),
+            [storedDiscounts],
         );
+        const [discountsByDb, setDiscountsByDb] = useState<
+            Record<number, DbDiscountDraft>
+        >(() => readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts());
         const discountsStorageKeyRef = useRef(discountsStorageKey);
         const effectiveUser = getEffectiveUser(auth);
-        const canEditDiscount = hasAnyRole(effectiveUser, ['dev', 'admin', 'commercial'])
-            || hasPermission(effectiveUser, 'order.remise');
+        const canEditDiscount =
+            hasAnyRole(effectiveUser, ['dev', 'admin', 'commercial']) ||
+            hasPermission(effectiveUser, 'order.remise');
 
         useEffect(() => {
             if (discountsStorageKeyRef.current !== discountsStorageKey) {
                 discountsStorageKeyRef.current = discountsStorageKey;
-                setDiscountsByDb(readCartDiscounts(discountsStorageKey) ?? getStoredDiscounts());
+                setDiscountsByDb(
+                    readCartDiscounts(discountsStorageKey) ??
+                        getStoredDiscounts(),
+                );
                 return;
             }
 
             writeCartDiscounts(discountsStorageKey, discountsByDb);
         }, [discountsByDb, discountsStorageKey, getStoredDiscounts]);
-        const getStoredTransportSelection = useCallback((): CarrierOverrides =>
-            Object.fromEntries(
-                Object.entries(storedTransportSelection as Record<string, { carrier_id: number; zone_id: number }>).map(([supplierId, choice]) => [
-                    Number(supplierId),
-                    { carrierId: Number(choice.carrier_id), zoneId: Number(choice.zone_id) },
-                ]),
-            ), [storedTransportSelection]);
-        const [carrierOverrides, setCarrierOverrides] = useState<CarrierOverrides>(() => {
-            const localOverrides = readCarrierOverrides(carrierOverridesStorageKey);
+        const getStoredTransportSelection = useCallback(
+            (): CarrierOverrides =>
+                Object.fromEntries(
+                    Object.entries(
+                        storedTransportSelection as Record<
+                            string,
+                            { carrier_id: number; zone_id: number }
+                        >,
+                    ).map(([supplierId, choice]) => [
+                        Number(supplierId),
+                        {
+                            carrierId: Number(choice.carrier_id),
+                            zoneId: Number(choice.zone_id),
+                        },
+                    ]),
+                ),
+            [storedTransportSelection],
+        );
+        const [carrierOverrides, setCarrierOverrides] =
+            useState<CarrierOverrides>(() => {
+                const localOverrides = readCarrierOverrides(
+                    carrierOverridesStorageKey,
+                );
 
-            return localOverrides ?? getStoredTransportSelection();
-        });
+                return localOverrides ?? getStoredTransportSelection();
+            });
         const carrierStorageKeyRef = useRef(carrierOverridesStorageKey);
 
         useEffect(() => {
@@ -313,8 +460,8 @@ export default withAppLayout<Props>(
             if (carrierStorageKeyRef.current !== carrierOverridesStorageKey) {
                 carrierStorageKeyRef.current = carrierOverridesStorageKey;
                 setCarrierOverrides(
-                    readCarrierOverrides(carrierOverridesStorageKey)
-                    ?? getStoredTransportSelection(),
+                    readCarrierOverrides(carrierOverridesStorageKey) ??
+                        getStoredTransportSelection(),
                 );
                 return;
             }
@@ -324,24 +471,35 @@ export default withAppLayout<Props>(
                     Number(supplierId),
                     {
                         ...choice,
-                        transport: choice.transport
-                            ?? cartTransportOptions[`${choice.carrierId}:${choice.zoneId}`],
+                        transport:
+                            choice.transport ??
+                            cartTransportOptions[
+                                `${choice.carrierId}:${choice.zoneId}`
+                            ],
                     },
                 ]),
             );
-            writeCarrierOverrides(carrierOverridesStorageKey, overridesWithTransport);
-        }, [carrierOverrides, carrierOverridesStorageKey, cartTransportOptions, getStoredTransportSelection]);
+            writeCarrierOverrides(
+                carrierOverridesStorageKey,
+                overridesWithTransport,
+            );
+        }, [
+            carrierOverrides,
+            carrierOverridesStorageKey,
+            cartTransportOptions,
+            getStoredTransportSelection,
+        ]);
 
         // const [isRefreshingCart, setIsRefreshingCart] = useState(false);
-        const {
-            isSaving,
-            saveMessage,
-            handleSaveCart,
-            handleGenerateTcpdf,
-        } = useCartOrder();
+        const { isSaving, saveMessage, handleSaveCart, handleGenerateTcpdf } =
+            useCartOrder();
         const [pageMessage, setPageMessage] = useState<string | null>(null);
         const [couponDraft, setCouponDraft] = useState(storedCouponCode ?? '');
-        const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount_ht: number; funded_by: string } | null>(null);
+        const [appliedCoupon, setAppliedCoupon] = useState<{
+            code: string;
+            discount_ht: number;
+            funded_by: string;
+        } | null>(null);
         const [couponMessage, setCouponMessage] = useState<string | null>(null);
         const [isCheckingCoupon, setIsCheckingCoupon] = useState(false);
         const hasRefreshedCartRef = useRef(false);
@@ -353,7 +511,9 @@ export default withAppLayout<Props>(
 
             hasRefreshedCartRef.current = true;
             void refreshCart().catch(() => {
-                setPageMessage(t('Erreur lors du rafraichissement des prix transport'));
+                setPageMessage(
+                    t('Erreur lors du rafraichissement des prix transport'),
+                );
             });
         }, [items.length, refreshCart, t]);
 
@@ -366,37 +526,56 @@ export default withAppLayout<Props>(
             setPageMessage(null);
             try {
                 await refreshCart();
-                setPageMessage(t('Panier rafraichi avec les prix et transports utilisateur'));
+                setPageMessage(
+                    t(
+                        'Panier rafraichi avec les prix et transports utilisateur',
+                    ),
+                );
                 setTimeout(() => setPageMessage(null), 3000);
             } catch {
-                setPageMessage(t('Erreur lors du rafraichissement des prix transport'));
+                setPageMessage(
+                    t('Erreur lors du rafraichissement des prix transport'),
+                );
             } finally {
                 setIsRefreshingCart(false);
             }
         }, [items.length, isRefreshingCart, refreshCart, t]);
 
-
-        const itemsPricing = useMemo(() =>
-            items.map((item) => ({
-                product: item.product,
-                quantity: item.quantity,
-                comment: item.comment,
-                pricing: getCartPricing(item.product, item.quantity),
-            })),
+        const itemsPricing = useMemo(
+            () =>
+                items.map((item) => ({
+                    product: item.product,
+                    quantity: item.quantity,
+                    comment: item.comment,
+                    pricing: getCartPricing(item.product, item.quantity),
+                })),
             [items],
         );
 
-        const getGroupKey = (product: { db_products_id?: number | null; dbProduct?: { id?: number | null } | null }) =>
-            Number(product.db_products_id ?? product.dbProduct?.id ?? 0);
+        const getGroupKey = (product: {
+            db_products_id?: number | null;
+            dbProduct?: { id?: number | null } | null;
+        }) => Number(product.db_products_id ?? product.dbProduct?.id ?? 0);
 
-        const getGroupLabel = useCallback((product: { dbProduct?: { name?: string | null } | null; db_products_id?: number | null }) => {
-            if (product.dbProduct?.name) return String(product.dbProduct.name);
-            if (product.db_products_id) return `DB #${product.db_products_id}`;
-            return t('Sans DB');
-        }, [t]);
+        const getGroupLabel = useCallback(
+            (product: {
+                dbProduct?: { name?: string | null } | null;
+                db_products_id?: number | null;
+            }) => {
+                if (product.dbProduct?.name)
+                    return String(product.dbProduct.name);
+                if (product.db_products_id)
+                    return `DB #${product.db_products_id}`;
+                return t('Sans DB');
+            },
+            [t],
+        );
 
         const groupedItems = useMemo(() => {
-            const groups = new Map<number, { id: number; label: string; items: typeof itemsPricing }>();
+            const groups = new Map<
+                number,
+                { id: number; label: string; items: typeof itemsPricing }
+            >();
 
             itemsPricing.forEach((item) => {
                 const groupId = getGroupKey(item.product);
@@ -409,34 +588,69 @@ export default withAppLayout<Props>(
                 groups.set(groupId, { id: groupId, label, items: [item] });
             });
 
+            const sharedShipping = calculateCartShipping(
+                itemsPricing.map(({ product, quantity, comment }) => ({
+                    product,
+                    quantity,
+                    comment,
+                })),
+                carrierOverrides,
+                cartTransportOptions,
+            );
             return Array.from(groups.values()).map((group) => {
-                const cartItems = group.items.map(({ product, quantity, comment }) => ({ product, quantity, comment }));
+                const cartItems = group.items.map(
+                    ({ product, quantity, comment }) => ({
+                        product,
+                        quantity,
+                        comment,
+                    }),
+                );
                 const transport = buildCartTransportContext(cartItems);
-                const shippingSummary = calculateCartShipping(cartItems, carrierOverrides, cartTransportOptions);
+                const shippingSummary = sharedShipping;
                 const override = carrierOverrides[group.id];
                 const originalAttributes = transport.attrsBySupplier[group.id];
-                const selectedAttributes = override && originalAttributes
-                    ? { ...originalAttributes, t: override.carrierId, z: override.zoneId }
-                    : originalAttributes;
+                const selectedAttributes =
+                    override && originalAttributes
+                        ? {
+                              ...originalAttributes,
+                              t: override.carrierId,
+                              z: override.zoneId,
+                          }
+                        : originalAttributes;
                 const selectedTransport = override
-                    ? cartTransportOptions[`${override.carrierId}:${override.zoneId}`]
+                    ? cartTransportOptions[
+                          `${override.carrierId}:${override.zoneId}`
+                      ]
                     : transport.transportBySupplier[group.id];
-                const supplier = buildRollDistribution(cartItems).suppliers[group.id];
-                const renderedDeliveryPerRoll = override && supplier
-                    ? getRenderedProductDeliveryPerRoll(supplier, selectedAttributes, selectedTransport)
-                    : null;
-                const pricedItems = renderedDeliveryPerRoll === null
-                    ? group.items
-                    : group.items.map((item) => ({
-                        ...item,
-                        pricing: getCartPricing(item.product, item.quantity, { renderedDeliveryPerRoll }),
-                    }));
-                const itemsTotal = pricedItems.reduce((sum, item) => sum + item.pricing.lineTotal, 0);
-                const deliveryTotal = shippingSummary.total;
+                const supplier =
+                    buildRollDistribution(cartItems).suppliers[group.id];
+                const renderedDeliveryPerRoll =
+                    sharedShipping.renderedPerRoll[group.id] ?? null;
+                const pricedItems =
+                    renderedDeliveryPerRoll === null
+                        ? group.items
+                        : group.items.map((item) => ({
+                              ...item,
+                              pricing: getCartPricing(
+                                  item.product,
+                                  item.quantity,
+                                  { renderedDeliveryPerRoll },
+                              ),
+                          }));
+                const itemsTotal = pricedItems.reduce(
+                    (sum, item) => sum + item.pricing.lineTotal,
+                    0,
+                );
+                const deliveryTotal = shippingSummary.bySupplier[group.id] ?? 0;
                 const grossTotal = itemsTotal + deliveryTotal;
-                const discountAmount = calculateDiscountAmount(grossTotal, discountsByDb[group.id]);
+                const discountAmount = calculateDiscountAmount(
+                    grossTotal,
+                    discountsByDb[group.id],
+                );
                 const orderTotal = Math.max(0, grossTotal - discountAmount);
-                const country = String(cartDbCountries[String(group.id)] ?? '').trim().toUpperCase();
+                const country = String(cartDbCountries[String(group.id)] ?? '')
+                    .trim()
+                    .toUpperCase();
                 const contacts = cartContacts[String(group.id)] ?? null;
                 const facturant = contacts?.fact ?? null;
                 const commercial = contacts?.com ?? null;
@@ -461,13 +675,34 @@ export default withAppLayout<Props>(
                     selectedTransport,
                 };
             });
-        }, [itemsPricing, getGroupLabel, cartContacts, cartDbCountries, carrierOverrides, cartTransportOptions, discountsByDb]);
+        }, [
+            itemsPricing,
+            getGroupLabel,
+            cartContacts,
+            cartDbCountries,
+            carrierOverrides,
+            cartTransportOptions,
+            discountsByDb,
+        ]);
 
-        const itemsTotal = groupedItems.reduce((sum, group) => sum + group.itemsTotal, 0);
-        const deliveryTotal = groupedItems.reduce((sum, group) => sum + group.deliveryTotal, 0);
-        const discountTotal = groupedItems.reduce((sum, group) => sum + group.discountAmount, 0);
-        const effectiveDiscountTotal = appliedCoupon?.discount_ht ?? discountTotal;
-        const orderTotal = Math.max(0, itemsTotal + deliveryTotal - effectiveDiscountTotal);
+        const itemsTotal = groupedItems.reduce(
+            (sum, group) => sum + group.itemsTotal,
+            0,
+        );
+        const deliveryTotal = groupedItems.reduce(
+            (sum, group) => sum + group.deliveryTotal,
+            0,
+        );
+        const discountTotal = groupedItems.reduce(
+            (sum, group) => sum + group.discountAmount,
+            0,
+        );
+        const effectiveDiscountTotal =
+            appliedCoupon?.discount_ht ?? discountTotal;
+        const orderTotal = Math.max(
+            0,
+            itemsTotal + deliveryTotal - effectiveDiscountTotal,
+        );
 
         useEffect(() => {
             setAppliedCoupon(null);
@@ -482,7 +717,9 @@ export default withAppLayout<Props>(
                 return;
             }
             if (discountTotal > 0) {
-                setCouponMessage('Supprimez les remises manuelles avant d’appliquer un coupon.');
+                setCouponMessage(
+                    'Supprimez les remises manuelles avant d’appliquer un coupon.',
+                );
                 return;
             }
 
@@ -494,98 +731,158 @@ export default withAppLayout<Props>(
                     headers: {
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
-                        'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '',
+                        'X-CSRF-Token':
+                            (
+                                document.querySelector(
+                                    'meta[name="csrf-token"]',
+                                ) as HTMLMetaElement | null
+                            )?.content ?? '',
                     },
                     body: JSON.stringify({
                         coupon_code: code,
-                        items: groupedItems.flatMap((group) => group.items.map((item) => ({
-                            id: item.product.id,
-                            quantity: item.quantity,
-                            line_total: item.pricing.lineTotal,
-                        }))),
+                        items: groupedItems.flatMap((group) =>
+                            group.items.map((item) => ({
+                                id: item.product.id,
+                                quantity: item.quantity,
+                                line_total: item.pricing.lineTotal,
+                            })),
+                        ),
                         shipping_total: deliveryTotal,
                     }),
                 });
                 const result = await response.json();
                 if (!response.ok) {
                     setAppliedCoupon(null);
-                    setCouponMessage(result?.errors?.coupon_code?.[0] ?? result?.message ?? 'Coupon invalide.');
+                    setCouponMessage(
+                        result?.errors?.coupon_code?.[0] ??
+                            result?.message ??
+                            'Coupon invalide.',
+                    );
                     return;
                 }
                 setCouponDraft(result.code);
                 setAppliedCoupon(result);
-                setCouponMessage(`Coupon appliqué : ${formatCurrency(result.discount_ht)} de remise HT.`);
+                setCouponMessage(
+                    `Coupon appliqué : ${formatCurrency(result.discount_ht)} de remise HT.`,
+                );
             } catch {
-                setCouponMessage('Impossible de vérifier le coupon pour le moment.');
+                setCouponMessage(
+                    'Impossible de vérifier le coupon pour le moment.',
+                );
             } finally {
                 setIsCheckingCoupon(false);
             }
         };
 
-        const orderOverrides = useMemo(() => ({
-            transportSelection: Object.fromEntries(
-                Object.entries(carrierOverrides).map(([supplierId, choice]) => [
-                    Number(supplierId),
-                    { carrier_id: choice.carrierId, zone_id: choice.zoneId },
-                ]),
-            ),
-            pricingByProductId: Object.fromEntries(
-                groupedItems.flatMap((group) => group.items.map((item) => [
-                    item.product.id,
-                    { unitPrice: item.pricing.unitPrice, lineTotal: item.pricing.lineTotal },
-                ])),
-            ),
-            shippingTotal: deliveryTotal,
-            shippingByDb: Object.fromEntries(
-                groupedItems.map((group) => [group.id, group.deliveryTotal]),
-            ),
-            discounts: appliedCoupon
-                ? {}
-                : canEditDiscount
-                ? Object.fromEntries(
-                    groupedItems
-                        .map((group) => {
-                            const discount = discountsByDb[group.id];
-                            return discount
-                                ? [group.id, { type: discount.type, value: parseDiscountValue(discount.value) }]
-                                : null;
-                        })
-                        .filter((entry): entry is [number, { type: DiscountType; value: number }] => entry !== null),
-                )
-                : undefined,
-            couponCode: appliedCoupon?.code ?? '',
-        }), [carrierOverrides, groupedItems, deliveryTotal, canEditDiscount, discountsByDb, appliedCoupon]);
+        const orderOverrides = useMemo(
+            () => ({
+                transportSelection: Object.fromEntries(
+                    Object.entries(carrierOverrides).map(
+                        ([supplierId, choice]) => [
+                            Number(supplierId),
+                            {
+                                carrier_id: choice.carrierId,
+                                zone_id: choice.zoneId,
+                            },
+                        ],
+                    ),
+                ),
+                pricingByProductId: Object.fromEntries(
+                    groupedItems.flatMap((group) =>
+                        group.items.map((item) => [
+                            item.product.id,
+                            {
+                                unitPrice: item.pricing.unitPrice,
+                                lineTotal: item.pricing.lineTotal,
+                            },
+                        ]),
+                    ),
+                ),
+                shippingTotal: deliveryTotal,
+                shippingByDb: Object.fromEntries(
+                    groupedItems.map((group) => [
+                        group.id,
+                        group.deliveryTotal,
+                    ]),
+                ),
+                discounts: appliedCoupon
+                    ? {}
+                    : canEditDiscount
+                      ? Object.fromEntries(
+                            groupedItems
+                                .map((group) => {
+                                    const discount = discountsByDb[group.id];
+                                    return discount
+                                        ? [
+                                              group.id,
+                                              {
+                                                  type: discount.type,
+                                                  value: parseDiscountValue(
+                                                      discount.value,
+                                                  ),
+                                              },
+                                          ]
+                                        : null;
+                                })
+                                .filter(
+                                    (
+                                        entry,
+                                    ): entry is [
+                                        number,
+                                        { type: DiscountType; value: number },
+                                    ] => entry !== null,
+                                ),
+                        )
+                      : undefined,
+                couponCode: appliedCoupon?.code ?? '',
+            }),
+            [
+                carrierOverrides,
+                groupedItems,
+                deliveryTotal,
+                canEditDiscount,
+                discountsByDb,
+                appliedCoupon,
+            ],
+        );
 
         const handleQuantityChange = (productId: number, next: number) => {
             updateQuantity(productId, next);
         };
 
-        const handleCarrierChange = useCallback((
-            supplierId: number,
-            carrierOptions: Array<{ carrierId: number; zoneId: number }>,
-            selectedIndex: string,
-        ) => {
-            const option = carrierOptions[Number(selectedIndex)];
-            if (!option) {
-                return;
-            }
+        const handleCarrierChange = useCallback(
+            (
+                supplierId: number,
+                carrierOptions: Array<{ carrierId: number; zoneId: number }>,
+                selectedIndex: string,
+            ) => {
+                const option = carrierOptions[Number(selectedIndex)];
+                if (!option) {
+                    return;
+                }
 
-            const transportKey = `${option.carrierId}:${option.zoneId}`;
-            if (!cartTransportOptions[transportKey]) {
-                setPageMessage(t('Tarifs indisponibles pour le transporteur sélectionné'));
-                return;
-            }
+                const transportKey = `${option.carrierId}:${option.zoneId}`;
+                if (!cartTransportOptions[transportKey]) {
+                    setPageMessage(
+                        t(
+                            'Tarifs indisponibles pour le transporteur sélectionné',
+                        ),
+                    );
+                    return;
+                }
 
-            setPageMessage(null);
-            setCarrierOverrides((previous) => ({
-                ...previous,
-                [supplierId]: {
-                    carrierId: option.carrierId,
-                    zoneId: option.zoneId,
-                    transport: cartTransportOptions[transportKey],
-                },
-            }));
-        }, [cartTransportOptions, t]);
+                setPageMessage(null);
+                setCarrierOverrides((previous) => ({
+                    ...previous,
+                    [supplierId]: {
+                        carrierId: option.carrierId,
+                        zoneId: option.zoneId,
+                        transport: cartTransportOptions[transportKey],
+                    },
+                }));
+            },
+            [cartTransportOptions, t],
+        );
 
         // const handleRefreshCart = async () => {
         //     if (items.length === 0 || isRefreshingCart) {
@@ -612,7 +909,9 @@ export default withAppLayout<Props>(
             }
 
             const confirmed = window.confirm(
-                t("Voulez-vous vider le panier actif et en preparer un nouveau sans identifiant ?")
+                t(
+                    'Voulez-vous vider le panier actif et en preparer un nouveau sans identifiant ?',
+                ),
             );
 
             if (!confirmed) {
@@ -623,7 +922,9 @@ export default withAppLayout<Props>(
 
             try {
                 const csrfToken = (
-                    document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement
+                    document.querySelector(
+                        'meta[name="csrf-token"]',
+                    ) as HTMLMetaElement
                 )?.content;
 
                 const response = await fetch(`/cart/${cartId}/status`, {
@@ -638,16 +939,27 @@ export default withAppLayout<Props>(
 
                 if (!response.ok) {
                     const data = await response.json().catch(() => ({}));
-                    setPageMessage(data?.message || t('Erreur lors de la preparation du nouveau panier'));
+                    setPageMessage(
+                        data?.message ||
+                            t(
+                                'Erreur lors de la preparation du nouveau panier',
+                            ),
+                    );
                     return;
                 }
 
                 clearCart({ skipConfirmation: true });
-                setPageMessage(t('Panier actif vide. Enregistrez pour creer un nouvel identifiant.'));
+                setPageMessage(
+                    t(
+                        'Panier actif vide. Enregistrez pour creer un nouvel identifiant.',
+                    ),
+                );
                 router.reload({ only: ['cart', 'cart_refresh_token'] });
             } catch (error) {
                 console.error('Error creating new cart:', error);
-                setPageMessage(t('Erreur lors de la preparation du nouveau panier'));
+                setPageMessage(
+                    t('Erreur lors de la preparation du nouveau panier'),
+                );
             }
         };
 
@@ -657,9 +969,9 @@ export default withAppLayout<Props>(
                 <StickyBar
                     zIndex={20}
                     borderBottom={false}
-                    className='mb-4 sticky-bar-cart'
+                    className="sticky-bar-cart mb-4"
                 >
-                    <div className='flex w-full flex-wrap items-center justify-between gap-y-2 py-2'>
+                    <div className="flex w-full flex-wrap items-center justify-between gap-y-2 py-2">
                         <div className="flex shrink-0 items-center gap-3">
                             <Link
                                 href="#"
@@ -667,7 +979,7 @@ export default withAppLayout<Props>(
                                     e.preventDefault();
                                     window.history.back();
                                 }}
-                                className="hover:text-gray-500 transition-colors duration-200"
+                                className="transition-colors duration-200 hover:text-gray-500"
                             >
                                 <ArrowLeftCircle size={32} />
                             </Link>
@@ -675,15 +987,22 @@ export default withAppLayout<Props>(
                                 {t('Order')}
                                 {cartId ? (
                                     <>
-                                        &nbsp;<button
+                                        &nbsp;
+                                        <button
                                             type="button"
                                             className="rounded"
                                             onClick={handleCreateNewCart}
                                             title={t('Creer un nouveau panier')}
                                             disabled={isSaving}
                                         >
-                                            <Badge variant="secondary" style={{ fontSize: '2rem' }}>#{cartId}</Badge>
-                                        </button></>
+                                            <Badge
+                                                variant="secondary"
+                                                style={{ fontSize: '2rem' }}
+                                            >
+                                                #{cartId}
+                                            </Badge>
+                                        </button>
+                                    </>
                                 ) : null}
                             </h1>
                         </div>
@@ -692,7 +1011,9 @@ export default withAppLayout<Props>(
                             <div className="ml-auto flex shrink-0 items-center gap-2">
                                 <ButtonsActions
                                     refresh={handleRefreshCart}
-                                    save={() => void handleSaveCart(orderOverrides)}
+                                    save={() =>
+                                        void handleSaveCart(orderOverrides)
+                                    }
                                     delete={clearCart}
                                     saving={isSaving}
                                     refreshing={isRefreshingCart}
@@ -703,14 +1024,16 @@ export default withAppLayout<Props>(
                 </StickyBar>
 
                 <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-6 lg:col-span-2">
                         {items.length === 0 && (
                             <Card>
                                 <CardContent className="space-y-4">
                                     <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
                                         <p>{t('Votre panier est vide')}</p>
                                         <Button asChild>
-                                            <Link href={products.index().url}>{t('Voir les produits')}</Link>
+                                            <Link href={products.index().url}>
+                                                {t('Voir les produits')}
+                                            </Link>
                                         </Button>
                                     </div>
                                 </CardContent>
@@ -723,28 +1046,61 @@ export default withAppLayout<Props>(
                                     <CardHeader>
                                         <CardTitle className="text-base">
                                             <div className="space-y-1 md:grid md:grid-cols-3 md:items-center md:gap-4 md:space-y-0">
-                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-0 md:py-0 md:pr-3 md:text-left md:border-r md:border-border/60">
-                                                    <p className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:block">{t('Produits')}</p>
+                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:border-r md:border-border/60 md:bg-transparent md:px-0 md:py-0 md:pr-3 md:text-left">
+                                                    <p className="hidden text-[11px] font-medium tracking-wide text-muted-foreground uppercase md:block">
+                                                        {t('Produits')}
+                                                    </p>
                                                     <div className="inline-flex items-center gap-2 text-sm font-semibold md:mt-1">
-                                                        <CountryFlag countryCode={group.country} className="w-5 shrink-0 md:w-6" />
-                                                        {group.items.length} <FlowerIcon className="inline size-4" />
-                                                        <span className="hidden md:inline">: {formatCurrency(group.itemsTotal)}</span>
+                                                        <CountryFlag
+                                                            countryCode={
+                                                                group.country
+                                                            }
+                                                            className="w-5 shrink-0 md:w-6"
+                                                        />
+                                                        {group.items.length}{' '}
+                                                        <FlowerIcon className="inline size-4" />
+                                                        <span className="hidden md:inline">
+                                                            :{' '}
+                                                            {formatCurrency(
+                                                                group.itemsTotal,
+                                                            )}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-sm font-semibold text-right md:hidden">{formatCurrency(group.itemsTotal)}</span>
+                                                    <span className="text-right text-sm font-semibold md:hidden">
+                                                        {formatCurrency(
+                                                            group.itemsTotal,
+                                                        )}
+                                                    </span>
                                                 </div>
 
-                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-3 md:py-0 md:text-center md:border-r md:border-border/60">
-                                                    <p className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:block">{t('Transport')}</p>
+                                                <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:border-r md:border-border/60 md:bg-transparent md:px-3 md:py-0 md:text-center">
+                                                    <p className="hidden text-[11px] font-medium tracking-wide text-muted-foreground uppercase md:block">
+                                                        {t('Transport')}
+                                                    </p>
                                                     <div className="inline-flex items-center gap-2 text-sm font-semibold md:mt-1 md:justify-center">
                                                         <TruckIcon className="size-4 shrink-0" />
-                                                        <span className="hidden md:inline">{formatCurrency(group.deliveryTotal)}</span>
+                                                        <span className="hidden md:inline">
+                                                            {formatCurrency(
+                                                                group.deliveryTotal,
+                                                            )}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-sm font-semibold text-right md:hidden">{formatCurrency(group.deliveryTotal)}</span>
+                                                    <span className="text-right text-sm font-semibold md:hidden">
+                                                        {formatCurrency(
+                                                            group.deliveryTotal,
+                                                        )}
+                                                    </span>
                                                 </div>
 
                                                 <div className="flex items-center justify-between rounded-md bg-muted/20 px-2 py-1.5 md:block md:rounded-none md:bg-transparent md:px-0 md:py-0 md:pl-3 md:text-right">
-                                                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('Total')}</p>
-                                                    <p className="text-lg font-bold leading-none text-right md:mt-1">{formatCurrency(group.orderTotal)}</p>
+                                                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                                        {t('Total')}
+                                                    </p>
+                                                    <p className="text-right text-lg leading-none font-bold md:mt-1">
+                                                        {formatCurrency(
+                                                            group.orderTotal,
+                                                        )}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </CardTitle>
@@ -756,80 +1112,367 @@ export default withAppLayout<Props>(
                                             <div className="hidden grid-cols-[5rem_minmax(0,1fr)_4rem_7rem_4.5rem_4rem] items-center gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground md:grid xl:grid-cols-[5rem_minmax(0,1fr)_5rem_6rem_7rem_9rem_6rem_5rem] xl:gap-3">
                                                 <span>{t('Photo')}</span>
                                                 <span>{t('Désignation')}</span>
-                                                <span className="hidden text-right xl:block">{t('Pot')}</span>
-                                                <span className="hidden text-right xl:block">{t('Hauteur')}</span>
-                                                <span className="text-right">{t('Prix')}</span>
-                                                <span className="text-center">{t('Quantité')}</span>
-                                                <span className="text-right">{t('Total')}</span>
-                                                <span className="text-center">{t('Actions')}</span>
+                                                <span className="hidden text-right xl:block">
+                                                    {t('Pot')}
+                                                </span>
+                                                <span className="hidden text-right xl:block">
+                                                    {t('Hauteur')}
+                                                </span>
+                                                <span className="text-right">
+                                                    {t('Prix')}
+                                                </span>
+                                                <span className="text-center">
+                                                    {t('Quantité')}
+                                                </span>
+                                                <span className="text-right">
+                                                    {t('Total')}
+                                                </span>
+                                                <span className="text-center">
+                                                    {t('Actions')}
+                                                </span>
                                             </div>
-                                            {group.items.map(({ product, quantity, comment, pricing }) => {
-                                                const unitPrice = pricing.unitPrice;
-                                                const lineTotal = pricing.lineTotal;
-                                                const unite = getUniteQuantity(product);
-                                                const step = getQuantityStep(product, quantity);
-                                                const isCommentOpen = openCommentProductIds.has(product.id);
-                                                const hasComment = comment.trim() !== '';
+                                            {group.items.map(
+                                                ({
+                                                    product,
+                                                    quantity,
+                                                    comment,
+                                                    pricing,
+                                                }) => {
+                                                    const unitPrice =
+                                                        pricing.unitPrice;
+                                                    const lineTotal =
+                                                        pricing.lineTotal;
+                                                    const unite =
+                                                        getUniteQuantity(
+                                                            product,
+                                                        );
+                                                    const step =
+                                                        getQuantityStep(
+                                                            product,
+                                                            quantity,
+                                                        );
+                                                    const isCommentOpen =
+                                                        openCommentProductIds.has(
+                                                            product.id,
+                                                        );
+                                                    const hasComment =
+                                                        comment.trim() !== '';
 
-                                                return (
-                                                    <div
-                                                        key={product.id}
-                                                        className="border-b last:border-b-0"
-                                                    >
-                                                        <div className="md:hidden space-y-3 p-3">
-                                                            <div className="flex items-start gap-3">
-                                                                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border">
+                                                    return (
+                                                        <div
+                                                            key={product.id}
+                                                            className="border-b last:border-b-0"
+                                                        >
+                                                            <div className="space-y-3 p-3 md:hidden">
+                                                                <div className="flex items-start gap-3">
+                                                                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border">
+                                                                        <img
+                                                                            src={getProductCartImage(
+                                                                                product,
+                                                                            )}
+                                                                            alt={
+                                                                                product.name
+                                                                            }
+                                                                            className="h-full w-full object-cover"
+                                                                        />
+                                                                        <Badge
+                                                                            className={cn(
+                                                                                'absolute -top-1 -right-1 rounded-full text-xs',
+                                                                                quantity >
+                                                                                    9
+                                                                                    ? 'size-6 px-1.5'
+                                                                                    : 'size-5 px-2',
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                quantity
+                                                                            }
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                                        <p className="line-clamp-2 text-sm leading-tight font-semibold capitalize">
+                                                                            {
+                                                                                product.name
+                                                                            }
+                                                                        </p>
+                                                                        {toText(
+                                                                            product.ref,
+                                                                        ) ? (
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                Ref:{' '}
+                                                                                {toText(
+                                                                                    product.ref,
+                                                                                )}
+                                                                            </p>
+                                                                        ) : null}
+                                                                        {product.pot ||
+                                                                        product.height ? (
+                                                                            <p className="flex flex-wrap gap-x-2 text-sm leading-tight font-medium">
+                                                                                {product.pot ? (
+                                                                                    <span>
+                                                                                        Pot
+                                                                                        :{' '}
+                                                                                        {String(
+                                                                                            product.pot,
+                                                                                        )}{' '}
+                                                                                        cm
+                                                                                    </span>
+                                                                                ) : null}
+                                                                                {product.height ? (
+                                                                                    <span>
+                                                                                        H
+                                                                                        :{' '}
+                                                                                        {String(
+                                                                                            product.height,
+                                                                                        )}{' '}
+                                                                                        cm
+                                                                                    </span>
+                                                                                ) : null}
+                                                                            </p>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-sm">
+                                                                    <div>
+                                                                        <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                                                                            {t(
+                                                                                'Prix',
+                                                                            )}
+                                                                        </p>
+                                                                        <p className="font-medium">
+                                                                            {formatCurrency(
+                                                                                unitPrice,
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                                                                            {t(
+                                                                                'Total',
+                                                                            )}
+                                                                        </p>
+                                                                        <p className="font-semibold">
+                                                                            {formatCurrency(
+                                                                                lineTotal,
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-2 rounded-lg bg-muted p-1">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8"
+                                                                            onClick={() =>
+                                                                                handleQuantityChange(
+                                                                                    product.id,
+                                                                                    quantity -
+                                                                                        step,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <Minus className="h-4 w-4" />
+                                                                        </Button>
+
+                                                                        <Input
+                                                                            type="text"
+                                                                            min={
+                                                                                unite
+                                                                            }
+                                                                            value={
+                                                                                quantity
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                handleQuantityChange(
+                                                                                    product.id,
+                                                                                    parseInt(
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                        10,
+                                                                                    ),
+                                                                                )
+                                                                            }
+                                                                            className="h-8 w-14 border-0 bg-transparent text-center"
+                                                                        />
+
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8"
+                                                                            onClick={() =>
+                                                                                handleQuantityChange(
+                                                                                    product.id,
+                                                                                    quantity +
+                                                                                        step,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <Plus className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className={cn(
+                                                                                'h-8 w-8',
+                                                                                (hasComment ||
+                                                                                    isCommentOpen) &&
+                                                                                    'text-primary',
+                                                                            )}
+                                                                            onClick={() =>
+                                                                                toggleProductComment(
+                                                                                    product.id,
+                                                                                )
+                                                                            }
+                                                                            aria-label={t(
+                                                                                hasComment
+                                                                                    ? 'Modifier le commentaire'
+                                                                                    : 'Ajouter un commentaire',
+                                                                            )}
+                                                                            title={t(
+                                                                                hasComment
+                                                                                    ? 'Modifier le commentaire'
+                                                                                    : 'Ajouter un commentaire',
+                                                                            )}
+                                                                        >
+                                                                            <Pencil className="h-4 w-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                            onClick={() =>
+                                                                                removeFromCart(
+                                                                                    product.id,
+                                                                                )
+                                                                            }
+                                                                            aria-label={t(
+                                                                                'Retirer du panier',
+                                                                            )}
+                                                                            title={t(
+                                                                                'Retirer du panier',
+                                                                            )}
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="hidden items-center gap-2 p-3 md:grid md:grid-cols-[5rem_minmax(0,1fr)_4rem_7rem_4.5rem_4rem] xl:grid-cols-[5rem_minmax(0,1fr)_5rem_6rem_7rem_9rem_6rem_5rem] xl:gap-3">
+                                                                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded md:row-span-1">
                                                                     <img
-                                                                        src={getProductCartImage(product)}
-                                                                        alt={product.name}
+                                                                        src={getProductCartImage(
+                                                                            product,
+                                                                        )}
+                                                                        alt={
+                                                                            product.name
+                                                                        }
                                                                         className="h-full w-full object-cover"
                                                                     />
                                                                     <Badge
                                                                         className={cn(
-                                                                            "absolute -top-1 -right-1 rounded-full text-xs",
-                                                                            quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                                            'absolute -top-1 -right-1 rounded-full text-xs',
+                                                                            quantity >
+                                                                                9
+                                                                                ? 'size-6 px-1.5'
+                                                                                : 'size-5 px-2',
                                                                         )}
                                                                     >
-                                                                        {quantity}
+                                                                        {
+                                                                            quantity
+                                                                        }
                                                                     </Badge>
                                                                 </div>
-                                                                <div className="min-w-0 flex-1 space-y-1">
-                                                                    <p className="line-clamp-2 text-sm font-semibold leading-tight capitalize">
-                                                                        {product.name}
+
+                                                                <div className="min-w-0 space-y-1">
+                                                                    <p className="line-clamp-2 text-sm leading-tight font-semibold capitalize">
+                                                                        {
+                                                                            product.name
+                                                                        }
                                                                     </p>
-                                                                    {toText(product.ref) ? (
+
+                                                                    {toText(
+                                                                        product.ref,
+                                                                    ) ? (
                                                                         <p className="text-xs text-muted-foreground">
-                                                                            Ref: {toText(product.ref)}
+                                                                            Ref:{' '}
+                                                                            {toText(
+                                                                                product.ref,
+                                                                            )}
                                                                         </p>
                                                                     ) : null}
-                                                                    {(product.pot || product.height) ? (
-                                                                        <p className="flex flex-wrap gap-x-2 text-sm font-medium leading-tight">
-                                                                            {product.pot ? <span>Pot : {String(product.pot)} cm</span> : null}
-                                                                            {product.height ? <span>H : {String(product.height)} cm</span> : null}
+
+                                                                    {product.pot ||
+                                                                    product.height ? (
+                                                                        <p className="flex flex-wrap gap-x-2 text-sm leading-tight font-medium xl:hidden">
+                                                                            {product.pot ? (
+                                                                                <span>
+                                                                                    Pot
+                                                                                    :{' '}
+                                                                                    {String(
+                                                                                        product.pot,
+                                                                                    )}{' '}
+                                                                                    cm
+                                                                                </span>
+                                                                            ) : null}
+                                                                            {product.height ? (
+                                                                                <span>
+                                                                                    H
+                                                                                    :{' '}
+                                                                                    {String(
+                                                                                        product.height,
+                                                                                    )}{' '}
+                                                                                    cm
+                                                                                </span>
+                                                                            ) : null}
                                                                         </p>
                                                                     ) : null}
-                                                                </div>
-                                                            </div>
 
-                                                            <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-sm">
-                                                                <div>
-                                                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('Prix')}</p>
-                                                                    <p className="font-medium">{formatCurrency(unitPrice)}</p>
+                                                                    <p className="line-clamp-1 text-xs text-muted-foreground xl:line-clamp-none">
+                                                                        {
+                                                                            product.description
+                                                                        }
+                                                                    </p>
                                                                 </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('Total')}</p>
-                                                                    <p className="font-semibold">{formatCurrency(lineTotal)}</p>
-                                                                </div>
-                                                            </div>
 
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <div className="flex items-center gap-2 rounded-lg bg-muted p-1">
+                                                                <div className="hidden text-right text-sm leading-tight font-medium xl:block">
+                                                                    {product.pot
+                                                                        ? `${String(product.pot)} cm`
+                                                                        : '—'}
+                                                                </div>
+
+                                                                <div className="hidden text-right text-sm leading-tight font-medium xl:block">
+                                                                    {product.height
+                                                                        ? `${String(product.height)} cm`
+                                                                        : '—'}
+                                                                </div>
+
+                                                                <div className="text-right text-sm font-medium">
+                                                                    {formatCurrency(
+                                                                        unitPrice,
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1 md:justify-self-center">
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         className="h-8 w-8"
                                                                         onClick={() =>
-                                                                            handleQuantityChange(product.id, quantity - step)
+                                                                            handleQuantityChange(
+                                                                                product.id,
+                                                                                quantity -
+                                                                                    step,
+                                                                            )
                                                                         }
                                                                     >
                                                                         <Minus className="h-4 w-4" />
@@ -837,15 +1480,26 @@ export default withAppLayout<Props>(
 
                                                                     <Input
                                                                         type="text"
-                                                                        min={unite}
-                                                                        value={quantity}
-                                                                        onChange={(e) =>
+                                                                        min={
+                                                                            unite
+                                                                        }
+                                                                        value={
+                                                                            quantity
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
                                                                             handleQuantityChange(
                                                                                 product.id,
-                                                                                parseInt(e.target.value, 10)
+                                                                                parseInt(
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                    10,
+                                                                                ),
                                                                             )
                                                                         }
-                                                                        className="h-8 w-14 border-0 bg-transparent text-center"
+                                                                        className="h-8 w-8 border-0 text-center"
                                                                     />
 
                                                                     <Button
@@ -853,21 +1507,48 @@ export default withAppLayout<Props>(
                                                                         size="icon"
                                                                         className="h-8 w-8"
                                                                         onClick={() =>
-                                                                            handleQuantityChange(product.id, quantity + step)
+                                                                            handleQuantityChange(
+                                                                                product.id,
+                                                                                quantity +
+                                                                                    step,
+                                                                            )
                                                                         }
                                                                     >
                                                                         <Plus className="h-4 w-4" />
                                                                     </Button>
                                                                 </div>
 
-                                                                <div className="flex items-center gap-1">
+                                                                <div className="text-right text-sm font-semibold">
+                                                                    {formatCurrency(
+                                                                        lineTotal,
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center md:justify-center">
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className={cn('h-8 w-8', (hasComment || isCommentOpen) && 'text-primary')}
-                                                                        onClick={() => toggleProductComment(product.id)}
-                                                                        aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
-                                                                        title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
+                                                                        className={cn(
+                                                                            'h-8 w-8',
+                                                                            (hasComment ||
+                                                                                isCommentOpen) &&
+                                                                                'text-primary',
+                                                                        )}
+                                                                        onClick={() =>
+                                                                            toggleProductComment(
+                                                                                product.id,
+                                                                            )
+                                                                        }
+                                                                        aria-label={t(
+                                                                            hasComment
+                                                                                ? 'Modifier le commentaire'
+                                                                                : 'Ajouter un commentaire',
+                                                                        )}
+                                                                        title={t(
+                                                                            hasComment
+                                                                                ? 'Modifier le commentaire'
+                                                                                : 'Ajouter un commentaire',
+                                                                        )}
                                                                     >
                                                                         <Pencil className="h-4 w-4" />
                                                                     </Button>
@@ -875,163 +1556,84 @@ export default withAppLayout<Props>(
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         className="h-8 w-8 text-destructive hover:text-destructive"
-                                                                        onClick={() => removeFromCart(product.id)}
-                                                                        aria-label={t('Retirer du panier')}
-                                                                        title={t('Retirer du panier')}
+                                                                        onClick={() =>
+                                                                            removeFromCart(
+                                                                                product.id,
+                                                                            )
+                                                                        }
+                                                                        aria-label={t(
+                                                                            'Retirer du panier',
+                                                                        )}
+                                                                        title={t(
+                                                                            'Retirer du panier',
+                                                                        )}
                                                                     >
                                                                         <Trash2 className="h-4 w-4" />
                                                                     </Button>
                                                                 </div>
                                                             </div>
-                                                        </div>
 
-                                                        <div className="hidden items-center gap-2 p-3 md:grid md:grid-cols-[5rem_minmax(0,1fr)_4rem_7rem_4.5rem_4rem] xl:grid-cols-[5rem_minmax(0,1fr)_5rem_6rem_7rem_9rem_6rem_5rem] xl:gap-3">
-                                                            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded md:row-span-1">
-                                                                <img
-                                                                    src={getProductCartImage(product)}
-                                                                    alt={product.name}
-                                                                    className="h-full w-full object-cover"
-                                                                />
-                                                                <Badge
-                                                                    className={cn(
-                                                                        "absolute -top-1 -right-1 rounded-full text-xs",
-                                                                        quantity > 9 ? "size-6 px-1.5" : "size-5 px-2"
+                                                            {(hasComment ||
+                                                                isCommentOpen) && (
+                                                                <div className="border-t bg-muted/20 px-3 py-2 md:pl-[6.75rem]">
+                                                                    {isCommentOpen ? (
+                                                                        <textarea
+                                                                            id={`product-comment-${product.id}`}
+                                                                            value={
+                                                                                comment
+                                                                            }
+                                                                            autoFocus
+                                                                            maxLength={
+                                                                                2000
+                                                                            }
+                                                                            rows={
+                                                                                2
+                                                                            }
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                updateComment(
+                                                                                    product.id,
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            placeholder={t(
+                                                                                'Ex. couleur souhaitée, consigne de préparation…',
+                                                                            )}
+                                                                            aria-label={t(
+                                                                                'Commentaire pour ce produit',
+                                                                            )}
+                                                                            className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                                        />
+                                                                    ) : (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                toggleProductComment(
+                                                                                    product.id,
+                                                                                )
+                                                                            }
+                                                                            className="flex w-full items-start gap-2 text-left text-sm text-muted-foreground hover:text-foreground"
+                                                                            title={t(
+                                                                                'Modifier le commentaire',
+                                                                            )}
+                                                                        >
+                                                                            <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                                                            <span className="whitespace-pre-wrap">
+                                                                                {
+                                                                                    comment
+                                                                                }
+                                                                            </span>
+                                                                        </button>
                                                                     )}
-                                                                >
-                                                                    {quantity}
-                                                                </Badge>
-                                                            </div>
-
-                                                            <div className="min-w-0 space-y-1">
-                                                                <p className="line-clamp-2 text-sm font-semibold leading-tight capitalize">
-                                                                    {product.name}
-                                                                </p>
-
-                                                                {toText(product.ref) ? (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        Ref: {toText(product.ref)}
-                                                                    </p>
-                                                                ) : null}
-
-                                                                {(product.pot || product.height) ? (
-                                                                    <p className="flex flex-wrap gap-x-2 text-sm font-medium leading-tight xl:hidden">
-                                                                        {product.pot ? <span>Pot : {String(product.pot)} cm</span> : null}
-                                                                        {product.height ? <span>H : {String(product.height)} cm</span> : null}
-                                                                    </p>
-                                                                ) : null}
-
-                                                                <p className="line-clamp-1 text-xs text-muted-foreground xl:line-clamp-none">
-                                                                    {product.description}
-                                                                </p>
-                                                            </div>
-
-                                                            <div className="hidden text-right text-sm font-medium leading-tight xl:block">
-                                                                {product.pot ? `${String(product.pot)} cm` : '—'}
-                                                            </div>
-
-                                                            <div className="hidden text-right text-sm font-medium leading-tight xl:block">
-                                                                {product.height ? `${String(product.height)} cm` : '—'}
-                                                            </div>
-
-                                                            <div className="text-sm font-medium text-right">
-                                                                {formatCurrency(unitPrice)}
-                                                            </div>
-
-                                                            <div className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1 md:justify-self-center">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8"
-                                                                    onClick={() =>
-                                                                        handleQuantityChange(product.id, quantity - step)
-                                                                    }
-                                                                >
-                                                                    <Minus className="h-4 w-4" />
-                                                                </Button>
-
-                                                                <Input
-                                                                    type="text"
-                                                                    min={unite}
-                                                                    value={quantity}
-                                                                    onChange={(e) =>
-                                                                        handleQuantityChange(
-                                                                            product.id,
-                                                                            parseInt(e.target.value, 10)
-                                                                        )
-                                                                    }
-                                                                    className="h-8 w-8 border-0 text-center"
-                                                                />
-
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8"
-                                                                    onClick={() =>
-                                                                        handleQuantityChange(product.id, quantity + step)
-                                                                    }
-                                                                >
-                                                                    <Plus className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-
-                                                            <div className="text-sm font-semibold text-right">
-                                                                {formatCurrency(lineTotal)}
-                                                            </div>
-
-                                                            <div className="flex items-center md:justify-center">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className={cn('h-8 w-8', (hasComment || isCommentOpen) && 'text-primary')}
-                                                                    onClick={() => toggleProductComment(product.id)}
-                                                                    aria-label={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
-                                                                    title={t(hasComment ? 'Modifier le commentaire' : 'Ajouter un commentaire')}
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                                                    onClick={() => removeFromCart(product.id)}
-                                                                    aria-label={t('Retirer du panier')}
-                                                                    title={t('Retirer du panier')}
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
+                                                                </div>
+                                                            )}
                                                         </div>
-
-                                                        {(hasComment || isCommentOpen) && (
-                                                            <div className="border-t bg-muted/20 px-3 py-2 md:pl-[6.75rem]">
-                                                                {isCommentOpen ? (
-                                                                    <textarea
-                                                                        id={`product-comment-${product.id}`}
-                                                                        value={comment}
-                                                                        autoFocus
-                                                                        maxLength={2000}
-                                                                        rows={2}
-                                                                        onChange={(event) => updateComment(product.id, event.target.value)}
-                                                                        placeholder={t('Ex. couleur souhaitée, consigne de préparation…')}
-                                                                        aria-label={t('Commentaire pour ce produit')}
-                                                                        className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                                    />
-                                                                ) : (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => toggleProductComment(product.id)}
-                                                                        className="flex w-full items-start gap-2 text-left text-sm text-muted-foreground hover:text-foreground"
-                                                                        title={t('Modifier le commentaire')}
-                                                                    >
-                                                                        <Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                                                        <span className="whitespace-pre-wrap">{comment}</span>
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
+                                                    );
+                                                },
+                                            )}
                                         </div>
 
                                         {/* Séparateur */}
@@ -1039,29 +1641,63 @@ export default withAppLayout<Props>(
 
                                         {/* Rolls */}
                                         <div className="space-y-4">
-
                                             <ProductRoll
                                                 items={group.cartItems}
-                                                onAddCarton={(productId, cond) => {
-                                                    const item = group.cartItems.find(({ product }) => product.id === productId);
-                                                    if (item) handleQuantityChange(productId, item.quantity + cond);
+                                                onAddCarton={(
+                                                    productId,
+                                                    cond,
+                                                ) => {
+                                                    const item =
+                                                        group.cartItems.find(
+                                                            ({ product }) =>
+                                                                product.id ===
+                                                                productId,
+                                                        );
+                                                    if (item)
+                                                        handleQuantityChange(
+                                                            productId,
+                                                            item.quantity +
+                                                                cond,
+                                                        );
                                                 }}
-                                                onRemoveCarton={(productId, cond) => {
-                                                    const item = group.cartItems.find(({ product }) => product.id === productId);
-                                                    if (item) handleQuantityChange(productId, item.quantity - cond);
+                                                onRemoveCarton={(
+                                                    productId,
+                                                    cond,
+                                                ) => {
+                                                    const item =
+                                                        group.cartItems.find(
+                                                            ({ product }) =>
+                                                                product.id ===
+                                                                productId,
+                                                        );
+                                                    if (item)
+                                                        handleQuantityChange(
+                                                            productId,
+                                                            item.quantity -
+                                                                cond,
+                                                        );
                                                 }}
                                                 onRemoveProduct={removeFromCart}
                                                 getSupplierPrice={(supplier) =>
-                                                    group.shipping.bySupplier[supplier.supplierId] ?? 0
+                                                    group.shipping.bySupplier[
+                                                        supplier.supplierId
+                                                    ] ?? 0
                                                 }
-                                                getRollPrice={(supplier, roll, rollIndex) => {
-                                                    const prices = getSupplierRollPrices(
-                                                        supplier,
-                                                        group.selectedAttributes,
-                                                        group.selectedTransport,
-                                                    );
+                                                getRollPrice={(
+                                                    supplier,
+                                                    roll,
+                                                    rollIndex,
+                                                ) => {
+                                                    const prices =
+                                                        group.shipping
+                                                            .rollPrices[
+                                                            supplier.supplierId
+                                                        ];
 
-                                                    return prices ? prices[rollIndex] ?? null : null;
+                                                    return prices
+                                                        ? (prices[rollIndex] ??
+                                                              null)
+                                                        : null;
                                                 }}
                                             />
                                         </div>
@@ -1079,21 +1715,27 @@ export default withAppLayout<Props>(
                     >
                         <Card
                             className="sidebar flex flex-col gap-0 overflow-hidden py-0"
-                            style={{ maxHeight: `calc(100svh - ${cartSidebarTopOffset}px)` }}
+                            style={{
+                                maxHeight: `calc(100svh - ${cartSidebarTopOffset}px)`,
+                            }}
                         >
                             <CardHeader className="shrink-0 py-6">
                                 <CardTitle>{t('Récapitulatif')}</CardTitle>
                                 {saveMessage && (
                                     <div
-                                        className={`mt-2 text-sm p-2 rounded ${saveMessage.includes("Erreur")
-                                            ? " text-destructive border border-destructive"
-                                            : " text-green-600 border border-green-600"}`}
+                                        className={`mt-2 rounded p-2 text-sm ${
+                                            saveMessage.includes('Erreur')
+                                                ? 'border border-destructive text-destructive'
+                                                : 'border border-green-600 text-green-600'
+                                        }`}
                                     >
                                         {saveMessage}
                                     </div>
                                 )}
                                 {pageMessage && (
-                                    <div className={`mt-2 text-sm p-2 rounded ${pageMessage.includes("Erreur") ? " text-destructive border border-destructive" : " text-green-600 border border-green-600"}`}>
+                                    <div
+                                        className={`mt-2 rounded p-2 text-sm ${pageMessage.includes('Erreur') ? 'border border-destructive text-destructive' : 'border border-green-600 text-green-600'}`}
+                                    >
                                         {pageMessage}
                                     </div>
                                 )}
@@ -1101,56 +1743,125 @@ export default withAppLayout<Props>(
                             <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-auto pb-6">
                                 <div className="space-y-3">
                                     {groupedItems.map((group) => (
-                                        <div key={group.id} className="relative rounded-md border px-3 py-2">
+                                        <div
+                                            key={group.id}
+                                            className="relative rounded-md border px-3 py-2"
+                                        >
                                             <div className="absolute -top-1 -left-2 shadow-sm">
-                                                <CountryFlag countryCode={group.country} className="w-4" />
+                                                <CountryFlag
+                                                    countryCode={group.country}
+                                                    className="w-4"
+                                                />
                                                 {/* {isAdminUser && group.label ? ` ${group.label}` : ''} */}
                                             </div>
                                             <div className="flex items-center justify-between text-sm">
-                                                <span>{t('Total produits')}</span>
-                                                <span className="font-semibold">{formatCurrency(group.itemsTotal)}</span>
+                                                <span>
+                                                    {t('Total produits')}
+                                                </span>
+                                                <span className="font-semibold">
+                                                    {formatCurrency(
+                                                        group.itemsTotal,
+                                                    )}
+                                                </span>
                                             </div>
-                                            {group.carrierOptions && group.carrierOptions.length > 1 ? (() => {
-                                                const override = carrierOverrides[group.id];
-                                                const currentIdx = override
-                                                    ? group.carrierOptions!.findIndex(
-                                                        (o) => o.carrierId === override.carrierId && o.zoneId === override.zoneId
-                                                    )
-                                                    : 0;
-                                                const value = String(currentIdx >= 0 ? currentIdx : 0);
-                                                return (
-                                                    <div className="flex items-center justify-between gap-2 text-sm">
-                                                        <span>{t('Transporteur')}</span>
-                                                        <Select
-                                                            value={value}
-                                                            onValueChange={(value: string) =>
-                                                                handleCarrierChange(group.id, group.carrierOptions!, value)
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="h-7 w-48 text-xs">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {group.carrierOptions.map((option, idx) => (
-                                                                    <SelectItem key={`${option.carrierId}-${option.zoneId}`} value={String(idx)}>
-                                                                        {cartCarriers[String(option.carrierId)]?.name ?? `#${option.carrierId}`}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                );
-                                            })() : group.carrierOptions && group.carrierOptions.length === 1 ? (
+                                            {group.carrierOptions &&
+                                            group.carrierOptions.length > 1 ? (
+                                                (() => {
+                                                    const override =
+                                                        carrierOverrides[
+                                                            group.id
+                                                        ];
+                                                    const currentIdx = override
+                                                        ? group.carrierOptions!.findIndex(
+                                                              (o) =>
+                                                                  o.carrierId ===
+                                                                      override.carrierId &&
+                                                                  o.zoneId ===
+                                                                      override.zoneId,
+                                                          )
+                                                        : 0;
+                                                    const value = String(
+                                                        currentIdx >= 0
+                                                            ? currentIdx
+                                                            : 0,
+                                                    );
+                                                    return (
+                                                        <div className="flex items-center justify-between gap-2 text-sm">
+                                                            <span>
+                                                                {t(
+                                                                    'Transporteur',
+                                                                )}
+                                                            </span>
+                                                            <Select
+                                                                value={value}
+                                                                onValueChange={(
+                                                                    value: string,
+                                                                ) =>
+                                                                    handleCarrierChange(
+                                                                        group.id,
+                                                                        group.carrierOptions!,
+                                                                        value,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <SelectTrigger className="h-7 w-48 text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {group.carrierOptions.map(
+                                                                        (
+                                                                            option,
+                                                                            idx,
+                                                                        ) => (
+                                                                            <SelectItem
+                                                                                key={`${option.carrierId}-${option.zoneId}`}
+                                                                                value={String(
+                                                                                    idx,
+                                                                                )}
+                                                                            >
+                                                                                {cartCarriers[
+                                                                                    String(
+                                                                                        option.carrierId,
+                                                                                    )
+                                                                                ]
+                                                                                    ?.name ??
+                                                                                    `#${option.carrierId}`}
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    );
+                                                })()
+                                            ) : group.carrierOptions &&
+                                              group.carrierOptions.length ===
+                                                  1 ? (
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span>{t('Transporteur')}</span>
+                                                    <span>
+                                                        {t('Transporteur')}
+                                                    </span>
                                                     <span className="text-muted-foreground">
-                                                        {cartCarriers[String(group.carrierOptions[0].carrierId)]?.name ?? `#${group.carrierOptions[0].carrierId}`}
+                                                        {cartCarriers[
+                                                            String(
+                                                                group
+                                                                    .carrierOptions[0]
+                                                                    .carrierId,
+                                                            )
+                                                        ]?.name ??
+                                                            `#${group.carrierOptions[0].carrierId}`}
                                                     </span>
                                                 </div>
                                             ) : null}
                                             <div className="flex items-center justify-between text-sm">
-                                                <span>{t('Frais de transport')}</span>
-                                                <span className="font-semibold">{formatCurrency(group.deliveryTotal)}</span>
+                                                <span>
+                                                    {t('Frais de transport')}
+                                                </span>
+                                                <span className="font-semibold">
+                                                    {formatCurrency(
+                                                        group.deliveryTotal,
+                                                    )}
+                                                </span>
                                             </div>
 
                                             {canEditDiscount && (
@@ -1160,56 +1871,133 @@ export default withAppLayout<Props>(
                                                         <Input
                                                             type="text"
                                                             inputMode="decimal"
-                                                            value={discountsByDb[group.id]?.value ?? ''}
-                                                            onChange={(event) => setDiscountsByDb((previous) => ({
-                                                                ...previous,
-                                                                [group.id]: {
-                                                                    type: previous[group.id]?.type ?? 'percent',
-                                                                    value: event.target.value,
-                                                                },
-                                                            }))}
+                                                            value={
+                                                                discountsByDb[
+                                                                    group.id
+                                                                ]?.value ?? ''
+                                                            }
+                                                            onChange={(event) =>
+                                                                setDiscountsByDb(
+                                                                    (
+                                                                        previous,
+                                                                    ) => ({
+                                                                        ...previous,
+                                                                        [group.id]:
+                                                                            {
+                                                                                type:
+                                                                                    previous[
+                                                                                        group
+                                                                                            .id
+                                                                                    ]
+                                                                                        ?.type ??
+                                                                                    'percent',
+                                                                                value: event
+                                                                                    .target
+                                                                                    .value,
+                                                                            },
+                                                                    }),
+                                                                )
+                                                            }
                                                             className="h-7 w-20 text-right text-xs"
-                                                            aria-label={t('Valeur de la remise')}
+                                                            aria-label={t(
+                                                                'Valeur de la remise',
+                                                            )}
                                                         />
                                                         <Select
-                                                            value={discountsByDb[group.id]?.type ?? 'percent'}
-                                                            onValueChange={(value: DiscountType) => setDiscountsByDb((previous) => ({
-                                                                ...previous,
-                                                                [group.id]: {
-                                                                    type: value,
-                                                                    value: previous[group.id]?.value ?? '',
-                                                                },
-                                                            }))}
+                                                            value={
+                                                                discountsByDb[
+                                                                    group.id
+                                                                ]?.type ??
+                                                                'percent'
+                                                            }
+                                                            onValueChange={(
+                                                                value: DiscountType,
+                                                            ) =>
+                                                                setDiscountsByDb(
+                                                                    (
+                                                                        previous,
+                                                                    ) => ({
+                                                                        ...previous,
+                                                                        [group.id]:
+                                                                            {
+                                                                                type: value,
+                                                                                value:
+                                                                                    previous[
+                                                                                        group
+                                                                                            .id
+                                                                                    ]
+                                                                                        ?.value ??
+                                                                                    '',
+                                                                            },
+                                                                    }),
+                                                                )
+                                                            }
                                                         >
                                                             <SelectTrigger className="h-7 w-16 text-xs">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="fixed">€</SelectItem>
-                                                                <SelectItem value="percent">%</SelectItem>
+                                                                <SelectItem value="fixed">
+                                                                    €
+                                                                </SelectItem>
+                                                                <SelectItem value="percent">
+                                                                    %
+                                                                </SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
                                                 </div>
                                             )}
-                                            {!canEditDiscount && group.discountAmount > 0 && (
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span>
-                                                        {t('Remise')} ({discountsByDb[group.id]?.value}{discountsByDb[group.id]?.type === 'percent' ? ' %' : ' €'})
-                                                    </span>
-                                                    <span className="font-semibold">- {formatCurrency(group.discountAmount)}</span>
-                                                </div>
-                                            )}
-                                            {canEditDiscount && group.discountAmount > 0 && (
-                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                                    <span>{t('Montant de la remise')}</span>
-                                                    <span>- {formatCurrency(group.discountAmount)}</span>
-                                                </div>
-                                            )}
+                                            {!canEditDiscount &&
+                                                group.discountAmount > 0 && (
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span>
+                                                            {t('Remise')} (
+                                                            {
+                                                                discountsByDb[
+                                                                    group.id
+                                                                ]?.value
+                                                            }
+                                                            {discountsByDb[
+                                                                group.id
+                                                            ]?.type ===
+                                                            'percent'
+                                                                ? ' %'
+                                                                : ' €'}
+                                                            )
+                                                        </span>
+                                                        <span className="font-semibold">
+                                                            -{' '}
+                                                            {formatCurrency(
+                                                                group.discountAmount,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            {canEditDiscount &&
+                                                group.discountAmount > 0 && (
+                                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                        <span>
+                                                            {t(
+                                                                'Montant de la remise',
+                                                            )}
+                                                        </span>
+                                                        <span>
+                                                            -{' '}
+                                                            {formatCurrency(
+                                                                group.discountAmount,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                )}
 
                                             <div className="flex items-center justify-between text-sm font-semibold">
                                                 <span>{t('Total')}</span>
-                                                <span>{formatCurrency(group.orderTotal)}</span>
+                                                <span>
+                                                    {formatCurrency(
+                                                        group.orderTotal,
+                                                    )}
+                                                </span>
                                             </div>
                                             <Separator className="my-2" />
                                             <div className="flex flex-col text-sm font-semibold">
@@ -1217,29 +2005,44 @@ export default withAppLayout<Props>(
                                                 <span className="text-right">
                                                     {!group.facturant ? (
                                                         '-'
-                                                    ) : group.facturant.email ? (
+                                                    ) : group.facturant
+                                                          .email ? (
                                                         <a
                                                             href={`mailto:${group.facturant.email}`}
                                                             className="text-primary hover:underline"
                                                         >
-                                                            {group.facturant.name || group.facturant.email}
+                                                            {group.facturant
+                                                                .name ||
+                                                                group.facturant
+                                                                    .email}
                                                         </a>
                                                     ) : (
-                                                        group.facturant.name || '-'
+                                                        group.facturant.name ||
+                                                        '-'
                                                     )}
                                                 </span>
                                             </div>
                                             <div className="flex flex-col text-sm font-semibold">
-                                                <span>{t('Commercial')} : </span>
+                                                <span>
+                                                    {t('Commercial')} :{' '}
+                                                </span>
                                                 <span className="text-right">
                                                     {!group.commercial ? (
                                                         '-'
-                                                    ) : group.commercial.email ? (
-                                                        <a href={`mailto:${group.commercial.email}`} className="text-primary hover:underline">
-                                                            {group.commercial.name || group.commercial.email}
+                                                    ) : group.commercial
+                                                          .email ? (
+                                                        <a
+                                                            href={`mailto:${group.commercial.email}`}
+                                                            className="text-primary hover:underline"
+                                                        >
+                                                            {group.commercial
+                                                                .name ||
+                                                                group.commercial
+                                                                    .email}
                                                         </a>
                                                     ) : (
-                                                        group.commercial.name || '-'
+                                                        group.commercial.name ||
+                                                        '-'
                                                     )}
                                                 </span>
                                             </div>
@@ -1257,16 +2060,25 @@ export default withAppLayout<Props>(
                                 />
 
                                 <div className="space-y-2">
-                                    <label htmlFor="order-comment" className="text-sm font-medium">
-                                        {t('Commentaire général de la commande')}
+                                    <label
+                                        htmlFor="order-comment"
+                                        className="text-sm font-medium"
+                                    >
+                                        {t(
+                                            'Commentaire général de la commande',
+                                        )}
                                     </label>
                                     <textarea
                                         id="order-comment"
                                         value={orderComment}
                                         maxLength={2000}
                                         rows={4}
-                                        onChange={(event) => setOrderComment(event.target.value)}
-                                        placeholder={t('Ajoutez une consigne valable pour toute la commande…')}
+                                        onChange={(event) =>
+                                            setOrderComment(event.target.value)
+                                        }
+                                        placeholder={t(
+                                            'Ajoutez une consigne valable pour toute la commande…',
+                                        )}
                                         className="w-full resize-y rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     />
                                     <p className="text-right text-xs text-muted-foreground">
@@ -1275,47 +2087,101 @@ export default withAppLayout<Props>(
                                 </div>
 
                                 <div className="space-y-2 rounded-lg border p-3">
-                                    <label htmlFor="coupon-code" className="flex items-center gap-2 text-sm font-medium">
-                                        <TicketPercent className="size-4" />Code promotionnel
+                                    <label
+                                        htmlFor="coupon-code"
+                                        className="flex items-center gap-2 text-sm font-medium"
+                                    >
+                                        <TicketPercent className="size-4" />
+                                        Code promotionnel
                                     </label>
                                     <div className="flex gap-2">
                                         <Input
                                             id="coupon-code"
                                             value={couponDraft}
                                             onChange={(event) => {
-                                                setCouponDraft(event.target.value.toUpperCase());
+                                                setCouponDraft(
+                                                    event.target.value.toUpperCase(),
+                                                );
                                                 setAppliedCoupon(null);
                                                 setCouponMessage(null);
                                             }}
                                             placeholder="VOTRE-CODE"
                                             maxLength={64}
                                         />
-                                        <Button type="button" variant="outline" onClick={() => void applyCoupon()} disabled={isCheckingCoupon || items.length === 0}>
-                                            {isCheckingCoupon ? 'Vérification…' : 'Appliquer'}
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => void applyCoupon()}
+                                            disabled={
+                                                isCheckingCoupon ||
+                                                items.length === 0
+                                            }
+                                        >
+                                            {isCheckingCoupon
+                                                ? 'Vérification…'
+                                                : 'Appliquer'}
                                         </Button>
                                     </div>
-                                    {couponMessage && <p className={cn('text-xs', appliedCoupon ? 'text-emerald-700' : 'text-destructive')}>{couponMessage}</p>}
-                                    {appliedCoupon && <button type="button" className="text-xs text-muted-foreground underline" onClick={() => { setCouponDraft(''); setAppliedCoupon(null); setCouponMessage(null); }}>Retirer le coupon</button>}
+                                    {couponMessage && (
+                                        <p
+                                            className={cn(
+                                                'text-xs',
+                                                appliedCoupon
+                                                    ? 'text-emerald-700'
+                                                    : 'text-destructive',
+                                            )}
+                                        >
+                                            {couponMessage}
+                                        </p>
+                                    )}
+                                    {appliedCoupon && (
+                                        <button
+                                            type="button"
+                                            className="text-xs text-muted-foreground underline"
+                                            onClick={() => {
+                                                setCouponDraft('');
+                                                setAppliedCoupon(null);
+                                                setCouponMessage(null);
+                                            }}
+                                        >
+                                            Retirer le coupon
+                                        </button>
+                                    )}
                                 </div>
 
-                                <div className="rounded-lg border p-3 space-y-2">
+                                <div className="space-y-2 rounded-lg border p-3">
                                     <div className="flex items-center justify-between text-sm">
                                         <span>{t('Total produits')}</span>
-                                        <span className="font-semibold">{formatCurrency(itemsTotal)}</span>
+                                        <span className="font-semibold">
+                                            {formatCurrency(itemsTotal)}
+                                        </span>
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
                                         <span>{t('Frais de transport')}</span>
-                                        <span className="font-semibold">{formatCurrency(deliveryTotal)}</span>
+                                        <span className="font-semibold">
+                                            {formatCurrency(deliveryTotal)}
+                                        </span>
                                     </div>
                                     {effectiveDiscountTotal > 0 && (
                                         <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                            <span>{appliedCoupon ? `Coupon ${appliedCoupon.code}` : t('Remise')}</span>
-                                            <span className="font-semibold">- {formatCurrency(effectiveDiscountTotal)}</span>
+                                            <span>
+                                                {appliedCoupon
+                                                    ? `Coupon ${appliedCoupon.code}`
+                                                    : t('Remise')}
+                                            </span>
+                                            <span className="font-semibold">
+                                                -{' '}
+                                                {formatCurrency(
+                                                    effectiveDiscountTotal,
+                                                )}
+                                            </span>
                                         </div>
                                     )}
                                     <div className="flex items-center justify-between text-base font-semibold">
                                         <span>{t('Total')}</span>
-                                        <span>{formatCurrency(orderTotal)}</span>
+                                        <span>
+                                            {formatCurrency(orderTotal)}
+                                        </span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -1324,7 +2190,9 @@ export default withAppLayout<Props>(
                                     className="w-full bg-brand-main hover:bg-brand-main-hover"
                                     size="lg"
                                     disabled={items.length === 0 || isSaving}
-                                    onClick={() => void handleGenerateTcpdf(orderOverrides)}
+                                    onClick={() =>
+                                        void handleGenerateTcpdf(orderOverrides)
+                                    }
                                 >
                                     {t('Commander')}
                                 </Button>

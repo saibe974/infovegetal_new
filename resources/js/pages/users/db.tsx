@@ -1,29 +1,42 @@
-import { Head, router, usePage, Form } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
-import { Button } from '@/components/ui/button';
-import { BreadcrumbItem, type SharedData, type User, type dbProduct, type ClientSalesCondition, type SalesConditions } from '@/types';
-import { useI18n } from '@/lib/i18n';
-import { FormField } from '@/components/ui/form-field';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchSelect from '@/components/app/search-select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StickyBar } from '@/components/ui/sticky-bar';
-import { TrashIcon } from 'lucide-react';
-import { DatabaseAccessIcon } from '@/lib/icons';
-import SalesConditionsForm from '@/components/sales/sales-conditions-form';
-import { Separator } from '@/components/ui/separator';
-import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
-import CountryFlag from '@/components/ui/country-flag';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { formatSalesConditionsSummary } from '@/components/sales/billing-utils';
+import SalesConditionsForm from '@/components/sales/sales-conditions-form';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import CountryFlag from '@/components/ui/country-flag';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { StickyBar } from '@/components/ui/sticky-bar';
+import AppLayout from '@/layouts/app-layout';
+import SettingsLayout from '@/layouts/settings/layout';
+import { normalizeBillingDefaultsToProfiles } from '@/lib/billing-defaults';
+import { useI18n } from '@/lib/i18n';
+import { DatabaseAccessIcon } from '@/lib/icons';
+import {
+    BreadcrumbItem,
+    type ClientSalesCondition,
+    type SalesConditions,
+    type SharedData,
+    type User,
+    type dbProduct,
+} from '@/types';
+import { Form, Head, router, usePage } from '@inertiajs/react';
+import { TrashIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 type CarrierOption = {
     id: number;
     name: string;
-    country?: string | null;
+    db_products?: Array<{ id: number }>;
     zones?: Array<{
         id: number;
         carrier_id: number;
@@ -64,21 +77,33 @@ type DbPageProps = SharedData & {
     salesConditions?: ClientSalesCondition[];
 };
 
-
-const normalizeConditions = (value: SalesConditions | undefined): SalesConditions => {
+const normalizeConditions = (
+    value: SalesConditions | undefined,
+): SalesConditions => {
     if (!value) {
         return {};
     }
 
-    const entries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+    const entries = Object.entries(value).sort(([a], [b]) =>
+        a.localeCompare(b),
+    );
     return Object.fromEntries(entries);
 };
 
-const areConditionsEqual = (left: SalesConditions | undefined, right: SalesConditions | undefined): boolean => {
-    return JSON.stringify(normalizeConditions(left)) === JSON.stringify(normalizeConditions(right));
+const areConditionsEqual = (
+    left: SalesConditions | undefined,
+    right: SalesConditions | undefined,
+): boolean => {
+    return (
+        JSON.stringify(normalizeConditions(left)) ===
+        JSON.stringify(normalizeConditions(right))
+    );
 };
 
-const diffConditions = (base: SalesConditions | undefined, target: SalesConditions | undefined): SalesConditions => {
+const diffConditions = (
+    base: SalesConditions | undefined,
+    target: SalesConditions | undefined,
+): SalesConditions => {
     const left = base ?? {};
     const right = target ?? {};
     const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
@@ -97,20 +122,37 @@ const diffConditions = (base: SalesConditions | undefined, target: SalesConditio
 const filterConditions = (
     value: SalesConditions | undefined,
     keep: (key: string) => boolean,
-): SalesConditions => normalizeConditions(
-    Object.fromEntries(Object.entries(value ?? {}).filter(([key]) => keep(key))),
-);
+): SalesConditions =>
+    normalizeConditions(
+        Object.fromEntries(
+            Object.entries(value ?? {}).filter(([key]) => keep(key)),
+        ),
+    );
 
-const getProfileConditions = (value: SalesConditions | undefined): SalesConditions =>
-    filterConditions(value, (key) => !PROFILE_INDEPENDENT_CONDITION_KEYS.has(key));
+const getProfileConditions = (
+    value: SalesConditions | undefined,
+): SalesConditions =>
+    filterConditions(
+        value,
+        (key) => !PROFILE_INDEPENDENT_CONDITION_KEYS.has(key),
+    );
 
-const getProfileIndependentConditions = (value: SalesConditions | undefined): SalesConditions =>
-    filterConditions(value, (key) => PROFILE_INDEPENDENT_CONDITION_KEYS.has(key));
+const getProfileIndependentConditions = (
+    value: SalesConditions | undefined,
+): SalesConditions =>
+    filterConditions(value, (key) =>
+        PROFILE_INDEPENDENT_CONDITION_KEYS.has(key),
+    );
 
-const getDefaultProfileConditions = (defaults: ReturnType<typeof normalizeBillingDefaultsToProfiles>): SalesConditions => {
-    const selected = defaults.profiles.find((profile) => profile.id === defaults.default_profile_id)
-        ?? defaults.profiles[0]
-        ?? null;
+const getDefaultProfileConditions = (
+    defaults: ReturnType<typeof normalizeBillingDefaultsToProfiles>,
+): SalesConditions => {
+    const selected =
+        defaults.profiles.find(
+            (profile) => profile.id === defaults.default_profile_id,
+        ) ??
+        defaults.profiles[0] ??
+        null;
 
     return normalizeConditions(selected?.conditions ?? {});
 };
@@ -140,15 +182,32 @@ const normalizePriceMode = (value: unknown): string => {
 
     const raw = String(value).trim().toLowerCase();
 
-    if (raw === 'price_depart' || raw === 'depart' || raw === 'departure' || raw === '0') {
+    if (
+        raw === 'price_depart' ||
+        raw === 'depart' ||
+        raw === 'departure' ||
+        raw === '0'
+    ) {
         return 'price_depart';
     }
 
-    if (raw === 'price_render' || raw === 'price_rendu' || raw === 'render' || raw === 'rendered' || raw === 'rendu' || raw === '1') {
+    if (
+        raw === 'price_render' ||
+        raw === 'price_rendu' ||
+        raw === 'render' ||
+        raw === 'rendered' ||
+        raw === 'rendu' ||
+        raw === '1'
+    ) {
         return 'price_render';
     }
 
-    if (raw === 'price' || raw === 'price_floor' || raw === 'price_roll' || raw === 'price_promo') {
+    if (
+        raw === 'price' ||
+        raw === 'price_floor' ||
+        raw === 'price_roll' ||
+        raw === 'price_promo'
+    ) {
         return raw;
     }
 
@@ -161,14 +220,29 @@ const toNumber = (value: string, fallback = 0): number => {
 };
 
 export default function UserDbPage() {
-    const { user: propsUser, dbProducts, carriers, salesConditions, selectedDbId } = usePage<DbPageProps>().props;
+    const {
+        user: propsUser,
+        dbProducts,
+        carriers,
+        salesConditions,
+        selectedDbId,
+    } = usePage<DbPageProps>().props;
     const { t } = useI18n();
     const targetUser: User = propsUser;
 
-    const dbProductsList = useMemo(() => (Array.isArray(dbProducts) ? dbProducts : []), [dbProducts]);
-    const carriersList = useMemo(() => (Array.isArray(carriers) ? carriers : []), [carriers]);
+    const dbProductsList = useMemo(
+        () => (Array.isArray(dbProducts) ? dbProducts : []),
+        [dbProducts],
+    );
+    const carriersList = useMemo(
+        () => (Array.isArray(carriers) ? carriers : []),
+        [carriers],
+    );
 
-    const dbById = useMemo(() => new Map(dbProductsList.map((db) => [Number(db.id), db])), [dbProductsList]);
+    const dbById = useMemo(
+        () => new Map(dbProductsList.map((db) => [Number(db.id), db])),
+        [dbProductsList],
+    );
 
     const [search, setSearch] = useState('');
     const [deliveryRaw, setDeliveryRaw] = useState('');
@@ -180,9 +254,17 @@ export default function UserDbPage() {
         if (existing.length > 0) {
             return existing.map((row) => ({
                 db_product_id: Number(row.db_product_id),
-                billing_user_id: row.billing_user_id ? Number(row.billing_user_id) : null,
-                seller_user_id: row.seller_user_id !== null && row.seller_user_id !== undefined ? Number(row.seller_user_id) : null,
-                conditions_override: normalizeConditions(row.conditions_override ?? {}),
+                billing_user_id: row.billing_user_id
+                    ? Number(row.billing_user_id)
+                    : null,
+                seller_user_id:
+                    row.seller_user_id !== null &&
+                    row.seller_user_id !== undefined
+                        ? Number(row.seller_user_id)
+                        : null,
+                conditions_override: normalizeConditions(
+                    row.conditions_override ?? {},
+                ),
                 profile_selection_key: null,
             }));
         }
@@ -205,13 +287,20 @@ export default function UserDbPage() {
     }, [activeIndex]);
 
     const dbOptions = useMemo(
-        () => dbProductsList.map((db) => ({ value: String(db.id), label: (db.name), country: (db.country) })),
+        () =>
+            dbProductsList.map((db) => ({
+                value: String(db.id),
+                label: db.name,
+                country: db.country,
+            })),
         [dbProductsList],
     );
 
     const availableDbOptions = useMemo(() => {
         const selected = new Set(rows.map((row) => Number(row.db_product_id)));
-        return dbOptions.filter((option) => !selected.has(Number(option.value)));
+        return dbOptions.filter(
+            (option) => !selected.has(Number(option.value)),
+        );
     }, [dbOptions, rows]);
 
     const activeRow = rows[activeIndex] ?? null;
@@ -241,7 +330,9 @@ export default function UserDbPage() {
         }
 
         const db = dbById.get(Number(activeRow.db_product_id));
-        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
+        const billing = (db?.billing_users ?? []).find(
+            (row) => Number(row.id) === Number(activeRow.billing_user_id),
+        );
 
         return (billing?.sellers ?? []).map((seller) => ({
             value: String(seller.id),
@@ -257,7 +348,9 @@ export default function UserDbPage() {
             return EMPTY_SEARCH_SELECTION;
         }
 
-        return billingOptions.filter((opt) => Number(opt.value) === Number(activeRow.billing_user_id));
+        return billingOptions.filter(
+            (opt) => Number(opt.value) === Number(activeRow.billing_user_id),
+        );
     }, [activeRow?.billing_user_id, billingOptions]);
 
     // console.log(selectedBillingOption)
@@ -270,17 +363,31 @@ export default function UserDbPage() {
         if (!Number.isInteger(nextBillingId) || nextBillingId <= 0) return;
         if (Number(activeRow.billing_user_id) === nextBillingId) return;
 
-        updateRow(activeIndex, { billing_user_id: nextBillingId, seller_user_id: null });
+        updateRow(activeIndex, {
+            billing_user_id: nextBillingId,
+            seller_user_id: null,
+        });
     }, [billingOptions, activeRow, activeIndex]);
 
     const activeSellerData = useMemo(() => {
-        if (!activeRow || !activeRow.billing_user_id || !activeRow.seller_user_id) {
+        if (
+            !activeRow ||
+            !activeRow.billing_user_id ||
+            !activeRow.seller_user_id
+        ) {
             return null;
         }
 
         const db = dbById.get(Number(activeRow.db_product_id));
-        const billing = (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id));
-        return (billing?.sellers ?? []).find((seller) => Number(seller.id) === Number(activeRow.seller_user_id)) ?? null;
+        const billing = (db?.billing_users ?? []).find(
+            (row) => Number(row.id) === Number(activeRow.billing_user_id),
+        );
+        return (
+            (billing?.sellers ?? []).find(
+                (seller) =>
+                    Number(seller.id) === Number(activeRow.seller_user_id),
+            ) ?? null
+        );
     }, [activeRow, dbById]);
     // console.log(activeSellerData);
 
@@ -290,7 +397,11 @@ export default function UserDbPage() {
         }
 
         const db = dbById.get(Number(activeRow.db_product_id));
-        return (db?.billing_users ?? []).find((row) => Number(row.id) === Number(activeRow.billing_user_id)) ?? null;
+        return (
+            (db?.billing_users ?? []).find(
+                (row) => Number(row.id) === Number(activeRow.billing_user_id),
+            ) ?? null
+        );
     }, [activeRow, dbById]);
     // console.log(activeBillingData);
 
@@ -305,39 +416,58 @@ export default function UserDbPage() {
         }
 
         if (!activeSellerData) {
-            const profile = activeBillingDefaults.profiles.find((item) => item.id === activeBillingDefaults.default_profile_id)
-                ?? activeBillingDefaults.profiles[0]
-                ?? null;
+            const profile =
+                activeBillingDefaults.profiles.find(
+                    (item) =>
+                        item.id === activeBillingDefaults.default_profile_id,
+                ) ??
+                activeBillingDefaults.profiles[0] ??
+                null;
 
             return profile;
         }
 
         const profileId = activeSellerData.use_billing_profile
-            ? (activeSellerData.billing_profile_id ?? activeBillingDefaults.default_profile_id ?? null)
+            ? (activeSellerData.billing_profile_id ??
+              activeBillingDefaults.default_profile_id ??
+              null)
             : null;
 
         if (!profileId) {
             return {
                 id: '__custom__',
                 name: t('Paramétrage custom'),
-                conditions: normalizeConditions(activeSellerData.conditions ?? {}),
+                conditions: normalizeConditions(
+                    activeSellerData.conditions ?? {},
+                ),
             };
         }
 
-        const profile = activeBillingDefaults.profiles.find((p) => p.id === String(profileId));
-        return profile ?? {
-            id: String(profileId),
-            name: String(profileId),
-            conditions: {},
-        };
-    }, [activeBillingDefaults, activeSellerData, activeRow?.billing_user_id, t]);
+        const profile = activeBillingDefaults.profiles.find(
+            (p) => p.id === String(profileId),
+        );
+        return (
+            profile ?? {
+                id: String(profileId),
+                name: String(profileId),
+                conditions: {},
+            }
+        );
+    }, [
+        activeBillingDefaults,
+        activeSellerData,
+        activeRow?.billing_user_id,
+        t,
+    ]);
 
     const sellerProfiles = useMemo(() => {
         if (!activeSellerData) {
             return [];
         }
 
-        const sellerDefaults = normalizeBillingDefaultsToProfiles(activeSellerData.seller_defaults);
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(
+            activeSellerData.seller_defaults,
+        );
         return sellerDefaults.profiles.map((profile) => ({
             key: `seller:${profile.id}`,
             label: profile.name,
@@ -368,14 +498,23 @@ export default function UserDbPage() {
             return billingBase;
         }
 
-        const sellerDefaults = normalizeBillingDefaultsToProfiles(activeSellerData.seller_defaults);
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(
+            activeSellerData.seller_defaults,
+        );
         const sellerBase = getDefaultProfileConditions(sellerDefaults);
 
         const billingToSellerBase = activeSellerData.use_billing_profile
             ? normalizeConditions(
-                activeBillingDefaults.profiles.find((p) => p.id === String(activeSellerData.billing_profile_id ?? activeBillingDefaults.default_profile_id ?? ''))?.conditions
-                ?? billingBase,
-            )
+                  activeBillingDefaults.profiles.find(
+                      (p) =>
+                          p.id ===
+                          String(
+                              activeSellerData.billing_profile_id ??
+                                  activeBillingDefaults.default_profile_id ??
+                                  '',
+                          ),
+                  )?.conditions ?? billingBase,
+              )
             : normalizeConditions(activeSellerData.conditions ?? {});
 
         return normalizeConditions({
@@ -383,7 +522,6 @@ export default function UserDbPage() {
             ...sellerBase,
         });
     }, [activeBillingDefaults, activeRow, activeSellerData]);
-
 
     const activeProfileOptions = useMemo(
         () => (activeRow?.seller_user_id ? sellerProfiles : billingProfiles),
@@ -404,7 +542,9 @@ export default function UserDbPage() {
         }
 
         if (activeRow.profile_selection_key) {
-            const explicitProfile = activeProfileOptions.find((profile) => profile.key === activeRow.profile_selection_key);
+            const explicitProfile = activeProfileOptions.find(
+                (profile) => profile.key === activeRow.profile_selection_key,
+            );
             return explicitProfile ? explicitProfile.key : '';
         }
 
@@ -414,7 +554,10 @@ export default function UserDbPage() {
             const profileOverride = getProfileConditions(
                 diffConditions(
                     inheritedConditions,
-                    normalizeConditions({ ...inheritedConditions, ...profile.conditions }),
+                    normalizeConditions({
+                        ...inheritedConditions,
+                        ...profile.conditions,
+                    }),
                 ),
             );
 
@@ -433,38 +576,63 @@ export default function UserDbPage() {
             return null;
         }
 
-        return activeProfileOptions.find((profile) => profile.key === selectedProfileKey) ?? null;
+        return (
+            activeProfileOptions.find(
+                (profile) => profile.key === selectedProfileKey,
+            ) ?? null
+        );
     }, [activeProfileOptions, selectedProfileKey]);
 
-    const breadcrumbs: BreadcrumbItem[] = [{ title: t('User database association'), href: '#' }];
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('User database association'), href: '#' },
+    ];
 
     const updateRow = (index: number, patch: Partial<SalesConditionDraft>) => {
-        setRows((prev) => prev.map((row, rowIndex) => {
-            if (rowIndex !== index) {
-                return row;
-            }
+        setRows((prev) =>
+            prev.map((row, rowIndex) => {
+                if (rowIndex !== index) {
+                    return row;
+                }
 
-            const patchEntries = Object.entries(patch) as Array<[keyof SalesConditionDraft, SalesConditionDraft[keyof SalesConditionDraft]]>;
-            const hasChanges = patchEntries.some(([key, value]) => !Object.is(row[key], value));
+                const patchEntries = Object.entries(patch) as Array<
+                    [
+                        keyof SalesConditionDraft,
+                        SalesConditionDraft[keyof SalesConditionDraft],
+                    ]
+                >;
+                const hasChanges = patchEntries.some(
+                    ([key, value]) => !Object.is(row[key], value),
+                );
 
-            if (!hasChanges) {
-                return row;
-            }
+                if (!hasChanges) {
+                    return row;
+                }
 
-            return { ...row, ...patch };
-        }));
+                return { ...row, ...patch };
+            }),
+        );
     };
 
-    const mergedSource = selectedProfileKey === '__custom__'
-        ? normalizeConditions({ ...inheritedConditions, ...(activeRow?.conditions_override ?? {}) })
-        : selectedProfile
-            ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions, ...(activeRow?.conditions_override ?? {}) })
-            : inheritedConditions;
-
+    const mergedSource =
+        selectedProfileKey === '__custom__'
+            ? normalizeConditions({
+                  ...inheritedConditions,
+                  ...(activeRow?.conditions_override ?? {}),
+              })
+            : selectedProfile
+              ? normalizeConditions({
+                    ...inheritedConditions,
+                    ...selectedProfile.conditions,
+                    ...(activeRow?.conditions_override ?? {}),
+                })
+              : inheritedConditions;
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
     const selectedProfileBase = selectedProfile
-        ? normalizeConditions({ ...inheritedConditions, ...selectedProfile.conditions })
+        ? normalizeConditions({
+              ...inheritedConditions,
+              ...selectedProfile.conditions,
+          })
         : inheritedConditions;
     const activeIndependentOverrides = getProfileIndependentConditions(
         diffConditions(selectedProfileBase, merged),
@@ -479,7 +647,9 @@ export default function UserDbPage() {
             return;
         }
 
-        const profile = activeProfileOptions.find((item) => item.key === profileKey);
+        const profile = activeProfileOptions.find(
+            (item) => item.key === profileKey,
+        );
         if (!profile) {
             return;
         }
@@ -490,28 +660,43 @@ export default function UserDbPage() {
         });
     };
 
-    const customConditionsForm = selectedProfileKey === '__custom__' ? (
-        <SalesConditionsForm
-            value={getProfileConditions(activeRow?.conditions_override)}
-            onChange={(next) => updateRow(activeIndex, {
-                profile_selection_key: '__custom__',
-                conditions_override: normalizeConditions({
-                    ...activeIndependentOverrides,
-                    ...next,
-                }),
-            })}
-            carriers={carriersList}
-            mode="client"
-        />
-    ) : null;
+    const customConditionsForm =
+        selectedProfileKey === '__custom__' ? (
+            <SalesConditionsForm
+                value={getProfileConditions(activeRow?.conditions_override)}
+                onChange={(next) =>
+                    updateRow(activeIndex, {
+                        profile_selection_key: '__custom__',
+                        conditions_override: normalizeConditions({
+                            ...activeIndependentOverrides,
+                            ...next,
+                        }),
+                    })
+                }
+                carriers={carriersList.filter((carrier) =>
+                    carrier.db_products?.some(
+                        (db) => db.id === Number(activeRow?.db_product_id),
+                    ),
+                )}
+                mode="client"
+            />
+        ) : null;
 
-    type CarrierAssignment = { carrier_id: number | null; zone_id: number | null; tva?: number | null };
+    type CarrierAssignment = {
+        carrier_id: number | null;
+        zone_id: number | null;
+        tva?: number | null;
+    };
 
-    const [carrierTvaRaw, setCarrierTvaRaw] = useState<Record<number, string>>({});
+    const [carrierTvaRaw, setCarrierTvaRaw] = useState<Record<number, string>>(
+        {},
+    );
 
     const carrierAssignments: CarrierAssignment[] = useMemo(() => {
-        if (merged.t === null || merged.t === undefined || merged.t === '') return [];
-        if (typeof merged.t === 'number') return [{ carrier_id: merged.t, zone_id: merged.z ?? null }];
+        if (merged.t === null || merged.t === undefined || merged.t === '')
+            return [];
+        if (typeof merged.t === 'number')
+            return [{ carrier_id: merged.t, zone_id: merged.z ?? null }];
         try {
             const parsed = JSON.parse(merged.t);
             return Array.isArray(parsed) ? parsed : [];
@@ -522,7 +707,9 @@ export default function UserDbPage() {
 
     const updateCarrierAssignments = (next: CarrierAssignment[]) => {
         const json = next.length === 0 ? null : JSON.stringify(next);
-        updateWithoutChangingProfile({ t: json as unknown as SalesConditions['t'] });
+        updateWithoutChangingProfile({
+            t: json as unknown as SalesConditions['t'],
+        });
     };
 
     const updateWithoutChangingProfile = (patch: Partial<SalesConditions>) => {
@@ -530,13 +717,20 @@ export default function UserDbPage() {
 
         updateRow(activeIndex, {
             profile_selection_key: selectedProfileKey,
-            conditions_override: diffConditions(selectedProfileBase, nextResolved),
+            conditions_override: diffConditions(
+                selectedProfileBase,
+                nextResolved,
+            ),
         });
     };
 
-    const resolveRowSubmissionOverride = (row: SalesConditionDraft): SalesConditions => {
+    const resolveRowSubmissionOverride = (
+        row: SalesConditionDraft,
+    ): SalesConditions => {
         const db = dbById.get(Number(row.db_product_id));
-        const billing = (db?.billing_users ?? []).find((item) => Number(item.id) === Number(row.billing_user_id));
+        const billing = (db?.billing_users ?? []).find(
+            (item) => Number(item.id) === Number(row.billing_user_id),
+        );
 
         if (!billing) {
             return row.profile_selection_key === '__custom__'
@@ -544,23 +738,38 @@ export default function UserDbPage() {
                 : {};
         }
 
-        const billingDefaults = normalizeBillingDefaultsToProfiles(billing.defaults);
+        const billingDefaults = normalizeBillingDefaultsToProfiles(
+            billing.defaults,
+        );
         const billingBase = getDefaultProfileConditions(billingDefaults);
 
         const seller = row.seller_user_id
-            ? (billing.sellers ?? []).find((item) => Number(item.id) === Number(row.seller_user_id))
+            ? (billing.sellers ?? []).find(
+                  (item) => Number(item.id) === Number(row.seller_user_id),
+              )
             : null;
 
-        const sellerDefaults = normalizeBillingDefaultsToProfiles(seller?.seller_defaults);
-        const sellerBase = seller ? getDefaultProfileConditions(sellerDefaults) : {};
+        const sellerDefaults = normalizeBillingDefaultsToProfiles(
+            seller?.seller_defaults,
+        );
+        const sellerBase = seller
+            ? getDefaultProfileConditions(sellerDefaults)
+            : {};
 
         const billingToSellerBase = seller
-            ? ((seller.use_billing_profile ?? true)
+            ? (seller.use_billing_profile ?? true)
                 ? normalizeConditions(
-                    billingDefaults.profiles.find((p) => p.id === String(seller.billing_profile_id ?? billingDefaults.default_profile_id ?? ''))?.conditions
-                    ?? billingBase,
-                )
-                : normalizeConditions(seller.conditions ?? {}))
+                      billingDefaults.profiles.find(
+                          (p) =>
+                              p.id ===
+                              String(
+                                  seller.billing_profile_id ??
+                                      billingDefaults.default_profile_id ??
+                                      '',
+                              ),
+                      )?.conditions ?? billingBase,
+                  )
+                : normalizeConditions(seller.conditions ?? {})
             : billingBase;
 
         const rowBase = normalizeConditions({
@@ -578,15 +787,17 @@ export default function UserDbPage() {
 
         const profilePool = seller
             ? sellerDefaults.profiles.map((profile) => ({
-                key: `seller:${profile.id}`,
-                conditions: normalizeConditions(profile.conditions),
-            }))
+                  key: `seller:${profile.id}`,
+                  conditions: normalizeConditions(profile.conditions),
+              }))
             : billingDefaults.profiles.map((profile) => ({
-                key: `billing:${profile.id}`,
-                conditions: normalizeConditions(profile.conditions),
-            }));
+                  key: `billing:${profile.id}`,
+                  conditions: normalizeConditions(profile.conditions),
+              }));
 
-        const selected = profilePool.find((profile) => profile.key === row.profile_selection_key);
+        const selected = profilePool.find(
+            (profile) => profile.key === row.profile_selection_key,
+        );
         if (!selected) {
             return {};
         }
@@ -602,15 +813,27 @@ export default function UserDbPage() {
 
     const submit = () => {
         const normalizedRows = rows
-            .filter((row) => Number(row.db_product_id) > 0 && Number(row.billing_user_id ?? 0) > 0)
+            .filter(
+                (row) =>
+                    Number(row.db_product_id) > 0 &&
+                    Number(row.billing_user_id ?? 0) > 0,
+            )
             .map((row) => ({
                 db_product_id: Number(row.db_product_id),
                 billing_user_id: Number(row.billing_user_id),
-                seller_user_id: row.seller_user_id ? Number(row.seller_user_id) : null,
+                seller_user_id: row.seller_user_id
+                    ? Number(row.seller_user_id)
+                    : null,
                 conditions_override: resolveRowSubmissionOverride(row),
             }));
 
-        const dbIds = Array.from(new Set(rows.map((row) => Number(row.db_product_id)).filter((id) => id > 0)));
+        const dbIds = Array.from(
+            new Set(
+                rows
+                    .map((row) => Number(row.db_product_id))
+                    .filter((id) => id > 0),
+            ),
+        );
 
         router.post(
             `/admin/users/${targetUser.id}/db`,
@@ -639,27 +862,60 @@ export default function UserDbPage() {
                         </div>
                     </StickyBar>
 
-
-                    <Form method="post" action={`/admin/users/${targetUser.id}/db`} className="space-y-4">
-                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                            <Card className="p-6 space-y-4">
-                                <FormField label={<><DatabaseAccessIcon className="inline mx-2" /> {t('Select DB product')}</>}>
+                    <Form
+                        method="post"
+                        action={`/admin/users/${targetUser.id}/db`}
+                        className="space-y-4"
+                    >
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                            <Card className="space-y-4 p-6">
+                                <FormField
+                                    label={
+                                        <>
+                                            <DatabaseAccessIcon className="mx-2 inline" />{' '}
+                                            {t('Select DB product')}
+                                        </>
+                                    }
+                                >
                                     <SearchSelect
                                         value={search}
                                         onChange={setSearch}
                                         onSubmit={(value) => {
-                                            const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                            if (!Number.isInteger(id) || id <= 0) {
+                                            const id = Number(
+                                                value
+                                                    .trim()
+                                                    .split(/\s+/)
+                                                    .pop() ?? '',
+                                            );
+                                            if (
+                                                !Number.isInteger(id) ||
+                                                id <= 0
+                                            ) {
                                                 return;
                                             }
 
                                             setRows((prev) => {
-                                                const exists = prev.some((row) => Number(row.db_product_id) === id);
+                                                const exists = prev.some(
+                                                    (row) =>
+                                                        Number(
+                                                            row.db_product_id,
+                                                        ) === id,
+                                                );
                                                 if (exists) {
                                                     return prev;
                                                 }
 
-                                                return [...prev, { db_product_id: id, billing_user_id: null, seller_user_id: null, conditions_override: {}, profile_selection_key: '' }];
+                                                return [
+                                                    ...prev,
+                                                    {
+                                                        db_product_id: id,
+                                                        billing_user_id: null,
+                                                        seller_user_id: null,
+                                                        conditions_override: {},
+                                                        profile_selection_key:
+                                                            '',
+                                                    },
+                                                ];
                                             });
                                             setActiveIndex(rows.length);
                                             setSearch('');
@@ -671,30 +927,50 @@ export default function UserDbPage() {
                                     />
                                 </FormField>
 
-                                <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                                <div className="max-h-[420px] space-y-2 overflow-y-auto">
                                     {rows.map((row, index) => {
-                                        const db = dbById.get(Number(row.db_product_id));
+                                        const db = dbById.get(
+                                            Number(row.db_product_id),
+                                        );
                                         // console.log(db)
                                         if (!db) {
                                             return null;
                                         }
 
                                         return (
-                                            <div key={`${row.db_product_id}-${index}`} className="flex items-center justify-between gap-2">
-                                                {db.country && <CountryFlag countryCode={db.country} title={db.country} className="w-4" />}
+                                            <div
+                                                key={`${row.db_product_id}-${index}`}
+                                                className="flex items-center justify-between gap-2"
+                                            >
+                                                {db.country && (
+                                                    <CountryFlag
+                                                        countryCode={db.country}
+                                                        title={db.country}
+                                                        className="w-4"
+                                                    />
+                                                )}
                                                 <button
                                                     type="button"
-                                                    className={`text-left rounded-md px-3 py-2 w-full border ${activeIndex === index ? 'bg-muted border-primary' : 'border-border'}`}
-                                                    onClick={() => setActiveIndex(index)}
+                                                    className={`w-full rounded-md border px-3 py-2 text-left ${activeIndex === index ? 'border-primary bg-muted' : 'border-border'}`}
+                                                    onClick={() =>
+                                                        setActiveIndex(index)
+                                                    }
                                                 >
-                                                    <span className="font-medium">{db.name}</span>
+                                                    <span className="font-medium">
+                                                        {db.name}
+                                                    </span>
                                                 </button>
                                                 <Button
                                                     type="button"
                                                     variant="destructive-outline"
                                                     size="icon"
                                                     onClick={() => {
-                                                        setRows((prev) => prev.filter((_, i) => i !== index));
+                                                        setRows((prev) =>
+                                                            prev.filter(
+                                                                (_, i) =>
+                                                                    i !== index,
+                                                            ),
+                                                        );
                                                         setActiveIndex(0);
                                                     }}
                                                 >
@@ -706,49 +982,122 @@ export default function UserDbPage() {
                                 </div>
                             </Card>
 
-                            <Card className="p-6 xl:col-span-2 space-y-4">
+                            <Card className="space-y-4 p-6 xl:col-span-2">
                                 {!activeRow ? (
-                                    <p className="text-sm text-muted-foreground">{t('Select a DB product to configure sales conditions.')}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {t(
+                                            'Select a DB product to configure sales conditions.',
+                                        )}
+                                    </p>
                                 ) : (
                                     <>
                                         <CardHeader className="px-0">
                                             <CardTitle className="flex items-center gap-2">
-                                                {dbById.get(Number(activeRow.db_product_id))?.country && <CountryFlag countryCode={dbById.get(Number(activeRow.db_product_id))!.country!} title={dbById.get(Number(activeRow.db_product_id))!.country!} className="w-5" />}
-                                                {dbById.get(Number(activeRow.db_product_id))?.name}
+                                                {dbById.get(
+                                                    Number(
+                                                        activeRow.db_product_id,
+                                                    ),
+                                                )?.country && (
+                                                    <CountryFlag
+                                                        countryCode={
+                                                            dbById.get(
+                                                                Number(
+                                                                    activeRow.db_product_id,
+                                                                ),
+                                                            )!.country!
+                                                        }
+                                                        title={
+                                                            dbById.get(
+                                                                Number(
+                                                                    activeRow.db_product_id,
+                                                                ),
+                                                            )!.country!
+                                                        }
+                                                        className="w-5"
+                                                    />
+                                                )}
+                                                {
+                                                    dbById.get(
+                                                        Number(
+                                                            activeRow.db_product_id,
+                                                        ),
+                                                    )?.name
+                                                }
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardContent className="px-0 space-y-6">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField label={t('Facturant')}>
-                                                    {billingOptions.length <= 1 ? (
+                                        <CardContent className="space-y-6 px-0">
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                <FormField
+                                                    label={t('Facturant')}
+                                                >
+                                                    {billingOptions.length <=
+                                                    1 ? (
                                                         <Input
                                                             disabled
                                                             readOnly
-                                                            value={billingOptions[0]?.label ?? ''}
-                                                            placeholder={t('Facturant')}
+                                                            value={
+                                                                billingOptions[0]
+                                                                    ?.label ??
+                                                                ''
+                                                            }
+                                                            placeholder={t(
+                                                                'Facturant',
+                                                            )}
                                                         />
                                                     ) : (
                                                         <SearchSelect
                                                             value={''}
-                                                            onChange={() => undefined}
-                                                            onSubmit={(value) => {
-                                                                const id = Number(value.trim().split(/\s+/).pop() ?? '');
-                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                            onChange={() =>
+                                                                undefined
+                                                            }
+                                                            onSubmit={(
+                                                                value,
+                                                            ) => {
+                                                                const id =
+                                                                    Number(
+                                                                        value
+                                                                            .trim()
+                                                                            .split(
+                                                                                /\s+/,
+                                                                            )
+                                                                            .pop() ??
+                                                                            '',
+                                                                    );
+                                                                if (
+                                                                    !Number.isInteger(
+                                                                        id,
+                                                                    ) ||
+                                                                    id <= 0
+                                                                ) {
                                                                     return;
                                                                 }
 
-                                                                if (Number(activeRow.billing_user_id) === id) {
+                                                                if (
+                                                                    Number(
+                                                                        activeRow.billing_user_id,
+                                                                    ) === id
+                                                                ) {
                                                                     return;
                                                                 }
 
-                                                                updateRow(activeIndex, {
-                                                                    billing_user_id: id,
-                                                                    seller_user_id: null,
-                                                                    profile_selection_key: null,
-                                                                });
+                                                                updateRow(
+                                                                    activeIndex,
+                                                                    {
+                                                                        billing_user_id:
+                                                                            id,
+                                                                        seller_user_id:
+                                                                            null,
+                                                                        profile_selection_key:
+                                                                            null,
+                                                                    },
+                                                                );
                                                             }}
-                                                            propositions={billingOptions}
-                                                            selection={selectedBillingOption}
+                                                            propositions={
+                                                                billingOptions
+                                                            }
+                                                            selection={
+                                                                selectedBillingOption
+                                                            }
                                                             loading={false}
                                                             minQueryLength={0}
                                                         />
@@ -757,311 +1106,840 @@ export default function UserDbPage() {
                                                     {activeRow.seller_user_id ? (
                                                         <div
                                                             className="w-full rounded-md border border-border bg-muted/40 px-3 py-2"
-                                                            title={activeBillingProfile ? formatSalesConditionsSummary(activeBillingProfile.conditions, t('Vente directe')) : undefined}
+                                                            title={
+                                                                activeBillingProfile
+                                                                    ? formatSalesConditionsSummary(
+                                                                          activeBillingProfile.conditions,
+                                                                          t(
+                                                                              'Vente directe',
+                                                                          ),
+                                                                      )
+                                                                    : undefined
+                                                            }
                                                         >
                                                             <span className="block truncate font-medium">
-                                                                {activeBillingProfile?.name ?? t('Profil facturant assigné')}
+                                                                {activeBillingProfile?.name ??
+                                                                    t(
+                                                                        'Profil facturant assigné',
+                                                                    )}
                                                             </span>
                                                             {activeBillingProfile ? (
                                                                 <span className="block truncate text-xs text-muted-foreground">
-                                                                    {formatSalesConditionsSummary(activeBillingProfile.conditions, t('Vente directe'))}
+                                                                    {formatSalesConditionsSummary(
+                                                                        activeBillingProfile.conditions,
+                                                                        t(
+                                                                            'Vente directe',
+                                                                        ),
+                                                                    )}
                                                                 </span>
                                                             ) : null}
                                                         </div>
-                                                    ) : (<></>)}
-
+                                                    ) : (
+                                                        <></>
+                                                    )}
                                                 </FormField>
 
                                                 {!activeRow.seller_user_id ? (
-                                                    <FormField label={t('Commercial')}>
-                                                        {sellerOptions.length > 0 ? (
+                                                    <FormField
+                                                        label={t('Commercial')}
+                                                    >
+                                                        {sellerOptions.length >
+                                                        0 ? (
                                                             <Select
-                                                                value={activeRow.seller_user_id ? String(activeRow.seller_user_id) : 'none'}
-                                                                onValueChange={(val) => {
-                                                                    if (val === 'none') {
-                                                                        updateRow(activeIndex, {
-                                                                            seller_user_id: null,
-                                                                            profile_selection_key: null,
-                                                                        });
+                                                                value={
+                                                                    activeRow.seller_user_id
+                                                                        ? String(
+                                                                              activeRow.seller_user_id,
+                                                                          )
+                                                                        : 'none'
+                                                                }
+                                                                onValueChange={(
+                                                                    val,
+                                                                ) => {
+                                                                    if (
+                                                                        val ===
+                                                                        'none'
+                                                                    ) {
+                                                                        updateRow(
+                                                                            activeIndex,
+                                                                            {
+                                                                                seller_user_id:
+                                                                                    null,
+                                                                                profile_selection_key:
+                                                                                    null,
+                                                                            },
+                                                                        );
                                                                         return;
                                                                     }
 
-                                                                    const id = Number(val);
-                                                                    if (!Number.isInteger(id) || id <= 0) {
+                                                                    const id =
+                                                                        Number(
+                                                                            val,
+                                                                        );
+                                                                    if (
+                                                                        !Number.isInteger(
+                                                                            id,
+                                                                        ) ||
+                                                                        id <= 0
+                                                                    ) {
                                                                         return;
                                                                     }
 
-                                                                    updateRow(activeIndex, {
-                                                                        seller_user_id: id,
-                                                                        profile_selection_key: null,
-                                                                    });
+                                                                    updateRow(
+                                                                        activeIndex,
+                                                                        {
+                                                                            seller_user_id:
+                                                                                id,
+                                                                            profile_selection_key:
+                                                                                null,
+                                                                        },
+                                                                    );
                                                                 }}
                                                             >
                                                                 <SelectTrigger>
-                                                                    <SelectValue placeholder={t('Select a commercial')} />
+                                                                    <SelectValue
+                                                                        placeholder={t(
+                                                                            'Select a commercial',
+                                                                        )}
+                                                                    />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="none">{t('No commercial')}</SelectItem>
-                                                                    {sellerOptions.map((seller) => (
-                                                                        <SelectItem key={seller.value} value={seller.value}>
-                                                                            {seller.label}
-                                                                        </SelectItem>
-                                                                    ))}
+                                                                    <SelectItem value="none">
+                                                                        {t(
+                                                                            'No commercial',
+                                                                        )}
+                                                                    </SelectItem>
+                                                                    {sellerOptions.map(
+                                                                        (
+                                                                            seller,
+                                                                        ) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    seller.value
+                                                                                }
+                                                                                value={
+                                                                                    seller.value
+                                                                                }
+                                                                            >
+                                                                                {
+                                                                                    seller.label
+                                                                                }
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
                                                                 </SelectContent>
                                                             </Select>
                                                         ) : (
                                                             <Input
                                                                 disabled
                                                                 readOnly
-                                                                value={t('No commercial')}
-                                                                placeholder={t('Commercial')}
+                                                                value={t(
+                                                                    'No commercial',
+                                                                )}
+                                                                placeholder={t(
+                                                                    'Commercial',
+                                                                )}
                                                             />
                                                         )}
                                                         <Select
-                                                            value={selectedProfileKey}
-                                                            onValueChange={selectProfile}
+                                                            value={
+                                                                selectedProfileKey
+                                                            }
+                                                            onValueChange={
+                                                                selectProfile
+                                                            }
                                                         >
                                                             <SelectTrigger>
-                                                                <SelectValue placeholder={t('Select a billing profile')} />
+                                                                <SelectValue
+                                                                    placeholder={t(
+                                                                        'Select a billing profile',
+                                                                    )}
+                                                                />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
-                                                                {billingProfiles.map((profile) => (
-                                                                    <SelectItem key={profile.key} value={profile.key}>
-                                                                        <span className="block">{profile.label}</span>
-                                                                        <span className="block text-xs text-muted-foreground">
-                                                                            {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
-                                                                        </span>
-                                                                    </SelectItem>
-                                                                ))}
+                                                                <SelectItem value="__custom__">
+                                                                    {t(
+                                                                        'Paramétrage custom',
+                                                                    )}
+                                                                </SelectItem>
+                                                                {billingProfiles.map(
+                                                                    (
+                                                                        profile,
+                                                                    ) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                profile.key
+                                                                            }
+                                                                            value={
+                                                                                profile.key
+                                                                            }
+                                                                        >
+                                                                            <span className="block">
+                                                                                {
+                                                                                    profile.label
+                                                                                }
+                                                                            </span>
+                                                                            <span className="block text-xs text-muted-foreground">
+                                                                                {formatSalesConditionsSummary(
+                                                                                    profile.conditions,
+                                                                                    t(
+                                                                                        'Vente directe',
+                                                                                    ),
+                                                                                )}
+                                                                            </span>
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectContent>
                                                         </Select>
 
                                                         {customConditionsForm}
-
-
                                                     </FormField>
                                                 ) : (
-                                                    <FormField label={t('Commercial')}>
+                                                    <FormField
+                                                        label={t('Commercial')}
+                                                    >
                                                         <Select
-                                                            value={activeRow.seller_user_id ? String(activeRow.seller_user_id) : 'none'}
-                                                            onValueChange={(val) => {
-                                                                if (val === 'none') {
-                                                                    updateRow(activeIndex, {
-                                                                        seller_user_id: null,
-                                                                        profile_selection_key: null,
-                                                                    });
+                                                            value={
+                                                                activeRow.seller_user_id
+                                                                    ? String(
+                                                                          activeRow.seller_user_id,
+                                                                      )
+                                                                    : 'none'
+                                                            }
+                                                            onValueChange={(
+                                                                val,
+                                                            ) => {
+                                                                if (
+                                                                    val ===
+                                                                    'none'
+                                                                ) {
+                                                                    updateRow(
+                                                                        activeIndex,
+                                                                        {
+                                                                            seller_user_id:
+                                                                                null,
+                                                                            profile_selection_key:
+                                                                                null,
+                                                                        },
+                                                                    );
                                                                     return;
                                                                 }
 
-                                                                const id = Number(val);
-                                                                if (!Number.isInteger(id) || id <= 0) {
+                                                                const id =
+                                                                    Number(val);
+                                                                if (
+                                                                    !Number.isInteger(
+                                                                        id,
+                                                                    ) ||
+                                                                    id <= 0
+                                                                ) {
                                                                     return;
                                                                 }
 
-                                                                updateRow(activeIndex, {
-                                                                    seller_user_id: id,
-                                                                    profile_selection_key: null,
-                                                                });
+                                                                updateRow(
+                                                                    activeIndex,
+                                                                    {
+                                                                        seller_user_id:
+                                                                            id,
+                                                                        profile_selection_key:
+                                                                            null,
+                                                                    },
+                                                                );
                                                             }}
                                                         >
                                                             <SelectTrigger>
-                                                                <SelectValue placeholder={t('Select a commercial')} />
+                                                                <SelectValue
+                                                                    placeholder={t(
+                                                                        'Select a commercial',
+                                                                    )}
+                                                                />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="none">{t('No commercial')}</SelectItem>
-                                                                {sellerOptions.map((seller) => (
-                                                                    <SelectItem key={seller.value} value={seller.value}>
-                                                                        {seller.label}
-                                                                    </SelectItem>
-                                                                ))}
+                                                                <SelectItem value="none">
+                                                                    {t(
+                                                                        'No commercial',
+                                                                    )}
+                                                                </SelectItem>
+                                                                {sellerOptions.map(
+                                                                    (
+                                                                        seller,
+                                                                    ) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                seller.value
+                                                                            }
+                                                                            value={
+                                                                                seller.value
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                seller.label
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectContent>
                                                         </Select>
                                                         <Select
-                                                            value={selectedProfileKey}
-                                                            onValueChange={selectProfile}
+                                                            value={
+                                                                selectedProfileKey
+                                                            }
+                                                            onValueChange={
+                                                                selectProfile
+                                                            }
                                                         >
                                                             <SelectTrigger>
-                                                                <SelectValue placeholder={t('Select a seller profile')} />
+                                                                <SelectValue
+                                                                    placeholder={t(
+                                                                        'Select a seller profile',
+                                                                    )}
+                                                                />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="__custom__">{t('Paramétrage custom')}</SelectItem>
-                                                                {sellerProfiles.map((profile) => (
-                                                                    <SelectItem key={profile.key} value={profile.key}>
-                                                                        <span className="block">{profile.label}</span>
-                                                                        <span className="block text-xs text-muted-foreground">
-                                                                            {formatSalesConditionsSummary(profile.conditions, t('Vente directe'))}
-                                                                        </span>
-                                                                    </SelectItem>
-                                                                ))}
+                                                                <SelectItem value="__custom__">
+                                                                    {t(
+                                                                        'Paramétrage custom',
+                                                                    )}
+                                                                </SelectItem>
+                                                                {sellerProfiles.map(
+                                                                    (
+                                                                        profile,
+                                                                    ) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                profile.key
+                                                                            }
+                                                                            value={
+                                                                                profile.key
+                                                                            }
+                                                                        >
+                                                                            <span className="block">
+                                                                                {
+                                                                                    profile.label
+                                                                                }
+                                                                            </span>
+                                                                            <span className="block text-xs text-muted-foreground">
+                                                                                {formatSalesConditionsSummary(
+                                                                                    profile.conditions,
+                                                                                    t(
+                                                                                        'Vente directe',
+                                                                                    ),
+                                                                                )}
+                                                                            </span>
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
                                                             </SelectContent>
                                                         </Select>
 
                                                         {customConditionsForm}
-
                                                     </FormField>
                                                 )}
-
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField label={t('Price mode')}>
-                                                    <Select value={normalizePriceMode(merged.p)} onValueChange={(v) => updateWithoutChangingProfile({ p: v })}>
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                <FormField
+                                                    label={t('Price mode')}
+                                                >
+                                                    <Select
+                                                        value={normalizePriceMode(
+                                                            merged.p,
+                                                        )}
+                                                        onValueChange={(v) =>
+                                                            updateWithoutChangingProfile(
+                                                                { p: v },
+                                                            )
+                                                        }
+                                                    >
                                                         <SelectTrigger>
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="-1">{t('Auto (inherits from parent)')}</SelectItem>
-                                                            <SelectItem value="price_depart">{t('Departure price')}</SelectItem>
-                                                            <SelectItem value="price_render">{t('Rendered price')}</SelectItem>
-                                                            <SelectItem value="price">{t('Base price')}</SelectItem>
-                                                            <SelectItem value="price_floor">{t('Floor price')}</SelectItem>
-                                                            <SelectItem value="price_roll">{t('Roll price')}</SelectItem>
-                                                            <SelectItem value="price_promo">{t('Promo price')}</SelectItem>
+                                                            <SelectItem value="-1">
+                                                                {t(
+                                                                    'Auto (inherits from parent)',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price_depart">
+                                                                {t(
+                                                                    'Departure price',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price_render">
+                                                                {t(
+                                                                    'Rendered price',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price">
+                                                                {t(
+                                                                    'Base price',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price_floor">
+                                                                {t(
+                                                                    'Floor price',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price_roll">
+                                                                {t(
+                                                                    'Roll price',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="price_promo">
+                                                                {t(
+                                                                    'Promo price',
+                                                                )}
+                                                            </SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </FormField>
-
                                             </div>
-
-
 
                                             <Separator />
 
                                             <div className="space-y-4">
-                                                <FormField label={t('Carriers')}>
+                                                <FormField
+                                                    label={t('Carriers')}
+                                                >
                                                     <div className="space-y-2">
-                                                        {carrierAssignments.map((assignment, index) => {
-                                                            const carrierZones = carriersList.find((c) => c.id === assignment.carrier_id)?.zones ?? [];
-                                                            return (
-                                                                <div key={index} className="flex items-center gap-2">
-                                                                    <Select
-                                                                        value={assignment.carrier_id !== null ? String(assignment.carrier_id) : 'none'}
-                                                                        onValueChange={(v) => {
-                                                                            const next = [...carrierAssignments];
-                                                                            next[index] = { carrier_id: v === 'none' ? null : Number(v), zone_id: null };
-                                                                            updateCarrierAssignments(next);
-                                                                        }}
+                                                        {carrierAssignments.map(
+                                                            (
+                                                                assignment,
+                                                                index,
+                                                            ) => {
+                                                                const carrierZones =
+                                                                    carriersList.find(
+                                                                        (c) =>
+                                                                            c.id ===
+                                                                            assignment.carrier_id,
+                                                                    )?.zones ??
+                                                                    [];
+                                                                return (
+                                                                    <div
+                                                                        key={
+                                                                            index
+                                                                        }
+                                                                        className="flex items-center gap-2"
                                                                     >
-                                                                        <SelectTrigger className="flex-1">
-                                                                            <SelectValue placeholder={t('Select a carrier')} />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            <SelectItem value="none">{t('None')}</SelectItem>
-                                                                            {carriersList.map((carrier) => (
-                                                                                <SelectItem key={carrier.id} value={String(carrier.id)}>
-                                                                                    {carrier.name}
-                                                                                </SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                    <Select
-                                                                        value={assignment.zone_id !== null ? String(assignment.zone_id) : 'none'}
-                                                                        onValueChange={(v) => {
-                                                                            const next = [...carrierAssignments];
-                                                                            next[index] = { ...next[index], zone_id: v === 'none' ? null : Number(v) };
-                                                                            updateCarrierAssignments(next);
-                                                                        }}
-                                                                        disabled={!assignment.carrier_id}
-                                                                    >
-                                                                        <SelectTrigger className="flex-1">
-                                                                            <SelectValue placeholder={t('Select a zone')} />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            <SelectItem value="none">{t('None')}</SelectItem>
-                                                                            {carrierZones.map((zone) => (
-                                                                                <SelectItem key={zone.id} value={String(zone.id)}>
-                                                                                    {zone.name}
-                                                                                </SelectItem>
-                                                                            ))}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                    <Input
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        className="h-9 w-20"
-                                                                        placeholder={t('TVA %')}
-                                                                        value={index in carrierTvaRaw ? carrierTvaRaw[index] : (assignment.tva !== null && assignment.tva !== undefined ? String(assignment.tva) : '')}
-                                                                        onChange={(e) => {
-                                                                            setCarrierTvaRaw((prev) => ({ ...prev, [index]: e.target.value }));
-                                                                            const num = toNumber(e.target.value);
-                                                                            if (Number.isFinite(num)) {
-                                                                                const next = [...carrierAssignments];
-                                                                                next[index] = { ...next[index], tva: num };
-                                                                                updateCarrierAssignments(next);
+                                                                        <Select
+                                                                            value={
+                                                                                assignment.carrier_id !==
+                                                                                null
+                                                                                    ? String(
+                                                                                          assignment.carrier_id,
+                                                                                      )
+                                                                                    : 'none'
                                                                             }
-                                                                        }}
-                                                                        onBlur={() => setCarrierTvaRaw((prev) => {
-                                                                            const next = { ...prev };
-                                                                            delete next[index];
-                                                                            return next;
-                                                                        })}
-                                                                    />
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-9 w-9 shrink-0 text-destructive"
-                                                                        onClick={() => {
-                                                                            const next = carrierAssignments.filter((_, i) => i !== index);
-                                                                            updateCarrierAssignments(next);
-                                                                        }}
-                                                                    >
-                                                                        <TrashIcon className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                            onValueChange={(
+                                                                                v,
+                                                                            ) => {
+                                                                                const next =
+                                                                                    [
+                                                                                        ...carrierAssignments,
+                                                                                    ];
+                                                                                next[
+                                                                                    index
+                                                                                ] =
+                                                                                    {
+                                                                                        carrier_id:
+                                                                                            v ===
+                                                                                            'none'
+                                                                                                ? null
+                                                                                                : Number(
+                                                                                                      v,
+                                                                                                  ),
+                                                                                        zone_id:
+                                                                                            null,
+                                                                                    };
+                                                                                updateCarrierAssignments(
+                                                                                    next,
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <SelectTrigger className="flex-1">
+                                                                                <SelectValue
+                                                                                    placeholder={t(
+                                                                                        'Select a carrier',
+                                                                                    )}
+                                                                                />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem value="none">
+                                                                                    {t(
+                                                                                        'None',
+                                                                                    )}
+                                                                                </SelectItem>
+                                                                                {carriersList
+                                                                                    .filter(
+                                                                                        (
+                                                                                            carrier,
+                                                                                        ) =>
+                                                                                            carrier.db_products?.some(
+                                                                                                (
+                                                                                                    db,
+                                                                                                ) =>
+                                                                                                    db.id ===
+                                                                                                    Number(
+                                                                                                        activeRow.db_product_id,
+                                                                                                    ),
+                                                                                            ),
+                                                                                    )
+                                                                                    .map(
+                                                                                        (
+                                                                                            carrier,
+                                                                                        ) => (
+                                                                                            <SelectItem
+                                                                                                key={
+                                                                                                    carrier.id
+                                                                                                }
+                                                                                                value={String(
+                                                                                                    carrier.id,
+                                                                                                )}
+                                                                                            >
+                                                                                                {
+                                                                                                    carrier.name
+                                                                                                }
+                                                                                            </SelectItem>
+                                                                                        ),
+                                                                                    )}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                        <Select
+                                                                            value={
+                                                                                assignment.zone_id !==
+                                                                                null
+                                                                                    ? String(
+                                                                                          assignment.zone_id,
+                                                                                      )
+                                                                                    : 'none'
+                                                                            }
+                                                                            onValueChange={(
+                                                                                v,
+                                                                            ) => {
+                                                                                const next =
+                                                                                    [
+                                                                                        ...carrierAssignments,
+                                                                                    ];
+                                                                                next[
+                                                                                    index
+                                                                                ] =
+                                                                                    {
+                                                                                        ...next[
+                                                                                            index
+                                                                                        ],
+                                                                                        zone_id:
+                                                                                            v ===
+                                                                                            'none'
+                                                                                                ? null
+                                                                                                : Number(
+                                                                                                      v,
+                                                                                                  ),
+                                                                                    };
+                                                                                updateCarrierAssignments(
+                                                                                    next,
+                                                                                );
+                                                                            }}
+                                                                            disabled={
+                                                                                !assignment.carrier_id
+                                                                            }
+                                                                        >
+                                                                            <SelectTrigger className="flex-1">
+                                                                                <SelectValue
+                                                                                    placeholder={t(
+                                                                                        'Select a zone',
+                                                                                    )}
+                                                                                />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem value="none">
+                                                                                    {t(
+                                                                                        'None',
+                                                                                    )}
+                                                                                </SelectItem>
+                                                                                {carrierZones.map(
+                                                                                    (
+                                                                                        zone,
+                                                                                    ) => (
+                                                                                        <SelectItem
+                                                                                            key={
+                                                                                                zone.id
+                                                                                            }
+                                                                                            value={String(
+                                                                                                zone.id,
+                                                                                            )}
+                                                                                        >
+                                                                                            {
+                                                                                                zone.name
+                                                                                            }
+                                                                                        </SelectItem>
+                                                                                    ),
+                                                                                )}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                        <Input
+                                                                            type="text"
+                                                                            inputMode="decimal"
+                                                                            className="h-9 w-20"
+                                                                            placeholder={t(
+                                                                                'TVA %',
+                                                                            )}
+                                                                            value={
+                                                                                index in
+                                                                                carrierTvaRaw
+                                                                                    ? carrierTvaRaw[
+                                                                                          index
+                                                                                      ]
+                                                                                    : assignment.tva !==
+                                                                                            null &&
+                                                                                        assignment.tva !==
+                                                                                            undefined
+                                                                                      ? String(
+                                                                                            assignment.tva,
+                                                                                        )
+                                                                                      : ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) => {
+                                                                                setCarrierTvaRaw(
+                                                                                    (
+                                                                                        prev,
+                                                                                    ) => ({
+                                                                                        ...prev,
+                                                                                        [index]:
+                                                                                            e
+                                                                                                .target
+                                                                                                .value,
+                                                                                    }),
+                                                                                );
+                                                                                const num =
+                                                                                    toNumber(
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    );
+                                                                                if (
+                                                                                    Number.isFinite(
+                                                                                        num,
+                                                                                    )
+                                                                                ) {
+                                                                                    const next =
+                                                                                        [
+                                                                                            ...carrierAssignments,
+                                                                                        ];
+                                                                                    next[
+                                                                                        index
+                                                                                    ] =
+                                                                                        {
+                                                                                            ...next[
+                                                                                                index
+                                                                                            ],
+                                                                                            tva: num,
+                                                                                        };
+                                                                                    updateCarrierAssignments(
+                                                                                        next,
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                            onBlur={() =>
+                                                                                setCarrierTvaRaw(
+                                                                                    (
+                                                                                        prev,
+                                                                                    ) => {
+                                                                                        const next =
+                                                                                            {
+                                                                                                ...prev,
+                                                                                            };
+                                                                                        delete next[
+                                                                                            index
+                                                                                        ];
+                                                                                        return next;
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-9 w-9 shrink-0 text-destructive"
+                                                                            onClick={() => {
+                                                                                const next =
+                                                                                    carrierAssignments.filter(
+                                                                                        (
+                                                                                            _,
+                                                                                            i,
+                                                                                        ) =>
+                                                                                            i !==
+                                                                                            index,
+                                                                                    );
+                                                                                updateCarrierAssignments(
+                                                                                    next,
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            <TrashIcon className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                );
+                                                            },
+                                                        )}
                                                         <ButtonsActions
-                                                            add={() => updateCarrierAssignments([...carrierAssignments, { carrier_id: null, zone_id: null }])}
+                                                            add={() =>
+                                                                updateCarrierAssignments(
+                                                                    [
+                                                                        ...carrierAssignments,
+                                                                        {
+                                                                            carrier_id:
+                                                                                null,
+                                                                            zone_id:
+                                                                                null,
+                                                                        },
+                                                                    ],
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                 </FormField>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <FormField label={t('Delivery (€)')}>
+                                                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                                    <FormField
+                                                        label={t(
+                                                            'Delivery (€)',
+                                                        )}
+                                                    >
                                                         <Input
                                                             type="text"
                                                             inputMode="decimal"
-                                                            value={deliveryRaw || String(merged.l ?? 0)}
+                                                            value={
+                                                                deliveryRaw ||
+                                                                String(
+                                                                    merged.l ??
+                                                                        0,
+                                                                )
+                                                            }
                                                             onChange={(e) => {
-                                                                setDeliveryRaw(e.target.value);
-                                                                const num = toNumber(e.target.value);
-                                                                if (Number.isFinite(num)) {
-                                                                    updateWithoutChangingProfile({ l: num });
+                                                                setDeliveryRaw(
+                                                                    e.target
+                                                                        .value,
+                                                                );
+                                                                const num =
+                                                                    toNumber(
+                                                                        e.target
+                                                                            .value,
+                                                                    );
+                                                                if (
+                                                                    Number.isFinite(
+                                                                        num,
+                                                                    )
+                                                                ) {
+                                                                    updateWithoutChangingProfile(
+                                                                        {
+                                                                            l: num,
+                                                                        },
+                                                                    );
                                                                 }
                                                             }}
-                                                            onBlur={() => setDeliveryRaw('')}
+                                                            onBlur={() =>
+                                                                setDeliveryRaw(
+                                                                    '',
+                                                                )
+                                                            }
                                                         />
                                                     </FormField>
-                                                    <FormField label={t('Minimum delivery (€)')}>
+                                                    <FormField
+                                                        label={t(
+                                                            'Minimum delivery (€)',
+                                                        )}
+                                                    >
                                                         <Input
                                                             type="text"
                                                             inputMode="decimal"
-                                                            value={lmRaw || String(merged.lm ?? 0)}
+                                                            value={
+                                                                lmRaw ||
+                                                                String(
+                                                                    merged.lm ??
+                                                                        0,
+                                                                )
+                                                            }
                                                             onChange={(e) => {
-                                                                setLmRaw(e.target.value);
-                                                                const num = toNumber(e.target.value);
-                                                                if (Number.isFinite(num)) {
-                                                                    updateWithoutChangingProfile({ lm: num });
+                                                                setLmRaw(
+                                                                    e.target
+                                                                        .value,
+                                                                );
+                                                                const num =
+                                                                    toNumber(
+                                                                        e.target
+                                                                            .value,
+                                                                    );
+                                                                if (
+                                                                    Number.isFinite(
+                                                                        num,
+                                                                    )
+                                                                ) {
+                                                                    updateWithoutChangingProfile(
+                                                                        {
+                                                                            lm: num,
+                                                                        },
+                                                                    );
                                                                 }
                                                             }}
-                                                            onBlur={() => setLmRaw('')}
+                                                            onBlur={() =>
+                                                                setLmRaw('')
+                                                            }
                                                         />
                                                     </FormField>
 
-                                                    <FormField label={t('Transport VAT (%)')}>
+                                                    <FormField
+                                                        label={t(
+                                                            'Transport VAT (%)',
+                                                        )}
+                                                    >
                                                         <Input
                                                             type="text"
                                                             inputMode="decimal"
-                                                            value={tvatRaw !== '' ? tvatRaw : (merged.tvat === null || merged.tvat === undefined ? '' : String(merged.tvat))}
+                                                            value={
+                                                                tvatRaw !== ''
+                                                                    ? tvatRaw
+                                                                    : merged.tvat ===
+                                                                            null ||
+                                                                        merged.tvat ===
+                                                                            undefined
+                                                                      ? ''
+                                                                      : String(
+                                                                            merged.tvat,
+                                                                        )
+                                                            }
                                                             onChange={(e) => {
-                                                                setTvatRaw(e.target.value);
-                                                                const num = toNumber(e.target.value);
-                                                                updateWithoutChangingProfile({ tvat: e.target.value === '' ? null : (Number.isFinite(num) ? num : merged.tvat) });
+                                                                setTvatRaw(
+                                                                    e.target
+                                                                        .value,
+                                                                );
+                                                                const num =
+                                                                    toNumber(
+                                                                        e.target
+                                                                            .value,
+                                                                    );
+                                                                updateWithoutChangingProfile(
+                                                                    {
+                                                                        tvat:
+                                                                            e
+                                                                                .target
+                                                                                .value ===
+                                                                            ''
+                                                                                ? null
+                                                                                : Number.isFinite(
+                                                                                        num,
+                                                                                    )
+                                                                                  ? num
+                                                                                  : merged.tvat,
+                                                                    },
+                                                                );
                                                             }}
-                                                            onBlur={() => setTvatRaw('')}
+                                                            onBlur={() =>
+                                                                setTvatRaw('')
+                                                            }
                                                         />
                                                     </FormField>
-
                                                 </div>
                                             </div>
                                         </CardContent>

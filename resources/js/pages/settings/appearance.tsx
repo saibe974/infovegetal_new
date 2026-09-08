@@ -10,6 +10,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import {
     applyDisplayPreferences,
     defaultDisplayPreferences,
+    getAccessiblePreferencePages,
     getPreferenceScope,
     getStoredDisplayPreferences,
     normalizeDisplayPreferences,
@@ -32,6 +33,11 @@ import { toast } from 'sonner';
 type AppearancePageProps = SharedData & {
     editingUser?: User;
     appearancePreferences?: DisplayPreferences | null;
+    userAbilities?: {
+        manage_db?: boolean;
+        can_access_contracts?: boolean;
+        can_manage_promotions?: boolean;
+    };
 };
 
 const copyPreferences = (preferences: DisplayPreferences): DisplayPreferences =>
@@ -39,10 +45,16 @@ const copyPreferences = (preferences: DisplayPreferences): DisplayPreferences =>
 
 export default function Appearance() {
     const { t } = useI18n();
-    const { auth, editingUser, appearancePreferences } =
+    const { auth, editingUser, appearancePreferences, userAbilities } =
         usePage<AppearancePageProps>().props;
     const userId = editingUser?.id ?? auth.user?.id;
     const isSelf = !editingUser || editingUser.id === auth.user?.id;
+    const visiblePages = getAccessiblePreferencePages(
+        isSelf ? auth.user : editingUser,
+        isSelf
+            ? auth.can_manage_promotions
+            : (userAbilities?.can_manage_promotions ?? false),
+    );
     const [scope, setScope] = useState<PreferenceScope>(() =>
         isSelf ? getPreferenceScope(Boolean(appearancePreferences)) : 'account',
     );
@@ -195,6 +207,7 @@ export default function Appearance() {
                         />
                         <AppearancePageSettings
                             pages={preferences.pages}
+                            visiblePages={visiblePages}
                             onChange={updatePage}
                         />
                     </div>

@@ -1351,9 +1351,9 @@ class UserManagementController extends Controller
             ->values()
             ->all();
         $carriers = \App\Models\Carrier::query()
-            ->with(['zones:id,carrier_id,name'])
+            ->with(['zones:id,carrier_id,name', 'dbProducts:id,name'])
             ->orderBy('name')
-            ->get(['id', 'name', 'country']);
+            ->get(['id', 'name']);
 
         // On charge les pivots pour récupérer les attributs
         $userWithPivots = $user->load(['dbProducts' => function ($q) {

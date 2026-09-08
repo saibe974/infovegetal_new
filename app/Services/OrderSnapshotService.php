@@ -158,6 +158,7 @@ class OrderSnapshotService
                     'cart_status' => (string) ($cart->status ?? ''),
                     'discounts' => $payload['discounts'] ?? [],
                     'coupon' => $payload['coupon'] ?? null,
+                    'transport_breakdown' => $payload['transport_breakdown'] ?? null,
                     'resolved_actors' => [
                         'db_product_id' => $actors['db_product_id'],
                         'client_user_id' => $actors['client_user_id'],

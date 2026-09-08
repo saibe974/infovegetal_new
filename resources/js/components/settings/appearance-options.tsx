@@ -34,13 +34,24 @@ const accents: Array<{ value: AccentColor; label: string }> = [
 ];
 
 const pageLabels: Record<PreferencePage, string> = {
+    dashboard: 'Tableau de bord',
     products: 'Produits',
+    offers: 'Offres et sélections',
+    categories: 'Catégories',
+    tags: 'Tags',
+    'db-products': 'Base de données',
+    'missing-images': 'Images manquantes',
     users: 'Utilisateurs',
+    promotions: 'Promotions',
+    carriers: 'Transporteurs',
+    media: 'Médiathèque',
 };
 
-const pageViews: Record<
-    PreferencePage,
-    Array<{ value: ViewMode; label: string; icon: LucideIcon }>
+const pageViews: Partial<
+    Record<
+        PreferencePage,
+        Array<{ value: ViewMode; label: string; icon: LucideIcon }>
+    >
 > = {
     products: [
         { value: 'table', label: 'Tableau', icon: Table2 },
@@ -187,31 +198,31 @@ export function AppearanceConfirmationSettings({
         label: string;
         description: string;
     }> = [
-            {
-                key: 'removeItem',
-                label: 'Retrait d’un produit',
-                description:
-                    'Demander une confirmation avant de retirer un produit du panier.',
-            },
-            {
-                key: 'clearCart',
-                label: 'Vidage du panier',
-                description:
-                    'Demander une confirmation avant de vider complètement le panier.',
-            },
-            {
-                key: 'removeMissingImageLink',
-                label: 'Suppression d’un lien invalide',
-                description:
-                    'Demander une confirmation avant de supprimer un seul img_link dans Missing images.',
-            },
-            {
-                key: 'removeMissingImageLinks',
-                label: 'Suppression de tous les liens invalides',
-                description:
-                    'Demander une confirmation avant de supprimer plusieurs img_link dans Missing images.',
-            },
-        ];
+        {
+            key: 'removeItem',
+            label: 'Retrait d’un produit',
+            description:
+                'Demander une confirmation avant de retirer un produit du panier.',
+        },
+        {
+            key: 'clearCart',
+            label: 'Vidage du panier',
+            description:
+                'Demander une confirmation avant de vider complètement le panier.',
+        },
+        {
+            key: 'removeMissingImageLink',
+            label: 'Suppression d’un lien invalide',
+            description:
+                'Demander une confirmation avant de supprimer un seul img_link dans Missing images.',
+        },
+        {
+            key: 'removeMissingImageLinks',
+            label: 'Suppression de tous les liens invalides',
+            description:
+                'Demander une confirmation avant de supprimer plusieurs img_link dans Missing images.',
+        },
+    ];
 
     return (
         <Card>
@@ -248,25 +259,31 @@ export function AppearanceConfirmationSettings({
 
 type PagesProps = {
     pages: DisplayPreferences['pages'];
+    visiblePages: PreferencePage[];
     onChange: (
         page: PreferencePage,
         patch: Partial<DisplayPreferences['pages'][PreferencePage]>,
     ) => void;
 };
 
-export function AppearancePageSettings({ pages, onChange }: PagesProps) {
+export function AppearancePageSettings({
+    pages,
+    visiblePages,
+    onChange,
+}: PagesProps) {
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Préférences par page</CardTitle>
                 <CardDescription>
-                    Activez uniquement les pages que vous souhaitez
-                    personnaliser.
+                    Choisissez, pour chaque page que vous pouvez consulter, si
+                    le volet latéral droit doit être ouvert ou fermé.
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-                {(Object.keys(pageLabels) as PreferencePage[]).map((page) => {
+                {visiblePages.map((page) => {
                     const setting = pages[page];
+                    const views = pageViews[page];
 
                     return (
                         <div key={page} className="rounded-xl border p-4">
@@ -296,36 +313,38 @@ export function AppearancePageSettings({ pages, onChange }: PagesProps) {
                             </div>
 
                             {setting.enabled && (
-                                <div className="mt-4 grid gap-4 border-t pt-4 md:grid-cols-[1fr_auto]">
-                                    <div>
-                                        <div className="mb-2 text-sm font-medium">
-                                            Affichage par défaut
+                                <div className="mt-4 flex flex-wrap items-start justify-between gap-4 border-t pt-4">
+                                    {views && (
+                                        <div>
+                                            <div className="mb-2 text-sm font-medium">
+                                                Affichage par défaut
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {views.map(
+                                                    ({
+                                                        value,
+                                                        label,
+                                                        icon: Icon,
+                                                    }) => (
+                                                        <ChoiceButton
+                                                            key={value}
+                                                            active={
+                                                                setting.view ===
+                                                                value
+                                                            }
+                                                            onClick={() =>
+                                                                onChange(page, {
+                                                                    view: value,
+                                                                })
+                                                            }
+                                                        >
+                                                            <Icon /> {label}
+                                                        </ChoiceButton>
+                                                    ),
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {pageViews[page].map(
-                                                ({
-                                                    value,
-                                                    label,
-                                                    icon: Icon,
-                                                }) => (
-                                                    <ChoiceButton
-                                                        key={value}
-                                                        active={
-                                                            setting.view ===
-                                                            value
-                                                        }
-                                                        onClick={() =>
-                                                            onChange(page, {
-                                                                view: value,
-                                                            })
-                                                        }
-                                                    >
-                                                        <Icon /> {label}
-                                                    </ChoiceButton>
-                                                ),
-                                            )}
-                                        </div>
-                                    </div>
+                                    )}
                                     <div className="grid min-w-56 gap-2">
                                         <label className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
                                             <Checkbox

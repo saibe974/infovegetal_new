@@ -57,6 +57,12 @@ class DbProducts extends Model
             ->withPivot(['can_access', 'can_buy', 'can_invoice', 'can_sell', 'can_manage', 'attributes']);
     }
 
+    public function carriers(): BelongsToMany
+    {
+        return $this->belongsToMany(Carrier::class, 'carrier_db_product', 'db_product_id', 'carrier_id')
+            ->withPivot('supplement_per_roll');
+    }
+
     /**
      * Billing users attached to this DB product.
      */

@@ -19,11 +19,14 @@ class CarrierResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'country' => $this->country,
+            'db_products' => $this->whenLoaded('dbProducts', fn () => $this->dbProducts->map(fn ($db) => [
+                'id' => (int) $db->id,
+                'name' => $db->name,
+                'supplement_per_roll' => (float) $db->pivot->supplement_per_roll,
+            ])),
             'days' => $this->days,
             'minimum_delay_hours' => (int) ($this->minimum_delay_hours ?? 24),
             'order_cutoff_time' => substr((string) ($this->order_cutoff_time ?? '12:00'), 0, 5),
-            'minimum' => $this->minimum,
             'taxgo' => $this->taxgo,
             'zones_count' => $this->whenCounted('zones'),
             'zones' => CarrierZoneResource::collection($this->whenLoaded('zones')),

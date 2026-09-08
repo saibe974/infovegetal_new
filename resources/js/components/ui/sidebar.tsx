@@ -5,7 +5,7 @@ import { MenuIcon } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { persistSidebarPreference } from "@/lib/display-preferences"
+import { persistSidebarPreference, SIDEBAR_APPLY_PREFERENCE_EVENT } from "@/lib/display-preferences"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -194,6 +194,26 @@ function SidebarProvider({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
+
+  // Applies per-page sidebar preferences (e.g. right panel open state).
+  React.useEffect(() => {
+    const handleApplyPreference = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { id?: string; open?: boolean }
+        | undefined
+      if (
+        !detail ||
+        typeof detail.id !== "string" ||
+        typeof detail.open !== "boolean"
+      )
+        return
+      const { id, open } = detail
+      setOpenMap((m) => (m[id] === open ? m : { ...m, [id]: open }))
+    }
+
+    window.addEventListener(SIDEBAR_APPLY_PREFERENCE_EVENT, handleApplyPreference)
+    return () => window.removeEventListener(SIDEBAR_APPLY_PREFERENCE_EVENT, handleApplyPreference)
+  }, [])
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.

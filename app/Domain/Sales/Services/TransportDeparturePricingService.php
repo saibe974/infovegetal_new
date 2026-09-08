@@ -4,168 +4,89 @@ declare(strict_types=1);
 
 namespace App\Domain\Sales\Services;
 
-use App\Domain\Sales\DTO\TransportPreparationInput;
-use App\Domain\Sales\Enums\TransportPresentationMode;
-use App\Domain\Sales\ValueObjects\Currency;
-use App\Domain\Sales\ValueObjects\Money;
 use App\Models\Carrier;
-use App\Models\CarrierZone;
 
 final class TransportDeparturePricingService
 {
-    public function __construct(
-        private readonly TransportPricingPreparationService $pricingPreparationService = new TransportPricingPreparationService(),
-        private readonly TransportRenderedPricingService $renderedPricingService = new TransportRenderedPricingService(),
-    ) {
-    }
-
     public function calculate(array $rollDistribution, array $pivotsByDbProductId): float
     {
-        $suppliers = $rollDistribution['suppliers'] ?? [];
-        if (empty($suppliers) || empty($pivotsByDbProductId)) {
-            return 0.0;
-        }
+        return $this->calculateBreakdown($rollDistribution, $pivotsByDbProductId)['total'];
+    }
 
-        $carrierIds = [];
-        $zoneIds = [];
-        foreach ($suppliers as $supplier) {
-            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
-            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
-            if (!$attrs) {
+    /** One invocation represents the cart's common delivery address and date. */
+    public function calculateBreakdown(array $rollDistribution, array $pivotsByDbProductId): array
+    {
+        $groups = [];
+        $byDb = [];
+        $carrierIds = array_map(fn ($attrs) => $this->resolveTransportChoice($attrs)['carrier_id'], $pivotsByDbProductId);
+        $carriers = Carrier::with(['zones', 'dbProducts'])->whereIn('id', array_unique($carrierIds))->get()->keyBy('id');
+        foreach ($rollDistribution['suppliers'] ?? [] as $supplier) {
+            $dbId = (int) ($supplier['supplier_id'] ?? 0);
+            $rolls = $supplier['rolls'] ?? [];
+            $attrs = $pivotsByDbProductId[$dbId] ?? [];
+            if (($supplier['mod_liv'] ?? '') !== 'roll' || ! $rolls) {
                 continue;
             }
-
-            $transportChoice = $this->resolveTransportChoice($attrs);
-            $carrierId = $transportChoice['carrier_id'];
-            $zoneId = $transportChoice['zone_id'];
+            $choice = $this->resolveTransportChoice($attrs);
+            $carrierId = $choice['carrier_id'];
+            $zoneId = $choice['zone_id'];
+            $rendered = $this->normalizeShippingPriceMode($attrs['p'] ?? 0) === 1;
+            $fills = array_map(fn ($roll) => $this->tariffToFillRatio($this->tariffToFloat($roll['coef'] ?? 0)), $rolls);
             if ($carrierId > 0) {
-                $carrierIds[] = $carrierId;
-            }
-            if ($zoneId > 0) {
-                $zoneIds[] = $zoneId;
-            }
-        }
-
-        $carriers = empty($carrierIds)
-            ? collect()
-            : Carrier::whereIn('id', array_unique($carrierIds))->get()->keyBy('id');
-        $zones = empty($zoneIds)
-            ? collect()
-            : CarrierZone::whereIn('id', array_unique($zoneIds))->get()->keyBy('id');
-
-        $totalShipping = 0.0;
-
-        foreach ($suppliers as $supplier) {
-            $supplierId = (int) ($supplier['supplier_id'] ?? 0);
-            $modLiv = (string) ($supplier['mod_liv'] ?? '');
-            $rolls = is_array($supplier['rolls'] ?? null) ? $supplier['rolls'] : [];
-
-            if ($modLiv !== 'roll' || empty($rolls)) {
-                continue;
-            }
-
-            $attrs = $pivotsByDbProductId[$supplierId] ?? null;
-            if (!$attrs) {
-                continue;
-            }
-
-            $transportChoice = $this->resolveTransportChoice($attrs);
-            $carrierId = $transportChoice['carrier_id'];
-            $zoneId = $transportChoice['zone_id'];
-            $priceMode = $this->normalizeShippingPriceMode($attrs['p'] ?? 0);
-            $rollCount = count($rolls);
-
-            if ($carrierId > 0 && $zoneId > 0) {
                 $carrier = $carriers->get($carrierId);
-                $zone = $zones->get($zoneId);
-
-                if ($carrier && $zone) {
-                    $tariffs = is_array($zone->tariffs) ? $zone->tariffs : [];
-                    $baseTariffPerRoll = (new TransportZoneTariffResolver())->resolve($rollCount, $tariffs);
-                    $baseTotal = $baseTariffPerRoll * $rollCount;
-                    $carrierMinimum = max(0.0, $this->tariffToFloat($tariffs['mini'] ?? 0));
-
-                    if ($priceMode === 1 && $rollCount > 0) {
-                        $fillRates = [];
-                        foreach ($rolls as $roll) {
-                            $coef = $this->tariffToFloat($roll['coef'] ?? 0);
-                            $fillRates[] = $this->tariffToFillRatio($coef);
-                        }
-
-                        $embeddedMinor = 0;
-                        foreach ($fillRates as $fillRate) {
-                            $embeddedMinor += (int) round($baseTariffPerRoll * $fillRate * 100);
-                        }
-
-                        $realTransportMinor = (int) round(max(max(0.0, $carrierMinimum), $baseTariffPerRoll * $rollCount) * 100);
-
-                        $preparation = $this->pricingPreparationService->prepare(new TransportPreparationInput(
-                            presentationMode: TransportPresentationMode::SeparateAdditionalFee,
-                            transportRealHt: new Money($realTransportMinor, Currency::EUR),
-                            transportEmbeddedInProductsHt: new Money($embeddedMinor, Currency::EUR),
-                            lineIds: array_map(static fn (int $index): int => $index + 1, array_keys($fillRates)),
-                        ));
-
-                        $adjustedTotal = $preparation->transportAdditionalFeeHt->minorAmount / 100.0;
-                    } else {
-                        $adjustedTotal = $carrierMinimum > 0.0 && $baseTotal < $carrierMinimum
-                            ? $carrierMinimum
-                            : $baseTotal;
-                    }
-
-                    $taxgoRate = max(0.0, $this->tariffToFloat($carrier->taxgo ?? 0));
-                    $totalShipping += round($adjustedTotal * (1.0 + $taxgoRate / 100.0) * 100) / 100;
-                    continue;
+                $zone = $carrier?->zones->firstWhere('id', $zoneId);
+                $base = $carrier?->dbProducts->firstWhere('id', $dbId);
+                if (! $carrier || ! $zone || ! $base) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'transport_selection' => "Le transporteur ou la zone ne dessert plus la base #{$dbId}. Choisissez un transporteur disponible.",
+                    ]);
                 }
-            }
-
-            $rollPrice = max(0.0, $this->tariffToFloat($attrs['l'] ?? 0));
-            $customMinimum = max(0.0, $this->tariffToFloat($attrs['lm'] ?? 0));
-            $customTaxRate = max(0.0, $this->tariffToFloat($attrs['tvat'] ?? 0));
-
-            if ($priceMode === 0) {
-                $baseTotal = $rollPrice * $rollCount;
-                $adjustedTotal = $customMinimum > 0.0 && $baseTotal < $customMinimum
-                    ? $customMinimum
-                    : $baseTotal;
-
-                $totalShipping += round($adjustedTotal * (1.0 + $customTaxRate / 100.0) * 100) / 100;
-            } elseif ($priceMode === 1) {
-                $fillRates = [];
-                foreach ($rolls as $roll) {
-                    $coef = $this->tariffToFloat($roll['coef'] ?? 0);
-                    $fillRates[] = $this->tariffToFillRatio($coef);
+                $key = $carrierId.':'.$zoneId;
+                $groups[$key] ??= ['carrier_id' => $carrierId, 'zone_id' => $zoneId, 'tariffs' => $zone->tariffs ?? [], 'taxgo' => (float) $carrier->taxgo, 'bases' => []];
+                $groups[$key]['bases'][] = ['id' => $dbId, 'count' => count($rolls), 'fills' => $fills, 'rendered' => $rendered, 'supplement' => (float) $base->pivot->supplement_per_roll];
+            } else {
+                $price = max(0, $this->tariffToFloat($attrs['l'] ?? 0));
+                $minimum = max(0, $this->tariffToFloat($attrs['lm'] ?? 0));
+                $cost = max($minimum, count($rolls) * $price);
+                if ($rendered) {
+                    $cost = max(0, $cost - array_sum($fills) * $price);
                 }
-
-                $embeddedMinor = 0;
-                foreach ($fillRates as $fillRate) {
-                    $embeddedMinor += (int) round($rollPrice * $fillRate * 100);
-                }
-
-                $realTransportMinor = (int) round(max($customMinimum, $rollPrice * $rollCount) * 100);
-
-                $preparation = $this->pricingPreparationService->prepare(new TransportPreparationInput(
-                    presentationMode: TransportPresentationMode::SeparateAdditionalFee,
-                    transportRealHt: new Money($realTransportMinor, Currency::EUR),
-                    transportEmbeddedInProductsHt: new Money($embeddedMinor, Currency::EUR),
-                    lineIds: array_map(static fn (int $index): int => $index + 1, array_keys($fillRates)),
-                ));
-
-                $adjustedTotal = $preparation->transportAdditionalFeeHt->minorAmount / 100.0;
-                $totalShipping += round($adjustedTotal * (1.0 + $customTaxRate / 100.0) * 100) / 100;
+                $byDb[$dbId] = round($cost * (1 + max(0, $this->tariffToFloat($attrs['tvat'] ?? 0)) / 100), 2);
             }
         }
+        $breakdown = [];
+        foreach ($groups as $group) {
+            $count = array_sum(array_column($group['bases'], 'count'));
+            $price = (new TransportZoneTariffResolver)->resolve($count, $group['tariffs']);
+            $minimum = max(0, $this->tariffToFloat($group['tariffs']['mini'] ?? 0));
+            $minimumGap = max(0, $minimum - $price * $count);
+            $rate = 1 + max(0, $group['taxgo']) / 100;
+            $groupTotal = 0;
+            foreach ($group['bases'] as $base) {
+                $grid = $price * $base['count'] + $minimumGap * $base['count'] / $count;
+                $embedded = $base['rendered'] ? array_sum($base['fills']) * $price : 0;
+                $supplement = $base['count'] * $base['supplement'];
+                $amount = round((max(0, $grid - $embedded) + $supplement) * $rate, 2);
+                $byDb[$base['id']] = $amount;
+                $groupTotal += $amount;
+            }
+            $breakdown[] = ['carrier_id' => $group['carrier_id'], 'zone_id' => $group['zone_id'], 'roll_count' => $count, 'price_per_roll' => $price, 'bases' => $group['bases'], 'total' => round($groupTotal, 2)];
+        }
 
-        return round($totalShipping * 100) / 100;
+        return ['total' => round(array_sum($byDb), 2), 'by_db' => $byDb, 'groups' => $breakdown];
     }
 
     /**
-     * @param array<string, mixed> $attrs
+     * @param  array<string, mixed>  $attrs
      * @return array{carrier_id:int,zone_id:int}
      */
     private function resolveTransportChoice(array $attrs): array
     {
-        $legacyCarrierId = (int) ($attrs['t'] ?? 0);
+        $selected = $attrs['transport_selection'][0] ?? null;
+        if (is_array($selected)) {
+            return ['carrier_id' => (int) ($selected['carrier_id'] ?? 0), 'zone_id' => (int) ($selected['zone_id'] ?? 0)];
+        }
+        $legacyCarrierId = is_numeric($attrs['t'] ?? null) ? (int) $attrs['t'] : 0;
         $legacyZoneId = (int) ($attrs['z'] ?? 0);
 
         if ($legacyCarrierId > 0 && $legacyZoneId > 0) {
@@ -177,7 +98,7 @@ final class TransportDeparturePricingService
 
         $raw = $attrs['t'] ?? null;
         $parsed = is_string($raw) ? json_decode($raw, true) : $raw;
-        if (!is_array($parsed) || empty($parsed)) {
+        if (! is_array($parsed) || empty($parsed)) {
             return [
                 'carrier_id' => 0,
                 'zone_id' => 0,
@@ -188,7 +109,7 @@ final class TransportDeparturePricingService
         $selected = null;
 
         foreach ($parsed as $option) {
-            if (!is_array($option)) {
+            if (! is_array($option)) {
                 continue;
             }
 
@@ -208,7 +129,7 @@ final class TransportDeparturePricingService
             }
         }
 
-        if (!is_array($selected)) {
+        if (! is_array($selected)) {
             return [
                 'carrier_id' => 0,
                 'zone_id' => 0,
@@ -247,6 +168,7 @@ final class TransportDeparturePricingService
 
         if (is_string($value)) {
             $parsed = (float) str_replace(',', '.', trim($value));
+
             return is_finite($parsed) ? $parsed : 0.0;
         }
 
@@ -256,6 +178,7 @@ final class TransportDeparturePricingService
     private function tariffToFillRatio(float $coef): float
     {
         $normalized = $coef > 1.0 ? $coef / 100.0 : $coef;
+
         return max(0.0, min(1.0, $normalized));
     }
 }

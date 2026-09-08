@@ -14,7 +14,7 @@ uses(Tests\TestCase::class, RefreshDatabase::class);
 
 function cartControllerPickZoneTariff(int $rollCount, array $tariffs): float
 {
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'pickZoneTariff');
     $method->setAccessible(true);
 
@@ -23,7 +23,7 @@ function cartControllerPickZoneTariff(int $rollCount, array $tariffs): float
 
 function cartControllerTariffToFillRatio(float $coef): float
 {
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'tariffToFillRatio');
     $method->setAccessible(true);
 
@@ -32,9 +32,13 @@ function cartControllerTariffToFillRatio(float $coef): float
 
 function cartControllerBuildPdfPayload(array $itemsInput, User $user, float $shippingTotal, array $transportSelection = []): array
 {
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'buildPdfPayload');
     $method->setAccessible(true);
+
+    foreach (Carrier::all() as $carrier) {
+        $carrier->dbProducts()->syncWithoutDetaching(DB::table('db_products')->pluck('id')->all());
+    }
 
     return $method->invoke($controller, $itemsInput, $user, $shippingTotal, false, $transportSelection);
 }
@@ -90,7 +94,7 @@ it('applies the carrier monetary minimum when the tiered total is below the floo
         ],
     ]);
 
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'computeShippingFromRollDistribution');
     $method->setAccessible(true);
 
@@ -115,6 +119,10 @@ it('applies the carrier monetary minimum when the tiered total is below the floo
         ],
     ];
 
+    foreach (array_keys($pivotsByDbProductId) as $dbId) {
+        DB::table('db_products')->insertOrIgnore(['id' => $dbId, 'name' => 'Test base '.$dbId, 'created_at' => now(), 'updated_at' => now()]);
+        $carrier->dbProducts()->syncWithoutDetaching([$dbId]);
+    }
     $shipping = $method->invoke($controller, $rollDistribution, $pivotsByDbProductId);
 
     expect($shipping)->toBe(350.0);
@@ -142,7 +150,7 @@ it('applies transport vat on the computed shipping total', function (): void {
         ],
     ]);
 
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'computeShippingFromRollDistribution');
     $method->setAccessible(true);
 
@@ -168,6 +176,10 @@ it('applies transport vat on the computed shipping total', function (): void {
         ],
     ];
 
+    foreach (array_keys($pivotsByDbProductId) as $dbId) {
+        DB::table('db_products')->insertOrIgnore(['id' => $dbId, 'name' => 'Test base '.$dbId, 'created_at' => now(), 'updated_at' => now()]);
+        $carrier->dbProducts()->syncWithoutDetaching([$dbId]);
+    }
     $shipping = $method->invoke($controller, $rollDistribution, $pivotsByDbProductId);
 
     expect($shipping)->toBe(360.0);
@@ -204,7 +216,7 @@ it('uses the zone-specific tariff when the delivery zone changes', function (): 
         ],
     ]);
 
-    $controller = new CartController();
+    $controller = new CartController;
     $method = new ReflectionMethod($controller, 'computeShippingFromRollDistribution');
     $method->setAccessible(true);
 
@@ -244,6 +256,10 @@ it('uses the zone-specific tariff when the delivery zone changes', function (): 
         ],
     ];
 
+    foreach (array_keys($pivotsByDbProductId) as $dbId) {
+        DB::table('db_products')->insertOrIgnore(['id' => $dbId, 'name' => 'Test base '.$dbId, 'created_at' => now(), 'updated_at' => now()]);
+        $carrier->dbProducts()->syncWithoutDetaching([$dbId]);
+    }
     $shipping = $method->invoke($controller, $rollDistribution, $pivotsByDbProductId);
 
     expect($shipping)->toBe(480.0);

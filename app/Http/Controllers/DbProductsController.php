@@ -577,13 +577,13 @@ class DbProductsController extends Controller
     private function carrierOptions(): array
     {
         return \App\Models\Carrier::query()
-            ->with(['zones:id,carrier_id,name'])
+            ->with(['zones:id,carrier_id,name', 'dbProducts:id,name'])
             ->orderBy('name')
-            ->get(['id', 'name', 'country'])
+            ->get(['id', 'name'])
             ->map(fn (\App\Models\Carrier $carrier) => [
                 'id' => (int) $carrier->id,
                 'name' => (string) $carrier->name,
-                'country' => $carrier->country,
+                'db_products' => $carrier->dbProducts->map(fn ($db) => ['id' => (int) $db->id])->all(),
                 'zones' => $carrier->zones
                     ->map(fn ($zone) => [
                         'id' => (int) $zone->id,

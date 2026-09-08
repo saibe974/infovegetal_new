@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserMeta;
+use App\Services\PromotionAuthorizationService;
 use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,6 +16,23 @@ use Inertia\Response;
 
 class AppearanceController extends Controller
 {
+    /**
+     * Modes d'affichage autorisés pour chaque page de préférences.
+     */
+    private const PAGE_VIEWS = [
+        'dashboard' => ['table'],
+        'products' => ['table', 'list', 'grid'],
+        'offers' => ['table'],
+        'categories' => ['table'],
+        'tags' => ['table'],
+        'db-products' => ['table'],
+        'missing-images' => ['table'],
+        'users' => ['accordion', 'grid'],
+        'promotions' => ['table'],
+        'carriers' => ['table'],
+        'media' => ['table'],
+    ];
+
     public function __construct(
         private readonly UserManagementAuthorizationService $authorization,
     ) {}
@@ -58,6 +76,7 @@ class AppearanceController extends Controller
             'userAbilities' => [
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
                 'can_access_contracts' => $target->canInvoiceAnyDbProduct(),
+                'can_manage_promotions' => app(PromotionAuthorizationService::class)->canViewModule($target),
             ],
         ]);
     }
@@ -68,7 +87,7 @@ class AppearanceController extends Controller
 
         $this->authorize('update', $target);
 
-        $validated = $request->validate([
+        $rules = [
             'version' => ['required', 'integer', Rule::in([1])],
             'general' => ['required', 'array'],
             'general.theme' => ['required', Rule::in(['light', 'dark', 'system'])],
@@ -80,16 +99,18 @@ class AppearanceController extends Controller
             'confirmations.removeMissingImageLink' => ['required', 'boolean'],
             'confirmations.removeMissingImageLinks' => ['required', 'boolean'],
             'pages' => ['required', 'array'],
-            'pages.products' => ['required', 'array'],
-            'pages.products.enabled' => ['required', 'boolean'],
-            'pages.products.view' => ['required', Rule::in(['table', 'list', 'grid'])],
-            'pages.products.rightSidebarOpen' => ['required', 'boolean'],
-            'pages.products.autoOpenCartOnAdd' => ['required', 'boolean'],
-            'pages.users' => ['required', 'array'],
-            'pages.users.enabled' => ['required', 'boolean'],
-            'pages.users.view' => ['required', Rule::in(['accordion', 'grid'])],
-            'pages.users.rightSidebarOpen' => ['required', 'boolean'],
-        ]);
+        ];
+
+        foreach (self::PAGE_VIEWS as $page => $views) {
+            $rules["pages.{$page}"] = ['required', 'array'];
+            $rules["pages.{$page}.enabled"] = ['required', 'boolean'];
+            $rules["pages.{$page}.view"] = ['required', Rule::in($views)];
+            $rules["pages.{$page}.rightSidebarOpen"] = ['required', 'boolean'];
+        }
+
+        $rules['pages.products.autoOpenCartOnAdd'] = ['required', 'boolean'];
+
+        $validated = $request->validate($rules);
 
         $target->usersMeta()->updateOrCreate(
             ['key' => UserMeta::APPEARANCE_PREFERENCES_KEY],

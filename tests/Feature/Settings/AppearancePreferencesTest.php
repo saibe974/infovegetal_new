@@ -16,18 +16,65 @@ function appearancePreferencesPayload(array $overrides = []): array
         'confirmations' => [
             'removeItem' => true,
             'clearCart' => false,
+            'removeMissingImageLink' => true,
+            'removeMissingImageLinks' => true,
         ],
         'pages' => [
+            'dashboard' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
             'products' => [
                 'enabled' => true,
                 'view' => 'grid',
                 'rightSidebarOpen' => true,
+                'autoOpenCartOnAdd' => false,
+            ],
+            'offers' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'categories' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'tags' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'db-products' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'missing-images' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
             ],
             'users' => [
                 'enabled' => false,
                 'view' => 'accordion',
                 'rightSidebarOpen' => false,
-                'autoOpenCartOnAdd' => false,
+            ],
+            'promotions' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'carriers' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
+            ],
+            'media' => [
+                'enabled' => true,
+                'view' => 'table',
+                'rightSidebarOpen' => false,
             ],
         ],
     ], $overrides);
@@ -42,7 +89,8 @@ test('appearance preferences page is displayed', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/appearance')
             ->where('editingUser.id', $user->id)
-            ->where('appearancePreferences', null));
+            ->where('appearancePreferences', null)
+            ->where('userAbilities.can_manage_promotions', false));
 });
 
 test('appearance preferences can be stored on the user account', function () {

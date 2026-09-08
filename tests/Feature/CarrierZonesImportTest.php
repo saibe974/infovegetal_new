@@ -8,7 +8,6 @@ use Spatie\Permission\Models\Role;
 
 test('an admin can import carrier zones from a csv file', function () {
     /** @var \Tests\TestCase $this */
-
     $adminRole = Role::create([
         'name' => 'admin',
         'guard_name' => 'web',
@@ -31,7 +30,7 @@ test('an admin can import carrier zones from a csv file', function () {
         'tariffs' => ['mini' => '1.00'],
     ]);
 
-    $file = UploadedFile::fake()->createWithContent('zones.csv', <<<CSV
+    $file = UploadedFile::fake()->createWithContent('zones.csv', <<<'CSV'
 zone,mini,1,2
 Zone A,5,10,20
 Zone B,7,11,
@@ -122,6 +121,7 @@ test('an admin can configure carrier delivery timing', function () {
     $this->actingAs($admin)
         ->post(route('carriers.store', absolute: false), [
             'name' => 'Timed carrier',
+            'db_products' => [['id' => \App\Models\DbProducts::create(['name' => 'Timed base'])->id, 'supplement_per_roll' => 0]],
             'country' => 'FR',
             'days' => ['1', '2', '3', '4', '5'],
             'minimum_delay_hours' => 48,
