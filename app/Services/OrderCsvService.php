@@ -90,6 +90,8 @@ class OrderCsvService
                         'id' => $client->id,
                         'name' => $client->name,
                         'email' => $client->email,
+                        'ref' => $client->ref, 
+                        'alias' => $client->alias,
                     ],
                     'billing' => [
                         'id' => $rule->billingUser?->id,
@@ -254,7 +256,7 @@ class OrderCsvService
             $context = [
                 'document' => $documentContext,
                 'order' => $documentContext,
-                'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email],
+                'client' => ['id' => $client->id, 'name' => $client->name, 'email' => $client->email, 'ref' => $client->ref, 'alias' => $client->alias],
                 'billing' => [
                     'id' => $rule->billingUser?->id,
                     'name' => $rule->billingUser?->name,

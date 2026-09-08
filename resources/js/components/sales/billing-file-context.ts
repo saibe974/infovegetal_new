@@ -16,6 +16,8 @@ const documentVariables = [
     '%client.id%',
     '%client.name%',
     '%client.email%',
+    '%client.ref%',
+    '%client.alias%',
     '%billing.id%',
     '%billing.name%',
     '%billing.email%',
@@ -88,6 +90,8 @@ const previewValues: Record<string, string> = {
     'client.id': '508',
     'client.name': 'Client exemple',
     'client.email': 'client@exemple.test',
+    'client.ref': 'CLI-508',
+    'client.alias': 'Client principal',
     'billing.id': '463',
     'billing.name': 'Facturant exemple',
     'billing.email': 'facturation@exemple.test',
@@ -220,9 +224,9 @@ export const variablesForBlock = (
     blockType: BillingFileBlockType,
     event: BillingFileTemplate['event'],
 ) => [
-    ...documentVariables,
-    `%${event}.number%`,
-    `%${event}.date%`,
-    `%${event}.total%`,
-    ...(blockType === 'items' ? itemVariables : []),
-];
+        ...documentVariables,
+        `%${event}.number%`,
+        `%${event}.date%`,
+        `%${event}.total%`,
+        ...(blockType === 'items' ? itemVariables : []),
+    ];

@@ -193,7 +193,7 @@ it('stores enabled order CSV templates for the configured billing user', functio
 it('supports multi-event TSV files, dynamic names, sharing and the order PDF name', function (): void {
     Storage::fake('local');
 
-    $client = User::factory()->create(['name' => 'Client Test']);
+    $client = User::factory()->create(['name' => 'Client Test', 'ref' => 'CLI-508', 'alias' => 'Client principal']);
     $billingUser = User::factory()->create();
     $seller = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -215,7 +215,7 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
                 [
                     'id' => 'shared-export',
                     'name' => 'Export partage',
-                    'filename' => '%document.number%_%db.name%',
+                    'filename' => '%document.number%_%db.name%_%client.ref%_%client.alias%',
                     'event' => 'order',
                     'events' => ['order', 'delivery'],
                     'enabled' => true,
@@ -231,14 +231,14 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
                         'columns' => [['id' => 'reference', 'name' => 'Reference']],
                         'rows' => [[
                             'id' => 'item-row',
-                            'cells' => ['reference' => '%product.reference%'],
+                            'cells' => ['reference' => '%product.reference% / %client.ref% / %client.alias%'],
                         ]],
                     ]],
                 ],
                 [
                     'id' => 'order-pdf',
                     'name' => 'Commande PDF',
-                    'filename' => 'BC_%document.number%_%client.name%',
+                    'filename' => 'BC_%document.number%_%client.name%_%client.ref%_%client.alias%',
                     'event' => 'order',
                     'events' => ['order'],
                     'enabled' => true,
@@ -280,7 +280,9 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
 
     expect($orderFiles)->toHaveCount(1)
         ->and($deliveryFiles)->toHaveCount(1)
-        ->and($orderFiles[0]['filename'])->toBe('DOC-42_Fleurs France.tsv')
+        ->and($orderFiles[0]['filename'])->toBe('DOC-42_Fleurs France_CLI-508_Client principal.tsv')
+        ->and(Storage::disk('local')->get($orderFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
+        ->and(Storage::disk('local')->get($deliveryFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
         ->and($orderFiles[0]['mime'])->toBe('text/tab-separated-values')
         ->and($orderFiles[0]['shared'])->toBeTrue()
         ->and($service->attachmentsForRecipient($orderFiles, $billingUser->id, $client->id))->toHaveCount(1)
@@ -292,5 +294,5 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
             $client,
             $payload,
             'commande-CMD-42.pdf',
-        ))->toBe('BC_CMD-42_Client Test.pdf');
+        ))->toBe('BC_CMD-42_Client Test_CLI-508_Client principal.pdf');
 });
