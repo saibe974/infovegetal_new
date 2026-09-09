@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
 
 const images = [
-    { src: "/img_carousel/pepin.jpg", alt: "Image 1" },
+    { src: "/img_carousel/accueil_infovegetal.jpg", alt: "Image 1" },
     { src: "/img_carousel/orchi.jpg", alt: "Image 2" },
     { src: "/img_carousel/infov.jpg", alt: "Image 3" },
 ]
