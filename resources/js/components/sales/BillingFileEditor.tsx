@@ -5,6 +5,7 @@ import {
     type FilePreviewRow,
 } from '@/components/app/file-template/export-controls';
 import {
+    AddBlockButton,
     FileBlocksEditor,
     FileEditorProvider,
     FilenameRuleField,
@@ -72,9 +73,10 @@ export default function BillingFileEditor({
     onExpandedChange,
 }: Props) {
     const { t } = useI18n();
+    const isOrderPdf = file.id === 'order-pdf';
     const [openSection, setOpenSection] = useState<
-        'settings' | 'content' | null
-    >(null);
+        'settings' | 'content' | 'preview' | null
+    >(isOrderPdf ? null : 'preview');
     const [editingFileName, setEditingFileName] = useState(false);
     const [fileNameDraft, setFileNameDraft] = useState(file.name);
     const primaryEvent = file.events[0] ?? file.event;
@@ -93,7 +95,6 @@ export default function BillingFileEditor({
         }),
         [file.event],
     );
-    const isOrderPdf = file.id === 'order-pdf';
     const automaticEnabled = isOrderPdf || file.enabled;
     const sharingEnabled = isOrderPdf || file.shared;
     const suggestedExtension = preferredExtension(file.delimiter);
@@ -104,18 +105,47 @@ export default function BillingFileEditor({
         primaryEvent,
         previewItems[0],
     )}.${file.extension}`;
+    const buildPreview = (target: BillingFileTemplate) => {
+        const event = target.events[0] ?? target.event;
+        return {
+            rows: renderPreviewRows(target),
+            key: JSON.stringify([
+                fileDefinition(target),
+                target.extension,
+                target.event,
+            ]),
+            filename: `${replacePreviewVariables(
+                target.filename,
+                event,
+                previewItems[0],
+            )}.${target.extension}`,
+            fileId: target.id,
+        };
+    };
     const [preview, setPreview] = useState<{
         rows: FilePreviewRow[];
         key: string;
         filename: string;
         fileId: string;
-    } | null>(null);
+    } | null>(() =>
+        openSection === 'preview' ? buildPreview(file) : null,
+    );
     const previewKey = JSON.stringify([
         fileDefinition(file),
         file.extension,
         file.event,
     ]);
     const currentPreview = preview?.fileId === file.id ? preview : null;
+    const previewNode = !isOrderPdf ? (
+        <FilePreview
+            rows={currentPreview?.rows}
+            stale={currentPreview?.key !== previewKey}
+            filename={currentPreview?.filename}
+            caption={t(
+                'Aperçu avec des données d’exemple. Les données réelles seront utilisées lors de la génération du fichier.',
+            )}
+        />
+    ) : null;
     const finishFileNameEditing = (save: boolean) => {
         const name = fileNameDraft.trim();
         if (save && name && name !== file.name) {
@@ -195,19 +225,23 @@ export default function BillingFileEditor({
                         key={file.id}
                         template={file}
                         format={file.extension}
-                        formats={['csv', 'tsv']}
+                        formats={['csv', 'tsv', 'xlsx']}
                         variables={editorContext.variablesForBlock}
                         disabled={!canManage}
                         onChange={(template) =>
                             onChange({ ...file, ...fileDefinition(template) })
                         }
-                        onLoad={(saved) =>
-                            onChange({
+                        onLoad={(saved) => {
+                            const next = {
                                 ...file,
                                 ...fileDefinition(saved.template),
-                                extension: saved.format as BillingFileExtension,
-                            })
-                        }
+                                extension:
+                                    saved.format as BillingFileExtension,
+                            };
+                            onChange(next);
+                            if (openSection === 'preview')
+                                setPreview(buildPreview(next));
+                        }}
                     />
                 )}
                 <FileEditorSection
@@ -289,101 +323,40 @@ export default function BillingFileEditor({
                     }
                 >
                     <div className="space-y-4">
-                        <FormField label={t('Nom du fichier')}>
-                            <FilenameRuleField
-                                value={file.filename}
-                                disabled={!canManage}
-                                onChange={(filename) =>
-                                    onChange({ ...file, filename })
-                                }
-                            />
-                        </FormField>
-                        <p className="text-xs text-muted-foreground">
-                            {t('Aperçu')} :{' '}
-                            <span className="font-mono">{filenamePreview}</span>
-                        </p>
-
-                        {!isOrderPdf ? (
-                            <div className="space-y-4">
-                                <FormField label={t('Événements')}>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="w-full justify-between font-normal"
-                                                disabled={!canManage}
-                                            >
-                                                <span className="truncate">
-                                                    {file.events
-                                                        .map((event) =>
-                                                            t(
-                                                                eventLabels[
-                                                                    event
-                                                                ],
-                                                            ),
-                                                        )
-                                                        .join(', ')}
-                                                </span>
-                                                <ChevronDownIcon className="h-4 w-4 opacity-60" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
-                                            {Object.entries(eventLabels).map(
-                                                ([event, label]) => {
-                                                    const typedEvent =
-                                                        event as BillingFileEvent;
-                                                    const checked =
-                                                        file.events.includes(
-                                                            typedEvent,
-                                                        );
-                                                    return (
-                                                        <DropdownMenuCheckboxItem
-                                                            key={event}
-                                                            checked={checked}
-                                                            onSelect={(event) =>
-                                                                event.preventDefault()
-                                                            }
-                                                            onCheckedChange={() => {
-                                                                const events =
-                                                                    checked
-                                                                        ? file.events.filter(
-                                                                              (
-                                                                                  item,
-                                                                              ) =>
-                                                                                  item !==
-                                                                                  typedEvent,
-                                                                          )
-                                                                        : [
-                                                                              ...file.events,
-                                                                              typedEvent,
-                                                                          ];
-                                                                if (
-                                                                    !events.length
-                                                                )
-                                                                    return;
-                                                                onChange({
-                                                                    ...file,
-                                                                    events,
-                                                                    event: events[0],
-                                                                });
-                                                            }}
-                                                        >
-                                                            {t(label)}
-                                                        </DropdownMenuCheckboxItem>
-                                                    );
-                                                },
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </FormField>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <FormField label={t('Extension')}>
+                        <div className="flex flex-wrap items-end gap-4">
+                            <FormField
+                                label={t('Nom du fichier')}
+                                className="w-1/2 min-w-64"
+                            >
+                                <FilenameRuleField
+                                    value={file.filename}
+                                    disabled={!canManage}
+                                    onChange={(filename) =>
+                                        onChange({ ...file, filename })
+                                    }
+                                />
+                            </FormField>
+                            {!isOrderPdf ? (
+                                <>
+                                    <FormField
+                                        label={t('Extension')}
+                                        className="min-w-0"
+                                    >
                                         <FileFormatField
                                             value={file.extension}
-                                            formats={['csv', 'tsv'] as const}
+                                            formats={
+                                                [
+                                                    'csv',
+                                                    'tsv',
+                                                    'xlsx',
+                                                    'pdf',
+                                                ] as const
+                                            }
+                                            disabledFormats={['pdf']}
                                             disabled={!canManage}
+                                            hideLegend
                                             onChange={(extension) => {
+                                                if (extension === 'pdf') return;
                                                 const delimiter =
                                                     extension === 'csv'
                                                         ? file.delimiter ===
@@ -391,10 +364,11 @@ export default function BillingFileEditor({
                                                           file.delimiter === ','
                                                             ? file.delimiter
                                                             : ';'
-                                                        : file.delimiter ===
+                                                        : extension === 'tsv' &&
+                                                            (file.delimiter ===
                                                                 '\t' ||
-                                                            file.delimiter ===
-                                                                '|'
+                                                                file.delimiter ===
+                                                                    '|')
                                                           ? file.delimiter
                                                           : '\t';
                                                 onChange({
@@ -404,57 +378,145 @@ export default function BillingFileEditor({
                                                 });
                                             }}
                                         />
-                                        {extensionMismatch ? (
-                                            <p className="text-xs text-orange-600 dark:text-orange-400">
-                                                {t(
-                                                    `Extension suggérée : .${suggestedExtension}`,
-                                                )}
-                                            </p>
-                                        ) : null}
                                     </FormField>
-                                    <FormField label={t('Séparateur')}>
-                                        <Select
-                                            value={file.delimiter}
+                                    {file.extension !== 'xlsx' && (
+                                        <label className="flex items-center gap-3 text-sm">
+                                            {t('Séparateur')}
+                                            <Select
+                                                value={file.delimiter}
+                                                disabled={!canManage}
+                                                onValueChange={(
+                                                    delimiter: BillingFileTemplate['delimiter'],
+                                                ) =>
+                                                    onChange({
+                                                        ...file,
+                                                        delimiter,
+                                                    })
+                                                }
+                                            >
+                                                <SelectTrigger className="w-36">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {file.extension ===
+                                                    'csv' ? (
+                                                        <>
+                                                            <SelectItem value=";">
+                                                                ; (
+                                                                {t(
+                                                                    'point-virgule',
+                                                                )}
+                                                                )
+                                                            </SelectItem>
+                                                            <SelectItem value=",">
+                                                                , (
+                                                                {t('virgule')})
+                                                            </SelectItem>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <SelectItem value="\t">
+                                                                {t(
+                                                                    'Tabulation',
+                                                                )}
+                                                            </SelectItem>
+                                                            <SelectItem value="|">
+                                                                |
+                                                            </SelectItem>
+                                                        </>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </label>
+                                    )}
+                                </>
+                            ) : null}
+                        </div>
+                        {extensionMismatch && file.extension !== 'xlsx' ? (
+                            <p className="text-xs text-orange-600 dark:text-orange-400">
+                                {t(
+                                    `Extension suggérée : .${suggestedExtension}`,
+                                )}
+                            </p>
+                        ) : null}
+                        <p className="text-xs text-muted-foreground">
+                            {t('Aperçu')} :{' '}
+                            <span className="font-mono">{filenamePreview}</span>
+                        </p>
+
+                        {!isOrderPdf ? (
+                            <FormField label={t('Événements')}>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full justify-between font-normal"
                                             disabled={!canManage}
-                                            onValueChange={(
-                                                delimiter: BillingFileTemplate['delimiter'],
-                                            ) =>
-                                                onChange({
-                                                    ...file,
-                                                    delimiter,
-                                                })
-                                            }
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {file.extension === 'csv' ? (
-                                                    <>
-                                                        <SelectItem value=";">
-                                                            ; (
-                                                            {t('point-virgule')}
+                                            <span className="truncate">
+                                                {file.events
+                                                    .map((event) =>
+                                                        t(
+                                                            eventLabels[
+                                                                event
+                                                            ],
+                                                        ),
+                                                    )
+                                                    .join(', ')}
+                                            </span>
+                                            <ChevronDownIcon className="h-4 w-4 opacity-60" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                                        {Object.entries(eventLabels).map(
+                                            ([event, label]) => {
+                                                const typedEvent =
+                                                    event as BillingFileEvent;
+                                                const checked =
+                                                    file.events.includes(
+                                                        typedEvent,
+                                                    );
+                                                return (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={event}
+                                                        checked={checked}
+                                                        onSelect={(event) =>
+                                                            event.preventDefault()
+                                                        }
+                                                        onCheckedChange={() => {
+                                                            const events =
+                                                                checked
+                                                                    ? file.events.filter(
+                                                                          (
+                                                                              item,
+                                                                          ) =>
+                                                                              item !==
+                                                                              typedEvent,
+                                                                      )
+                                                                    : [
+                                                                          ...file.events,
+                                                                          typedEvent,
+                                                                      ];
+                                                            if (
+                                                                !events.length
                                                             )
-                                                        </SelectItem>
-                                                        <SelectItem value=",">
-                                                            , ({t('virgule')})
-                                                        </SelectItem>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <SelectItem value="\t">
-                                                            {t('Tabulation')}
-                                                        </SelectItem>
-                                                        <SelectItem value="|">
-                                                            |
-                                                        </SelectItem>
-                                                    </>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormField>
-                                </div>
-                            </div>
+                                                                return;
+                                                            onChange({
+                                                                ...file,
+                                                                events,
+                                                                event: events[0],
+                                                            });
+                                                        }}
+                                                    >
+                                                        {t(label)}
+                                                    </DropdownMenuCheckboxItem>
+                                                );
+                                            },
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </FormField>
                         ) : null}
                     </div>
                 </FileEditorSection>
@@ -467,6 +529,17 @@ export default function BillingFileEditor({
                             onOpenChange={(open) =>
                                 setOpenSection(open ? 'content' : null)
                             }
+                            actions={
+                                openSection === 'content' ? (
+                                    <AddBlockButton
+                                        blocks={file.blocks}
+                                        disabled={!canManage}
+                                        onChange={(blocks) =>
+                                            onChange({ ...file, blocks })
+                                        }
+                                    />
+                                ) : null
+                            }
                         >
                             <FileBlocksEditor
                                 blocks={file.blocks}
@@ -474,24 +547,18 @@ export default function BillingFileEditor({
                                 onChange={(blocks) =>
                                     onChange({ ...file, blocks })
                                 }
-                            />{' '}
+                            />
                         </FileEditorSection>
-                        <FilePreview
-                            rows={currentPreview?.rows}
-                            stale={currentPreview?.key !== previewKey}
-                            filename={currentPreview?.filename}
-                            caption={t(
-                                'Aperçu avec des données d’exemple. Les données réelles seront utilisées lors de la génération du fichier.',
-                            )}
-                            onRefresh={() =>
-                                setPreview({
-                                    rows: renderPreviewRows(file),
-                                    key: previewKey,
-                                    filename: filenamePreview,
-                                    fileId: file.id,
-                                })
-                            }
-                        />
+                        <FileEditorSection
+                            title={t('Aperçu')}
+                            open={openSection === 'preview'}
+                            onOpenChange={(open) => {
+                                setOpenSection(open ? 'preview' : null);
+                                if (open) setPreview(buildPreview(file));
+                            }}
+                        >
+                            {previewNode}
+                        </FileEditorSection>
                     </>
                 )}
             </CardContent>

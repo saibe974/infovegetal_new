@@ -3,11 +3,16 @@ import { Input } from '@/components/ui/input';
 import { useI18n } from '@/lib/i18n';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
-import { Copy, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { Copy, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { FileFormatField } from './export-controls';
 import { FileBlocksEditor, FilenameRuleField } from './file-template-editor';
-import { parseCalculationToken, parseVariableToken, uniqueId } from './rules';
+import {
+    parseCalculationToken,
+    parseUserImageRule,
+    parseVariableToken,
+    uniqueId,
+} from './rules';
 import type { FileBlockType, FileTemplate } from './types';
 
 export type SavedFileTemplate = {
@@ -31,15 +36,16 @@ export function templateCompatibility(
     const inspect = (rule: string, type: FileBlockType) => {
         const allowed = new Set(variables(type));
         for (const token of rule.match(/%[^%]+%/g) ?? []) {
+            if (parseUserImageRule(token) !== null) continue;
             const variable = parseVariableToken(token);
             const calculation = parseCalculationToken(token);
             const names = variable
                 ? [variable.base]
                 : calculation
-                  ? calculation.operands
+                    ? calculation.operands
                         .filter(({ value }) => !/^\d+(?:\.\d+)?$/.test(value))
                         .map(({ value }) => `%${value}%`)
-                  : [token];
+                    : [token];
             names.forEach((name) => {
                 if (!allowed.has(name)) missing.add(name);
             });
@@ -83,9 +89,7 @@ export function TemplateLibrary({
     );
     const [busy, setBusy] = useState(false);
     const [ready, setReady] = useState(false);
-    const [reload, setReload] = useState(0);
     const [error, setError] = useState<string | null>(null);
-    const [notice, setNotice] = useState<string | null>(null);
     const selected = saved.find((item) => item.id === selectedId);
     const missing = selected
         ? templateCompatibility(selected.template, variables)
@@ -95,30 +99,31 @@ export function TemplateLibrary({
         ? templateCompatibility(adaptation.template, variables)
         : [];
     const userId = auth?.user?.id;
-    const request = useCallback(async (
-        path = '',
-        method = 'GET',
-        body?: SavedFileTemplate,
-    ) => {
-        const response = await fetch(`/file-export-templates${path}`, {
-            method,
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken ?? '',
-            },
-            body: body ? JSON.stringify(body) : undefined,
-        });
-        if (response.status === 204) return null;
-        const payload = await response.json().catch(() => null);
-        if (!response.ok || !payload)
-            throw new Error(
-                (Object.values(payload?.errors ?? {}).flat()[0] as string) ||
+    const request = useCallback(
+        async (path = '', method = 'GET', body?: SavedFileTemplate) => {
+            const response = await fetch(`/file-export-templates${path}`, {
+                method,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken ?? '',
+                },
+                body: body ? JSON.stringify(body) : undefined,
+            });
+            if (response.status === 204) return null;
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload)
+                throw new Error(
+                    (Object.values(
+                        payload?.errors ?? {},
+                    ).flat()[0] as string) ||
                     payload?.message ||
                     'Impossible d’accéder aux configurations.',
-            );
-        return payload;
-    }, [csrfToken]);
+                );
+            return payload;
+        },
+        [csrfToken],
+    );
     useEffect(() => {
         let cancelled = false;
         setReady(false);
@@ -192,7 +197,7 @@ export function TemplateLibrary({
         };
         // Reload the personal library only when the authenticated session changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId, csrfToken, reload]);
+    }, [userId, csrfToken]);
 
     // A model saved in the other interface/tab becomes available on return.
     useEffect(() => {
@@ -203,19 +208,27 @@ export function TemplateLibrary({
                 const models: SavedFileTemplate[] = await request();
                 if (!cancelled) {
                     setSaved(models);
-                    setLoadedId((id) => models.some((model) => model.id === id) ? id : '');
-                    setSelectedId((id) => models.some((model) => model.id === id) ? id : '');
+                    setLoadedId((id) =>
+                        models.some((model) => model.id === id) ? id : '',
+                    );
+                    setSelectedId((id) =>
+                        models.some((model) => model.id === id) ? id : '',
+                    );
                 }
-            } catch (exception) { if (!cancelled) setError((exception as Error).message); }
+            } catch (exception) {
+                if (!cancelled) setError((exception as Error).message);
+            }
         };
         window.addEventListener('focus', refresh);
-        return () => { cancelled = true; window.removeEventListener('focus', refresh); };
+        return () => {
+            cancelled = true;
+            window.removeEventListener('focus', refresh);
+        };
     }, [ready, busy, userId, request]);
 
     const save = async (duplicate: boolean) => {
         setBusy(true);
         setError(null);
-        setNotice(null);
         try {
             const definition = fileDefinition(template);
             if (duplicate) definition.name = `${definition.name} — copie`;
@@ -232,11 +245,6 @@ export function TemplateLibrary({
             setSelectedId(result.id);
             setLoadedId(result.id);
             onChange(structuredClone(result.template));
-            setNotice(
-                t(
-                    'Configuration enregistrée dans votre bibliothèque personnelle.',
-                ),
-            );
         } catch (exception) {
             setError((exception as Error).message);
         } finally {
@@ -246,7 +254,6 @@ export function TemplateLibrary({
     const remove = async () => {
         setBusy(true);
         setError(null);
-        setNotice(null);
         try {
             await request(`/${encodeURIComponent(selectedId)}`, 'DELETE');
             setSaved((models) =>
@@ -254,11 +261,6 @@ export function TemplateLibrary({
             );
             setSelectedId('');
             if (loadedId === selectedId) setLoadedId('');
-            setNotice(
-                t(
-                    'Configuration supprimée. Le brouillon reste dans l’éditeur.',
-                ),
-            );
         } catch (exception) {
             setError((exception as Error).message);
         } finally {
@@ -267,10 +269,6 @@ export function TemplateLibrary({
     };
     return (
         <div className="space-y-3 rounded-lg bg-muted/40 p-3">
-            <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium">{t('Configurations enregistrées')}</p>
-                <Button type="button" variant="ghost" size="icon" aria-label={t('Actualiser la bibliothèque')} disabled={disabled || busy || !userId} onClick={() => { setError(null); setReload((value) => value + 1); }}><RefreshCw className="size-4" /></Button>
-            </div>
             <div className="flex flex-wrap items-center gap-2">
                 <select
                     aria-label={t('Configuration enregistrée')}
@@ -282,7 +280,6 @@ export function TemplateLibrary({
                         if (!event.target.value) setLoadedId('');
                         setAdaptation(null);
                         setError(null);
-                        setNotice(null);
                     }}
                 >
                     <option value="">{t('Nouvelle configuration')}</option>
@@ -307,9 +304,6 @@ export function TemplateLibrary({
                             onLoad(structuredClone(selected));
                             setLoadedId(selected.id);
                             setAdaptation(null);
-                            setNotice(
-                                t('Configuration chargée dans l’éditeur.'),
-                            );
                         }
                     }}
                 >
@@ -459,11 +453,6 @@ export function TemplateLibrary({
                                 setLoadedId('');
                                 setSelectedId('');
                                 setAdaptation(null);
-                                setNotice(
-                                    t(
-                                        'Copie adaptée chargée. Enregistrez-la pour l’ajouter à votre bibliothèque.',
-                                    ),
-                                );
                             }}
                         >
                             {t('Utiliser cette copie')}
@@ -489,16 +478,11 @@ export function TemplateLibrary({
                     {error}
                 </p>
             )}
-            {notice && (
-                <p role="status" className="text-sm text-muted-foreground">
-                    {notice}
-                </p>
-            )}
-            <p className="text-xs text-muted-foreground">
+            {/* <p className="text-xs text-muted-foreground">
                 {t(
                     'Bibliothèque personnelle commune à Products et Billing. Les filtres, données, événements et options de partage ne sont pas enregistrés.',
                 )}
-            </p>
+            </p> */}
         </div>
     );
 }

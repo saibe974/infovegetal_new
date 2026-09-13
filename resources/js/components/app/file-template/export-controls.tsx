@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Collapsible,
@@ -6,40 +5,57 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { useI18n } from '@/lib/i18n';
-import { ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export function FileFormatField<T extends string>({
     value,
     formats,
+    disabledFormats = [],
     disabled,
+    hideLegend,
     onChange,
 }: {
     value: T;
     formats: readonly T[];
+    disabledFormats?: readonly T[];
     disabled?: boolean;
+    hideLegend?: boolean;
     onChange: (value: T) => void;
 }) {
     const { t } = useI18n();
     return (
         <fieldset disabled={disabled} className="space-y-2">
-            <legend className="mb-2 text-sm font-medium">
-                {t('Format du fichier')}
-            </legend>
+            {hideLegend ? null : (
+                <legend className="mb-2 text-sm font-medium">
+                    {t('Format du fichier')}
+                </legend>
+            )}
             <div className="flex flex-wrap gap-3">
                 {formats.map((format) => (
                     <label
                         key={format}
-                        className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm ${value === format ? 'border-primary bg-primary/5' : ''}`}
+                        className={`flex h-9 items-center gap-2 rounded-lg border px-3 text-sm ${disabledFormats.includes(format) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${value === format ? 'border-primary bg-primary/5' : ''}`}
                     >
                         <Checkbox
                             checked={value === format}
-                            disabled={disabled}
+                            disabled={
+                                disabled || disabledFormats.includes(format)
+                            }
                             onCheckedChange={() => onChange(format)}
                         />
-                        {format === 'xlsx'
-                            ? 'Excel (.xlsx)'
-                            : format.toUpperCase()}
+                        <span>
+                            {format === 'xlsx'
+                                ? 'Excel (.xlsx)'
+                                : format.toUpperCase()}
+                            {format === 'pdf' && (
+                                <span className="text-xs">
+                                    {' '}
+                                    — {t('À venir')}
+                                </span>
+                            )}
+                        </span>
                     </label>
                 ))}
             </div>
@@ -66,7 +82,10 @@ export function FileEditorSection({
         <Collapsible
             open={open}
             onOpenChange={onOpenChange}
-            className="overflow-hidden rounded-lg border bg-background"
+            className={cn(
+                'overflow-hidden rounded-lg border bg-background',
+                open && 'bg-muted/40',
+            )}
         >
             <div className="flex min-w-0 items-center gap-2 p-2">
                 <CollapsibleTrigger asChild>
@@ -111,8 +130,6 @@ export function FilePreview({
     error,
     caption,
     filename,
-    disabled,
-    onRefresh,
 }: {
     rows?: FilePreviewRow[];
     stale: boolean;
@@ -120,38 +137,22 @@ export function FilePreview({
     error?: string | null;
     caption: string;
     filename?: string;
-    disabled?: boolean;
-    onRefresh: () => void;
 }) {
     const { t } = useI18n();
     return (
         <section
             aria-label={t('Aperçu du fichier')}
-            className="space-y-3 border-t pt-4"
+            className="space-y-3"
             aria-busy={loading}
         >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-semibold">{t('Aperçu du fichier')}</h2>
-                <Button
-                    type="button"
-                    variant="outline"
-                    disabled={disabled || loading}
-                    onClick={onRefresh}
-                >
-                    {loading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="size-4" />
-                    )}
-                    {t(loading ? 'Actualisation…' : 'Actualiser l’aperçu')}
-                </Button>
-            </div>
             {rows && stale && (
                 <p
                     role="status"
                     className="text-sm text-amber-700 dark:text-amber-400"
                 >
-                    {t('Configuration modifiée — aperçu à actualiser')}
+                    {t(
+                        'Configuration modifiée depuis la dernière actualisation.',
+                    )}
                 </p>
             )}
             {error && (
@@ -162,7 +163,9 @@ export function FilePreview({
             {!rows && (
                 <p className="text-sm text-muted-foreground">
                     {t(
-                        'Cliquez sur Actualiser l’aperçu pour afficher le fichier.',
+                        loading
+                            ? 'Actualisation…'
+                            : 'Aucun aperçu disponible.',
                     )}
                 </p>
             )}

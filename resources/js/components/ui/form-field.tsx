@@ -7,9 +7,17 @@ type Props = PropsWithChildren<{
     label: React.ReactNode;
     error?: string;
     help?: string;
+    className?: string;
 }>;
 
-export function FormField({ children, htmlFor, label, error, help }: Props) {
+export function FormField({
+    children,
+    htmlFor,
+    label,
+    error,
+    help,
+    className,
+}: Props) {
     const content = (
         <>
             {children}
@@ -21,7 +29,7 @@ export function FormField({ children, htmlFor, label, error, help }: Props) {
     );
     if (!htmlFor) {
         return (
-            <fieldset className="space-y-2">
+            <fieldset className={cn('space-y-2', className)}>
                 <Label asChild className={cn(error && 'text-destructive')}>
                     <legend>{label}</legend>
                 </Label>
@@ -31,7 +39,7 @@ export function FormField({ children, htmlFor, label, error, help }: Props) {
     }
 
     return (
-        <div className="space-y-2">
+        <div className={cn('space-y-2', className)}>
             <Label
                 htmlFor={htmlFor}
                 className={cn('block', error && 'text-destructive')}

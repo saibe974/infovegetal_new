@@ -74,7 +74,7 @@ export interface SalesConditionProfile {
 }
 
 export type BillingFileEvent = 'order' | 'delivery' | 'invoice' | 'credit_note';
-export type BillingFileExtension = 'csv' | 'tsv' | 'pdf' | 'xls';
+export type BillingFileExtension = 'csv' | 'tsv' | 'xlsx' | 'pdf' | 'xls';
 
 export interface BillingFileColumn {
     id: string;

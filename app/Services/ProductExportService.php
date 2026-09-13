@@ -78,11 +78,11 @@ class ProductExportService
     private static function defaultTemplate(array $columns): array
     {
         return [
-            'name' => 'Catalogue produits', 'filename' => 'products_export_%export.date%', 'delimiter' => ';',
+            'name' => 'Catalogue produits', 'filename' => 'products_export_%document.date%', 'delimiter' => ';',
             'blocks' => [[
                 'id' => 'products', 'name' => 'Produits', 'type' => 'items', 'enabled' => true, 'show_headers' => true,
                 'columns' => array_map(fn ($key) => ['id' => $key, 'name' => self::COLUMNS[$key]], $columns),
-                'rows' => [['id' => 'product', 'cells' => array_combine($columns, array_map(fn ($key) => '%product.'.$key.'%', $columns))]],
+                'rows' => [['id' => 'product', 'cells' => array_combine($columns, array_map(fn ($key) => '%product.'.($key === 'ref' ? 'reference' : $key).'%', $columns))]],
             ]],
         ];
     }
@@ -97,7 +97,7 @@ class ProductExportService
             $request->merge(['template' => $decoded]);
         }
         $data = $request->validate([
-            'format' => ['required', Rule::in(['csv', 'xlsx'])],
+            'format' => ['required', Rule::in(['csv', 'tsv', 'xlsx'])],
             'template' => ['sometimes', 'array'],
             'columns' => ['required_without:template', 'array', 'min:1', 'max:'.count(self::COLUMNS)],
             'columns.*' => ['required', 'string', 'distinct', Rule::in(array_keys(self::COLUMNS))],
@@ -106,10 +106,15 @@ class ProductExportService
         ]);
 
         $template = new ProductExportTemplate($data['template'] ?? self::defaultTemplate($data['columns']), self::metadata());
+        if ($request->user()) {
+            app(FileImageRuleService::class)->assertOwnedRules($template->definition, $request->user());
+        }
         $columns = $template->fields;
         $format = $data['format'];
         $query = (new ProductCatalogQuery($request))->query();
-        $limitKey = $format === 'xlsx' && $template->imageCount(1) > 0 ? 'xlsx_image' : $format;
+        $limitKey = $format === 'xlsx' && $template->imageCount(1) > 0
+            ? 'xlsx_image'
+            : ($format === 'tsv' ? 'csv' : $format);
         $limit = (int) config("product-export.{$limitKey}_max_rows");
         if ($format === 'xlsx') {
             // Wide templates also consume memory: bound the workbook, not only its rows.
@@ -117,7 +122,13 @@ class ProductExportService
             $limit = min($limit, max(0, intdiv((int) config('product-export.xlsx_max_cells'), $template->width()) - $headings));
         }
         $total = (clone $query)->reorder()->count();
-        $context = ['export.date' => now()->format('Y-m-d'), 'export.count' => (string) $total];
+        $date = now()->format('Y-m-d');
+        $context = [
+            'document.date' => $date,
+            'document.count' => (string) $total,
+            'export.date' => $date,
+            'export.count' => (string) $total,
+        ];
         $lineCount = $template->rowCount($total);
         $imageCount = $format === 'xlsx' ? $template->imageCount($total) : 0;
         $tooLarge = $lineCount > $limit || $imageCount > (int) config('product-export.xlsx_image_max_rows');
@@ -168,10 +179,12 @@ class ProductExportService
                 foreach ($this->rows($query, $template, $request, $context, $sample) as $row) {
                     $rows[] = [
                         'heading' => $row['heading'],
-                        'cells' => array_pad(array_map(function ($cell) use (&$temporaryImages) {
+                        'cells' => array_pad(array_map(function ($cell) use (&$temporaryImages, $request) {
                             $product = $cell['image'];
-                            $image = $product && $this->existingThumbnail($product, $temporaryImages)
-                                ? $product->getFirstMedia('images')->getUrl('thumb') : null;
+                            $image = ($cell['fixed_image_id'] ?? null)
+                                ? app(FileImageRuleService::class)->url($cell['fixed_image_id'], 'thumb', $request->user())
+                                : ($product && $this->existingThumbnail($product, $temporaryImages)
+                                    ? $product->getFirstMedia('images')->getUrl('thumb') : null);
 
                             return ['value' => $cell['display'], 'image' => $image];
                         }, $row['cells']), $template->width(), ['value' => '', 'image' => null]),
@@ -191,19 +204,26 @@ class ProductExportService
             ]);
         }
 
-        if ($format === 'csv') {
-            return response()->streamDownload(function () use ($query, $template, $request, $context): void {
+        if (in_array($format, ['csv', 'tsv'], true)) {
+            $delimiter = $format === 'tsv' && ! in_array($template->definition['delimiter'], ["\t", '|'], true)
+                ? "\t"
+                : $template->definition['delimiter'];
+
+            return response()->streamDownload(function () use ($query, $template, $request, $context, $delimiter): void {
                 $handle = fopen('php://output', 'wb');
                 try {
                     fwrite($handle, "\xEF\xBB\xBF");
                     foreach ($this->rows($query, $template, $request, $context) as $row) {
                         $values = array_map(fn ($cell) => is_int($cell['value']) || is_float($cell['value']) ? $cell['display'] : $this->safeCsvCell($cell['display']), $row['cells']);
-                        fputcsv($handle, array_pad($values, $template->width(), ''), $template->definition['delimiter'], '"', '');
+                        fputcsv($handle, array_pad($values, $template->width(), ''), $delimiter, '"', '');
                     }
                 } finally {
                     fclose($handle);
                 }
-            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8', 'X-Accel-Buffering' => 'no']);
+            }, $filename, [
+                'Content-Type' => $format === 'tsv' ? 'text/tab-separated-values; charset=UTF-8' : 'text/csv; charset=UTF-8',
+                'X-Accel-Buffering' => 'no',
+            ]);
         }
 
         return $this->excel($query, $template, $request, $context, $filename, $limit);
@@ -234,12 +254,15 @@ class ProductExportService
                     $cells = [];
                     foreach ($block['columns'] as $column) {
                         $rule = (string) ($row['cells'][$column['id']] ?? '');
-                        $display = $renderer->render($rule, $variables, true);
+                        $fixedImageId = app(FileImageRuleService::class)->mediaId($rule);
+                        $display = $fixedImageId
+                            ? app(FileImageRuleService::class)->url($fixedImageId, 'document', $request->user())
+                            : $renderer->render($rule, $variables, true);
                         $value = $display;
                         $format = null;
-                        if (preg_match('/^%(product\.[a-z_0-9]+|export.count)(?:\|decimal:([0-4]))?%$/', $rule, $match)) {
+                        if (preg_match('/^%(product\.[a-z_0-9]+|(?:export|document)\.count)(?:\|decimal:([0-4]))?%$/', $rule, $match)) {
                             $key = substr($match[1], 8);
-                            if (($match[1] === 'export.count' || ($metadata[$key]['type'] ?? '') === 'decimal') && is_numeric($display)) {
+                            if ((in_array($match[1], ['export.count', 'document.count'], true) || ($metadata[$key]['type'] ?? '') === 'decimal') && is_numeric($display)) {
                                 $value = (float) $display;
                                 $decimals = $match[2] ?? (in_array($key, self::PRICES, true) ? '2' : null);
                                 $format = $decimals === null ? null : ($decimals === '0' ? '0' : '0.'.str_repeat('0', (int) $decimals));
@@ -250,7 +273,11 @@ class ProductExportService
                                 $format = $match[1] === '0' ? '0' : '0.'.str_repeat('0', (int) $match[1]);
                             }
                         }
-                        $cells[] = ['value' => $value, 'display' => $display, 'format' => $format, 'image' => $request->input('format') === 'xlsx' && $rule === '%product.image%' ? $product : null];
+                        $cells[] = [
+                            'value' => $value, 'display' => $display, 'format' => $format,
+                            'image' => $request->input('format') === 'xlsx' && $rule === '%product.image%' ? $product : null,
+                            'fixed_image_id' => $fixedImageId,
+                        ];
                     }
                     yield ['heading' => false, 'cells' => $cells];
                 }
@@ -280,7 +307,7 @@ class ProductExportService
             }
 
             return match ($key) {
-                'image' => $request->input('format') === 'csv' ? $product->img_link : null,
+                'image' => in_array($request->input('format'), ['csv', 'tsv'], true) ? $product->img_link : null,
                 'category' => $product->category?->name,
                 'database' => $product->dbProduct?->name,
                 'country' => $product->dbProduct?->country,
@@ -340,6 +367,24 @@ class ProductExportService
                             $drawing->setPath($thumbnail);
                             $drawing->setCoordinates($cell);
                             $drawing->setWidthAndHeight(72, 72);
+                            $drawing->setOffsetX(4)->setOffsetY(4);
+                            $drawing->setWorksheet($sheet);
+                            $sheet->getRowDimension($row)->setRowHeight(60);
+                        }
+
+                        continue;
+                    }
+                    if ($data['fixed_image_id'] ?? null) {
+                        if (++$images > (int) config('product-export.xlsx_image_max_rows')) {
+                            throw ValidationException::withMessages(['export' => 'Trop d’images pour un export synchrone.']);
+                        }
+                        $imagePath = app(FileImageRuleService::class)->temporaryPath($data['fixed_image_id'], $temporaryImages, $request->user());
+                        if ($imagePath !== null) {
+                            $drawing = new Drawing;
+                            $drawing->setName('Image fixe');
+                            $drawing->setPath($imagePath);
+                            $drawing->setCoordinates($cell);
+                            $drawing->setWidthAndHeight(96, 72);
                             $drawing->setOffsetX(4)->setOffsetY(4);
                             $drawing->setWorksheet($sheet);
                             $sheet->getRowDimension($row)->setRowHeight(60);

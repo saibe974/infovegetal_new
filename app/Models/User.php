@@ -2,31 +2,33 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasSortable;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Fortify\TwoFactorAuthenticatable;
-use Spatie\Permission\Traits\HasRoles;
 use Kalnoy\Nestedset\NodeTrait;
 use Lab404\Impersonate\Models\Impersonate;
+use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use App\Models\Traits\HasSortable;
-use App\Services\UserManagementAuthorizationService;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles {
+    use HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable {
         hasRole as protected hasRoleTrait;
         hasAnyRole as protected hasAnyRoleTrait;
     }
-    use NodeTrait, SoftDeletes, Impersonate, InteractsWithMedia, HasSortable;
+
+    use HasSortable, Impersonate, InteractsWithMedia, NodeTrait, SoftDeletes;
 
     protected array $sortable = ['name', 'email', 'created_at'];
 
@@ -227,10 +229,25 @@ class User extends Authenticatable implements HasMedia
         $this->addMediaCollection('user_logos');
         $this->addMediaCollection('user_photos');
         $this->addMediaCollection('user_meta_files');
+        $this->addMediaCollection('user_export_images')
+            ->useDisk(config('media-library.disk_name', 'public'))
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
     }
 
     public function registerMediaConversions(?Media $media = null): void
     {
+        $this->addMediaConversion('thumb')
+            ->fit(Fit::Contain, 200, 200)
+            ->format('png')
+            ->quality(78)
+            ->performOnCollections('user_export_images')
+            ->nonQueued();
+        $this->addMediaConversion('document')
+            ->fit(Fit::Contain, 1200, 1200)
+            ->format('png')
+            ->quality(85)
+            ->performOnCollections('user_export_images')
+            ->nonQueued();
     }
 
     /**
@@ -250,7 +267,7 @@ class User extends Authenticatable implements HasMedia
      */
     public function canBeImpersonated(): bool
     {
-        return !$this->hasProtectedManagementRole();
+        return ! $this->hasProtectedManagementRole();
     }
 
     public function hasRole($roles, ?string $guard = null): bool
@@ -307,13 +324,13 @@ class User extends Authenticatable implements HasMedia
             return null;
         }
 
-        if (!method_exists($this, 'isImpersonated') || !$this->isImpersonated()) {
+        if (! method_exists($this, 'isImpersonated') || ! $this->isImpersonated()) {
             return null;
         }
 
         $impersonatorId = app('impersonate')->getImpersonatorId();
 
-        if (!$impersonatorId) {
+        if (! $impersonatorId) {
             return null;
         }
 
@@ -328,13 +345,13 @@ class User extends Authenticatable implements HasMedia
 
     private function isImpersonationStrictModeEnabled(): bool
     {
-        if (!app()->bound('request')) {
+        if (! app()->bound('request')) {
             return false;
         }
 
         $request = request();
 
-        if (!$request || !$request->hasSession()) {
+        if (! $request || ! $request->hasSession()) {
             return false;
         }
 

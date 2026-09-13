@@ -11,6 +11,11 @@ Route::middleware('auth')->prefix('file-export-templates')->name('file-export-te
     Route::post('/', [\App\Http\Controllers\FileExportTemplateController::class, 'store'])->name('store');
     Route::delete('/{id}', [\App\Http\Controllers\FileExportTemplateController::class, 'destroy'])->name('destroy');
 });
+Route::middleware('auth')->prefix('file-export-images')->name('file-export-images.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FileExportImageController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\FileExportImageController::class, 'store'])->name('store');
+    Route::get('/{id}', [\App\Http\Controllers\FileExportImageController::class, 'show'])->whereNumber('id')->name('show');
+});
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/documentation', [HomeController::class, 'documentation'])->name('documentation');
@@ -29,10 +34,10 @@ Route::get('/csrf-refresh', function () {
 
 Route::get('/appearance', [AppearanceController::class, 'editGuest'])->name('appearance.guest');
 
-require __DIR__ . '/products.php';
-require __DIR__ . '/promotions.php';
-require __DIR__ . '/cart.php';
-require __DIR__ . '/users.php';
-require __DIR__ . '/admin.php';
-require __DIR__ . '/settings.php';
-require __DIR__ . '/auth.php';
+require __DIR__.'/products.php';
+require __DIR__.'/promotions.php';
+require __DIR__.'/cart.php';
+require __DIR__.'/users.php';
+require __DIR__.'/admin.php';
+require __DIR__.'/settings.php';
+require __DIR__.'/auth.php';

@@ -1,5 +1,4 @@
 import { DataTable } from '@/components/data-table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -58,6 +57,7 @@ import {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -65,9 +65,11 @@ import {
 import {
     formatVariableToken,
     parseCalculationToken,
+    parseUserImageRule,
     parseVariableToken,
     serializeCalculation,
     uniqueId,
+    userImageRule,
     type CalculationOperand,
     type CalculationOperator,
     type ParsedCalculation,
@@ -78,6 +80,7 @@ import type {
     FileEditorContextValue,
     FileRow,
 } from './types';
+import { UserExportImagePicker } from './user-export-image-picker';
 const FileEditorContext = createContext<FileEditorContextValue | null>(null);
 export const FileEditorProvider = FileEditorContext.Provider;
 const useFileEditor = () => {
@@ -90,6 +93,7 @@ const hasVariableIssue = (
     blockType: FileBlockType,
     { variablesForBlock, variableFormatType }: FileEditorContextValue,
 ) => {
+    if (parseUserImageRule(value) !== null) return false;
     const allowed = new Set(
         variablesForBlock(blockType).map((variable) => variable.slice(1, -1)),
     );
@@ -176,6 +180,7 @@ type RuleEditorProps = {
     value: string;
     variables: string[];
     blockType: FileBlockType;
+    allowImages?: boolean;
     onApply: (value: string) => void;
 };
 
@@ -618,25 +623,34 @@ export function FileRuleEditor({
     value,
     variables,
     blockType,
+    allowImages = true,
     onApply,
 }: RuleEditorProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
     const [segments, setSegments] = useState<RuleSegment[]>([]);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [contentType, setContentType] = useState<'rule' | 'image'>('rule');
+    const [imageId, setImageId] = useState<number | null>(null);
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         }),
     );
-    const result = segments.map((segment) => segment.value).join('');
+    const result =
+        contentType === 'image' && imageId
+            ? userImageRule(imageId)
+            : segments.map((segment) => segment.value).join('');
     const { previewValue } = useFileEditor();
     const previewResult = previewValue(result, blockType);
 
     const handleOpenChange = (nextOpen: boolean) => {
         if (nextOpen) {
-            setSegments(parseRuleSegments(value));
+            const savedImageId = parseUserImageRule(value);
+            setContentType(savedImageId ? 'image' : 'rule');
+            setImageId(savedImageId);
+            setSegments(parseRuleSegments(savedImageId ? '' : value));
             setPreviewOpen(false);
         }
         setOpen(nextOpen);
@@ -708,65 +722,97 @@ export function FileRuleEditor({
                     </DialogDescription>
                 </DialogHeader>
 
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleSegmentDragEnd}
-                >
-                    <SortableContext
-                        items={segments.map((segment) => segment.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
-                            {segments.map((segment) => (
-                                <SortableRuleSegment
-                                    key={segment.id}
-                                    segment={segment}
-                                    variables={variables}
-                                    onChange={updateSegment}
-                                    onInsert={(position) =>
-                                        insertSegment(segment.id, position)
-                                    }
-                                    onDelete={() => removeSegment(segment.id)}
-                                />
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
-
-                <div className="space-y-2">
+                <div className="flex gap-2">
                     <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                        onClick={() => setPreviewOpen((current) => !current)}
+                        variant={contentType === 'rule' ? 'default' : 'outline'}
+                        onClick={() => setContentType('rule')}
                     >
-                        <ChevronDownIcon
-                            className={cn(
-                                'h-4 w-4 transition-transform',
-                                previewOpen && 'rotate-180',
-                            )}
-                        />
-                        {previewOpen
-                            ? t('Masquer l’aperçu')
-                            : t('Afficher l’aperçu')}
+                        {t('Texte, variables ou calcul')}
                     </Button>
-                    {previewOpen ? (
-                        <div className="space-y-1.5 rounded-md bg-muted px-3 py-2">
-                            <p className="text-xs text-muted-foreground">
-                                {t('Exemple de résultat')}
-                            </p>
-                            <div className="min-h-5 font-mono text-sm break-all">
-                                {previewResult || (
-                                    <span className="text-muted-foreground">
-                                        {t('Valeur vide')}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    ) : null}
+                    {allowImages && <Button
+                        type="button"
+                        variant={
+                            contentType === 'image' ? 'default' : 'outline'
+                        }
+                        onClick={() => setContentType('image')}
+                    >
+                        {t('Image fixe')}
+                    </Button>}
                 </div>
+
+                {contentType === 'rule' ? (
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleSegmentDragEnd}
+                    >
+                        <SortableContext
+                            items={segments.map((segment) => segment.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+                                {segments.map((segment) => (
+                                    <SortableRuleSegment
+                                        key={segment.id}
+                                        segment={segment}
+                                        variables={variables}
+                                        onChange={updateSegment}
+                                        onInsert={(position) =>
+                                            insertSegment(segment.id, position)
+                                        }
+                                        onDelete={() =>
+                                            removeSegment(segment.id)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
+                ) : (
+                    <UserExportImagePicker
+                        value={imageId}
+                        onChange={setImageId}
+                    />
+                )}
+
+                {contentType === 'rule' && (
+                    <div className="space-y-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                            onClick={() =>
+                                setPreviewOpen((current) => !current)
+                            }
+                        >
+                            <ChevronDownIcon
+                                className={cn(
+                                    'h-4 w-4 transition-transform',
+                                    previewOpen && 'rotate-180',
+                                )}
+                            />
+                            {previewOpen
+                                ? t('Masquer l’aperçu')
+                                : t('Afficher l’aperçu')}
+                        </Button>
+                        {previewOpen ? (
+                            <div className="space-y-1.5 rounded-md bg-muted px-3 py-2">
+                                <p className="text-xs text-muted-foreground">
+                                    {t('Exemple de résultat')}
+                                </p>
+                                <div className="min-h-5 font-mono text-sm break-all">
+                                    {previewResult || (
+                                        <span className="text-muted-foreground">
+                                            {t('Valeur vide')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                )}
 
                 <DialogFooter>
                     <Button
@@ -778,6 +824,7 @@ export function FileRuleEditor({
                     </Button>
                     <Button
                         type="button"
+                        disabled={contentType === 'image' && imageId === null}
                         onClick={() => {
                             onApply(result);
                             setOpen(false);
@@ -864,6 +911,7 @@ export function FilenameRuleField({
                 value={value}
                 variables={variables}
                 blockType={scope}
+                allowImages={false}
                 onApply={onChange}
             />
         </div>
@@ -877,7 +925,7 @@ export function FilenameRuleField({
                 <Input
                     value={value}
                     disabled={disabled}
-                    className={cn(value && !disabled && 'pr-8')}
+                    className={cn('h-9', value && !disabled && 'pr-8')}
                     placeholder={t('Nom du fichier')}
                     onChange={(event) => onChange(event.target.value)}
                 />
@@ -912,7 +960,7 @@ type BlockEditorProps = {
 export function BlockEditor({ block, canManage, onChange }: BlockEditorProps) {
     const { t } = useI18n();
     const context = useFileEditor();
-    const { variablesForBlock, blockLabels } = context;
+    const { variablesForBlock } = context;
     const tRef = useRef(t);
     tRef.current = t;
     const focusRowIdRef = useRef<string | null>(null);
@@ -1246,64 +1294,12 @@ export function BlockEditor({ block, canManage, onChange }: BlockEditorProps) {
     return (
         <section
             className={cn(
-                'rounded-lg border border-violet-200 bg-background/90 shadow-sm dark:border-violet-400/25',
+                'rounded-b-md border border-t-0 border-violet-400 bg-background/90 shadow-sm dark:border-violet-400/50',
                 !block.enabled && 'opacity-60',
             )}
         >
-            <div className="flex flex-wrap items-center gap-2 border-b border-violet-100 p-3 dark:border-violet-400/20">
-                <Input
-                    value={block.name}
-                    disabled={!canManage}
-                    className="min-w-44 flex-1 font-medium"
-                    onChange={(event) =>
-                        onChange({ ...block, name: event.target.value })
-                    }
-                />
-                <Select
-                    value={block.type}
-                    disabled={!canManage}
-                    onValueChange={(type: FileBlockType) =>
-                        onChange({ ...block, type })
-                    }
-                >
-                    <SelectTrigger className="w-52">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {Object.entries(blockLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                                {t(label)}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <label className="flex items-center gap-2 text-sm">
-                    <Input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={block.show_headers}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                            onChange({
-                                ...block,
-                                show_headers: event.target.checked,
-                            })
-                        }
-                    />
-                    {t('Afficher les titres')}
-                </label>
-            </div>
-
-            <div className="space-y-3 p-3">
-                <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                        {block.type === 'items'
-                            ? t('Répété pour chaque produit')
-                            : t('Généré une fois')}
-                    </Badge>
-                </div>
-                <div className="overflow-x-auto">
-                    <DataTable
+            <div className="overflow-x-auto p-3">
+                <DataTable
                         columns={columns}
                         data={block.rows}
                         emptyMessage={
@@ -1354,8 +1350,7 @@ export function BlockEditor({ block, canManage, onChange }: BlockEditorProps) {
                                 columns: arrayMove(block.columns, from, to),
                             });
                         }}
-                    />
-                </div>
+                />
             </div>
         </section>
     );
@@ -1365,6 +1360,7 @@ type CompactBlockProps = {
     block: FileBlock;
     canManage: boolean;
     selected: boolean;
+    onChange: (block: FileBlock) => void;
     onEdit: () => void;
     onToggle: () => void;
     onDelete: () => void;
@@ -1374,6 +1370,7 @@ export function CompactBlock({
     block,
     canManage,
     selected,
+    onChange,
     onEdit,
     onToggle,
     onDelete,
@@ -1397,9 +1394,9 @@ export function CompactBlock({
                 transition,
             }}
             className={cn(
-                'flex items-center gap-2 rounded-md border bg-background px-2 py-2 transition-colors',
+                'flex flex-wrap items-center gap-2 rounded-md border bg-background px-2 py-2 transition-colors',
                 selected &&
-                    'border-violet-400 bg-violet-50/70 dark:border-violet-400/50 dark:bg-violet-500/10',
+                    'rounded-b-none border-b-0 border-violet-400 bg-violet-50/70 dark:border-violet-400/50 dark:bg-violet-500/10',
                 isDragging && 'z-10 opacity-70 shadow-lg',
                 !block.enabled && 'opacity-60',
             )}
@@ -1417,19 +1414,79 @@ export function CompactBlock({
             >
                 <GripVerticalIcon className="h-4 w-4" />
             </Button>
-            <button
-                type="button"
-                className="min-w-0 flex-1 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                onClick={onEdit}
-            >
-                <span className="block truncate text-sm font-medium">
-                    {block.name}
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                    {t(blockLabels[block.type])} · {block.columns.length}{' '}
-                    {t('colonnes')} · {block.rows.length} {t('lignes')}
-                </span>
-            </button>
+            {selected ? (
+                <>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        title={t('Replier le bloc')}
+                        aria-label={t('Replier le bloc')}
+                        aria-expanded
+                        onClick={onEdit}
+                    >
+                        <ChevronUpIcon className="h-4 w-4" />
+                    </Button>
+                    <Input
+                        value={block.name}
+                        disabled={!canManage}
+                        className="min-w-44 flex-1 font-medium"
+                        onChange={(event) =>
+                            onChange({ ...block, name: event.target.value })
+                        }
+                    />
+                    <Select
+                        value={block.type}
+                        disabled={!canManage}
+                        onValueChange={(type: FileBlockType) =>
+                            onChange({ ...block, type })
+                        }
+                    >
+                        <SelectTrigger className="w-52 shrink-0">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {Object.entries(blockLabels).map(
+                                ([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {t(label)}
+                                    </SelectItem>
+                                ),
+                            )}
+                        </SelectContent>
+                    </Select>
+                    <label className="flex shrink-0 items-center gap-2 text-sm">
+                        <Input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={block.show_headers}
+                            disabled={!canManage}
+                            onChange={(event) =>
+                                onChange({
+                                    ...block,
+                                    show_headers: event.target.checked,
+                                })
+                            }
+                        />
+                        {t('Afficher les titres')}
+                    </label>
+                </>
+            ) : (
+                <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    onClick={onEdit}
+                >
+                    <span className="block truncate text-sm font-medium">
+                        {block.name}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                        {t(blockLabels[block.type])} · {block.columns.length}{' '}
+                        {t('colonnes')} · {block.rows.length} {t('lignes')}
+                    </span>
+                </button>
+            )}
             <Button
                 type="button"
                 variant="ghost"
@@ -1477,8 +1534,6 @@ export function FileBlocksEditor({
     initiallyOpen?: boolean;
 }) {
     const { t } = useI18n();
-    const { blockLabels } = useFileEditor();
-    const [newBlockType, setNewBlockType] = useState<FileBlockType>('header');
     const [selectedBlockId, setSelectedBlockId] = useState<string | null>(
         initiallyOpen ? (blocks[0]?.id ?? null) : null,
     );
@@ -1505,36 +1560,17 @@ export function FileBlocksEditor({
         [file, updateFile],
     );
 
-    const addBlock = () => {
-        const id = uniqueId('block');
-        const columnId = uniqueId('column');
-        updateFile({
-            ...file,
-            blocks: [
-                ...file.blocks,
-                {
-                    id,
-                    name: t(blockLabels[newBlockType]),
-                    type: newBlockType,
-                    enabled: true,
-                    show_headers: newBlockType === 'items',
-                    columns: [
-                        {
-                            id: columnId,
-                            name: `${t('Colonne')} 1`,
-                        },
-                    ],
-                    rows: [
-                        {
-                            id: uniqueId('row'),
-                            cells: { [columnId]: '' },
-                        },
-                    ],
-                },
-            ],
-        });
-        setSelectedBlockId(id);
-    };
+    const knownBlockIdsRef = useRef<Set<string>>(
+        new Set(blocks.map((block) => block.id)),
+    );
+    useEffect(() => {
+        const nextIds = new Set(blocks.map((block) => block.id));
+        const added = [...nextIds].filter(
+            (id) => !knownBlockIdsRef.current.has(id),
+        );
+        knownBlockIdsRef.current = nextIds;
+        if (added.length === 1) setSelectedBlockId(added[0]);
+    }, [blocks]);
 
     const handleDragEnd = ({ active, over }: DragEndEvent) => {
         if (!over || active.id === over.id) return;
@@ -1546,45 +1582,6 @@ export function FileBlocksEditor({
 
     return (
         <div className="space-y-4">
-            {' '}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t(
-                        'Sélectionnez un bloc pour modifier ses colonnes et ses lignes.',
-                    )}
-                </p>
-                {canManage ? (
-                    <div className="flex items-center gap-2">
-                        <Select
-                            value={newBlockType}
-                            onValueChange={(value: FileBlockType) =>
-                                setNewBlockType(value)
-                            }
-                        >
-                            <SelectTrigger className="w-52">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(blockLabels).map(
-                                    ([value, label]) => (
-                                        <SelectItem key={value} value={value}>
-                                            {t(label)}
-                                        </SelectItem>
-                                    ),
-                                )}
-                            </SelectContent>
-                        </Select>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={addBlock}
-                        >
-                            <PlusIcon className="size-4" />
-                            {t('Ajouter un bloc')}
-                        </Button>
-                    </div>
-                ) : null}
-            </div>
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -1596,11 +1593,21 @@ export function FileBlocksEditor({
                 >
                     <div className="space-y-2">
                         {file.blocks.map((block) => (
-                            <div key={block.id} className="space-y-2">
+                            <div
+                                key={block.id}
+                                className={
+                                    selectedBlockId === block.id
+                                        ? undefined
+                                        : 'space-y-2'
+                                }
+                            >
                                 <CompactBlock
                                     block={block}
                                     canManage={canManage}
                                     selected={selectedBlockId === block.id}
+                                    onChange={(next) =>
+                                        updateBlock(block.id, next)
+                                    }
                                     onEdit={() =>
                                         setSelectedBlockId(
                                             selectedBlockId === block.id
@@ -1645,5 +1652,53 @@ export function FileBlocksEditor({
                 </div>
             ) : null}
         </div>
+    );
+}
+
+export function AddBlockButton({
+    blocks,
+    disabled,
+    onChange,
+}: {
+    blocks: FileBlock[];
+    disabled?: boolean;
+    onChange: (blocks: FileBlock[]) => void;
+}) {
+    const { t } = useI18n();
+    const { blockLabels } = useFileEditor();
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            title={t('Ajouter un bloc')}
+            onClick={() => {
+                const id = uniqueId('block');
+                const columnId = uniqueId('column');
+                onChange([
+                    ...blocks,
+                    {
+                        id,
+                        name: t(blockLabels.header),
+                        type: 'header',
+                        enabled: true,
+                        show_headers: false,
+                        columns: [
+                            { id: columnId, name: `${t('Colonne')} 1` },
+                        ],
+                        rows: [
+                            {
+                                id: uniqueId('row'),
+                                cells: { [columnId]: '' },
+                            },
+                        ],
+                    },
+                ]);
+            }}
+        >
+            <PlusIcon className="size-4" />
+            {t('Ajouter un bloc')}
+        </Button>
     );
 }

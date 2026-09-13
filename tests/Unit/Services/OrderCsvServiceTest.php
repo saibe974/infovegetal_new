@@ -199,3 +199,64 @@ it('renders ordered header item and footer blocks', function (): void {
         ->and(str_getcsv($lines[3], ';'))->toBe(['Total', '7.50', ''])
         ->and($csv)->not->toContain('INVISIBLE');
 });
+
+it('renders the same billing rows as a valid XLSX workbook', function (): void {
+    $template = [
+        'delimiter' => ';',
+        'blocks' => [[
+            'id' => 'items', 'name' => 'Produits', 'type' => 'items',
+            'enabled' => true, 'show_headers' => true,
+            'columns' => [['id' => 'sku', 'name' => 'SKU']],
+            'rows' => [['id' => 'item', 'cells' => ['sku' => '%product.sku%']]],
+        ]],
+    ];
+    $contents = (new OrderCsvService)->renderXlsx($template, collect([[
+        'product' => new Product(['sku' => '00042']),
+    ]]), []);
+    $path = tempnam(sys_get_temp_dir(), 'billing-xlsx-');
+    file_put_contents($path, $contents);
+
+    try {
+        $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet();
+        expect($sheet->getCell('A1')->getValue())->toBe('SKU')
+            ->and($sheet->getCell('A2')->getValue())->toBe('00042');
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('renders the shared canonical product and document variables with legacy reference support', function (): void {
+    $product = new Product([
+        'ref' => 'REF-42',
+        'sku' => 'SKU-42',
+        'img_link' => 'https://example.test/plant.jpg',
+    ]);
+    $csv = (new OrderCsvService)->render([
+        'delimiter' => ';',
+        'blocks' => [[
+            'id' => 'items', 'name' => 'Produits', 'type' => 'items',
+            'enabled' => true, 'show_headers' => false,
+            'columns' => [
+                ['id' => 'reference', 'name' => 'Reference'],
+                ['id' => 'legacy_reference', 'name' => 'Legacy'],
+                ['id' => 'image', 'name' => 'Image'],
+                ['id' => 'date', 'name' => 'Date'],
+                ['id' => 'count', 'name' => 'Count'],
+            ],
+            'rows' => [[
+                'id' => 'item',
+                'cells' => [
+                    'reference' => '%product.reference%',
+                    'legacy_reference' => '%product.ref%',
+                    'image' => '%product.image%',
+                    'date' => '%document.date%',
+                    'count' => '%document.count%',
+                ],
+            ]],
+        ]],
+    ], collect([['product' => $product]]), [
+        'document' => ['date' => '2026-09-13', 'count' => '1'],
+    ]);
+
+    expect($csv)->toContain('REF-42;REF-42;https://example.test/plant.jpg;2026-09-13;1');
+});

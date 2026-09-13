@@ -8,6 +8,11 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class OrderCsvService
 {
@@ -76,6 +81,7 @@ class OrderCsvService
                     'id' => $payload['document_id'] ?? $cart->id,
                     'number' => $documentNumber,
                     'date' => $documentDate,
+                    'count' => (string) $dbItems->count(),
                     'comment' => (string) ($payload['comment'] ?? ''),
                     'items_total' => $this->decimal($payload['items_total'] ?? 0),
                     'shipping_total' => $this->decimal($payload['shipping_total'] ?? 0),
@@ -90,7 +96,7 @@ class OrderCsvService
                         'id' => $client->id,
                         'name' => $client->name,
                         'email' => $client->email,
-                        'ref' => $client->ref, 
+                        'ref' => $client->ref,
                         'alias' => $client->alias,
                     ],
                     'billing' => [
@@ -103,11 +109,12 @@ class OrderCsvService
                         'name' => $rule->dbProduct?->name,
                     ],
                 ];
-                $csv = $this->render($template, $dbItems, $context);
-
-                $extension = in_array($template['extension'] ?? null, ['csv', 'tsv'], true)
+                $extension = in_array($template['extension'] ?? null, ['csv', 'tsv', 'xlsx'], true)
                     ? $template['extension']
                     : (in_array($template['delimiter'] ?? null, ["\t", '|'], true) ? 'tsv' : 'csv');
+                $contents = $extension === 'xlsx'
+                    ? $this->renderXlsx($template, $dbItems, $context)
+                    : $this->render($template, $dbItems, $context);
                 $templateName = Str::slug((string) ($template['name'] ?? 'fichier')) ?: 'fichier';
                 $fallbackName = sprintf(
                     '%s_%s_%s_%s',
@@ -138,10 +145,10 @@ class OrderCsvService
                     $storageFilename,
                 );
 
-                Storage::disk('local')->put($relativePath, $csv);
+                Storage::disk('local')->put($relativePath, $contents);
                 $rule->billingUser?->files()->updateOrCreate(
                     ['file_path' => $relativePath],
-                    ['file_name' => $filename, 'file_size' => strlen($csv)],
+                    ['file_name' => $filename, 'file_size' => strlen($contents)],
                 );
 
                 $generated[] = [
@@ -153,7 +160,11 @@ class OrderCsvService
                     'seller_user_id' => (int) ($billingContext[$dbProductId]['seller_user_id'] ?? 0),
                     'client_user_id' => (int) $client->id,
                     'shared' => (bool) ($template['shared'] ?? false),
-                    'mime' => $extension === 'tsv' ? 'text/tab-separated-values' : 'text/csv',
+                    'mime' => match ($extension) {
+                        'tsv' => 'text/tab-separated-values',
+                        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        default => 'text/csv',
+                    },
                 ];
             }
         }
@@ -247,6 +258,7 @@ class OrderCsvService
                 'id' => $payload['document_id'] ?? $cart->id,
                 'number' => $documentNumber,
                 'date' => $documentDate,
+                'count' => (string) $dbItems->count(),
                 'comment' => (string) ($payload['comment'] ?? ''),
                 'items_total' => $this->decimal($payload['items_total'] ?? 0),
                 'shipping_total' => $this->decimal($payload['shipping_total'] ?? 0),
@@ -302,7 +314,7 @@ class OrderCsvService
             $context,
             is_array($item) ? $item : null,
         );
-        $resolved = (string) preg_replace('/\.(?:csv|tsv|pdf|xls)$/i', '', trim($resolved));
+        $resolved = (string) preg_replace('/\.(?:csv|tsv|xlsx|pdf|xls)$/i', '', trim($resolved));
         $resolved = (string) preg_replace('/[<>:"\/\\|?*\x00-\x1F]+/u', '-', $resolved);
         $resolved = trim((string) preg_replace('/\s+/u', ' ', $resolved), ". \t\n\r\0\x0B");
 
@@ -317,7 +329,7 @@ class OrderCsvService
      * @param  Collection<int, array<string, mixed>>  $items
      * @param  array<string, mixed>  $context
      */
-    public function render(array $template, Collection $items, array $context): string
+    public function render(array $template, Collection $items, array $context, string $imageMode = 'url'): string
     {
         $legacyColumns = collect($template['columns'] ?? [])->filter(fn ($column) => is_array($column))->values();
         $blocks = collect($template['blocks'] ?? [])->filter(fn ($block) => is_array($block))->values();
@@ -347,7 +359,7 @@ class OrderCsvService
             fputcsv($stream, array_pad($values, $width, ''), $delimiter, '"', '');
         };
 
-        $writeRows = function (Collection $rows, Collection $columns, ?array $item = null) use ($writeValues, $context): void {
+        $writeRows = function (Collection $rows, Collection $columns, ?array $item = null) use ($writeValues, $context, $imageMode): void {
             foreach ($rows as $row) {
                 if (! is_array($row)) {
                     continue;
@@ -358,6 +370,7 @@ class OrderCsvService
                         (string) ($cells[(string) ($column['id'] ?? '')] ?? ''),
                         $context,
                         $item,
+                        $imageMode,
                     ))->all(),
                 );
             }
@@ -389,15 +402,79 @@ class OrderCsvService
         return is_string($contents) ? $contents : '';
     }
 
-    private function replaceVariables(string $value, array $context, ?array $item): string
+    /**
+     * @param  Collection<int, array<string, mixed>>  $items
+     */
+    public function renderXlsx(array $template, Collection $items, array $context): string
     {
+        $csv = $this->render($template, $items, $context, 'marker');
+        $delimiter = in_array($template['delimiter'] ?? ';', [';', ',', "\t", '|'], true)
+            ? $template['delimiter']
+            : ';';
+        $input = fopen('php://temp', 'w+');
+        fwrite($input, preg_replace('/^\xEF\xBB\xBF/', '', $csv) ?? $csv);
+        rewind($input);
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $temporaryImages = [];
+        $rowNumber = 1;
+        while (($row = fgetcsv($input, null, $delimiter, '"', '')) !== false) {
+            foreach ($row as $columnIndex => $value) {
+                if (preg_match('/^__USER_IMAGE_(\d+)__$/', (string) $value, $matches) === 1) {
+                    $path = app(FileImageRuleService::class)->temporaryPath((int) $matches[1], $temporaryImages);
+                    if ($path) {
+                        $cell = Coordinate::stringFromColumnIndex($columnIndex + 1).$rowNumber;
+                        $drawing = new Drawing;
+                        $drawing->setName('Image fixe');
+                        $drawing->setPath($path);
+                        $drawing->setCoordinates($cell);
+                        $drawing->setWidthAndHeight(96, 72);
+                        $drawing->setOffsetX(4)->setOffsetY(4);
+                        $drawing->setWorksheet($sheet);
+                        $sheet->getRowDimension($rowNumber)->setRowHeight(60);
+                    }
+
+                    continue;
+                }
+                $sheet->setCellValueExplicit(
+                    Coordinate::stringFromColumnIndex($columnIndex + 1).$rowNumber,
+                    (string) $value,
+                    DataType::TYPE_STRING,
+                );
+            }
+            $rowNumber++;
+        }
+        fclose($input);
+
+        ob_start();
+        (new Xlsx($spreadsheet))->save('php://output');
+        $contents = ob_get_clean();
+        $spreadsheet->disconnectWorksheets();
+        foreach ($temporaryImages as $path) {
+            @unlink($path);
+        }
+
+        return is_string($contents) ? $contents : '';
+    }
+
+    private function replaceVariables(string $value, array $context, ?array $item, string $imageMode = 'url'): string
+    {
+        $fixedImageId = app(FileImageRuleService::class)->mediaId($value);
+        if ($fixedImageId !== null) {
+            return $imageMode === 'marker'
+                ? '__USER_IMAGE_'.$fixedImageId.'__'
+                : app(FileImageRuleService::class)->url($fixedImageId);
+        }
         $product = $item['product'] ?? null;
         $variables = [
             'product.id' => $product?->id,
             'product.reference' => $product?->ref ?: $product?->sku,
+            'product.ref' => $product?->ref ?: $product?->sku,
             'product.sku' => $product?->sku,
             'product.name' => $product?->name,
             'product.description' => $product?->description,
+            'product.image' => $product ? ($product->getAttributes()['img_link'] ?? null) : null,
             'product.ean13' => $product?->ean13,
             'product.cond' => $product?->cond,
             'product.floor' => $product?->floor,

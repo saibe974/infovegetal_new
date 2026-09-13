@@ -442,7 +442,7 @@ class DbProductsController extends Controller
 
     private function validatePayload(Request $request, ?DbProducts $dbProduct = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => [
                 'required',
                 'string',
@@ -505,7 +505,7 @@ class DbProductsController extends Controller
             'billing_users.*.defaults.files.*.enabled' => ['required', 'boolean'],
             'billing_users.*.defaults.files.*.shared' => ['nullable', 'boolean'],
             'billing_users.*.defaults.files.*.delimiter' => ['required', Rule::in([';', ',', "\t", '|'])],
-            'billing_users.*.defaults.files.*.extension' => ['nullable', Rule::in(['csv', 'tsv', 'pdf', 'xls'])],
+            'billing_users.*.defaults.files.*.extension' => ['nullable', Rule::in(['csv', 'tsv', 'xlsx', 'pdf', 'xls'])],
             'billing_users.*.defaults.files.*.scope' => ['nullable', Rule::in(['items', 'document'])],
             'billing_users.*.defaults.files.*.system' => ['nullable', 'boolean'],
             'billing_users.*.defaults.files.*.columns' => ['nullable', 'array', 'min:1'],
@@ -536,6 +536,9 @@ class DbProductsController extends Controller
             'billing_users.*.sellers.*.seller_defaults' => ['nullable', 'array'],
             'billing_users.*.sellers.*.can_manage' => ['nullable', 'boolean'],
         ]);
+        app(\App\Services\FileImageRuleService::class)->assertOwnedRules($data, $request->user());
+
+        return $data;
     }
 
     private function categoryOptions(): array

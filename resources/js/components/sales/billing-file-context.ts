@@ -1,6 +1,10 @@
 import type { FilePreviewRow } from '@/components/app/file-template/export-controls';
-import { renderRulePreview } from '@/components/app/file-template/rules';
+import {
+    parseUserImageRule,
+    renderRulePreview,
+} from '@/components/app/file-template/rules';
 import type { VariableFormatType } from '@/components/app/file-template/types';
+import { sharedDocumentVariables } from '@/components/app/file-template/variables';
 import type {
     BillingFileBlockType,
     BillingFileEvent,
@@ -9,7 +13,7 @@ import type {
 } from '@/types';
 const documentVariables = [
     '%document.number%',
-    '%document.date%',
+    ...sharedDocumentVariables,
     '%document.items_total%',
     '%document.shipping_total%',
     '%document.total%',
@@ -28,9 +32,11 @@ const documentVariables = [
 const itemVariables = [
     '%product.id%',
     '%product.reference%',
+    '%product.ref%',
     '%product.sku%',
     '%product.name%',
     '%product.description%',
+    '%product.image%',
     '%product.ean13%',
     '%product.cond%',
     '%product.floor%',
@@ -81,6 +87,7 @@ const csvCell = (value: string, delimiter: string): string => {
 const previewValues: Record<string, string> = {
     'document.number': '00124',
     'document.date': '2026-08-23',
+    'document.count': '2',
     'document.items_total': '145.00',
     'document.shipping_total': '15.00',
     'document.total': '160.00',
@@ -103,9 +110,11 @@ export const previewItems: Array<Record<string, string>> = [
     {
         'product.id': '101',
         'product.reference': 'ROS-01',
+        'product.ref': 'ROS-01',
         'product.sku': 'ROS-01',
         'product.name': 'Rose rouge',
         'product.description': 'Rose rouge à longue tige',
+        'product.image': '/images/placeholder.png',
         'product.ean13': '1234567890123',
         'product.cond': '10',
         'product.floor': '5',
@@ -123,9 +132,11 @@ export const previewItems: Array<Record<string, string>> = [
     {
         'product.id': '102',
         'product.reference': 'TUL-02',
+        'product.ref': 'TUL-02',
         'product.sku': 'TUL-02',
         'product.name': 'Tulipe blanche',
         'product.description': 'Tulipe blanche de saison',
+        'product.image': '/images/placeholder.png',
         'product.ean13': '9876543210123',
         'product.cond': '8',
         'product.floor': '6',
@@ -147,7 +158,7 @@ export const variableFormatType = (
 ): VariableFormatType | null => {
     if (variableName.endsWith('.date')) return 'date';
     if (
-        /^(?:document|order|delivery|invoice|credit_note)\.(?:items_total|shipping_total|total)$/.test(
+        /^(?:document|order|delivery|invoice|credit_note)\.(?:count|items_total|shipping_total|total)$/.test(
             variableName,
         ) ||
         /^(?:product\.(?:cond|floor|roll|pot)|quantity|unit_price|line_total)$/.test(
@@ -165,6 +176,8 @@ export const replacePreviewVariables = (
     event: BillingFileTemplate['event'],
     item?: Record<string, string>,
 ) => {
+    const fixedImageId = parseUserImageRule(value);
+    if (fixedImageId !== null) return `/file-export-images/${fixedImageId}`;
     const values = { ...previewValues, ...item };
     Object.entries(values).forEach(([key, entry]) => {
         if (key.startsWith('document.'))
@@ -179,31 +192,48 @@ export const renderPreviewRows = (
     const blocks = file.blocks.filter((block) => block.enabled);
     const width = Math.max(0, ...blocks.map((block) => block.columns.length));
     const result: FilePreviewRow[] = [];
-    const append = (values: string[], heading = false) =>
+    const append = (cells: FilePreviewRow['cells'], heading = false) =>
         result.push({
             heading,
             cells: [
-                ...values,
-                ...Array(Math.max(0, width - values.length)).fill(''),
-            ].map((value) => ({ value, image: null })),
+                ...cells,
+                ...Array(Math.max(0, width - cells.length)).fill({
+                    value: '',
+                    image: null,
+                }),
+            ],
         });
     blocks.forEach((block) => {
         if (block.show_headers)
             append(
-                block.columns.map((column) => column.name),
+                block.columns.map((column) => ({
+                    value: column.name,
+                    image: null,
+                })),
                 true,
             );
         const items = block.type === 'items' ? previewItems : [undefined];
         items.forEach((item) =>
             block.rows.forEach((row) =>
                 append(
-                    block.columns.map((column) =>
-                        replacePreviewVariables(
-                            row.cells[column.id] ?? '',
+                    block.columns.map((column) => {
+                        const rule = row.cells[column.id] ?? '';
+                        const value = replacePreviewVariables(
+                            rule,
                             file.event,
                             item,
-                        ),
-                    ),
+                        );
+
+                        return {
+                            value,
+                            image:
+                                file.extension === 'xlsx' &&
+                                (rule === '%product.image%' ||
+                                    parseUserImageRule(rule) !== null)
+                                    ? value
+                                    : null,
+                        };
+                    }),
                 ),
             ),
         );

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\FileImageRuleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -53,6 +54,7 @@ class FileExportTemplateController extends Controller
                 $row['cells'] = array_map(fn ($value) => $value ?? '', $row['cells']);
             }
         }
+        app(FileImageRuleService::class)->assertOwnedRules($data['template'], $request->user());
         DB::table('file_export_templates')->upsert([[
             'user_id' => $request->user()->id,
             'client_id' => $data['id'],

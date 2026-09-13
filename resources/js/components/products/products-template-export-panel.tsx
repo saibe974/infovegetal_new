@@ -4,6 +4,7 @@ import {
     FilePreview,
 } from '@/components/app/file-template/export-controls';
 import {
+    AddBlockButton,
     FileBlocksEditor,
     FileEditorProvider,
     FilenameRuleField,
@@ -18,6 +19,11 @@ import type {
     FileEditorContextValue,
     FileTemplate,
 } from '@/components/app/file-template/types';
+import {
+    canonicalProductVariable,
+    legacyExportVariables,
+    sharedDocumentVariables,
+} from '@/components/app/file-template/variables';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useI18n } from '@/lib/i18n';
@@ -49,7 +55,7 @@ type Props = {
     catalogUrl: string;
     exportUrl: string;
 };
-type Format = 'csv' | 'xlsx';
+type Format = 'csv' | 'tsv' | 'xlsx';
 type ExportView = 'quick' | 'expert';
 type Preview = {
     total: number;
@@ -111,7 +117,7 @@ export function ProductsExportPanel({
                             cells: Object.fromEntries(
                                 quickColumns.map((key) => [
                                     key,
-                                    `%product.${key}%`,
+                                    canonicalProductVariable(key),
                                 ]),
                             ),
                         },
@@ -124,6 +130,13 @@ export function ProductsExportPanel({
     // Keep both drafts: returning to the quick view never flattens expert rules.
     const template = view === 'quick' ? quickTemplate : expertTemplate;
     const emptyQuickSelection = view === 'quick' && quickColumns.length === 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const filenamePreview = `${renderRulePreview(template.filename, {
+        'document.date': today,
+        'export.date': today,
+        'document.count': String(total),
+        'export.count': String(total),
+    })}.${format}`;
     const changeView = (next: string) => {
         if (busy || (next !== 'quick' && next !== 'expert')) return;
         if (next === 'expert' && !expertInitialized) {
@@ -133,8 +146,8 @@ export function ProductsExportPanel({
         setView(next);
     };
     const [openSection, setOpenSection] = useState<
-        'settings' | 'content' | null
-    >('content');
+        'settings' | 'content' | 'preview' | null
+    >('preview');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -175,7 +188,7 @@ export function ProductsExportPanel({
             0,
         );
     const limit =
-        format === 'csv'
+        format === 'csv' || format === 'tsv'
             ? options.limits.csv
             : Math.min(
                   imageSlots ? options.limits.xlsx_images : options.limits.xlsx,
@@ -232,8 +245,11 @@ export function ProductsExportPanel({
         headingRef.current?.focus({ preventScroll: true });
         headingRef.current?.scrollIntoView({ block: 'start' });
     }, []);
-    const refreshPreview = async () => {
-        if (emptyQuickSelection) return;
+    const refreshPreview = async (
+        nextTemplate: FileTemplate = template,
+        nextFormat: Format = format,
+        nextView: ExportView = view,
+    ) => {
         previewController.current?.abort();
         const controller = new AbortController();
         previewController.current = controller;
@@ -248,7 +264,11 @@ export function ProductsExportPanel({
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': csrfToken ?? '',
                 },
-                body: JSON.stringify({ template, format, preview: true }),
+                body: JSON.stringify({
+                    template: nextTemplate,
+                    format: nextFormat,
+                    preview: true,
+                }),
             });
             if (!response.ok) throw new Error(await responseError(response));
             if (
@@ -260,7 +280,14 @@ export function ProductsExportPanel({
             const result = (await response.json()) as Preview;
             if (!controller.signal.aborted) {
                 setPreview(result);
-                setPreviewKey(requestKey);
+                setPreviewKey(
+                    JSON.stringify([
+                        nextView,
+                        nextTemplate,
+                        nextFormat,
+                        catalogUrl,
+                    ]),
+                );
             }
         } catch (exception) {
             if (!controller.signal.aborted)
@@ -277,6 +304,11 @@ export function ProductsExportPanel({
         setError(null);
         setNotice(null);
     }, [requestKey]);
+    useEffect(() => {
+        if (openSection === 'preview' && !emptyQuickSelection)
+            void refreshPreview();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const editorContext = useMemo<FileEditorContextValue>(
         () => ({
@@ -286,17 +318,26 @@ export function ProductsExportPanel({
                 footer: 'Pied de fichier',
             },
             variablesForBlock: (type: FileBlockType) => [
-                '%export.date%',
-                '%export.count%',
+                ...sharedDocumentVariables,
+                ...legacyExportVariables,
                 ...(type === 'items'
-                    ? options.columns.map((column) => `%product.${column.key}%`)
+                    ? [
+                          ...options.columns.map((column) =>
+                              canonicalProductVariable(column.key),
+                          ),
+                          '%product.ref%',
+                      ]
                     : []),
             ],
             variableFormatType: (name: string) => {
-                if (name === 'export.date') return 'date';
-                if (name === 'export.count') return 'decimal';
+                if (name === 'document.date' || name === 'export.date')
+                    return 'date';
+                if (name === 'document.count' || name === 'export.count')
+                    return 'decimal';
                 const type = options.columns.find(
-                    (column) => `product.${column.key}` === name,
+                    (column) =>
+                        `product.${column.key}` === name ||
+                        (column.key === 'ref' && name === 'product.reference'),
                 )?.type;
                 return type === 'decimal' || type === 'date' ? type : null;
             },
@@ -336,7 +377,10 @@ export function ProductsExportPanel({
                               ...row,
                               cells: {
                                   ...row.cells,
-                                  [id]: index === 0 ? `%product.${key}%` : '',
+                                  [id]:
+                                      index === 0
+                                          ? canonicalProductVariable(key)
+                                          : '',
                               },
                           })),
                       },
@@ -366,7 +410,7 @@ export function ProductsExportPanel({
             )
                 throw new Error('Votre session a expiré. Rechargez la page.');
             const checked = (await check.json()) as { filename: string };
-            if (format === 'csv') {
+            if (format === 'csv' || format === 'tsv') {
                 // Native POST download: never accumulate the CSV in a JS Blob.
                 const form = document.createElement('form');
                 form.method = 'POST';
@@ -428,6 +472,21 @@ export function ProductsExportPanel({
         }
     };
 
+    const previewNode = (
+        <FilePreview
+            rows={preview?.rows}
+            stale={previewPending}
+            loading={previewLoading}
+            error={previewError}
+            filename={preview?.filename}
+            caption={
+                preview
+                    ? `${preview.sample_count} ${t('produits réels sur')} ${number(preview.total)}. ${t('Aperçu limité à 5 produits.')}`
+                    : t('Aperçu limité à 5 produits réels.')
+            }
+        />
+    );
+
     return (
         <FileEditorProvider value={editorContext}>
             <section
@@ -465,7 +524,7 @@ export function ProductsExportPanel({
                 <TemplateLibrary
                     template={template}
                     format={format}
-                    formats={['csv', 'xlsx']}
+                    formats={['csv', 'tsv', 'xlsx']}
                     variables={editorContext.variablesForBlock}
                     disabled={busy}
                     onChange={(value) => {
@@ -478,27 +537,30 @@ export function ProductsExportPanel({
                         else setTemplate(value);
                     }}
                     onLoad={(saved) => {
-                        setTemplate(saved.template);
-                        setFormat(saved.format as Format);
+                        const nextTemplate = saved.template;
+                        const nextFormat = saved.format as Format;
+                        setTemplate(nextTemplate);
+                        setFormat(nextFormat);
                         setExpertInitialized(true);
                         setView('expert');
+                        if (openSection === 'preview')
+                            void refreshPreview(
+                                nextTemplate,
+                                nextFormat,
+                                'expert',
+                            );
                     }}
                 />
                 <FileEditorSection
                     title={t('Paramètres du fichier')}
+                    summary={filenamePreview}
                     open={openSection === 'settings'}
                     onOpenChange={(open) =>
                         setOpenSection(open ? 'settings' : null)
                     }
                 >
-                    <FileFormatField
-                        value={format}
-                        formats={['csv', 'xlsx'] as const}
-                        disabled={busy}
-                        onChange={setFormat}
-                    />
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
+                    <div className="flex flex-wrap items-end gap-4">
+                        <div className="w-1/2 min-w-64 space-y-2">
                             <p className="text-sm font-medium">
                                 {t('Nom du fichier')}
                             </p>
@@ -516,7 +578,38 @@ export function ProductsExportPanel({
                                 }}
                             />
                         </div>
-                        {format === 'csv' && (
+                        <FileFormatField
+                            value={format}
+                            formats={['csv', 'tsv', 'xlsx', 'pdf'] as const}
+                            disabledFormats={['pdf']}
+                            disabled={busy}
+                            onChange={(value) => {
+                                if (value === 'pdf') return;
+                                setFormat(value);
+                                const delimiter =
+                                    value === 'tsv'
+                                        ? '\t'
+                                        : value === 'csv' &&
+                                            ['\t', '|'].includes(
+                                                template.delimiter,
+                                            )
+                                          ? ';'
+                                          : template.delimiter;
+                                if (value === 'csv' || value === 'tsv') {
+                                    if (view === 'quick')
+                                        setQuickSettings({
+                                            ...quickSettings,
+                                            delimiter,
+                                        });
+                                    else
+                                        setTemplate({
+                                            ...template,
+                                            delimiter,
+                                        });
+                                }
+                            }}
+                        />
+                        {(format === 'csv' || format === 'tsv') && (
                             <label className="flex items-center gap-3 text-sm">
                                 {t('Séparateur')}
                                 <select
@@ -539,29 +632,41 @@ export function ProductsExportPanel({
                                             });
                                     }}
                                 >
-                                    <option value=";">;</option>
-                                    <option value=",">,</option>
-                                    <option value={'\t'}>
-                                        {t('Tabulation')}
-                                    </option>
-                                    <option value="|">|</option>
+                                    {format === 'csv' ? (
+                                        <>
+                                            <option value=";">;</option>
+                                            <option value=",">,</option>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <option value={'\t'}>
+                                                {t('Tabulation')}
+                                            </option>
+                                            <option value="|">|</option>
+                                        </>
+                                    )}
                                 </select>
                             </label>
                         )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        {t(
-                            format === 'xlsx'
-                                ? 'Excel : les miniatures disponibles sont intégrées au fichier.'
-                                : 'CSV : les images sont exportées sous forme d’URL.',
-                        )}
-                    </p>
                 </FileEditorSection>
                 <FileEditorSection
                     title={t('Contenu du fichier')}
+                    summary={`${template.blocks.length} ${t('blocs')}`}
                     open={openSection === 'content'}
                     onOpenChange={(open) =>
                         setOpenSection(open ? 'content' : null)
+                    }
+                    actions={
+                        openSection === 'content' ? (
+                            <AddBlockButton
+                                blocks={template.blocks}
+                                disabled={busy}
+                                onChange={(blocks) =>
+                                    setTemplate({ ...template, blocks })
+                                }
+                            />
+                        ) : null
                     }
                 >
                     <Tabs
@@ -622,20 +727,17 @@ export function ProductsExportPanel({
                         </TabsContent>
                     </Tabs>
                 </FileEditorSection>
-                <FilePreview
-                    rows={preview?.rows}
-                    stale={previewPending}
-                    loading={previewLoading}
-                    error={previewError}
-                    filename={preview?.filename}
-                    disabled={busy || emptyQuickSelection || total === 0}
-                    onRefresh={() => void refreshPreview()}
-                    caption={
-                        preview
-                            ? `${preview.sample_count} ${t('produits réels sur')} ${number(preview.total)}. ${t('Aperçu limité à 5 produits.')}`
-                            : t('Aperçu limité à 5 produits réels.')
-                    }
-                />
+                <FileEditorSection
+                    title={t('Aperçu')}
+                    open={openSection === 'preview'}
+                    onOpenChange={(open) => {
+                        setOpenSection(open ? 'preview' : null);
+                        if (open && !emptyQuickSelection)
+                            void refreshPreview();
+                    }}
+                >
+                    {previewNode}
+                </FileEditorSection>
                 <footer className="space-y-3 border-t pt-4">
                     {total === 0 && (
                         <p

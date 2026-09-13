@@ -192,7 +192,9 @@ const normalizeFiles = (
                 delimiter: [';', ',', '\t', '|'].includes(file.delimiter)
                     ? file.delimiter
                     : ';',
-                extension: ['csv', 'tsv', 'pdf', 'xls'].includes(file.extension)
+                extension: ['csv', 'tsv', 'xlsx', 'pdf', 'xls'].includes(
+                    file.extension,
+                )
                     ? file.extension
                     : ['\t', '|'].includes(file.delimiter)
                       ? 'tsv'

@@ -1,6 +1,13 @@
 export const uniqueId = (prefix: string) =>
     `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+export const parseUserImageRule = (value: string): number | null => {
+    const match = value.match(/^%image:user:(\d+)%$/);
+    return match ? Number(match[1]) : null;
+};
+
+export const userImageRule = (mediaId: number) => `%image:user:${mediaId}%`;
+
 export type CalculationOperator = '+' | '-' | '*' | '/';
 export type CalculationOperand = {
     id: string;

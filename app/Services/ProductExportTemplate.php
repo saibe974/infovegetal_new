@@ -74,8 +74,9 @@ class ProductExportTemplate
         foreach ($this->blocks as $block) {
             foreach ($block['rows'] as $row) {
                 foreach ($block['columns'] as $column) {
-                    if (($row['cells'][$column['id']] ?? '') === '%product.image%') {
-                        $count += $products;
+                    $rule = (string) ($row['cells'][$column['id']] ?? '');
+                    if ($rule === '%product.image%' || app(FileImageRuleService::class)->mediaId($rule) !== null) {
+                        $count += $block['type'] === 'items' ? $products : 1;
                     }
                 }
             }
@@ -87,7 +88,7 @@ class ProductExportTemplate
     public function filename(array $context, string $extension): string
     {
         $name = app(FileRuleRenderer::class)->render($this->definition['filename'], $context, true);
-        $name = preg_replace('/\.(csv|xlsx|xls|tsv)$/i', '', trim($name));
+        $name = preg_replace('/\.(csv|xlsx|xls|tsv|pdf)$/i', '', trim($name));
         $name = preg_replace('/[<>:"\/\\\\|?*\x00-\x1F]+/u', '-', $name);
         $name = trim($name, ". \t\n\r\0\x0B");
 
@@ -101,6 +102,9 @@ class ProductExportTemplate
 
     private function validateRule(string $rule, bool $items, array &$fields): void
     {
+        if (app(FileImageRuleService::class)->mediaId($rule) !== null) {
+            return;
+        }
         preg_match_all('/%([^%]+)%/', $rule, $tokens);
         foreach ($tokens[1] as $token) {
             if (str_starts_with($token, 'calc:')) {
@@ -137,10 +141,10 @@ class ProductExportTemplate
 
     private function variableType(string $name, bool $items, array &$fields): string
     {
-        if ($name === 'export.date') {
+        if (in_array($name, ['document.date', 'export.date'], true)) {
             return 'date';
         }
-        if ($name === 'export.count') {
+        if (in_array($name, ['document.count', 'export.count'], true)) {
             return 'decimal';
         }
         $key = str_starts_with($name, 'product.') ? substr($name, 8) : '';

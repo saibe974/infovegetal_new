@@ -110,6 +110,41 @@ it('exports every matching page with the same category, multi filters, promotion
         ->where('collection.data', fn ($rows) => collect($rows)->pluck('id')->map('strval')->all() === array_slice($expected, 0, 24)));
 });
 
+it('exports TSV with a tab separator and the requested extension', function () {
+    exportProduct($this->dbId, 'tsv');
+    $template = customProductExportTemplate(['sku' => '%product.sku%', 'name' => '%product.name%']);
+    $template['filename'] = 'catalogue_test';
+    $template['delimiter'] = "\t";
+
+    $response = $this->post(route('products.admin.export'), ['format' => 'tsv', 'template' => json_encode($template)]);
+
+    $response->assertOk()->assertDownload('catalogue_test.tsv');
+    $content = preg_replace('/^\xEF\xBB\xBF/', '', $response->streamedContent());
+    expect($content)->toContain("sku\tname")->toContain("000tsv\t\"Plante tsv\"");
+});
+
+it('uses shared canonical variables while preserving product and export aliases', function () {
+    exportProduct($this->dbId, 'canonical', ['ref' => 'REF-CANON']);
+    $template = customProductExportTemplate([
+        'canonical_reference' => '%product.reference%',
+        'legacy_reference' => '%product.ref%',
+        'canonical_date' => '%document.date%',
+        'legacy_date' => '%export.date%',
+    ]);
+
+    $response = $this->postJson(route('products.admin.export'), [
+        'format' => 'csv',
+        'template' => $template,
+        'preview' => true,
+    ]);
+
+    $response->assertOk();
+    expect($response->json('rows.1.cells.0.value'))->toBe('REF-CANON')
+        ->and($response->json('rows.1.cells.1.value'))->toBe('REF-CANON')
+        ->and($response->json('rows.1.cells.2.value'))->toBe(now()->format('Y-m-d'))
+        ->and($response->json('rows.1.cells.3.value'))->toBe(now()->format('Y-m-d'));
+});
+
 it('keeps cart and inactive filters and rejects an empty cart', function () {
     $inactive = exportProduct($this->dbId, 'inactive', ['active' => false]);
     exportProduct($this->dbId, 'other');
