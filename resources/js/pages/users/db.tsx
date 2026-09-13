@@ -436,7 +436,7 @@ export default function UserDbPage() {
         if (!profileId) {
             return {
                 id: '__custom__',
-                name: t('Paramétrage custom'),
+                name: t('Custom setup'),
                 conditions: normalizeConditions(
                     activeSellerData.conditions ?? {},
                 ),
@@ -850,7 +850,7 @@ export default function UserDbPage() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('User fournisseur')} />
+            <Head title={t('Supplier database')} />
 
             <SettingsLayout>
                 <div className="space-y-4">
@@ -1028,7 +1028,7 @@ export default function UserDbPage() {
                                         <CardContent className="space-y-6 px-0">
                                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                                 <FormField
-                                                    label={t('Facturant')}
+                                                    label={t('Bill-to')}
                                                 >
                                                     {billingOptions.length <=
                                                         1 ? (
@@ -1041,7 +1041,7 @@ export default function UserDbPage() {
                                                                 ''
                                                             }
                                                             placeholder={t(
-                                                                'Facturant',
+                                                                'Bill-to',
                                                             )}
                                                         />
                                                     ) : (
@@ -1111,7 +1111,7 @@ export default function UserDbPage() {
                                                                     ? formatSalesConditionsSummary(
                                                                         activeBillingProfile.conditions,
                                                                         t(
-                                                                            'Vente directe',
+                                                                            'Direct sale',
                                                                         ),
                                                                     )
                                                                     : undefined
@@ -1120,7 +1120,7 @@ export default function UserDbPage() {
                                                             <span className="block truncate font-medium">
                                                                 {activeBillingProfile?.name ??
                                                                     t(
-                                                                        'Profil facturant assigné',
+                                                                        'Assigned billing profile',
                                                                     )}
                                                             </span>
                                                             {activeBillingProfile ? (
@@ -1128,7 +1128,7 @@ export default function UserDbPage() {
                                                                     {formatSalesConditionsSummary(
                                                                         activeBillingProfile.conditions,
                                                                         t(
-                                                                            'Vente directe',
+                                                                            'Direct sale',
                                                                         ),
                                                                     )}
                                                                 </span>
@@ -1141,7 +1141,7 @@ export default function UserDbPage() {
 
                                                 {!activeRow.seller_user_id ? (
                                                     <FormField
-                                                        label={t('Commercial')}
+                                                        label={t('Sales rep')}
                                                     >
                                                         {sellerOptions.length >
                                                             0 ? (
@@ -1199,14 +1199,14 @@ export default function UserDbPage() {
                                                                 <SelectTrigger>
                                                                     <SelectValue
                                                                         placeholder={t(
-                                                                            'Select a commercial',
+                                                                            'Select a sales rep',
                                                                         )}
                                                                     />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
                                                                     <SelectItem value="none">
                                                                         {t(
-                                                                            'No commercial',
+                                                                            'No sales rep',
                                                                         )}
                                                                     </SelectItem>
                                                                     {sellerOptions.map(
@@ -1234,10 +1234,10 @@ export default function UserDbPage() {
                                                                 disabled
                                                                 readOnly
                                                                 value={t(
-                                                                    'No commercial',
+                                                                    'No sales rep',
                                                                 )}
                                                                 placeholder={t(
-                                                                    'Commercial',
+                                                                    'Sales rep',
                                                                 )}
                                                             />
                                                         )}
@@ -1259,7 +1259,7 @@ export default function UserDbPage() {
                                                             <SelectContent>
                                                                 <SelectItem value="__custom__">
                                                                     {t(
-                                                                        'Paramétrage custom',
+                                                                        'Custom setup',
                                                                     )}
                                                                 </SelectItem>
                                                                 {billingProfiles.map(
@@ -1283,7 +1283,7 @@ export default function UserDbPage() {
                                                                                 {formatSalesConditionsSummary(
                                                                                     profile.conditions,
                                                                                     t(
-                                                                                        'Vente directe',
+                                                                                        'Direct sale',
                                                                                     ),
                                                                                 )}
                                                                             </span>
@@ -1297,7 +1297,7 @@ export default function UserDbPage() {
                                                     </FormField>
                                                 ) : (
                                                     <FormField
-                                                        label={t('Commercial')}
+                                                        label={t('Sales rep')}
                                                     >
                                                         <Select
                                                             value={
@@ -1351,14 +1351,14 @@ export default function UserDbPage() {
                                                             <SelectTrigger>
                                                                 <SelectValue
                                                                     placeholder={t(
-                                                                        'Select a commercial',
+                                                                        'Select a sales rep',
                                                                     )}
                                                                 />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="none">
                                                                     {t(
-                                                                        'No commercial',
+                                                                        'No sales rep',
                                                                     )}
                                                                 </SelectItem>
                                                                 {sellerOptions.map(
@@ -1399,7 +1399,7 @@ export default function UserDbPage() {
                                                             <SelectContent>
                                                                 <SelectItem value="__custom__">
                                                                     {t(
-                                                                        'Paramétrage custom',
+                                                                        'Custom setup',
                                                                     )}
                                                                 </SelectItem>
                                                                 {sellerProfiles.map(
@@ -1423,7 +1423,7 @@ export default function UserDbPage() {
                                                                                 {formatSalesConditionsSummary(
                                                                                     profile.conditions,
                                                                                     t(
-                                                                                        'Vente directe',
+                                                                                        'Direct sale',
                                                                                     ),
                                                                                 )}
                                                                             </span>
@@ -1473,7 +1473,7 @@ export default function UserDbPage() {
                                                             </SelectItem>
                                                             <SelectItem value="price">
                                                                 {t(
-                                                                    'Base price',
+                                                                    'Price',
                                                                 )}
                                                             </SelectItem>
                                                             <SelectItem value="price_floor">
@@ -1682,7 +1682,7 @@ export default function UserDbPage() {
                                                                             inputMode="decimal"
                                                                             className="h-9 w-20"
                                                                             placeholder={t(
-                                                                                'TVA %',
+                                                                                'VAT %',
                                                                             )}
                                                                             value={
                                                                                 index in

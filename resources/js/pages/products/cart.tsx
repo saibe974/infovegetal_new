@@ -2001,7 +2001,7 @@ export default withAppLayout<Props>(
                                             </div>
                                             <Separator className="my-2" />
                                             <div className="flex flex-col text-sm font-semibold">
-                                                <span>{t('Facturant')} : </span>
+                                                <span>{t('Bill-to')} : </span>
                                                 <span className="text-right">
                                                     {!group.facturant ? (
                                                         '-'
@@ -2024,7 +2024,7 @@ export default withAppLayout<Props>(
                                             </div>
                                             <div className="flex flex-col text-sm font-semibold">
                                                 <span>
-                                                    {t('Commercial')} :{' '}
+                                                    {t('Sales rep')} :{' '}
                                                 </span>
                                                 <span className="text-right">
                                                     {!group.commercial ? (

@@ -362,7 +362,7 @@ export default withAppLayout<Props>(
 
                                         {isDev ? (
                                             <FormField
-                                                label={t('Traitement')}
+                                                label={t('Processing')}
                                                 htmlFor="db-traitement"
                                             >
                                                 <Input
@@ -389,7 +389,7 @@ export default withAppLayout<Props>(
                             <div className="mx-auto w-full max-w-[1200px] flex-1 space-y-6">
                                 <Card className="space-y-4 p-6">
                                     <h2 className="text-base font-semibold">
-                                        {t('Column mapping (champs)')}
+                                        {t('Column mapping (fields)')}
                                     </h2>
                                     {!isCreate ? (
                                         <ProductImportConfigPanel
@@ -586,7 +586,7 @@ export default withAppLayout<Props>(
                                                     >
                                                         <Input
                                                             id="db-category-block-prefix"
-                                                            placeholder="Famille d'articles:"
+                                                            placeholder={t('Product family:')}
                                                             value={
                                                                 data.category_block_prefix
                                                             }

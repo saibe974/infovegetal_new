@@ -177,7 +177,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         filtersState.promo
             ? { name: 'promo', label: t('PROMO') }
             : null,
-        filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
+        filtersState.active === 'inactive' ? { name: 'active', label: t('Inactive') } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.country.length > 0
             ? {
@@ -192,7 +192,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         filtersState.height.length > 0
             ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
             : null,
-        filtersState.cart ? { name: 'cart', label: `Panier (${cartItems.length})` } : null,
+        filtersState.cart ? { name: 'cart', label: `${t('Cart')} (${cartItems.length})` } : null,
     ].filter((item): item is NonNullable<typeof item> => Boolean(item?.label));
 
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -411,7 +411,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
 
     return (
         <>
-            <Head title="Products" />
+            <Head title={t('Products')} />
             <StickyBar
                 className='header-search z-25 mb-4'
             >
@@ -466,7 +466,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         import={
                             <DialogUpload
                                 title='Upload'
-                                description='Uploadez un fichier'
+                                description={t('Upload a file')}
                                 uploadUrl='/upload'
                                 importProcessUrl={products.admin.import.process.url()}
                                 importProcessChunkUrl={products.admin.import.process_chunk.url()}
@@ -474,14 +474,14 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                                 importProgressUrl={(id) => products.admin.import.progress.url({ id })}
                                 postTreatmentComponent={ProductsImportTreatment}
                                 finishedLink={{
-                                    label: 'Missing image',
+                                    label: t('Missing image'),
                                     href: products.images.index.url(),
                                 }}
                                 buttonLabel=''
                             />
                         }
                         export={canExport ? () => setExportView(true) : undefined}
-                        exportLabel={t('Exporter')}
+                        exportLabel={t('Export')}
                         add={() => { }}
                     />
                 )}
@@ -489,7 +489,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     <ButtonsActions
                         className="md:hidden"
                         export={() => setExportView(true)}
-                        exportLabel={t('Exporter')}
+                        exportLabel={t('Export')}
                     />
                 )}
             </StickyBar>
@@ -506,16 +506,16 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 <div className='w-full flex flex-col items-center justify-center gap-4'>
                     {q ? (
                         <>
-                            <p className='text-lg'>{t('Aucun produit ne correspond à votre recherche.')}</p>
+                            <p className='text-lg'>{t('No products match your search.')}</p>
                             <Button
                                 variant='secondary'
                                 onClick={() => router.visit(products.index().url)}
                             >
-                                {t('Réinitialiser la recherche')}
+                                {t('Reset search')}
                             </Button>
                         </>
                     ) : (
-                        <p className='text-lg'>{t('Aucun produit disponible.')}</p>
+                        <p className='text-lg'>{t('No products available.')}</p>
                     )}
                 </div>
             ) : singleProduct ? (

@@ -162,7 +162,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct }) => {
                             </FormField>
                             {isDev ? (
                                 <FormField
-                                    label={t('Traitement')}
+                                    label={t('Processing')}
                                     htmlFor="db-traitement"
                                 >
                                     <Input

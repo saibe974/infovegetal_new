@@ -16,10 +16,12 @@ import { ArrowLeftCircle, FileSignature, InfoIcon, Menu, UserIcon } from 'lucide
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useI18n } from '@/lib/i18n';
 
 // sidebarNavItems are built inside the component to access `auth` for user-specific routes
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
+    const { t } = useI18n();
     const pageProps = usePage<SharedData & { editingUser?: User }>().props;
     const { auth, editingUser } = pageProps;
     const effectiveUser = getEffectiveUser(auth);
@@ -39,7 +41,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     const sidebarNavItems: NavItem[] = [
         {
-            title: 'Profile',
+            title: t('Profile'),
             href: isSelf ? editProfile() : editAdminUser(userId),
             icon: InfoIcon,
         },
@@ -51,7 +53,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
     if (canAccessContracts) {
         sidebarNavItems.push({
-            title: 'Contract',
+            title: t('Contract'),
             href: isSelf ? `/settings/contracts` : `/admin/users/${userId}/contracts`,
             icon: FileSignature,
         });
@@ -66,17 +68,17 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     if (isSelf) {
         sidebarNavItems.push(
             {
-                title: 'Password',
+                title: t('Password'),
                 href: editSettingsPassword(),
                 icon: null,
             },
             {
-                title: 'Two-Factor Auth',
+                title: t('Two-Factor Auth'),
                 href: showSettingsTwoFactor(),
                 icon: null,
             },
             {
-                title: 'Appearance',
+                title: t('Appearance'),
                 href: editSettingsAppearance(),
                 icon: null,
             },
@@ -85,7 +87,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     } else if (canManageChildSections) {
         sidebarNavItems.push(
             {
-                title: 'Permissions',
+                title: t('Permissions'),
                 href: `/admin/users/${userId}/permissions`,
                 icon: null,
             },
@@ -94,12 +96,12 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         if (canManageSensitiveChildSections) {
             sidebarNavItems.push(
                 {
-                    title: 'Two-Factor Auth',
+                    title: t('Two-Factor Auth'),
                     href: showAdminTwoFactor(userId),
                     icon: null,
                 },
                 {
-                    title: 'Appearance',
+                    title: t('Appearance'),
                     href: editAdminAppearance(userId),
                     icon: null,
                 }
@@ -116,7 +118,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     //  if (userAbilities.manage_db && canAccessDatabaseSection) {
     if (canAccessDatabaseSection) {
         sidebarNavItems.push({
-            title: 'Suppliers',
+            title: t('Suppliers'),
             href: `/admin/users/${userId}/db`,
             icon: DatabaseAccessIcon,
         });
@@ -143,13 +145,13 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                             <ArrowLeftCircle size={35} />
                         </Link>
                         <div className='flex flex-col'>
-                            <h1 className='text-3xl font-bold capitalize'><UserIcon className='inline mx-2' />{editingUser ? editingUser.name : 'Settings'}</h1>
+                            <h1 className='text-3xl font-bold capitalize'><UserIcon className='inline mx-2' />{editingUser ? editingUser.name : t('Settings')}</h1>
                             <p className="text-gray-500">
-                                {currentPath === `/admin/users/${userId}/db` ? `Manage suppliers` :
-                                    currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :
-                                        currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
-                                            currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
-                                                currentPath === `/admin/users/${userId}/edit` ? `Edit user information` :
+                                {currentPath === `/admin/users/${userId}/db` ? t('Manage suppliers') :
+                                    currentPath === `/admin/users/${userId}/permissions` ? t('Manage user permissions') :
+                                        currentPath === `/admin/users/${userId}/appearance` ? t('Manage user appearance settings') :
+                                            currentPath === `/admin/users/${userId}/two-factor` ? t('Manage two-factor authentication settings') :
+                                                currentPath === `/admin/users/${userId}/edit` ? t('Edit user information') :
                                                     ``}
                             </p>
                         </div>

@@ -1038,7 +1038,7 @@ export default withAppLayout<Props>(
             const fileId = `custom-${Date.now()}`;
             const nextFile: BillingFileTemplate = {
                 id: fileId,
-                name: `${t('Fichier')} ${fileNumber}`,
+                name: `${t('File')} ${fileNumber}`,
                 filename: `%document.number%_fichier-${fileNumber}_%db.name%`,
                 event: 'order',
                 events: ['order'],
@@ -1049,12 +1049,12 @@ export default withAppLayout<Props>(
                 blocks: [
                     {
                         id: 'header',
-                        name: t('Entête'),
+                        name: t('Header'),
                         type: 'header',
                         enabled: true,
                         show_headers: false,
                         columns: [
-                            { id: 'column-1', name: `${t('Colonne')} 1` },
+                            { id: 'column-1', name: `${t('Column')} 1` },
                         ],
                         rows: [
                             {
@@ -1172,7 +1172,7 @@ export default withAppLayout<Props>(
                                                                         'file'
                                                                       ? (currentFile?.name ??
                                                                         t(
-                                                                            'Fichier',
+                                                                            'File',
                                                                         ))
                                                                       : (userOptionById.get(
                                                                             Number(
@@ -1181,7 +1181,7 @@ export default withAppLayout<Props>(
                                                                         )
                                                                             ?.label ??
                                                                         t(
-                                                                            'Commercial',
+                                                                            'Sales rep',
                                                                         ))}
                                                             </BreadcrumbPage>
                                                         </BreadcrumbItemUI>

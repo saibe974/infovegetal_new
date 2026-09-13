@@ -149,7 +149,7 @@ export default function BillingTreePanel({
                                                 <span className="block truncate text-xs text-muted-foreground">
                                                     {formatSalesConditionsSummary(
                                                         profile.conditions,
-                                                        t('Vente directe'),
+                                                        t('Direct sale'),
                                                     )}
                                                 </span>
                                             </button>

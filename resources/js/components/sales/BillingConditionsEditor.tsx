@@ -224,7 +224,7 @@ export default function BillingConditionsEditor({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="__custom__">
-                                        {t('Paramétrage custom')}
+                                        {t('Custom setup')}
                                     </SelectItem>
                                     {profiles.map((profile) => (
                                         <SelectItem
@@ -237,7 +237,7 @@ export default function BillingConditionsEditor({
                                             <span className="block text-xs text-muted-foreground">
                                                 {formatSalesConditionsSummary(
                                                     profile.conditions,
-                                                    t('Vente directe'),
+                                                    t('Direct sale'),
                                                 )}
                                             </span>
                                         </SelectItem>

@@ -35,7 +35,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: products.index().url,
     },
     {
-        title: 'Editer',
+        title: 'Edit',
         href: '#',
     },
 ];
@@ -83,16 +83,16 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                 body: JSON.stringify({ id: product.id, force: true }),
             });
 
-            const payload = await response.json().catch(() => ({ ok: false, message: 'Reponse invalide' }));
+            const payload = await response.json().catch(() => ({ ok: false, message: t('Invalid response') }));
 
             if (!response.ok || !payload.ok) {
-                const message = payload?.message || 'Suppression impossible';
+                const message = payload?.message || t('Could not delete');
                 setRemoveImgLinkStatus(message);
                 toast.error(message);
                 return;
             }
 
-            const message = payload?.message || 'img_link supprime';
+            const message = payload?.message || t('img_link deleted');
             setImgLinkRemoved(true);
             setRemoveImgLinkStatus(message);
 
@@ -100,7 +100,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
             toast.success(message);
         } catch {
-            const message = 'Erreur reseau';
+            const message = t('Network error');
             setRemoveImgLinkStatus(message);
             toast.error(message);
         } finally {
@@ -270,7 +270,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                             value={data.description}
                                             onChange={(e) => setData('description', e.target.value)}
                                             aria-invalid={!!currentErrors['description']}
-                                            placeholder="Décrivez brièvement le produit"
+                                            placeholder={t('Briefly describe the product')}
                                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                         />
                                     </FormField>
@@ -306,11 +306,11 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 name="height"
                                                 value={data.height}
                                                 onChange={(e) => setData('height', e.target.value)}
-                                                placeholder="30 ou 30-40"
+                                                placeholder={t('30 or 30-40')}
                                                 aria-invalid={!!currentErrors['height']}
                                             />
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                Format: nombre (30) ou plage (30-40). Sans unité.
+                                                {t('Format: number (30) or range (30-40). No unit.')}
                                             </p>
                                         </FormField>
                                     </div>
@@ -389,13 +389,13 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
                                 <Card className="p-4 space-y-4">
                                     <div>
-                                        <h3 className="text-sm font-semibold text-muted-foreground">Disponibilité commerciale</h3>
+                                        <h3 className="text-sm font-semibold text-muted-foreground">{t('Commercial availability')}</h3>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            Le produit reste administrativement actif, mais ne peut être commandé qu’à l’intérieur de cette période.
+                                            {t('The product remains administratively active but can only be ordered within this period.')}
                                         </p>
                                     </div>
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        <FormField label="Disponible à partir du" htmlFor="available_from" error={currentErrors['available_from']}>
+                                        <FormField label={t('Available from')} htmlFor="available_from" error={currentErrors['available_from']}>
                                             <Input
                                                 id="available_from"
                                                 name="available_from"
@@ -405,7 +405,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 aria-invalid={!!currentErrors['available_from']}
                                             />
                                         </FormField>
-                                        <FormField label="Disponible jusqu’au" htmlFor="available_until" error={currentErrors['available_until']}>
+                                        <FormField label={t('Available until')} htmlFor="available_until" error={currentErrors['available_until']}>
                                             <Input
                                                 id="available_until"
                                                 name="available_until"
@@ -434,7 +434,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 disabled={!product.id || imgLinkRemoved || removeImgLinkProcessing}
                                                 onClick={handleRemoveMissingImgLink}
                                             >
-                                                {removeImgLinkProcessing ? 'Suppression...' : 'Supprimer img_link'}
+                                                {removeImgLinkProcessing ? t('Removing...') : t('Delete img_link')}
                                             </Button>
                                             {removeImgLinkStatus && (
                                                 <p className="text-xs text-muted-foreground">{removeImgLinkStatus}</p>

@@ -57,7 +57,7 @@ function DbProductActions({ item }: { item: DbProduct }) {
         <div className="flex justify-end gap-2">
             {item.abilities?.manage ? (
                 <DialogUpload
-                    title={`Mettre à jour la base de données ${item.name}`}
+                    title={`${t('Update database')} ${item.name}`}
                     uploadUrl="/upload"
                     importProcessUrl={products.admin.import.process.url()}
                     importProcessChunkUrl={products.admin.import.process_chunk.url()}
@@ -68,7 +68,7 @@ function DbProductActions({ item }: { item: DbProduct }) {
                     postTreatmentComponent={ProductsImportTreatment}
                     postTreatmentProps={{ dbProductsId: item.id }}
                     finishedLink={{
-                        label: 'Missing image',
+                        label: t('Missing image'),
                         href: products.images.index.url(),
                     }}
                     buttonLabel=""
@@ -164,7 +164,7 @@ function DbProductsMiniCards({ items }: { items: DbProduct[] }) {
                         <div className="flex items-center justify-between gap-3 border-t pt-3">
                             <p
                                 className="flex items-center gap-1 text-xs text-muted-foreground"
-                                title={t('maj')}
+                                title={t('Updated')}
                             >
                                 <CalendarClockIcon className="size-3.5" />
                                 {item.updated_at
@@ -276,7 +276,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                         {t('Name')}
                                     </SortableTableHead>
                                     <TableHead>{t('Description')}</TableHead>
-                                    <TableHead>{t('maj')}</TableHead>
+                                    <TableHead>{t('Updated')}</TableHead>
                                     <TableHead className="text-end">
                                         {t('Actions')}
                                     </TableHead>

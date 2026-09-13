@@ -124,7 +124,7 @@ export default function ProductsTable({ collection, canEdit = false, canDelete =
                             <TableCell>
                                 <div className="space-y-2">
                                     {item?.pot ? (
-                                        <p className=" flex gap-1" title={t('Diameter of the pot')}>
+                                        <p className=" flex gap-1" title={t('Pot diameter')}>
                                             <span><CircleSlash2 className="size-4" /></span>
                                             <span>{String(item.pot)} cm</span>
                                         </p>
