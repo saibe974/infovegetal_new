@@ -206,35 +206,7 @@ export function CartsList() {
     };
 
     const handlePreview = async (cart: CartSummary) => {
-        const userId = cart.user?.id;
-        if (!userId) {
-            toast.error(t('Impossible d\'ouvrir l\'aperçu: client introuvable'));
-            return;
-        }
-
-        const orderNumber = String(cart.id).padStart(5, '0');
-        const createdDate = cart.created_at ? String(cart.created_at).slice(0, 10) : null;
-        const updatedDate = cart.updated_at ? String(cart.updated_at).slice(0, 10) : null;
-        const todayDate = new Date().toISOString().slice(0, 10);
-
-        const createdDateUnderscore = createdDate ? createdDate.replace(/-/g, '_') : null;
-        const updatedDateUnderscore = updatedDate ? updatedDate.replace(/-/g, '_') : null;
-        const todayDateUnderscore = todayDate.replace(/-/g, '_');
-
-        const filenameCandidates = [
-            cart.pdf_filename,
-            createdDateUnderscore ? `${orderNumber}_${createdDateUnderscore}.pdf` : null,
-            updatedDateUnderscore ? `${orderNumber}_${updatedDateUnderscore}.pdf` : null,
-            `${orderNumber}_${todayDateUnderscore}.pdf`,
-            createdDate ? `${orderNumber}-${createdDate}.pdf` : null,
-            updatedDate ? `${orderNumber}-${updatedDate}.pdf` : null,
-            `${orderNumber}-${todayDate}.pdf`,
-        ].filter((value, index, arr): value is string => !!value && arr.indexOf(value) === index);
-
-        const legacyFilename = `${cart.id}.pdf`;
-        const candidateUrls = filenameCandidates
-            .map((filename) => `/storage/commandes/${userId}/${filename}`)
-            .concat(`/storage/commandes/${userId}/${legacyFilename}`);
+        const candidateUrls = [`/order-files/cart/${cart.id}/pdf`];
         setPreviewLoadingCartId(cart.id);
 
         try {

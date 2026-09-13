@@ -12,7 +12,14 @@ class File extends Model
         'file_name',
         'file_path',
         'file_size',
+        'disk',
+        'cart_id',
+        'document_key',
+        'document_date',
+        'mime',
     ];
+
+    protected $casts = ['document_date' => 'date'];
 
     public function user(): BelongsTo
     {

@@ -6,6 +6,13 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\Settings\AppearanceController;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware('auth')->group(function () {
+    Route::get('/settings/files', [\App\Http\Controllers\OrderFileController::class, 'index'])->name('order-files.index');
+    Route::get('/order-files/{file}/download', [\App\Http\Controllers\OrderFileController::class, 'download'])->whereNumber('file')->name('order-files.download');
+    Route::get('/order-files/{file}/preview', [\App\Http\Controllers\OrderFileController::class, 'preview'])->whereNumber('file')->name('order-files.preview');
+    Route::get('/order-files/cart/{cart}/pdf', [\App\Http\Controllers\OrderFileController::class, 'cartPdf'])->whereNumber('cart')->name('order-files.cart-pdf');
+});
+
 Route::middleware('auth')->prefix('file-export-templates')->name('file-export-templates.')->group(function () {
     Route::get('/', [\App\Http\Controllers\FileExportTemplateController::class, 'index'])->name('index');
     Route::post('/', [\App\Http\Controllers\FileExportTemplateController::class, 'store'])->name('store');

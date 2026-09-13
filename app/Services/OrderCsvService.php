@@ -6,7 +6,6 @@ use App\Models\Cart;
 use App\Models\DbProductBillingUser;
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -47,7 +46,7 @@ class OrderCsvService
             ?? $payload['order_number']
             ?? str_pad((string) $cart->id, 5, '0', STR_PAD_LEFT)
         );
-        $documentDate = (string) ($payload['document_date'] ?? now()->format('Y-m-d'));
+        $documentDate = app(OrderDocumentService::class)->date($cart, $payload)->format('Y-m-d');
         $safeDocumentNumber = Str::slug($documentNumber) ?: (string) $cart->id;
         $generated = [];
 
@@ -77,15 +76,16 @@ class OrderCsvService
                     continue;
                 }
 
+                $scopedPayload = app(OrderDocumentService::class)->payloadForDatabases($payload, [$dbProductId]);
                 $documentContext = [
                     'id' => $payload['document_id'] ?? $cart->id,
                     'number' => $documentNumber,
                     'date' => $documentDate,
                     'count' => (string) $dbItems->count(),
                     'comment' => (string) ($payload['comment'] ?? ''),
-                    'items_total' => $this->decimal($payload['items_total'] ?? 0),
-                    'shipping_total' => $this->decimal($payload['shipping_total'] ?? 0),
-                    'total' => $this->decimal($payload['total'] ?? 0),
+                    'items_total' => $this->decimal($scopedPayload['items_total'] ?? 0),
+                    'shipping_total' => $this->decimal($scopedPayload['shipping_total'] ?? 0),
+                    'total' => $this->decimal($scopedPayload['total'] ?? 0),
                     'event' => $event,
                 ];
 
@@ -130,26 +130,24 @@ class OrderCsvService
                     $extension,
                     $fallbackName,
                 );
-                $storageFilename = sprintf(
-                    '%s_%s_%s_db-%d.%s',
-                    $event,
-                    $safeDocumentNumber,
-                    Str::slug((string) ($template['id'] ?? $templateName)) ?: $templateName,
-                    $dbProductId,
-                    $extension,
-                );
-                $relativePath = sprintf(
-                    'commandes/facturants/%d/client-%d/%s',
-                    $billingUserId,
-                    $client->id,
-                    $storageFilename,
-                );
-
-                Storage::disk('local')->put($relativePath, $contents);
-                $rule->billingUser?->files()->updateOrCreate(
-                    ['file_path' => $relativePath],
-                    ['file_name' => $filename, 'file_size' => strlen($contents)],
-                );
+                $mime = match ($extension) {
+                    'tsv' => 'text/tab-separated-values',
+                    'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    default => 'text/csv',
+                };
+                $sellerId = (int) ($billingContext[$dbProductId]['seller_user_id'] ?? 0);
+                $ownerIds = [$billingUserId];
+                if ($template['shared'] ?? false) {
+                    $ownerIds = array_merge($ownerIds, [(int) $client->id, $sellerId]);
+                }
+                $copies = [];
+                foreach (array_unique(array_filter($ownerIds)) as $ownerId) {
+                    $copies[$ownerId] = app(OrderDocumentService::class)->store(
+                        $cart, $ownerId, $event.'-db-'.$dbProductId.'-'.hash('sha256', (string) ($template['id'] ?? $templateName).($event === 'order' ? '' : '|'.$documentNumber)),
+                        $filename, $contents, $mime, $payload,
+                    );
+                }
+                $relativePath = $copies[$billingUserId]['relative_path'];
 
                 $generated[] = [
                     'filename' => $filename,
@@ -160,6 +158,7 @@ class OrderCsvService
                     'seller_user_id' => (int) ($billingContext[$dbProductId]['seller_user_id'] ?? 0),
                     'client_user_id' => (int) $client->id,
                     'shared' => (bool) ($template['shared'] ?? false),
+                    'copies' => $copies,
                     'mime' => match ($extension) {
                         'tsv' => 'text/tab-separated-values',
                         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -217,6 +216,8 @@ class OrderCsvService
                     )
                 )
                 && is_string($file['relative_path'] ?? null))
+            ->map(fn ($file) => isset($file['copies']) ? ($file['copies'][$recipientId] ?? null) : $file)
+            ->filter()
             ->values()
             ->all();
     }
@@ -232,7 +233,7 @@ class OrderCsvService
             ? $payload['billing_context_by_db']
             : [];
         $documentNumber = (string) ($payload['order_number'] ?? $payload['document_number'] ?? $cart->id);
-        $documentDate = (string) ($payload['document_date'] ?? now()->format('Y-m-d'));
+        $documentDate = app(OrderDocumentService::class)->date($cart, $payload)->format('Y-m-d');
 
         foreach ($items->groupBy(fn ($item) => (int) ($item['product']->db_products_id ?? 0)) as $dbProductId => $dbItems) {
             $dbProductId = (int) $dbProductId;

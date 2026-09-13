@@ -295,4 +295,15 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
             $payload,
             'commande-CMD-42.pdf',
         ))->toBe('BC_CMD-42_Client Test_CLI-508_Client principal.pdf');
+
+    foreach ([$client, $billingUser, $seller] as $recipient) {
+        $copy = $service->attachmentsForRecipient($orderFiles, $recipient->id, $client->id)[0];
+        expect($copy['relative_path'])->toStartWith('meta_user/'.$recipient->id.'/commandes/')
+            ->and($recipient->files()->where('file_path', $copy['relative_path'])->exists())->toBeTrue();
+        Storage::disk('local')->assertExists($copy['relative_path']);
+    }
+    $service->generate($cart, $client, $payload);
+    expect($client->files()->count())->toBe(2)
+        ->and($seller->files()->count())->toBe(2)
+        ->and($billingUser->files()->count())->toBe(2);
 });

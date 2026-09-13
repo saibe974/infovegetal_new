@@ -507,7 +507,7 @@
             </tr>
             @endif
             <tr class="total-row">
-                <td colspan="5" class="text-right">Total général :</td>
+                <td colspan="5" class="text-right">{{ !empty($global_discount_excluded) ? 'Sous-total hors coupon global' : 'Total général' }} :</td>
                 <td class="text-right">{{ number_format($total, 2, ',', ' ') }} €</td>
             </tr>
         </tbody>

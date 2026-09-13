@@ -358,7 +358,8 @@ class CartTcpdfService
                 : 'Remise';
             $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, $discountLabel, -(float) $payload['discount_total'], false);
         }
-        $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, 'Total general', (float) ($payload['total'] ?? 0.0), true);
+        $totalLabel = ! empty($payload['global_discount_excluded']) ? 'Sous-total hors coupon global' : 'Total general';
+        $y = $this->drawTotalRow($pdf, $x, $y, $labelW, $totalW, $totalLabel, (float) ($payload['total'] ?? 0.0), true);
 
         return $y;
     }

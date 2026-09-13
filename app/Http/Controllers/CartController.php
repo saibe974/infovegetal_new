@@ -10,6 +10,7 @@ use App\Models\Cart;
 use App\Models\Product;
 use App\Services\CartTcpdfService;
 use App\Services\OrderCsvService;
+use App\Services\OrderDocumentService;
 use App\Services\OrderSnapshotService;
 use App\Services\PdfRollDistributionService;
 use App\Services\PriceCalculatorService;
@@ -169,25 +170,22 @@ class CartController extends Controller
             $pdfPayload,
             $storagePdfFilename,
         );
-        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $storagePdfFilename);
-
-        Pdf::view('pdf.cart', array_merge($pdfPayload, [
-            'order_id' => $cart->id,
-            'order_number' => $orderNumber,
-        ]))
-            ->format('a4')
-            ->disk('public', 'public')
-            ->save($pdfRelativePath);
+        $pdfPayload['document_date'] = app(OrderDocumentService::class)->date($cart)->format('Y-m-d');
+        $pdfCopies = app(OrderDocumentService::class)->storePdfs(
+            $cart, $user, $pdfPayload, $pdfFilename,
+            fn (array $scoped) => base64_decode(Pdf::view('pdf.cart', array_merge($scoped, [
+                'order_id' => $cart->id, 'order_number' => $orderNumber,
+            ]))->format('a4')->base64(), true),
+        );
+        $pdfRelativePath = $pdfCopies[$user->id]['relative_path'];
 
         $csvFiles = app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $pdfPayload);
 
         $mailCount = $this->sendOrderPdfMails(
             $pdfPayload['mail_recipients'],
-            $pdfRelativePath,
             $orderNumber,
             $user,
-            'public',
-            $pdfFilename,
+            $pdfCopies,
             $csvFiles,
         );
 
@@ -196,7 +194,7 @@ class CartController extends Controller
             'order_id' => $cart->id,
             'order_number' => $orderNumber,
             'pdf_filename' => $pdfFilename,
-            'pdf_download_url' => asset('storage/'.$pdfRelativePath),
+            'pdf_download_url' => $pdfCopies[$user->id]['download_url'],
             'csv_files_count' => count($csvFiles),
             'mail_recipients_count' => $mailCount,
             'message' => 'Commande enregistree, PDF genere et emails envoyes.',
@@ -1165,19 +1163,21 @@ class CartController extends Controller
 
     private function sendOrderPdfMails(
         iterable $recipients,
-        string $pdfRelativePath,
         string $orderNumber,
         \App\Models\User $client,
-        string $disk = 'public',
-        ?string $attachmentName = null,
+        array $pdfCopies,
         array $generatedFiles = [],
     ): int {
         $sent = 0;
-        $pdfAbsolutePath = Storage::disk($disk)->path($pdfRelativePath);
-        $attachmentFilename = $attachmentName ?: $this->buildOrderPdfFilename((int) $orderNumber);
 
         foreach ($recipients as $recipient) {
             try {
+                $copy = $pdfCopies[(int) $recipient->id] ?? null;
+                if (! $copy) {
+                    continue;
+                }
+                $pdfAbsolutePath = Storage::disk($copy['disk'])->path($copy['relative_path']);
+                $attachmentFilename = $copy['filename'];
                 $csvAttachments = app(OrderCsvService::class)->attachmentsForRecipient(
                     $generatedFiles,
                     (int) ($recipient->id ?? 0),
@@ -1274,47 +1274,25 @@ class CartController extends Controller
             $payload,
             $storageFilename,
         );
-        $pdfBinary = $cartTcpdfService->render($payload);
-
-        $pdfRelativePath = sprintf('commandes/%d/%s', $user->id, $storageFilename);
-        Storage::disk('public')->put($pdfRelativePath, $pdfBinary);
+        $payload['document_date'] = app(OrderDocumentService::class)->date($cart)->format('Y-m-d');
+        $pdfCopies = app(OrderDocumentService::class)->storePdfs(
+            $cart, $user, $payload, $filename,
+            fn (array $scoped) => $cartTcpdfService->render($scoped), $sendEmails,
+        );
+        $pdfRelativePath = $pdfCopies[$user->id]['relative_path'];
+        $pdfBinary = Storage::disk('local')->get($pdfRelativePath);
 
         $csvFiles = $sendEmails
             ? app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $payload)
             : [];
 
-        $user->files()->create([
-            'file_name' => $filename,
-            'file_path' => $pdfRelativePath,
-            'file_size' => strlen($pdfBinary),
-        ]);
-
-        try {
-            $user->addMediaFromString($pdfBinary)
-                ->usingName(pathinfo($filename, PATHINFO_FILENAME))
-                ->usingFileName($filename)
-                ->withCustomProperties([
-                    'source' => 'cart-tcpdf',
-                    'shipping_total' => $shippingTotal,
-                ])
-                ->toMediaCollection('user_meta_files');
-        } catch (\Throwable $e) {
-            Log::warning('Failed to store TCPDF in media library', [
-                'user_id' => $user->id,
-                'filename' => $filename,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
         $mailCount = 0;
         if ($sendEmails) {
             $mailCount = $this->sendOrderPdfMails(
                 $payload['mail_recipients'] ?? collect([$user]),
-                $pdfRelativePath,
                 $orderNumber,
                 $user,
-                'public',
-                $filename,
+                $pdfCopies,
                 $csvFiles,
             );
         }
@@ -1324,7 +1302,7 @@ class CartController extends Controller
             'order_number' => $orderNumber,
             'pdf_filename' => $filename,
             'pdf_relative_path' => $pdfRelativePath,
-            'pdf_download_url' => asset('storage/'.$pdfRelativePath),
+            'pdf_download_url' => $pdfCopies[$user->id]['download_url'],
             'items_total' => $cart->items_total,
             'shipping_total' => $cart->shipping_total,
             'discount_total' => $payload['discount_total'] ?? 0,
@@ -1644,6 +1622,8 @@ class CartController extends Controller
 
     private function buildOrderPdfFilename(int $cartId): string
     {
-        return $this->formatOrderNumber($cartId).'_'.now()->format('Y_m_d').'.pdf';
+        $cart = Cart::findOrFail($cartId);
+
+        return $this->formatOrderNumber($cartId).'_'.app(OrderDocumentService::class)->date($cart)->format('Y_m_d').'.pdf';
     }
 }
