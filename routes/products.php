@@ -138,8 +138,10 @@ Route::middleware(['role_or_permission_or_impersonator:admin|dev|users.db_produc
     ->group(function () {
         Route::get('/', [MediaController::class, 'images'])->name('index');
         Route::get('/items', [MediaController::class, 'imageItems'])->name('items');
+        Route::get('/compare-items', [MediaController::class, 'compareItems'])->name('items.compare');
         Route::post('/action/download', [MediaController::class, 'actionDownload'])->name('action.download');
         Route::post('/action/compare', [MediaController::class, 'actionCompare'])->name('action.compare');
+        Route::post('/action/refresh', [MediaController::class, 'actionRefreshRemote'])->name('action.refresh');
         Route::post('/action/thumbnail', [MediaController::class, 'actionThumbnail'])->name('action.thumbnail');
         Route::post('/action/remove-missing-img-link', [MediaController::class, 'actionRemoveMissingImgLink'])->name('action.remove-missing-img-link');
     });

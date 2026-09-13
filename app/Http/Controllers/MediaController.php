@@ -104,12 +104,18 @@ class MediaController extends Controller
         }
 
         try {
-            return response()->json($mediaService->compareRemoteWithLocal($product));
+            $result = $mediaService->compareRemoteWithLocal($product);
         } catch (\Throwable $e) {
             Log::warning('Media compare failed', ['product_id' => $product->id, 'error' => $e->getMessage()]);
 
-            return response()->json(['ok' => false, 'message' => 'Comparaison impossible'], 500);
+            return response()->json(['ok' => false, 'message' => 'Comparaison impossible', 'reason' => 'error'], 500);
         }
+
+        $product->loadMissing(['dbProduct:id,name', 'category:id,name']);
+
+        return response()->json(array_merge($result, [
+            'product' => $this->imageProductPayload($product, $mediaService),
+        ]));
     }
 
     public function actionThumbnail(Request $request, ProductMediaService $mediaService): JsonResponse
@@ -122,6 +128,21 @@ class MediaController extends Controller
         return response()->json($mediaService->ensureThumbnail($product));
     }
 
+    public function actionRefreshRemote(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $product = $this->findProductForAction($request);
+        if (! $product) {
+            return response()->json(['ok' => false, 'message' => 'Produit introuvable'], 404);
+        }
+
+        $result = $mediaService->refreshRemote($product);
+        $product->loadMissing(['dbProduct:id,name', 'category:id,name']);
+
+        return response()->json(array_merge($result, [
+            'product' => $this->imageProductPayload($product, $mediaService),
+        ]));
+    }
+
     public function actionRemoveMissingImgLink(Request $request, ProductMediaService $mediaService): JsonResponse
     {
         $product = $this->findProductForAction($request);
@@ -132,6 +153,57 @@ class MediaController extends Controller
         return response()->json(
             $mediaService->removeImgLinkIfMissing($product, $request->boolean('force'))
         );
+    }
+
+    public function compareItems(Request $request, ProductMediaService $mediaService): JsonResponse
+    {
+        $data = $request->validate([
+            'after' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'q' => ['nullable', 'string', 'max:150'],
+            'db_products_id' => ['nullable', 'integer', 'min:1'],
+            'category_products_id' => ['nullable', 'integer', 'min:1'],
+            'with_total' => ['nullable', 'boolean'],
+        ]);
+
+        $after = (int) ($data['after'] ?? 0);
+        $limit = (int) ($data['limit'] ?? 48);
+        $search = trim((string) ($data['q'] ?? ''));
+        $dbProductsId = isset($data['db_products_id']) ? (int) $data['db_products_id'] : null;
+        $categoryProductsId = isset($data['category_products_id']) ? (int) $data['category_products_id'] : null;
+
+        $baseQuery = $this->imageCandidatesQuery($dbProductsId, $categoryProductsId);
+        if ($search !== '') {
+            $baseQuery->where(function ($query) use ($search) {
+                $query->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('sku', 'like', '%'.$search.'%')
+                    ->orWhere('ref', 'like', '%'.$search.'%');
+            });
+        }
+
+        $scan = $this->scanComparableImages(clone $baseQuery, $after, $limit, $mediaService);
+        $total = $request->boolean('with_total')
+            ? $this->countComparableImages(clone $baseQuery, $mediaService)
+            : null;
+
+        return response()->json([
+            'items' => $scan['items']->map(function (Product $product) {
+                return [
+                    'id' => (int) $product->id,
+                    'sku' => $product->sku,
+                    'ref' => $product->ref,
+                    'name' => $product->name,
+                    'source_url' => $product->getRawOriginal('img_link'),
+                    'db_name' => $product->dbProduct?->name,
+                    'category_name' => $product->category?->name,
+                    'local_url' => $product->getFirstMediaUrl('images') ?: null,
+                    'thumb_url' => $product->getFirstMediaUrl('images', 'thumb') ?: null,
+                ];
+            })->values(),
+            'next_cursor' => $scan['cursor'],
+            'has_more' => $scan['has_more'],
+            'total' => $total,
+        ]);
     }
 
     private function imageCandidatesQuery(?int $dbProductsId, ?int $categoryProductsId)
@@ -235,6 +307,77 @@ class MediaController extends Controller
             ->chunkById(200, function ($products) use (&$count, $mediaService) {
                 foreach ($products as $product) {
                     if (! $mediaService->localImageStatus($product)['original_exists']) {
+                        $count++;
+                    }
+                }
+            });
+
+        return $count;
+    }
+
+    private function scanComparableImages($query, int $after, int $limit, ProductMediaService $mediaService): array
+    {
+        $items = collect();
+        $cursor = $after;
+        $remainingScan = 2000;
+
+        while ($items->count() < $limit && $remainingScan > 0) {
+            $chunkSize = min(200, $remainingScan);
+            $products = (clone $query)
+                ->with([
+                    'dbProduct:id,name',
+                    'category:id,name',
+                    'media' => fn ($mediaQuery) => $mediaQuery->where('collection_name', 'images'),
+                ])
+                ->where('products.id', '>', $cursor)
+                ->reorder()
+                ->orderBy('products.id')
+                ->limit($chunkSize)
+                ->get();
+
+            if ($products->isEmpty()) {
+                break;
+            }
+
+            foreach ($products as $product) {
+                $cursor = (int) $product->id;
+                $remainingScan--;
+
+                if ($mediaService->localImageStatus($product)['original_exists']) {
+                    $items->push($product);
+                }
+
+                if ($items->count() >= $limit || $remainingScan <= 0) {
+                    break;
+                }
+            }
+
+            if ($products->count() < $chunkSize) {
+                break;
+            }
+        }
+
+        $hasMore = (clone $query)
+            ->where('products.id', '>', $cursor)
+            ->exists();
+
+        return [
+            'items' => $items,
+            'cursor' => $cursor,
+            'has_more' => $hasMore,
+        ];
+    }
+
+    private function countComparableImages($query, ProductMediaService $mediaService): int
+    {
+        $count = 0;
+
+        $query
+            ->with(['media' => fn ($mediaQuery) => $mediaQuery->where('collection_name', 'images')])
+            ->reorder()
+            ->chunkById(200, function ($products) use (&$count, $mediaService) {
+                foreach ($products as $product) {
+                    if ($mediaService->localImageStatus($product)['original_exists']) {
                         $count++;
                     }
                 }

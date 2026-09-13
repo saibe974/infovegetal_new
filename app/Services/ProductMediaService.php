@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class ProductMediaService
 {
@@ -117,6 +118,23 @@ class ProductMediaService
 
         // Une ligne media sans fichier physique bloque la detection SQL des
         // images manquantes. On la retire avant de recreer le media.
+        $relocated = $this->relocateExisting($product);
+        if (is_string($relocated)) {
+            $product->refresh();
+
+            return [
+                'ok' => true,
+                'message' => $relocated,
+                'downloaded' => false,
+                'http_status' => null,
+                'has_local' => true,
+                'local_url' => $product->getFirstMediaUrl('images') ?: null,
+                'thumb_url' => $product->getFirstMediaUrl('images', 'thumb') ?: null,
+                'small_url' => $product->getFirstMediaUrl('images', 'small') ?: null,
+                'medium_url' => $product->getFirstMediaUrl('images', 'medium') ?: null,
+            ];
+        }
+
         if ($existing) {
             $product->clearMediaCollection('images');
             $product->unsetRelation('media');
@@ -146,6 +164,95 @@ class ProductMediaService
             'small_url' => $product->getFirstMediaUrl('images', 'small') ?: null,
             'medium_url' => $product->getFirstMediaUrl('images', 'medium') ?: null,
         ];
+    }
+
+    /**
+     * Recherche l'image attendue parmi les fichiers deja presents sur le
+     * disque (mauvais dossier) ou rattachee a un autre produit (meme
+     * source_url), et la recopie au bon emplacement. Retourne null si
+     * aucun fichier exploitable n'est trouve : le telechargement distant
+     * reste alors la solution de repli.
+     */
+    private function relocateExisting(Product $product): ?string
+    {
+        $imgLink = (string) $product->getRawOriginal('img_link');
+        if (! $this->isRemoteUrl($imgLink)) {
+            return null;
+        }
+
+        $media = $product->getFirstMedia('images');
+        $preferred = $media?->file_name;
+        $base = pathinfo(
+            (string) ($preferred ?? $this->buildProductFileName($product, $imgLink)),
+            PATHINFO_FILENAME,
+        );
+        $locator = app(MediaFileLocator::class);
+
+        $found = $locator->locateByBaseName($base, $preferred);
+        if ($found !== null) {
+            return $this->attachLocalFile($product, $found, $imgLink, $locator);
+        }
+
+        $sameSource = Media::query()
+            ->where('model_type', $product->getMorphClass())
+            ->where('collection_name', 'images')
+            ->where('model_id', '!=', $product->id)
+            ->where('custom_properties->source_url', $imgLink)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($sameSource as $candidate) {
+            $path = $candidate->getPathRelativeToRoot();
+            if (! Storage::disk($candidate->disk)->exists($path)) {
+                continue;
+            }
+
+            return $this->attachLocalFile($product, $path, $imgLink, $locator, $candidate->disk, true);
+        }
+
+        return null;
+    }
+
+    private function attachLocalFile(
+        Product $product,
+        string $diskPath,
+        string $imgLink,
+        MediaFileLocator $locator,
+        ?string $disk = null,
+        bool $preserveOriginal = false,
+    ): ?string {
+        $disk ??= $product->getFirstMedia('images')?->disk
+            ?: (string) config('media-library.disk_name', 'public');
+
+        try {
+            $product->getFirstMedia('images')?->delete();
+            $product->unsetRelation('media');
+
+            $fileAdder = $product->addMediaFromDisk($diskPath, $disk)
+                ->usingFileName(basename($diskPath))
+                ->withCustomProperties(['source_url' => $imgLink]);
+
+            if ($preserveOriginal) {
+                $fileAdder->preservingOriginal();
+            }
+
+            $fileAdder->toMediaCollection('images');
+
+            $locator->relocateIndexEntry(
+                $diskPath,
+                (string) $product->getFirstMedia('images')?->getPathRelativeToRoot(),
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Product image relocation failed', [
+                'product_id' => $product->id,
+                'path' => $diskPath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        return 'Image existante recuperee depuis le disque';
     }
 
     /**
@@ -187,6 +294,7 @@ class ProductMediaService
             return [
                 'ok' => false,
                 'message' => 'URL distante invalide',
+                'reason' => 'invalid_url',
             ];
         }
 
@@ -195,7 +303,7 @@ class ProductMediaService
             return [
                 'ok' => false,
                 'message' => 'Aucune image locale',
-                'similarity' => null,
+                'reason' => 'no_local',
             ];
         }
 
@@ -204,6 +312,7 @@ class ProductMediaService
             return [
                 'ok' => false,
                 'message' => 'Impossible de recuperer l\'image distante',
+                'reason' => 'remote_unreachable',
             ];
         }
 
@@ -214,6 +323,7 @@ class ProductMediaService
             return [
                 'ok' => false,
                 'message' => 'Fichier local introuvable',
+                'reason' => 'no_local',
             ];
         }
 
@@ -226,6 +336,42 @@ class ProductMediaService
             'same' => $same,
             'local_hash' => $localHash,
             'remote_hash' => $remoteHash,
+        ];
+    }
+
+    /**
+     * Remplace l'image locale par la version distante actuelle
+     * (contourne l'idempotence de downloadMissing).
+     */
+    public function refreshRemote(Product $product): array
+    {
+        $imgLink = (string) $product->getRawOriginal('img_link');
+        if (! $this->isRemoteUrl($imgLink)) {
+            return [
+                'ok' => false,
+                'message' => 'URL image distante invalide',
+                'downloaded' => false,
+                'http_status' => null,
+            ];
+        }
+
+        $product->clearMediaCollection('images');
+        $product->unsetRelation('media');
+
+        $httpStatus = null;
+        $downloaded = $this->syncFromImgLink($product, $imgLink, $httpStatus);
+        $product->refresh();
+
+        return [
+            'ok' => $downloaded,
+            'message' => $downloaded ? 'Image remplacee' : 'Telechargement impossible',
+            'downloaded' => $downloaded,
+            'http_status' => $httpStatus,
+            'has_local' => (bool) $product->getFirstMedia('images'),
+            'local_url' => $product->getFirstMediaUrl('images') ?: null,
+            'thumb_url' => $product->getFirstMediaUrl('images', 'thumb') ?: null,
+            'small_url' => $product->getFirstMediaUrl('images', 'small') ?: null,
+            'medium_url' => $product->getFirstMediaUrl('images', 'medium') ?: null,
         ];
     }
 
