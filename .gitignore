@@ -35,3 +35,5 @@ yarn-error.log
 
 /docs
 /_docs/
+
+deploy.ps1
