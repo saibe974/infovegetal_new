@@ -131,7 +131,7 @@ class ProductExportService
         }
 
         if ($request->boolean('check')) {
-            return response()->json(['total' => $total, 'rows' => $lineCount, 'limit' => $limit]);
+            return response()->json(['total' => $total, 'rows' => $lineCount, 'limit' => $limit, 'filename' => $template->filename($context, $format)]);
         }
 
         // Match the index's preloaded pivot attributes (including an explicit

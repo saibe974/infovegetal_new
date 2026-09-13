@@ -1,7 +1,7 @@
+import type { FilePreviewRow } from '@/components/app/file-template/export-controls';
 import { renderRulePreview } from '@/components/app/file-template/rules';
 import type { VariableFormatType } from '@/components/app/file-template/types';
 import type {
-    BillingFileBlock,
     BillingFileBlockType,
     BillingFileEvent,
     BillingFileExtension,
@@ -173,60 +173,60 @@ export const replacePreviewVariables = (
     return renderRulePreview(value, values);
 };
 
-export const renderPreview = (file: BillingFileTemplate): string => {
+export const renderPreviewRows = (
+    file: BillingFileTemplate,
+): FilePreviewRow[] => {
     const blocks = file.blocks.filter((block) => block.enabled);
-    const delimiter = file.delimiter;
-    const lines: string[] = [];
     const width = Math.max(0, ...blocks.map((block) => block.columns.length));
-
-    const writeCells = (cells: string[]) => {
-        const padded = [
-            ...cells,
-            ...Array(Math.max(0, width - cells.length)).fill(''),
-        ];
-        lines.push(
-            padded.map((cell) => csvCell(cell, delimiter)).join(delimiter),
-        );
-    };
-
-    const writeRows = (
-        block: BillingFileBlock,
-        item?: Record<string, string>,
-    ) => {
-        block.rows.forEach((row) => {
-            writeCells(
-                block.columns.map((column) =>
-                    replacePreviewVariables(
-                        row.cells[column.id] ?? '',
-                        file.event,
-                        item,
+    const result: FilePreviewRow[] = [];
+    const append = (values: string[], heading = false) =>
+        result.push({
+            heading,
+            cells: [
+                ...values,
+                ...Array(Math.max(0, width - values.length)).fill(''),
+            ].map((value) => ({ value, image: null })),
+        });
+    blocks.forEach((block) => {
+        if (block.show_headers)
+            append(
+                block.columns.map((column) => column.name),
+                true,
+            );
+        const items = block.type === 'items' ? previewItems : [undefined];
+        items.forEach((item) =>
+            block.rows.forEach((row) =>
+                append(
+                    block.columns.map((column) =>
+                        replacePreviewVariables(
+                            row.cells[column.id] ?? '',
+                            file.event,
+                            item,
+                        ),
                     ),
                 ),
-            );
-        });
-    };
-
-    blocks.forEach((block) => {
-        if (block.show_headers) {
-            writeCells(block.columns.map((column) => column.name));
-        }
-        if (block.type === 'items') {
-            previewItems.forEach((item) => writeRows(block, item));
-        } else {
-            writeRows(block);
-        }
+            ),
+        );
     });
-
-    return lines.join('\n');
+    return result;
 };
+
+export const renderPreview = (file: BillingFileTemplate): string =>
+    renderPreviewRows(file)
+        .map((row) =>
+            row.cells
+                .map((cell) => csvCell(cell.value, file.delimiter))
+                .join(file.delimiter),
+        )
+        .join('\n');
 
 export const variablesForBlock = (
     blockType: BillingFileBlockType,
     event: BillingFileTemplate['event'],
 ) => [
-        ...documentVariables,
-        `%${event}.number%`,
-        `%${event}.date%`,
-        `%${event}.total%`,
-        ...(blockType === 'items' ? itemVariables : []),
-    ];
+    ...documentVariables,
+    `%${event}.number%`,
+    `%${event}.date%`,
+    `%${event}.total%`,
+    ...(blockType === 'items' ? itemVariables : []),
+];

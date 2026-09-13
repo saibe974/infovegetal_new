@@ -248,8 +248,9 @@ export function NavMainExtended({
                                             className="relative"
                                             onClick={(e) => {
                                                 const itemUrl = typeof item.href === 'string' ? item.href : item.href.url;
-                                                // Si on est déjà sur cette URL, basculer les sous-éléments sans naviguer
-                                                if (page.url === itemUrl || page.url.startsWith(itemUrl)) {
+                                                const currentPath = page.url.split('?')[0];
+                                                // Si on est déjà sur cette URL exacte, basculer les sous-éléments sans naviguer
+                                                if (currentPath === itemUrl) {
                                                     e.preventDefault();
                                                     setOpenExclusive(item.title, !isOpen);
                                                 } else {

@@ -3,8 +3,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useI18n } from '@/lib/i18n';
 
 type Props = {
-    format: 'csv' | 'xlsx';
-    onFormatChange: (format: 'csv' | 'xlsx') => void;
     columns: { key: string; label: string }[];
     selected: string[];
     onSelectionChange: (columns: string[]) => void;
@@ -12,8 +10,6 @@ type Props = {
 };
 
 export function ProductsExportQuickFields({
-    format,
-    onFormatChange,
     columns,
     selected,
     onSelectionChange,
@@ -23,47 +19,6 @@ export function ProductsExportQuickFields({
 
     return (
         <div className="space-y-6">
-            <fieldset disabled={disabled} className="space-y-3">
-                <legend className="mb-2 text-sm font-medium">
-                    {t('Format du fichier')}
-                </legend>
-                <div className="grid gap-3 sm:grid-cols-3">
-                    {(['csv', 'xlsx'] as const).map((value) => (
-                        <label
-                            key={value}
-                            className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm ${format === value ? 'border-primary bg-primary/5' : ''}`}
-                        >
-                            <input
-                                type="radio"
-                                name="quick-export-format"
-                                checked={format === value}
-                                onChange={() => onFormatChange(value)}
-                            />
-                            {value === 'csv' ? 'CSV' : 'Excel (.xlsx)'}
-                        </label>
-                    ))}
-                    <label className="flex items-center gap-2 rounded-lg border p-3 text-sm opacity-50">
-                        <input
-                            type="radio"
-                            name="quick-export-format"
-                            disabled
-                        />
-                        <span>
-                            PDF{' '}
-                            <span className="text-xs">— {t('À venir')}</span>
-                        </span>
-                    </label>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {format === 'csv'
-                        ? t(
-                              'CSV : adapté aux gros volumes. Les images sont exportées sous forme d’URL.',
-                          )
-                        : t(
-                              'Excel : seules les miniatures déjà créées et disponibles sont intégrées. Sinon, la cellule reste vide. Aucune image n’est générée.',
-                          )}
-                </p>
-            </fieldset>
             <fieldset disabled={disabled} className="space-y-3">
                 <legend className="mb-2 text-sm font-medium">
                     {t('Données à exporter')}

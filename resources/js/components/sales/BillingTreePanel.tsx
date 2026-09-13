@@ -110,7 +110,7 @@ export default function BillingTreePanel({
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
-                                        openSection === 'profiles' ? (
+                                            openSection === 'profiles' ? (
                                             <ButtonsActions
                                                 add={() => {
                                                     onAddProfile();
@@ -124,7 +124,7 @@ export default function BillingTreePanel({
                                 </div>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="border-t border-amber-200/80 px-3 py-3 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-amber-400/25">
-                                <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                                <div className="min-h-[220px] space-y-2">
                                     {(
                                         activeBillingRule.defaults.profiles ??
                                         []
@@ -187,7 +187,7 @@ export default function BillingTreePanel({
                                     </h3>
                                     <div className="flex items-center gap-1">
                                         {canManageSellers &&
-                                        openSection === 'sellers' ? (
+                                            openSection === 'sellers' ? (
                                             <ButtonsActions
                                                 add={() =>
                                                     setShowSellerSearch(
@@ -239,7 +239,7 @@ export default function BillingTreePanel({
                                         </FormField>
                                     ) : null}
 
-                                    <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                                    <div className="min-h-[220px] space-y-2">
                                         {(activeBillingRule.sellers ?? []).map(
                                             (seller) => {
                                                 const id = Number(
@@ -272,8 +272,8 @@ export default function BillingTreePanel({
                                                                 className="font-medium"
                                                                 {...(option?.description
                                                                     ? {
-                                                                          title: option.description,
-                                                                      }
+                                                                        title: option.description,
+                                                                    }
                                                                     : {})}
                                                             >
                                                                 {option.label}
@@ -325,7 +325,7 @@ export default function BillingTreePanel({
                                     </div>
                                     <div className="flex items-center gap-1">
                                         {canManageProfiles &&
-                                        openSection === 'files' ? (
+                                            openSection === 'files' ? (
                                             <ButtonsActions add={onAddFile} />
                                         ) : null}
                                         <ChevronDown
@@ -335,7 +335,7 @@ export default function BillingTreePanel({
                                 </div>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="border-t border-violet-200/80 px-3 py-3 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 dark:border-violet-400/25">
-                                <div className="max-h-[220px] space-y-2 overflow-y-auto">
+                                <div className="min-h-[220px] space-y-2">
                                     {(
                                         activeBillingRule.defaults.files ?? []
                                     ).map((file) => (
@@ -360,8 +360,8 @@ export default function BillingTreePanel({
                                                     {file.id === 'order-pdf'
                                                         ? t('Système')
                                                         : file.enabled
-                                                          ? t('Actif')
-                                                          : t('Inactif')}{' '}
+                                                            ? t('Actif')
+                                                            : t('Inactif')}{' '}
                                                     ·{' '}
                                                     {file.extension.toUpperCase()}
                                                 </span>
@@ -385,8 +385,8 @@ export default function BillingTreePanel({
                                                     file.id === 'order-pdf'
                                                         ? 'Le PDF est toujours généré automatiquement'
                                                         : file.enabled
-                                                          ? 'Génération automatique activée'
-                                                          : 'Génération automatique désactivée',
+                                                            ? 'Génération automatique activée'
+                                                            : 'Génération automatique désactivée',
                                                 )}
                                                 aria-label={t(
                                                     file.enabled
@@ -425,8 +425,8 @@ export default function BillingTreePanel({
                                                     file.id === 'order-pdf'
                                                         ? 'Le PDF est toujours partagé avec les destinataires'
                                                         : file.shared
-                                                          ? 'Partage avec les destinataires activé'
-                                                          : 'Partage avec les destinataires désactivé',
+                                                            ? 'Partage avec les destinataires activé'
+                                                            : 'Partage avec les destinataires désactivé',
                                                 )}
                                                 aria-label={t(
                                                     file.shared
@@ -447,7 +447,7 @@ export default function BillingTreePanel({
                                                 <Share2Icon className="h-4 w-4" />
                                             </Button>
                                             {canManageProfiles &&
-                                            !file.system ? (
+                                                !file.system ? (
                                                 <Button
                                                     type="button"
                                                     variant="destructive-outline"

@@ -259,7 +259,7 @@ export default function UserDbPage() {
                     : null,
                 seller_user_id:
                     row.seller_user_id !== null &&
-                    row.seller_user_id !== undefined
+                        row.seller_user_id !== undefined
                         ? Number(row.seller_user_id)
                         : null,
                 conditions_override: normalizeConditions(
@@ -429,8 +429,8 @@ export default function UserDbPage() {
 
         const profileId = activeSellerData.use_billing_profile
             ? (activeSellerData.billing_profile_id ??
-              activeBillingDefaults.default_profile_id ??
-              null)
+                activeBillingDefaults.default_profile_id ??
+                null)
             : null;
 
         if (!profileId) {
@@ -505,16 +505,16 @@ export default function UserDbPage() {
 
         const billingToSellerBase = activeSellerData.use_billing_profile
             ? normalizeConditions(
-                  activeBillingDefaults.profiles.find(
-                      (p) =>
-                          p.id ===
-                          String(
-                              activeSellerData.billing_profile_id ??
-                                  activeBillingDefaults.default_profile_id ??
-                                  '',
-                          ),
-                  )?.conditions ?? billingBase,
-              )
+                activeBillingDefaults.profiles.find(
+                    (p) =>
+                        p.id ===
+                        String(
+                            activeSellerData.billing_profile_id ??
+                            activeBillingDefaults.default_profile_id ??
+                            '',
+                        ),
+                )?.conditions ?? billingBase,
+            )
             : normalizeConditions(activeSellerData.conditions ?? {});
 
         return normalizeConditions({
@@ -616,23 +616,23 @@ export default function UserDbPage() {
     const mergedSource =
         selectedProfileKey === '__custom__'
             ? normalizeConditions({
-                  ...inheritedConditions,
-                  ...(activeRow?.conditions_override ?? {}),
-              })
+                ...inheritedConditions,
+                ...(activeRow?.conditions_override ?? {}),
+            })
             : selectedProfile
-              ? normalizeConditions({
+                ? normalizeConditions({
                     ...inheritedConditions,
                     ...selectedProfile.conditions,
                     ...(activeRow?.conditions_override ?? {}),
                 })
-              : inheritedConditions;
+                : inheritedConditions;
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
     const selectedProfileBase = selectedProfile
         ? normalizeConditions({
-              ...inheritedConditions,
-              ...selectedProfile.conditions,
-          })
+            ...inheritedConditions,
+            ...selectedProfile.conditions,
+        })
         : inheritedConditions;
     const activeIndependentOverrides = getProfileIndependentConditions(
         diffConditions(selectedProfileBase, merged),
@@ -745,8 +745,8 @@ export default function UserDbPage() {
 
         const seller = row.seller_user_id
             ? (billing.sellers ?? []).find(
-                  (item) => Number(item.id) === Number(row.seller_user_id),
-              )
+                (item) => Number(item.id) === Number(row.seller_user_id),
+            )
             : null;
 
         const sellerDefaults = normalizeBillingDefaultsToProfiles(
@@ -759,16 +759,16 @@ export default function UserDbPage() {
         const billingToSellerBase = seller
             ? (seller.use_billing_profile ?? true)
                 ? normalizeConditions(
-                      billingDefaults.profiles.find(
-                          (p) =>
-                              p.id ===
-                              String(
-                                  seller.billing_profile_id ??
-                                      billingDefaults.default_profile_id ??
-                                      '',
-                              ),
-                      )?.conditions ?? billingBase,
-                  )
+                    billingDefaults.profiles.find(
+                        (p) =>
+                            p.id ===
+                            String(
+                                seller.billing_profile_id ??
+                                billingDefaults.default_profile_id ??
+                                '',
+                            ),
+                    )?.conditions ?? billingBase,
+                )
                 : normalizeConditions(seller.conditions ?? {})
             : billingBase;
 
@@ -787,13 +787,13 @@ export default function UserDbPage() {
 
         const profilePool = seller
             ? sellerDefaults.profiles.map((profile) => ({
-                  key: `seller:${profile.id}`,
-                  conditions: normalizeConditions(profile.conditions),
-              }))
+                key: `seller:${profile.id}`,
+                conditions: normalizeConditions(profile.conditions),
+            }))
             : billingDefaults.profiles.map((profile) => ({
-                  key: `billing:${profile.id}`,
-                  conditions: normalizeConditions(profile.conditions),
-              }));
+                key: `billing:${profile.id}`,
+                conditions: normalizeConditions(profile.conditions),
+            }));
 
         const selected = profilePool.find(
             (profile) => profile.key === row.profile_selection_key,
@@ -850,7 +850,7 @@ export default function UserDbPage() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('User database association')} />
+            <Head title={t('User fournisseur')} />
 
             <SettingsLayout>
                 <div className="space-y-4">
@@ -873,7 +873,7 @@ export default function UserDbPage() {
                                     label={
                                         <>
                                             <DatabaseAccessIcon className="mx-2 inline" />{' '}
-                                            {t('Select DB product')}
+                                            {t('Select supplier')}
                                         </>
                                     }
                                 >
@@ -998,24 +998,24 @@ export default function UserDbPage() {
                                                         activeRow.db_product_id,
                                                     ),
                                                 )?.country && (
-                                                    <CountryFlag
-                                                        countryCode={
-                                                            dbById.get(
-                                                                Number(
-                                                                    activeRow.db_product_id,
-                                                                ),
-                                                            )!.country!
-                                                        }
-                                                        title={
-                                                            dbById.get(
-                                                                Number(
-                                                                    activeRow.db_product_id,
-                                                                ),
-                                                            )!.country!
-                                                        }
-                                                        className="w-5"
-                                                    />
-                                                )}
+                                                        <CountryFlag
+                                                            countryCode={
+                                                                dbById.get(
+                                                                    Number(
+                                                                        activeRow.db_product_id,
+                                                                    ),
+                                                                )!.country!
+                                                            }
+                                                            title={
+                                                                dbById.get(
+                                                                    Number(
+                                                                        activeRow.db_product_id,
+                                                                    ),
+                                                                )!.country!
+                                                            }
+                                                            className="w-5"
+                                                        />
+                                                    )}
                                                 {
                                                     dbById.get(
                                                         Number(
@@ -1031,7 +1031,7 @@ export default function UserDbPage() {
                                                     label={t('Facturant')}
                                                 >
                                                     {billingOptions.length <=
-                                                    1 ? (
+                                                        1 ? (
                                                         <Input
                                                             disabled
                                                             readOnly
@@ -1061,7 +1061,7 @@ export default function UserDbPage() {
                                                                                 /\s+/,
                                                                             )
                                                                             .pop() ??
-                                                                            '',
+                                                                        '',
                                                                     );
                                                                 if (
                                                                     !Number.isInteger(
@@ -1109,11 +1109,11 @@ export default function UserDbPage() {
                                                             title={
                                                                 activeBillingProfile
                                                                     ? formatSalesConditionsSummary(
-                                                                          activeBillingProfile.conditions,
-                                                                          t(
-                                                                              'Vente directe',
-                                                                          ),
-                                                                      )
+                                                                        activeBillingProfile.conditions,
+                                                                        t(
+                                                                            'Vente directe',
+                                                                        ),
+                                                                    )
                                                                     : undefined
                                                             }
                                                         >
@@ -1144,13 +1144,13 @@ export default function UserDbPage() {
                                                         label={t('Commercial')}
                                                     >
                                                         {sellerOptions.length >
-                                                        0 ? (
+                                                            0 ? (
                                                             <Select
                                                                 value={
                                                                     activeRow.seller_user_id
                                                                         ? String(
-                                                                              activeRow.seller_user_id,
-                                                                          )
+                                                                            activeRow.seller_user_id,
+                                                                        )
                                                                         : 'none'
                                                                 }
                                                                 onValueChange={(
@@ -1303,8 +1303,8 @@ export default function UserDbPage() {
                                                             value={
                                                                 activeRow.seller_user_id
                                                                     ? String(
-                                                                          activeRow.seller_user_id,
-                                                                      )
+                                                                        activeRow.seller_user_id,
+                                                                    )
                                                                     : 'none'
                                                             }
                                                             onValueChange={(
@@ -1525,10 +1525,10 @@ export default function UserDbPage() {
                                                                         <Select
                                                                             value={
                                                                                 assignment.carrier_id !==
-                                                                                null
+                                                                                    null
                                                                                     ? String(
-                                                                                          assignment.carrier_id,
-                                                                                      )
+                                                                                        assignment.carrier_id,
+                                                                                    )
                                                                                     : 'none'
                                                                             }
                                                                             onValueChange={(
@@ -1541,17 +1541,17 @@ export default function UserDbPage() {
                                                                                 next[
                                                                                     index
                                                                                 ] =
-                                                                                    {
-                                                                                        carrier_id:
-                                                                                            v ===
+                                                                                {
+                                                                                    carrier_id:
+                                                                                        v ===
                                                                                             'none'
-                                                                                                ? null
-                                                                                                : Number(
-                                                                                                      v,
-                                                                                                  ),
-                                                                                        zone_id:
-                                                                                            null,
-                                                                                    };
+                                                                                            ? null
+                                                                                            : Number(
+                                                                                                v,
+                                                                                            ),
+                                                                                    zone_id:
+                                                                                        null,
+                                                                                };
                                                                                 updateCarrierAssignments(
                                                                                     next,
                                                                                 );
@@ -1608,10 +1608,10 @@ export default function UserDbPage() {
                                                                         <Select
                                                                             value={
                                                                                 assignment.zone_id !==
-                                                                                null
+                                                                                    null
                                                                                     ? String(
-                                                                                          assignment.zone_id,
-                                                                                      )
+                                                                                        assignment.zone_id,
+                                                                                    )
                                                                                     : 'none'
                                                                             }
                                                                             onValueChange={(
@@ -1624,18 +1624,18 @@ export default function UserDbPage() {
                                                                                 next[
                                                                                     index
                                                                                 ] =
-                                                                                    {
-                                                                                        ...next[
-                                                                                            index
-                                                                                        ],
-                                                                                        zone_id:
-                                                                                            v ===
+                                                                                {
+                                                                                    ...next[
+                                                                                    index
+                                                                                    ],
+                                                                                    zone_id:
+                                                                                        v ===
                                                                                             'none'
-                                                                                                ? null
-                                                                                                : Number(
-                                                                                                      v,
-                                                                                                  ),
-                                                                                    };
+                                                                                            ? null
+                                                                                            : Number(
+                                                                                                v,
+                                                                                            ),
+                                                                                };
                                                                                 updateCarrierAssignments(
                                                                                     next,
                                                                                 );
@@ -1686,18 +1686,18 @@ export default function UserDbPage() {
                                                                             )}
                                                                             value={
                                                                                 index in
-                                                                                carrierTvaRaw
+                                                                                    carrierTvaRaw
                                                                                     ? carrierTvaRaw[
-                                                                                          index
-                                                                                      ]
+                                                                                    index
+                                                                                    ]
                                                                                     : assignment.tva !==
-                                                                                            null &&
+                                                                                        null &&
                                                                                         assignment.tva !==
-                                                                                            undefined
-                                                                                      ? String(
+                                                                                        undefined
+                                                                                        ? String(
                                                                                             assignment.tva,
                                                                                         )
-                                                                                      : ''
+                                                                                        : ''
                                                                             }
                                                                             onChange={(
                                                                                 e,
@@ -1731,12 +1731,12 @@ export default function UserDbPage() {
                                                                                     next[
                                                                                         index
                                                                                     ] =
-                                                                                        {
-                                                                                            ...next[
-                                                                                                index
-                                                                                            ],
-                                                                                            tva: num,
-                                                                                        };
+                                                                                    {
+                                                                                        ...next[
+                                                                                        index
+                                                                                        ],
+                                                                                        tva: num,
+                                                                                    };
                                                                                     updateCarrierAssignments(
                                                                                         next,
                                                                                     );
@@ -1748,9 +1748,9 @@ export default function UserDbPage() {
                                                                                         prev,
                                                                                     ) => {
                                                                                         const next =
-                                                                                            {
-                                                                                                ...prev,
-                                                                                            };
+                                                                                        {
+                                                                                            ...prev,
+                                                                                        };
                                                                                         delete next[
                                                                                             index
                                                                                         ];
@@ -1814,7 +1814,7 @@ export default function UserDbPage() {
                                                                 deliveryRaw ||
                                                                 String(
                                                                     merged.l ??
-                                                                        0,
+                                                                    0,
                                                                 )
                                                             }
                                                             onChange={(e) => {
@@ -1858,7 +1858,7 @@ export default function UserDbPage() {
                                                                 lmRaw ||
                                                                 String(
                                                                     merged.lm ??
-                                                                        0,
+                                                                    0,
                                                                 )
                                                             }
                                                             onChange={(e) => {
@@ -1901,11 +1901,11 @@ export default function UserDbPage() {
                                                                 tvatRaw !== ''
                                                                     ? tvatRaw
                                                                     : merged.tvat ===
-                                                                            null ||
+                                                                        null ||
                                                                         merged.tvat ===
-                                                                            undefined
-                                                                      ? ''
-                                                                      : String(
+                                                                        undefined
+                                                                        ? ''
+                                                                        : String(
                                                                             merged.tvat,
                                                                         )
                                                             }
@@ -1925,13 +1925,13 @@ export default function UserDbPage() {
                                                                             e
                                                                                 .target
                                                                                 .value ===
-                                                                            ''
+                                                                                ''
                                                                                 ? null
                                                                                 : Number.isFinite(
-                                                                                        num,
-                                                                                    )
-                                                                                  ? num
-                                                                                  : merged.tvat,
+                                                                                    num,
+                                                                                )
+                                                                                    ? num
+                                                                                    : merged.tvat,
                                                                     },
                                                                 );
                                                             }}

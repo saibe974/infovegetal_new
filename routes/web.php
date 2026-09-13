@@ -6,6 +6,12 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\Settings\AppearanceController;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware('auth')->prefix('file-export-templates')->name('file-export-templates.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FileExportTemplateController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\FileExportTemplateController::class, 'store'])->name('store');
+    Route::delete('/{id}', [\App\Http\Controllers\FileExportTemplateController::class, 'destroy'])->name('destroy');
+});
+
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/documentation', [HomeController::class, 'documentation'])->name('documentation');
 Route::get('/legals/legal-notices', [HomeController::class, 'legalNotices'])->name('legal.notices');

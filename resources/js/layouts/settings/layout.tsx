@@ -116,7 +116,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     //  if (userAbilities.manage_db && canAccessDatabaseSection) {
     if (canAccessDatabaseSection) {
         sidebarNavItems.push({
-            title: 'Database access',
+            title: 'Suppliers',
             href: `/admin/users/${userId}/db`,
             icon: DatabaseAccessIcon,
         });
@@ -145,7 +145,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                         <div className='flex flex-col'>
                             <h1 className='text-3xl font-bold capitalize'><UserIcon className='inline mx-2' />{editingUser ? editingUser.name : 'Settings'}</h1>
                             <p className="text-gray-500">
-                                {currentPath === `/admin/users/${userId}/db` ? `Manage database access` :
+                                {currentPath === `/admin/users/${userId}/db` ? `Manage suppliers` :
                                     currentPath === `/admin/users/${userId}/permissions` ? `Manage user permissions` :
                                         currentPath === `/admin/users/${userId}/appearance` ? `Manage user appearance settings` :
                                             currentPath === `/admin/users/${userId}/two-factor` ? `Manage two-factor authentication settings` :
