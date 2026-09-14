@@ -22,6 +22,7 @@ class CarrierResource extends JsonResource
             'db_products' => $this->whenLoaded('dbProducts', fn () => $this->dbProducts->map(fn ($db) => [
                 'id' => (int) $db->id,
                 'name' => $db->name,
+                'country' => $db->country,
                 'supplement_per_roll' => (float) $db->pivot->supplement_per_roll,
             ])),
             'days' => $this->days,

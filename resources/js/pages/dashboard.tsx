@@ -20,7 +20,7 @@ export default function Dashboard() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('Dashboard')} />
             <div className="flex h-full min-h-screen flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-                <CommercialBalance />
+                {/* <CommercialBalance /> */}
                 <CartsList />
             </div>
         </AppLayout>

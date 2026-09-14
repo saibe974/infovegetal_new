@@ -21,6 +21,7 @@ import { useRef, useState } from 'react';
 
 import SearchSelect from '@/components/app/search-select';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { CountryFlag } from '@/components/ui/country-flag';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { useI18n } from '@/lib/i18n';
 import { EditIcon, TrashIcon } from 'lucide-react';
@@ -33,21 +34,27 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const WEEKDAY_LABELS: Record<string, string> = {
-    '1': 'Lundi',
-    '2': 'Mardi',
-    '3': 'Mercredi',
-    '4': 'Jeudi',
-    '5': 'Vendredi',
-    '6': 'Samedi',
-    '7': 'Dimanche',
+    '1': 'Monday',
+    '2': 'Tuesday',
+    '3': 'Wednesday',
+    '4': 'Thursday',
+    '5': 'Friday',
+    '6': 'Saturday',
+    '7': 'Sunday',
 };
 
-const formatDays = (days?: string[] | null) => {
+const formatDays = (
+    days: string[] | null | undefined,
+    translate: (key: string) => string,
+) => {
     if (!days || days.length === 0) {
         return '-';
     }
 
-    const labels = days.map((day) => WEEKDAY_LABELS[day]).filter(Boolean);
+    const labels = days
+        .map((day) => WEEKDAY_LABELS[day])
+        .filter(Boolean)
+        .map(translate);
 
     return labels.length > 0 ? labels.join(', ') : '-';
 };
@@ -65,6 +72,7 @@ const getCsrfToken = (): string =>
     )?.content ?? '';
 
 function TaxgoInput({ carrier }: { carrier: Carrier }) {
+    const { t } = useI18n();
     const initialValue =
         carrier.taxgo === null || carrier.taxgo === undefined
             ? ''
@@ -136,7 +144,7 @@ function TaxgoInput({ carrier }: { carrier: Carrier }) {
             aria-label={`Taxgo ${carrier.name}`}
             aria-invalid={status === 'error'}
             title={
-                status === 'error' ? 'Erreur lors de la mise à jour' : undefined
+                status === 'error' ? t('Error while updating') : undefined
             }
             className={`h-8 w-24 text-right ${status === 'saved' ? 'border-green-600' : ''}`}
         />
@@ -214,7 +222,9 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                             <SortableTableHead field="name">
                                 {t('Name')}
                             </SortableTableHead>
-                            <TableHead>Bases livrables</TableHead>
+                            <TableHead>
+                                {t('Deliverable bases')}
+                            </TableHead>
                             <SortableTableHead field="days">
                                 {t('Days')}
                             </SortableTableHead>
@@ -250,21 +260,29 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                         {item.db_products?.map((db) => (
                                             <span
                                                 key={db.id}
-                                                className="rounded-full border px-2 py-0.5 text-xs"
+                                                className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs"
                                             >
+                                                <CountryFlag
+                                                    countryCode={db.country}
+                                                    title={db.name}
+                                                    className="h-2.5 w-auto rounded-[2px]"
+                                                />
                                                 {db.name}
                                                 {db.supplement_per_roll > 0
                                                     ? ' + ' +
                                                       db.supplement_per_roll.toLocaleString(
                                                           'fr-FR',
                                                       ) +
-                                                      ' €/roll'
+                                                      ' ' +
+                                                      t('€/roll')
                                                     : ''}
                                             </span>
                                         ))}
                                     </div>
                                 </TableCell>
-                                <TableCell>{formatDays(item.days)}</TableCell>
+                                <TableCell>
+                                    {formatDays(item.days, t)}
+                                </TableCell>
                                 <TableCell>
                                     <TaxgoInput carrier={item} />
                                 </TableCell>

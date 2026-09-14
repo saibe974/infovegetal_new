@@ -198,6 +198,7 @@ export interface Carrier {
     db_products?: Array<{
         id: number;
         name: string;
+        country?: string | null;
         supplement_per_roll: number;
     }>;
     days?: string[] | null;

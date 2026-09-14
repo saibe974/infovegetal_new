@@ -41,7 +41,7 @@ class CarrierController extends Controller
     {
         return Inertia::render('carriers/form', [
             'carrier' => CarrierResource::make(new Carrier),
-            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name']),
+            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name', 'country']),
         ]);
     }
 
@@ -63,12 +63,12 @@ class CarrierController extends Controller
             });
 
             return back()
-                ->with('success', 'Transporteur cree');
+                ->with('success', __('Carrier created'));
         } catch (ValidationException $exception) {
             return back()
                 ->withErrors($exception->errors())
                 ->withInput()
-                ->with('error', 'Merci de corriger les erreurs du formulaire.');
+                ->with('error', __('Please fix the form errors.'));
         }
     }
 
@@ -89,7 +89,7 @@ class CarrierController extends Controller
 
         return Inertia::render('carriers/form', [
             'carrier' => CarrierResource::make($carrier),
-            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name']),
+            'dbProducts' => \App\Models\DbProducts::orderBy('name')->get(['id', 'name', 'country']),
         ]);
     }
 
@@ -111,12 +111,12 @@ class CarrierController extends Controller
             });
 
             return back()
-                ->with('success', 'Transporteur mis a jour');
+                ->with('success', __('Carrier updated'));
         } catch (ValidationException $exception) {
             return back()
                 ->withErrors($exception->errors())
                 ->withInput()
-                ->with('error', 'Merci de corriger les erreurs du formulaire.');
+                ->with('error', __('Please fix the form errors.'));
         }
     }
 
@@ -130,7 +130,7 @@ class CarrierController extends Controller
 
         if ($handle === false) {
             throw ValidationException::withMessages([
-                'file' => 'Impossible de lire le fichier CSV.',
+                'file' => __('Unable to read the CSV file.'),
             ]);
         }
 
@@ -138,7 +138,7 @@ class CarrierController extends Controller
             $headerLine = fgets($handle);
             if ($headerLine === false) {
                 throw ValidationException::withMessages([
-                    'file' => 'Le fichier CSV est vide.',
+                    'file' => __('The CSV file is empty.'),
                 ]);
             }
 
@@ -148,7 +148,7 @@ class CarrierController extends Controller
             $header = fgetcsv($handle, 0, $delimiter);
             if ($header === false) {
                 throw ValidationException::withMessages([
-                    'file' => 'Le fichier CSV est invalide.',
+                    'file' => __('The CSV file is invalid.'),
                 ]);
             }
 
@@ -160,7 +160,7 @@ class CarrierController extends Controller
 
             if ($zoneIndex === null || $miniIndex === null) {
                 throw ValidationException::withMessages([
-                    'file' => 'Le CSV doit contenir les colonnes "zone" et "mini".',
+                    'file' => __('The CSV must contain the "zone" and "mini" columns.'),
                 ]);
             }
 
@@ -191,7 +191,7 @@ class CarrierController extends Controller
                 $zoneName = trim((string) ($row[$zoneIndex] ?? ''));
                 if ($zoneName === '') {
                     throw ValidationException::withMessages([
-                        'file' => 'La ligne '.$lineNumber.' ne contient pas de zone.',
+                        'file' => __('Line :line does not contain a zone.', ['line' => $lineNumber]),
                     ]);
                 }
 
@@ -218,7 +218,7 @@ class CarrierController extends Controller
 
             if ($zones === []) {
                 throw ValidationException::withMessages([
-                    'file' => 'Aucune zone exploitable n\'a été trouvée dans ce CSV.',
+                    'file' => __('No usable zone found in this CSV.'),
                 ]);
             }
 
@@ -233,7 +233,7 @@ class CarrierController extends Controller
             $carrier->load('zones');
 
             return response()->json([
-                'message' => 'Zones importées.',
+                'message' => __('Zones imported.'),
                 'carrier' => CarrierResource::make($carrier),
             ]);
         } finally {
@@ -265,7 +265,7 @@ class CarrierController extends Controller
         $carrier->delete();
 
         return redirect()->route('carriers.index')
-            ->with('success', 'Transporteur supprime');
+            ->with('success', __('Carrier deleted'));
     }
 
     private function validateCarrier(Request $request): array

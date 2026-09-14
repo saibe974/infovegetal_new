@@ -3,6 +3,7 @@ import { BadgeMultiSelect } from '@/components/ui/badge-multi-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CountryFlag } from '@/components/ui/country-flag';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
@@ -41,7 +42,7 @@ type ZoneRow = ZoneDraft & { __index: number };
 
 type Props = {
     carrier: Carrier;
-    dbProducts: Array<{ id: number; name: string }>;
+    dbProducts: Array<{ id: number; name: string; country?: string | null }>;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -125,13 +126,13 @@ const getNextRoll = (zones: ZoneDraft[]) => {
 const normalizeDecimal = (value: string) => value.trim().replace(',', '.');
 
 const WEEKDAYS = [
-    { value: '1', label: 'Lundi' },
-    { value: '2', label: 'Mardi' },
-    { value: '3', label: 'Mercredi' },
-    { value: '4', label: 'Jeudi' },
-    { value: '5', label: 'Vendredi' },
-    { value: '6', label: 'Samedi' },
-    { value: '7', label: 'Dimanche' },
+    { value: '1', label: 'Monday' },
+    { value: '2', label: 'Tuesday' },
+    { value: '3', label: 'Wednesday' },
+    { value: '4', label: 'Thursday' },
+    { value: '5', label: 'Friday' },
+    { value: '6', label: 'Saturday' },
+    { value: '7', label: 'Sunday' },
 ];
 
 const DAY_MASKS: Record<string, number> = {
@@ -671,8 +672,8 @@ export default withAppLayout<Props>(
                                 <div className="min-w-0 md:col-span-2">
                                     <BadgeMultiSelect
                                         id="db_products"
-                                        label="Bases livrables"
-                                        placeholder="Ajouter une base…"
+                                        label={t('Deliverable bases')}
+                                        placeholder={t('Add a base…')}
                                         options={dbProducts.map((db) => ({
                                             value: String(db.id),
                                             label: db.name,
@@ -708,6 +709,19 @@ export default withAppLayout<Props>(
                                                 data.db_products[index];
                                             return (
                                                 <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                                    <CountryFlag
+                                                        countryCode={
+                                                            dbProducts.find(
+                                                                (db) =>
+                                                                    db.id ===
+                                                                    Number(
+                                                                        option.value,
+                                                                    ),
+                                                            )?.country
+                                                        }
+                                                        title={option.label}
+                                                        className="h-3 w-auto rounded-[2px]"
+                                                    />
                                                     <span>{option.label}</span>
                                                     <span className="text-muted-foreground">
                                                         +
@@ -716,7 +730,10 @@ export default withAppLayout<Props>(
                                                         type="text"
                                                         inputMode="decimal"
                                                         aria-label={
-                                                            'Supplément HT par roll pour ' +
+                                                            t(
+                                                                'HT supplement per roll for',
+                                                            ) +
+                                                            ' ' +
                                                             option.label
                                                         }
                                                         aria-invalid={
@@ -765,15 +782,16 @@ export default withAppLayout<Props>(
                                                         }
                                                     />
                                                     <span className="text-xs text-muted-foreground">
-                                                        €/roll
+                                                        {t('€/roll')}
                                                     </span>
                                                 </span>
                                             );
                                         }}
                                     />
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Supplément HT par roll ajouté à la
-                                        grille. 0 = aucun supplément.
+                                        {t(
+                                            'HT supplement per roll added to the grid. 0 = no supplement.',
+                                        )}
                                     </p>
                                     {Object.entries(errorBag)
                                         .filter(
@@ -815,7 +833,7 @@ export default withAppLayout<Props>(
                                                         htmlFor={`day-${day.value}`}
                                                         className="cursor-pointer text-sm font-normal"
                                                     >
-                                                        {day.label}
+                                                        {t(day.label)}
                                                     </Label>
                                                 </div>
                                             ))}
