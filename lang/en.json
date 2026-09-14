@@ -389,5 +389,7 @@
     "The CSV must contain the \"zone\" and \"mini\" columns.": "The CSV must contain the \"zone\" and \"mini\" columns.",
     "Line :line does not contain a zone.": "Line :line does not contain a zone.",
     "No usable zone found in this CSV.": "No usable zone found in this CSV.",
-    "Zones imported.": "Zones imported."
+    "Zones imported.": "Zones imported.",
+    "Full screen": "Full screen",
+    "Exit full screen": "Exit full screen"
 }

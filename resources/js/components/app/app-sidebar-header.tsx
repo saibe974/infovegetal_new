@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ProductsFilters } from '@/components/products/products-filters';
 import { type Option as SearchOption } from '@/components/app/search-select';
+import { FullscreenButton } from './fullscreen-button';
 
 
 type FilterActive = 'all' | 'active' | 'inactive';
@@ -449,6 +450,7 @@ export function AppSidebarHeader({
                             {/* <NavigationMenuContent className=''> */}
                             <SelectLang />
                             <AppearanceToggleDropdown />
+                            <FullscreenButton />
                             {/* </NavigationMenuContent> */}
                         </div>
 
