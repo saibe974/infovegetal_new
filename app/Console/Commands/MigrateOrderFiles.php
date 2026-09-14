@@ -67,7 +67,9 @@ class MigrateOrderFiles extends Command
                 || ($isPdf && $ownerIds !== [(int) $cart->user_id])
                 || User::whereIn('id', $ownerIds)->count() !== count($ownerIds)
                 || ! Storage::disk($disk)->exists($path)) {
-                $this->warn('À examiner (aucune modification) : '.$disk.':'.$path);
+                $this->warn($this->option('retire-public') && $disk === 'public'
+                    ? 'À examiner, mise en quarantaine privée : '.$disk.':'.$path
+                    : 'À examiner (aucune modification) : '.$disk.':'.$path);
                 $unresolved++;
                 if ($disk === 'public' && $this->option('retire-public')) {
                     $this->quarantine($source);
@@ -101,6 +103,9 @@ class MigrateOrderFiles extends Command
             if (! $mime) {
                 $this->warn('Format non pris en charge : '.$path);
                 $unresolved++;
+                if ($disk === 'public' && $this->option('retire-public')) {
+                    $this->quarantine($source);
+                }
 
                 continue;
             }
@@ -108,7 +113,7 @@ class MigrateOrderFiles extends Command
                 // Retain historical versions without replacing an already regenerated document.
                 $copy = $documents->store($cart, $ownerId, 'legacy-'.hash('sha256', $disk.':'.$path),
                     $records->first()?->file_name ?? basename($path), $contents, $mime);
-                if (hash('sha256', Storage::disk('local')->get($copy['relative_path'])) !== hash('sha256', $contents)) {
+                if (hash('sha256', Storage::disk($copy['disk'])->get($copy['relative_path'])) !== hash('sha256', $contents)) {
                     throw new \RuntimeException('Vérification de copie échouée : '.$path);
                 }
                 $this->record($source, $copy, hash('sha256', $contents));

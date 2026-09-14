@@ -1418,7 +1418,8 @@ class UserManagementController extends Controller
 
         // Log::info("ok " . $state['path']);
         $path = $state['path'];
-        $fullPath = Storage::path($path);
+        $disk = $state['disk'] ?? 'local';
+        $fullPath = Storage::disk($disk)->path($path);
 
         if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
@@ -1435,6 +1436,7 @@ class UserManagementController extends Controller
             'current' => null,
             'report' => null,
             'path' => $relativePath,
+            'disk' => $disk,
             'next_offset' => 0,
             'has_more' => true,
             'strategy' => $strategy,
@@ -1488,7 +1490,8 @@ class UserManagementController extends Controller
         }
 
         $path = $state['path'];
-        $fullPath = Storage::path($path);
+        $disk = $state['disk'] ?? 'local';
+        $fullPath = Storage::disk($disk)->path($path);
 
         if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);

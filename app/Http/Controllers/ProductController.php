@@ -260,7 +260,8 @@ class ProductController extends Controller
         }
 
         $path = $state['path'];
-        $fullPath = Storage::path($path);
+        $disk = $state['disk'] ?? 'local';
+        $fullPath = Storage::disk($disk)->path($path);
 
         if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);
@@ -278,6 +279,7 @@ class ProductController extends Controller
             'current' => null,
             'report' => null,
             'path' => $relativePath,
+            'disk' => $disk,
             'next_offset' => 0,
             'has_more' => true,
             'db_products_id' => $dbProductsId, // Crucial pour le mapping dans splitIntoTempFiles
@@ -316,7 +318,8 @@ class ProductController extends Controller
         $this->authorizeImportDb($request, isset($state['db_products_id']) ? (int) $state['db_products_id'] : null);
 
         $path = $state['path'];
-        $fullPath = Storage::path($path);
+        $disk = $state['disk'] ?? 'local';
+        $fullPath = Storage::disk($disk)->path($path);
 
         if (! is_string($fullPath) || ! is_file($fullPath)) {
             return response()->json(['message' => "Impossible d'accéder au fichier importé"], 400);

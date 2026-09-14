@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 test('it assembles uploaded chunks through streams', function () {
-    Storage::fake('local');
+    Storage::fake('public');
     $this->actingAs(User::factory()->create());
 
     $service = app(ChunkUploadService::class);
@@ -42,6 +42,7 @@ test('it assembles uploaded chunks through streams', function () {
     $payload = $response->getData(true);
 
     expect($payload['file'])->toBe('large-products.csv')
-        ->and(Storage::disk('local')->get($payload['path']))->toBe($contents)
-        ->and(Storage::disk('local')->exists("chunks/{$uploadId}"))->toBeFalse();
+        ->and($payload['path'])->toBe('imports/large-products.csv')
+        ->and(Storage::disk('public')->get($payload['path']))->toBe($contents)
+        ->and(Storage::disk('public')->exists("imports/chunks/{$uploadId}"))->toBeFalse();
 });

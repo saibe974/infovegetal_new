@@ -4,27 +4,27 @@ namespace App\Services;
 
 use App\Models\File;
 use App\Models\User;
-use Illuminate\Http\Request;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Contracts\Filesystem\Filesystem;
 
 class FileUploadService
 {
     public function __construct(
         private Filesystem $disk
     ) {
-        $this->disk = Storage::disk('local');
+        $this->disk = Storage::disk('public');
     }
 
     public function handleRegularUpload(Request $request): JsonResponse
     {
         $uploadedFile = $request->file('file');
 
-        if (!$uploadedFile instanceof UploadedFile) {
+        if (! $uploadedFile instanceof UploadedFile) {
             throw new \InvalidArgumentException('Invalid file upload');
         }
 
@@ -35,10 +35,10 @@ class FileUploadService
         $fileName = $this->generateSafeFilename($originalName);
 
         // Use Laravel's putFileAs for better file handling
-        $filePath = $this->disk->putFileAs('uploads', $uploadedFile, $fileName);
+        $filePath = $this->disk->putFileAs('imports', $uploadedFile, $fileName);
 
         // Save file info to database
-        $file = $this->createFileRecord($originalName, $filePath, $uploadedFile->getSize());
+        $file = $this->createFileRecord($originalName, $filePath, $uploadedFile->getSize(), $uploadedFile->getMimeType() ?: null);
 
         // Return success response with upload identifier
         return $this->createSuccessResponse($file, [
@@ -61,24 +61,24 @@ class FileUploadService
         }
 
         // Combine name and extension
-        $fileName = $safeName . ($extension ? '.' . $extension : '');
+        $fileName = $safeName.($extension ? '.'.$extension : '');
 
         // Check if file already exists and add counter if needed
         $counter = 1;
 
-        while ($this->disk->exists("uploads/{$fileName}")) {
-            $fileName = $safeName . '_' . $counter . ($extension ? '.' . $extension : '');
+        while ($this->disk->exists("imports/{$fileName}")) {
+            $fileName = $safeName.'_'.$counter.($extension ? '.'.$extension : '');
             $counter++;
         }
 
         return $fileName;
     }
 
-    private function createFileRecord(string $fileName, string $filePath, int $fileSize): File
+    private function createFileRecord(string $fileName, string $filePath, int $fileSize, ?string $mime): File
     {
         $user = Auth::user();
 
-        if (!$user instanceof User) {
+        if (! $user instanceof User) {
             throw new \RuntimeException('Unable to save file record without an authenticated user.');
         }
 
@@ -86,6 +86,8 @@ class FileUploadService
             'file_name' => $fileName,
             'file_path' => $filePath,
             'file_size' => $fileSize,
+            'disk' => 'public',
+            'mime' => $mime,
         ]);
 
         Cache::put(
@@ -93,6 +95,7 @@ class FileUploadService
             [
                 'status' => 'uploaded',
                 'path' => $file->file_path,
+                'disk' => $file->disk,
                 'original_name' => $file->file_name,
                 'size' => $file->file_size,
             ],

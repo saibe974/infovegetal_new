@@ -152,7 +152,7 @@ class OrderCsvService
                 $generated[] = [
                     'filename' => $filename,
                     'relative_path' => $relativePath,
-                    'disk' => 'local',
+                    'disk' => 'public',
                     'event' => $event,
                     'billing_user_id' => (int) $billingUserId,
                     'seller_user_id' => (int) ($billingContext[$dbProductId]['seller_user_id'] ?? 0),

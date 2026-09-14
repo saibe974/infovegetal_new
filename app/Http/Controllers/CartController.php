@@ -177,7 +177,6 @@ class CartController extends Controller
                 'order_id' => $cart->id, 'order_number' => $orderNumber,
             ]))->format('a4')->base64(), true),
         );
-        $pdfRelativePath = $pdfCopies[$user->id]['relative_path'];
 
         $csvFiles = app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $pdfPayload);
 
@@ -1280,7 +1279,7 @@ class CartController extends Controller
             fn (array $scoped) => $cartTcpdfService->render($scoped), $sendEmails,
         );
         $pdfRelativePath = $pdfCopies[$user->id]['relative_path'];
-        $pdfBinary = Storage::disk('local')->get($pdfRelativePath);
+        $pdfBinary = Storage::disk($pdfCopies[$user->id]['disk'])->get($pdfRelativePath);
 
         $csvFiles = $sendEmails
             ? app(OrderCsvService::class)->generateForEvent('order', $cart, $user, $payload)

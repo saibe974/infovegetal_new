@@ -11,7 +11,7 @@ import { logout } from '@/routes';
 import { edit as editProfile } from '@/routes/profile';
 import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { LogOut, Settings, UserCheck } from 'lucide-react';
+import { FileText, LogOut, Settings, UserCheck } from 'lucide-react';
 import { getEffectiveUser, hasAnyPermission, isAdmin } from '@/lib/roles';
 
 interface UserMenuContentProps {
@@ -93,6 +93,18 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full"
+                        href="/settings/files"
+                        as="button"
+                        prefetch
+                        onClick={cleanup}
+                    >
+                        <FileText className="mr-2" />
+                        Mes fichiers
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link
+                        className="block w-full"
                         href={editProfile()}
                         as="button"
                         prefetch
@@ -119,5 +131,4 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
         </>
     );
 }
-
 

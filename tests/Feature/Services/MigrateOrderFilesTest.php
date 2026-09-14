@@ -20,7 +20,8 @@ it('simulates then migrates historical PDFs without deleting unverified sources'
     $this->artisan('orders:migrate-files --apply')->assertSuccessful();
     $copy = File::firstOrFail();
     expect($copy->user_id)->toBe($client->id)->and($copy->cart_id)->toBe($cart->id);
-    expect(Storage::disk('local')->get($copy->file_path))->toBe('historical pdf');
+    expect($copy->disk)->toBe('public');
+    expect(Storage::disk('public')->get($copy->file_path))->toBe('historical pdf');
     Storage::disk('public')->assertExists($path);
 
     $this->artisan('orders:migrate-files --apply --retire-public')->assertSuccessful();

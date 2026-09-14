@@ -17,7 +17,7 @@ class ChunkUploadService
     public function __construct(
         private Filesystem $disk
     ) {
-        $this->disk = Storage::disk('local');
+        $this->disk = Storage::disk('public');
     }
 
     public function handleChunkUpload(Request $request): JsonResponse
@@ -28,7 +28,7 @@ class ChunkUploadService
         $uploadId = $request->header('Upload-Id', session()->getId());
 
         // Create temp path for chunks
-        $tempPath = "chunks/{$uploadId}";
+        $tempPath = "imports/chunks/{$uploadId}";
 
         // Ensure chunks directory exists
         $this->disk->makeDirectory($tempPath);
@@ -137,10 +137,10 @@ class ChunkUploadService
     {
         // Generate filename from original name
         $fileName = $this->generateSafeFilename($uploadName);
-        $filePath = "uploads/{$fileName}";
+        $filePath = "imports/{$fileName}";
 
-        // Ensure uploads directory exists
-        $this->disk->makeDirectory('uploads');
+        // Ensure imports directory exists
+        $this->disk->makeDirectory('imports');
 
         // Get all chunk files and sort by offset
         $chunks = $this->disk->files($tempPath);
@@ -259,7 +259,7 @@ class ChunkUploadService
         // Check if file already exists and add counter if needed
         $counter = 1;
 
-        while ($this->disk->exists("uploads/{$fileName}")) {
+        while ($this->disk->exists("imports/{$fileName}")) {
             $fileName = $safeName.'_'.$counter.($extension ? '.'.$extension : '');
             $counter++;
         }
@@ -279,6 +279,8 @@ class ChunkUploadService
             'file_name' => $fileName,
             'file_path' => $filePath,
             'file_size' => $fileSize,
+            'disk' => 'public',
+            'mime' => $this->mimeFromFilename($fileName),
         ]);
 
         Cache::put(
@@ -286,6 +288,7 @@ class ChunkUploadService
             [
                 'status' => 'uploaded',
                 'path' => $file->file_path,
+                'disk' => $file->disk,
                 'original_name' => $file->file_name,
                 'size' => $file->file_size,
             ],
@@ -303,5 +306,16 @@ class ChunkUploadService
             'path' => $file->file_path,
             'size' => $file->file_size,
         ], $extra));
+    }
+
+    private function mimeFromFilename(string $fileName): ?string
+    {
+        return match (strtolower(pathinfo($fileName, PATHINFO_EXTENSION))) {
+            'csv' => 'text/csv',
+            'tsv' => 'text/tab-separated-values',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'xls' => 'application/vnd.ms-excel',
+            default => null,
+        };
     }
 }

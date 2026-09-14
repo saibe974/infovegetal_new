@@ -86,7 +86,7 @@ it('persists billing profiles and CSV files together', function (): void {
 });
 
 it('stores enabled order CSV templates for the configured billing user', function (): void {
-    Storage::fake('local');
+    Storage::fake('public');
 
     $client = User::factory()->create();
     $billingUser = User::factory()->create();
@@ -160,7 +160,7 @@ it('stores enabled order CSV templates for the configured billing user', functio
         ->and($files[0]['filename'])->toContain('commande-csv')
         ->and($files[0]['billing_user_id'])->toBe($billingUser->id)
         ->and($files[0]['event'])->toBe('order')
-        ->and($files[0]['disk'])->toBe('local')
+        ->and($files[0]['disk'])->toBe('public')
         ->and($service->attachmentPathsForBillingUser($files, $billingUser->id))->toBe([
             $files[0]['relative_path'],
         ])
@@ -169,8 +169,8 @@ it('stores enabled order CSV templates for the configured billing user', functio
         ->and($billingUser->files()->where('file_path', $files[0]['relative_path'])->exists())->toBeTrue()
         ->and($client->files()->where('file_path', $files[0]['relative_path'])->exists())->toBeFalse();
 
-    Storage::disk('local')->assertExists($files[0]['relative_path']);
-    expect(Storage::disk('local')->get($files[0]['relative_path']))->toContain('TUL-01');
+    Storage::disk('public')->assertExists($files[0]['relative_path']);
+    expect(Storage::disk('public')->get($files[0]['relative_path']))->toContain('TUL-01');
 
     $deliveryFiles = $service->generateForEvent('delivery', $cart, $client, [
         'document_number' => 'BL-00012',
@@ -187,11 +187,11 @@ it('stores enabled order CSV templates for the configured billing user', functio
 
     expect($deliveryFiles)->toHaveCount(1)
         ->and($deliveryFiles[0]['event'])->toBe('delivery')
-        ->and(Storage::disk('local')->get($deliveryFiles[0]['relative_path']))->toContain('BL-00012');
+        ->and(Storage::disk('public')->get($deliveryFiles[0]['relative_path']))->toContain('BL-00012');
 });
 
 it('supports multi-event TSV files, dynamic names, sharing and the order PDF name', function (): void {
-    Storage::fake('local');
+    Storage::fake('public');
 
     $client = User::factory()->create(['name' => 'Client Test', 'ref' => 'CLI-508', 'alias' => 'Client principal']);
     $billingUser = User::factory()->create();
@@ -281,8 +281,8 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
     expect($orderFiles)->toHaveCount(1)
         ->and($deliveryFiles)->toHaveCount(1)
         ->and($orderFiles[0]['filename'])->toBe('DOC-42_Fleurs France_CLI-508_Client principal.tsv')
-        ->and(Storage::disk('local')->get($orderFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
-        ->and(Storage::disk('local')->get($deliveryFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
+        ->and(Storage::disk('public')->get($orderFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
+        ->and(Storage::disk('public')->get($deliveryFiles[0]['relative_path']))->toContain('TUL-01 / CLI-508 / Client principal')
         ->and($orderFiles[0]['mime'])->toBe('text/tab-separated-values')
         ->and($orderFiles[0]['shared'])->toBeTrue()
         ->and($service->attachmentsForRecipient($orderFiles, $billingUser->id, $client->id))->toHaveCount(1)
@@ -298,9 +298,9 @@ it('supports multi-event TSV files, dynamic names, sharing and the order PDF nam
 
     foreach ([$client, $billingUser, $seller] as $recipient) {
         $copy = $service->attachmentsForRecipient($orderFiles, $recipient->id, $client->id)[0];
-        expect($copy['relative_path'])->toStartWith('meta_user/'.$recipient->id.'/commandes/')
+        expect($copy['relative_path'])->toStartWith('user-meta/'.$recipient->id.'/commandes/')
             ->and($recipient->files()->where('file_path', $copy['relative_path'])->exists())->toBeTrue();
-        Storage::disk('local')->assertExists($copy['relative_path']);
+        Storage::disk('public')->assertExists($copy['relative_path']);
     }
     $service->generate($cart, $client, $payload);
     expect($client->files()->count())->toBe(2)
