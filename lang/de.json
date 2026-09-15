@@ -391,5 +391,17 @@
     "No usable zone found in this CSV.": "Keine verwendbare Zone in dieser CSV gefunden.",
     "Zones imported.": "Zonen importiert.",
     "Full screen": "Vollbild",
-    "Exit full screen": "Vollbild beenden"
+    "Exit full screen": "Vollbild beenden",
+    "Insert a zone before": "Zone davor einfügen",
+    "Insert a zone after": "Zone danach einfügen",
+    "Delete zone": "Zone löschen",
+    "Add first zone": "Erste Zone hinzufügen",
+    "Add a tier here": "Staffel hier einfügen",
+    "Add a tier": "Staffel hinzufügen",
+    "Enter a whole number": "Ganze Zahl eingeben",
+    "The value must be at least 1": "Der Wert muss mindestens 1 sein",
+    "This tier already exists": "Diese Staffel existiert bereits",
+    "The value must be greater than :min": "Der Wert muss größer als :min sein",
+    "The value must be less than :max": "Der Wert muss kleiner als :max sein",
+    "The value must be between :min and :max": "Der Wert muss zwischen :min und :max liegen"
 }

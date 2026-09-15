@@ -126,7 +126,41 @@ class CarrierController extends Controller
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
         ]);
 
-        $handle = fopen($validated['file']->getRealPath(), 'rb');
+        $zones = $this->parseZonesCsv($validated['file']);
+
+        DB::transaction(function () use ($carrier, $zones): void {
+            $carrier->zones()->delete();
+
+            foreach (array_values($zones) as $zone) {
+                $carrier->zones()->create($zone);
+            }
+        });
+
+        $carrier->load('zones');
+
+        return response()->json([
+            'message' => __('Zones imported.'),
+            'carrier' => CarrierResource::make($carrier),
+        ]);
+    }
+
+    public function parseZones(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'],
+        ]);
+
+        $zones = $this->parseZonesCsv($validated['file']);
+
+        return response()->json([
+            'message' => __('Zones imported.'),
+            'zones' => array_values($zones),
+        ]);
+    }
+
+    private function parseZonesCsv($file): array
+    {
+        $handle = fopen($file->getRealPath(), 'rb');
 
         if ($handle === false) {
             throw ValidationException::withMessages([
@@ -222,20 +256,7 @@ class CarrierController extends Controller
                 ]);
             }
 
-            DB::transaction(function () use ($carrier, $zones): void {
-                $carrier->zones()->delete();
-
-                foreach (array_values($zones) as $zone) {
-                    $carrier->zones()->create($zone);
-                }
-            });
-
-            $carrier->load('zones');
-
-            return response()->json([
-                'message' => __('Zones imported.'),
-                'carrier' => CarrierResource::make($carrier),
-            ]);
+            return $zones;
         } finally {
             fclose($handle);
         }

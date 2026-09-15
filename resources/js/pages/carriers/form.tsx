@@ -4,6 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CountryFlag } from '@/components/ui/country-flag';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
@@ -23,7 +31,16 @@ import carrierZones from '@/routes/carriers/zones';
 import type { BreadcrumbItem, Carrier, CarrierZone } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
-import { ArrowLeftCircle, PlusIcon, SaveIcon, TrashIcon } from 'lucide-react';
+import {
+    ArrowLeftCircle,
+    ChevronDownIcon,
+    ChevronUpIcon,
+    DownloadIcon,
+    Loader2Icon,
+    PlusIcon,
+    SaveIcon,
+    TrashIcon,
+} from 'lucide-react';
 import { FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 
 interface ZoneTier {
@@ -58,7 +75,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const mapZones = (zones?: CarrierZone[]): ZoneDraft[] => {
     if (!zones || zones.length === 0) {
-        return [{ name: '', mini: '', tiers: [] }];
+        return [];
     }
 
     return zones.map((zone) => {
@@ -105,22 +122,6 @@ const getUniqueRolls = (zones: ZoneDraft[]) => {
 
         return left.localeCompare(right);
     });
-};
-
-const getNextRoll = (zones: ZoneDraft[]) => {
-    const rolls = getUniqueRolls(zones);
-    const numericRolls = rolls
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value));
-    let next = numericRolls.length > 0 ? Math.max(...numericRolls) + 1 : 1;
-    let candidate = String(next);
-
-    while (rolls.includes(candidate)) {
-        next += 1;
-        candidate = String(next);
-    }
-
-    return candidate;
 };
 
 const normalizeDecimal = (value: string) => value.trim().replace(',', '.');
@@ -200,7 +201,6 @@ export default withAppLayout<Props>(
                         : '',
                 zones: mapZones(carrier?.zones),
             });
-        const [newRoll, setNewRoll] = useState('');
         const [importingZones, setImportingZones] = useState(false);
         const [importZonesError, setImportZonesError] = useState<string | null>(
             null,
@@ -265,50 +265,54 @@ export default withAppLayout<Props>(
             [setData],
         );
 
-        const addZone = () => {
-            setData('zones', [
-                ...data.zones,
-                { name: '', mini: '', tiers: [] },
-            ]);
-        };
+        const insertZone = useCallback(
+            (index: number | null, position: 'before' | 'after') => {
+                setData((current) => {
+                    const currentIndex =
+                        index !== null &&
+                        index >= 0 &&
+                        index < current.zones.length
+                            ? index
+                            : -1;
+                    const insertAt =
+                        currentIndex < 0
+                            ? current.zones.length
+                            : currentIndex + (position === 'after' ? 1 : 0);
+                    const next = [...current.zones];
+                    next.splice(insertAt, 0, {
+                        name: '',
+                        mini: '',
+                        tiers: [],
+                    });
+                    return { ...current, zones: next };
+                });
+            },
+            [setData],
+        );
 
         const removeZone = useCallback(
             (index: number) => {
                 setData((current) => {
                     const next = [...current.zones];
                     next.splice(index, 1);
-                    return {
-                        ...current,
-                        zones:
-                            next.length > 0
-                                ? next
-                                : [{ name: '', mini: '', tiers: [] }],
-                    };
+                    return { ...current, zones: next };
                 });
             },
             [setData],
         );
 
-        const addRoll = () => {
-            let roll = newRoll.trim();
-            const rolls = getUniqueRolls(data.zones);
-            if (!roll) {
-                roll = getNextRoll(data.zones);
-            } else if (rolls.includes(roll)) {
-                setNewRoll('');
-                return;
-            }
-
-            const next = data.zones.map((zone) => {
-                if (zone.tiers.some((tier) => tier.roll === roll)) {
-                    return zone;
-                }
-                return { ...zone, tiers: [...zone.tiers, { roll, price: '' }] };
-            });
-
-            setData('zones', next);
-            setNewRoll('');
-        };
+        const insertRoll = useCallback(
+            (roll: string) => {
+                setData((current) => ({
+                    ...current,
+                    zones: current.zones.map((zone) => ({
+                        ...zone,
+                        tiers: [...zone.tiers, { roll, price: '' }],
+                    })),
+                }));
+            },
+            [setData],
+        );
 
         const removeRoll = useCallback(
             (roll: string) => {
@@ -376,6 +380,133 @@ export default withAppLayout<Props>(
             rollsRef.current = next;
             return next;
         }, [data.zones]);
+        const [tierPrompt, setTierPrompt] = useState<{
+            prev: number | null;
+            next: number | null;
+        } | null>(null);
+        const [tierValue, setTierValue] = useState('');
+        const [tierError, setTierError] = useState<string | null>(null);
+
+        const canInsertRollBefore = useCallback(
+            (columnId: string) => {
+                if (columnId === 'actions') {
+                    return true;
+                }
+                if (!columnId.startsWith('roll-')) {
+                    return false;
+                }
+
+                const index = rolls.indexOf(columnId.replace(/^roll-/, ''));
+                if (index < 0) {
+                    return true;
+                }
+
+                const next = Number(rolls[index]);
+                if (!Number.isFinite(next)) {
+                    return true;
+                }
+
+                const prev = index > 0 ? Number(rolls[index - 1]) : null;
+                if (prev === null || !Number.isFinite(prev)) {
+                    return next >= 2;
+                }
+
+                return next - prev >= 2;
+            },
+            [rolls],
+        );
+
+        const openTierPrompt = useCallback(
+            (columnIndex: number) => {
+                const rollIndex = columnIndex - 2;
+                if (rollIndex < 0 || rollIndex > rolls.length) {
+                    return;
+                }
+
+                const toFinite = (value: number | null) =>
+                    value !== null && Number.isFinite(value) ? value : null;
+                const prev = toFinite(
+                    rollIndex > 0 ? Number(rolls[rollIndex - 1]) : null,
+                );
+                const next = toFinite(
+                    rollIndex < rolls.length ? Number(rolls[rollIndex]) : null,
+                );
+
+                const defaultValue =
+                    prev !== null && next !== null
+                        ? String(Math.floor((prev + next) / 2))
+                        : next !== null
+                          ? String(next - 1)
+                          : prev !== null
+                            ? String(prev + 1)
+                            : '1';
+
+                setTierValue(defaultValue);
+                setTierError(null);
+                setTierPrompt({ prev, next });
+            },
+            [rolls],
+        );
+
+        const submitTierPrompt = () => {
+            if (!tierPrompt) {
+                return;
+            }
+
+            const raw = tierValue.trim();
+            const value = Number(raw);
+
+            if (raw === '' || !Number.isInteger(value)) {
+                setTierError(t('Enter a whole number'));
+                return;
+            }
+            if (value < 1) {
+                setTierError(t('The value must be at least 1'));
+                return;
+            }
+            if (rolls.some((roll) => Number(roll) === value)) {
+                setTierError(t('This tier already exists'));
+                return;
+            }
+            if (tierPrompt.prev !== null && value <= tierPrompt.prev) {
+                setTierError(
+                    t('The value must be greater than :min').replace(
+                        ':min',
+                        String(tierPrompt.prev),
+                    ),
+                );
+                return;
+            }
+            if (tierPrompt.next !== null && value >= tierPrompt.next) {
+                setTierError(
+                    t('The value must be less than :max').replace(
+                        ':max',
+                        String(tierPrompt.next),
+                    ),
+                );
+                return;
+            }
+
+            insertRoll(String(value));
+            setTierPrompt(null);
+        };
+
+        const tierRangeText = tierPrompt
+            ? tierPrompt.prev !== null && tierPrompt.next !== null
+                ? t('The value must be between :min and :max')
+                      .replace(':min', String(tierPrompt.prev))
+                      .replace(':max', String(tierPrompt.next))
+                : tierPrompt.prev !== null
+                  ? t('The value must be greater than :min').replace(
+                        ':min',
+                        String(tierPrompt.prev),
+                    )
+                  : t('The value must be less than :max').replace(
+                        ':max',
+                        String(tierPrompt.next ?? ''),
+                    )
+            : '';
+
         const zoneRows = useMemo<ZoneRow[]>(
             () =>
                 data.zones.map((zone, index) => ({ ...zone, __index: index })),
@@ -437,32 +568,33 @@ export default withAppLayout<Props>(
                 const file = event.target.files?.[0];
                 event.target.value = '';
 
-                if (!file || !carrier.id) {
+                if (!file) {
                     return;
                 }
 
                 const formData = new FormData();
                 formData.append('file', file);
 
+                const url = carrier.id
+                    ? carrierZones.import.url({
+                          carrier: carrier.id as number,
+                      })
+                    : carrierZones.parse.url();
+
                 setImportingZones(true);
                 setImportZonesError(null);
 
                 try {
-                    const response = await fetch(
-                        carrierZones.import.url({
-                            carrier: carrier.id as number,
-                        }),
-                        {
-                            method: 'POST',
-                            headers: {
-                                Accept: 'application/json',
-                                'X-CSRF-TOKEN': getCsrfToken(),
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            credentials: 'same-origin',
-                            body: formData,
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
                         },
-                    );
+                        credentials: 'same-origin',
+                        body: formData,
+                    });
 
                     const payload = await response.json().catch(() => null);
 
@@ -475,7 +607,7 @@ export default withAppLayout<Props>(
                         throw new Error(message);
                     }
 
-                    const nextZones = payload?.carrier?.zones ?? [];
+                    const nextZones = payload?.carrier?.zones ?? payload?.zones ?? [];
                     setData('zones', mapZones(nextZones));
                 } catch (error) {
                     setImportZonesError(
@@ -579,23 +711,54 @@ export default withAppLayout<Props>(
                 ...rollColumns,
                 {
                     id: 'actions',
-                    header: '',
+                    header: () => null,
                     cell: ({ row }: CellContext<ZoneRow, unknown>) => (
-                        <Button
-                            type="button"
-                            variant="destructive-outline"
-                            size="icon"
-                            onClick={() => removeZone(row.original.__index)}
-                        >
-                            <TrashIcon size={16} />
-                        </Button>
+                        <div className="flex items-center gap-0.5 whitespace-nowrap">
+                            <div className="flex h-9 w-9 flex-col overflow-hidden rounded-md border border-border/60 bg-transparent">
+                                <button
+                                    type="button"
+                                    className="flex h-1/2 w-full items-center justify-center border-b border-border/60 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-green-400"
+                                    title={t('Insert a zone before')}
+                                    aria-label={t('Insert a zone before')}
+                                    onClick={() =>
+                                        insertZone(row.original.__index, 'before')
+                                    }
+                                >
+                                    <ChevronUpIcon className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="flex h-1/2 w-full items-center justify-center text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-green-400"
+                                    title={t('Insert a zone after')}
+                                    aria-label={t('Insert a zone after')}
+                                    onClick={() =>
+                                        insertZone(row.original.__index, 'after')
+                                    }
+                                >
+                                    <ChevronDownIcon className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                title={t('Delete zone')}
+                                aria-label={t('Delete zone')}
+                                onClick={() => removeZone(row.original.__index)}
+                            >
+                                <TrashIcon className="h-4 w-4" />
+                            </Button>
+                        </div>
                     ),
                 },
             ];
         }, [
+            insertZone,
             minimumPriceHeader,
             rolls,
             removeZone,
+            t,
             updateTierPrice,
             updateZone,
             zonesHeader,
@@ -909,31 +1072,32 @@ export default withAppLayout<Props>(
                         </Card>
 
                         <Card className="space-y-4 p-4">
-                            {!isNew && (
-                                <input
-                                    ref={importInputRef}
-                                    type="file"
-                                    accept=".csv,text/csv,application/csv"
-                                    className="hidden"
-                                    onChange={handleImportFile}
-                                />
-                            )}
+                            <input
+                                ref={importInputRef}
+                                type="file"
+                                accept=".csv,text/csv,application/csv"
+                                className="hidden"
+                                onChange={handleImportFile}
+                            />
                             {importZonesError && (
                                 <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                                     {importZonesError}
                                 </div>
                             )}
-                            <div className="flex flex-wrap items-end justify-between gap-3">
-                                <div className="flex flex-wrap items-end gap-6">
-                                    <h3 className="pb-2 text-sm font-semibold text-muted-foreground">
+                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                    <h3 className="text-sm font-semibold text-muted-foreground">
                                         {t('Delivery zones')}
                                     </h3>
-                                    <div className="w-40">
-                                        <FormField
-                                            label={t('Taxgo')}
+                                    <div className="h-5 w-px bg-border" />
+                                    <div className="flex items-center gap-2">
+                                        <Label
                                             htmlFor="taxgo"
-                                            error={errors.taxgo}
+                                            className="text-xs font-normal text-muted-foreground"
                                         >
+                                            {t('Taxgo')}
+                                        </Label>
+                                        <div className="flex flex-col">
                                             <Input
                                                 id="taxgo"
                                                 name="taxgo"
@@ -950,64 +1114,112 @@ export default withAppLayout<Props>(
                                                     )
                                                 }
                                                 aria-invalid={!!errors.taxgo}
+                                                className="h-8 w-24 border-primary/60 bg-primary/5 text-right font-semibold focus-visible:border-primary focus-visible:ring-primary/30"
                                             />
-                                        </FormField>
+                                            {errors.taxgo && (
+                                                <InputError
+                                                    message={errors.taxgo}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <div className="flex items-center gap-2">
-                                        {!isNew && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleImportClick}
-                                                disabled={
-                                                    processing || importingZones
-                                                }
-                                            >
-                                                {importingZones
-                                                    ? t('Importing...')
-                                                    : t('Import CSV')}
-                                            </Button>
-                                        )}
-                                        <Input
-                                            value={newRoll}
-                                            onChange={(e) =>
-                                                setNewRoll(e.target.value)
-                                            }
-                                            placeholder={t('Rolls')}
-                                            className="w-24"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={addRoll}
-                                        >
-                                            <PlusIcon className="mr-2 h-4 w-4" />{' '}
-                                            {t('Add tier')}
-                                        </Button>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={addZone}
-                                    >
-                                        <PlusIcon className="mr-2 h-4 w-4" />{' '}
-                                        {t('Add zone')}
-                                    </Button>
-                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleImportClick}
+                                    disabled={processing || importingZones}
+                                >
+                                    {importingZones ? (
+                                        <>
+                                            <Loader2Icon className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                            {t('Importing...')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <DownloadIcon className="mr-2 h-3.5 w-3.5" />
+                                            {t('Import CSV')}
+                                        </>
+                                    )}
+                                </Button>
                             </div>
 
                             <DataTable
                                 columns={columns}
                                 data={zoneRows}
-                                emptyMessage={t('No zones yet')}
+                                emptyMessage={
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => insertZone(null, 'after')}
+                                    >
+                                        <PlusIcon className="mr-2 h-4 w-4" />{' '}
+                                        {t('Add first zone')}
+                                    </Button>
+                                }
                                 getRowId={getZoneRowId}
+                                stickyEndColumnId="actions"
+                                columnInsertLabel={t('Add a tier here')}
+                                onColumnInsert={openTierPrompt}
+                                canInsertBefore={canInsertRollBefore}
                                 headerControls={headerControls}
                             />
+
+                            <Dialog
+                                open={tierPrompt !== null}
+                                onOpenChange={(open) => {
+                                    if (!open) {
+                                        setTierPrompt(null);
+                                    }
+                                }}
+                            >
+                                <DialogContent className="sm:max-w-sm">
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            {t('Add a tier')}
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            {tierRangeText}
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <Input
+                                        value={tierValue}
+                                        inputMode="numeric"
+                                        aria-invalid={!!tierError}
+                                        onChange={(event) => {
+                                            setTierValue(event.target.value);
+                                            setTierError(null);
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter') {
+                                                event.preventDefault();
+                                                submitTierPrompt();
+                                            }
+                                        }}
+                                    />
+                                    {tierError && (
+                                        <p className="text-sm text-destructive">
+                                            {tierError}
+                                        </p>
+                                    )}
+                                    <DialogFooter>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setTierPrompt(null)}
+                                        >
+                                            {t('Cancel')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={submitTierPrompt}
+                                        >
+                                            {t('Add')}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </Card>
                     </main>
                 </div>

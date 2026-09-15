@@ -390,5 +390,17 @@
     "No usable zone found in this CSV.": "Geen bruikbare zone gevonden in deze CSV.",
     "Zones imported.": "Zones geïmporteerd.",
     "Full screen": "Volledig scherm",
-    "Exit full screen": "Volledig scherm afsluiten"
+    "Exit full screen": "Volledig scherm afsluiten",
+    "Insert a zone before": "Zone ervoor invoegen",
+    "Insert a zone after": "Zone erna invoegen",
+    "Delete zone": "Zone verwijderen",
+    "Add first zone": "Eerste zone toevoegen",
+    "Add a tier here": "Niveau hier invoegen",
+    "Add a tier": "Niveau toevoegen",
+    "Enter a whole number": "Voer een geheel getal in",
+    "The value must be at least 1": "De waarde moet minimaal 1 zijn",
+    "This tier already exists": "Dit niveau bestaat al",
+    "The value must be greater than :min": "De waarde moet groter zijn dan :min",
+    "The value must be less than :max": "De waarde moet kleiner zijn dan :max",
+    "The value must be between :min and :max": "De waarde moet tussen :min en :max liggen"
 }

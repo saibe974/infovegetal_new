@@ -10,6 +10,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::match(['post', 'patch', 'delete'], 'upload', UploadController::class)->name('upload');
 
     // Carriers
+    Route::post('carriers/zones/parse', [CarrierController::class, 'parseZones'])
+        ->name('carriers.zones.parse')
+        ->middleware(['role_or_impersonator:admin']);
     Route::post('carriers/{carrier}/zones/import', [CarrierController::class, 'importZones'])
         ->whereNumber('carrier')
         ->name('carriers.zones.import')

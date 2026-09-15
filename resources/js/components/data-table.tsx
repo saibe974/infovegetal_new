@@ -60,6 +60,7 @@ type DataTableProps<TData, TValue> = {
     onColumnReorder?: (activeColumnId: string, overColumnId: string) => void;
     onColumnInsert?: (columnIndex: number) => void;
     columnInsertLabel?: string;
+    canInsertBefore?: (columnId: string) => boolean;
 };
 
 type SortableTableHeadProps = {
@@ -127,6 +128,7 @@ export function DataTable<TData, TValue>({
     onColumnReorder,
     onColumnInsert,
     columnInsertLabel = 'Ajouter une colonne ici',
+    canInsertBefore,
 }: DataTableProps<TData, TValue>) {
     const [headerDrafts, setHeaderDrafts] = React.useState<
         Record<string, string>
@@ -229,8 +231,12 @@ export function DataTable<TData, TValue>({
                                                 headerDrafts[
                                                     header.column.id
                                                 ] ?? headerValue;
-                                            const canInsertBefore =
-                                                Boolean(onColumnInsert);
+                                            const showInsertBefore =
+                                                Boolean(onColumnInsert) &&
+                                                (!canInsertBefore ||
+                                                    canInsertBefore(
+                                                        header.column.id,
+                                                    ));
 
                                             return (
                                                 <SortableTableHead
@@ -246,7 +252,7 @@ export function DataTable<TData, TValue>({
                                                 >
                                                     {(dragHandle) => (
                                                         <>
-                                                            {canInsertBefore ? (
+                                                            {showInsertBefore ? (
                                                                 <Button
                                                                     type="button"
                                                                     variant="ghost"

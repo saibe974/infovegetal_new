@@ -391,5 +391,17 @@
     "No usable zone found in this CSV.": "Nessuna zona utilizzabile trovata in questo CSV.",
     "Zones imported.": "Zone importate.",
     "Full screen": "Schermo intero",
-    "Exit full screen": "Esci da schermo intero"
+    "Exit full screen": "Esci da schermo intero",
+    "Insert a zone before": "Inserisci una zona prima",
+    "Insert a zone after": "Inserisci una zona dopo",
+    "Delete zone": "Elimina zona",
+    "Add first zone": "Aggiungi la prima zona",
+    "Add a tier here": "Aggiungi uno scaglione qui",
+    "Add a tier": "Aggiungi uno scaglione",
+    "Enter a whole number": "Inserisci un numero intero",
+    "The value must be at least 1": "Il valore deve essere almeno 1",
+    "This tier already exists": "Questo scaglione esiste già",
+    "The value must be greater than :min": "Il valore deve essere maggiore di :min",
+    "The value must be less than :max": "Il valore deve essere minore di :max",
+    "The value must be between :min and :max": "Il valore deve essere compreso tra :min e :max"
 }

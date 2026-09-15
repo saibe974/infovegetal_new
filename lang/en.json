@@ -391,5 +391,17 @@
     "No usable zone found in this CSV.": "No usable zone found in this CSV.",
     "Zones imported.": "Zones imported.",
     "Full screen": "Full screen",
-    "Exit full screen": "Exit full screen"
+    "Exit full screen": "Exit full screen",
+    "Insert a zone before": "Insert a zone before",
+    "Insert a zone after": "Insert a zone after",
+    "Delete zone": "Delete zone",
+    "Add first zone": "Add first zone",
+    "Add a tier here": "Add a tier here",
+    "Add a tier": "Add a tier",
+    "Enter a whole number": "Enter a whole number",
+    "The value must be at least 1": "The value must be at least 1",
+    "This tier already exists": "This tier already exists",
+    "The value must be greater than :min": "The value must be greater than :min",
+    "The value must be less than :max": "The value must be less than :max",
+    "The value must be between :min and :max": "The value must be between :min and :max"
 }
