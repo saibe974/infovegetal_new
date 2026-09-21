@@ -100,6 +100,7 @@ export interface BillingFileBlock {
 
 export interface BillingFileTemplate {
     id: string;
+    template_id?: string | null;
     name: string;
     filename: string;
     event: BillingFileEvent;

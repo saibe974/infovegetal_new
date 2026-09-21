@@ -210,12 +210,12 @@ try {
         ),
     );
     await click('Tout sélectionner');
-    await click('Enregistrer');
+    await click('Save model');
     await page.waitForFunction(() =>
         document.body.textContent.includes('Configuration enregistrée dans'),
     );
     const originalId = models.at(-1).id;
-    await click('Dupliquer');
+    await click('Duplicate model');
     await settle();
     assert.equal(models.length, 3);
     assert.notEqual(models.at(-1).id, originalId);
@@ -225,7 +225,7 @@ try {
             .find((label) => label.textContent.trim() === 'Excel (.xlsx)')
             .click(),
     );
-    await click('Exporter');
+    await click('Export');
     await settle();
     assert.equal(
         calls.filter((call) => call.body?.preview).length,

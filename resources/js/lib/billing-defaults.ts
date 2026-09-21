@@ -180,6 +180,7 @@ const normalizeFiles = (
 
             return {
                 id: String(file.id || `file-${fileIndex + 1}`),
+                template_id: file.template_id,
                 name: String(file.name || `Fichier ${fileIndex + 1}`),
                 filename: String(
                     file.filename ||

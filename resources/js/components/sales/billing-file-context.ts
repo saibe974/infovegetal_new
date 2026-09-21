@@ -54,16 +54,16 @@ const itemVariables = [
 ];
 
 export const blockLabels: Record<BillingFileBlockType, string> = {
-    header: 'Entête',
-    items: 'Liste des produits',
-    footer: 'Total / pied de fichier',
+    header: 'Header',
+    items: 'Product list',
+    footer: 'Total / file footer',
 };
 
 export const eventLabels: Record<BillingFileEvent, string> = {
-    order: 'Commande',
-    delivery: 'Livraison',
-    invoice: 'Facture',
-    credit_note: 'Avoir',
+    order: 'Order',
+    delivery: 'Delivery',
+    invoice: 'Invoice',
+    credit_note: 'Credit note',
 };
 
 export const preferredExtension = (

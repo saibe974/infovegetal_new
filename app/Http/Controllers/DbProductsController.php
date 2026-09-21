@@ -497,6 +497,7 @@ class DbProductsController extends Controller
             'billing_users.*.defaults.profiles.*.conditions.*' => ['nullable'],
             'billing_users.*.defaults.files' => ['nullable', 'array'],
             'billing_users.*.defaults.files.*.id' => ['required', 'string', 'max:190'],
+            'billing_users.*.defaults.files.*.template_id' => ['nullable', 'string', 'max:100'],
             'billing_users.*.defaults.files.*.name' => ['required', 'string', 'max:190'],
             'billing_users.*.defaults.files.*.filename' => ['nullable', 'string', 'max:5000'],
             'billing_users.*.defaults.files.*.event' => ['required', Rule::in(['order', 'delivery', 'invoice', 'credit_note'])],

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { Copy, Save, Trash2 } from 'lucide-react';
@@ -27,6 +28,23 @@ export const fileDefinition = (file: FileTemplate): FileTemplate => ({
     delimiter: file.delimiter,
     blocks: structuredClone(file.blocks),
 });
+
+// Export names can differ from library names. Compare normalized file content.
+const definitionKey = (file: FileTemplate) =>
+    JSON.stringify([
+        file.filename,
+        file.delimiter,
+        file.blocks.map((block) => [
+            block.name,
+            block.type,
+            block.enabled,
+            block.show_headers,
+            block.columns.map((column) => column.name),
+            block.rows.map((row) =>
+                block.columns.map((column) => row.cells[column.id] ?? ''),
+            ),
+        ]),
+    ]);
 
 export function templateCompatibility(
     template: FileTemplate,
@@ -68,6 +86,9 @@ export function TemplateLibrary({
     formats,
     variables,
     disabled,
+    autoSelectCurrentTemplate = false,
+    currentTemplateId,
+    onClearSelection,
     onChange,
     onLoad,
 }: {
@@ -76,10 +97,14 @@ export function TemplateLibrary({
     formats: readonly string[];
     variables: (type: FileBlockType) => string[];
     disabled?: boolean;
-    onChange: (template: FileTemplate) => void;
-    onLoad: (saved: SavedFileTemplate) => void;
+    autoSelectCurrentTemplate?: boolean;
+    currentTemplateId?: string | null;
+    onClearSelection?: () => void;
+    onChange: (template: FileTemplate, savedId?: string) => void;
+    onLoad: (saved: SavedFileTemplate, savedId: string | null) => void;
 }) {
     const { t } = useI18n();
+    const accessError = t('Unable to access models.');
     const { auth, csrf_token: csrfToken } = usePage<SharedData>().props;
     const [saved, setSaved] = useState<SavedFileTemplate[]>([]);
     const [selectedId, setSelectedId] = useState('');
@@ -99,6 +124,19 @@ export function TemplateLibrary({
         ? templateCompatibility(adaptation.template, variables)
         : [];
     const userId = auth?.user?.id;
+    const currentId = autoSelectCurrentTemplate
+        ? saved.find((model) =>
+              currentTemplateId !== undefined
+                  ? model.id === currentTemplateId
+                  : model.format === format &&
+                    definitionKey(model.template) === definitionKey(template),
+          )?.id ?? ''
+        : '';
+    useEffect(() => {
+        if (!autoSelectCurrentTemplate || !ready) return;
+        setSelectedId(currentId);
+        setLoadedId(currentId);
+    }, [autoSelectCurrentTemplate, currentId, ready]);
     const request = useCallback(
         async (path = '', method = 'GET', body?: SavedFileTemplate) => {
             const response = await fetch(`/file-export-templates${path}`, {
@@ -118,11 +156,11 @@ export function TemplateLibrary({
                         payload?.errors ?? {},
                     ).flat()[0] as string) ||
                     payload?.message ||
-                    'Impossible d’accéder aux configurations.',
+                    accessError,
                 );
             return payload;
         },
-        [csrfToken],
+        [csrfToken, accessError],
     );
     useEffect(() => {
         let cancelled = false;
@@ -184,7 +222,7 @@ export function TemplateLibrary({
                     if (migrationFailed)
                         setError(
                             t(
-                                'Certains anciens modèles n’ont pas pu être repris. Leur copie locale est conservée.',
+                                'Some older models could not be imported. Their local copies have been preserved.',
                             ),
                         );
                 }
@@ -231,7 +269,7 @@ export function TemplateLibrary({
         setError(null);
         try {
             const definition = fileDefinition(template);
-            if (duplicate) definition.name = `${definition.name} — copie`;
+            if (duplicate) definition.name = `${definition.name} — ${t('copy')}`;
             const item: SavedFileTemplate = {
                 id: !duplicate && loadedId ? loadedId : uniqueId('template'),
                 template: definition,
@@ -244,7 +282,7 @@ export function TemplateLibrary({
             ]);
             setSelectedId(result.id);
             setLoadedId(result.id);
-            onChange(structuredClone(result.template));
+            onChange(structuredClone(result.template), result.id);
         } catch (exception) {
             setError((exception as Error).message);
         } finally {
@@ -271,46 +309,49 @@ export function TemplateLibrary({
         <div className="space-y-3 rounded-lg bg-muted/40 p-3">
             <div className="flex flex-wrap items-center gap-2">
                 <select
-                    aria-label={t('Configuration enregistrée')}
-                    className="h-9 min-w-48 flex-1 rounded-md border bg-background px-3 text-sm"
+                    aria-label={t('Saved model')}
+                    className={cn(
+                        'h-9 min-w-48 flex-1 rounded-md border bg-background px-3 text-sm',
+                        selectedId === '' && 'text-muted-foreground',
+                    )}
                     disabled={disabled || busy || !ready}
                     value={selectedId}
                     onChange={(event) => {
-                        setSelectedId(event.target.value);
-                        if (!event.target.value) setLoadedId('');
+                        const id = event.target.value;
+                        const item = saved.find((model) => model.id === id);
+                        setSelectedId(id);
+                        if (!id) {
+                            setLoadedId('');
+                            onClearSelection?.();
+                        }
                         setAdaptation(null);
                         setError(null);
+                        if (
+                            item &&
+                            formats.includes(item.format) &&
+                            templateCompatibility(item.template, variables)
+                                .length === 0
+                        ) {
+                            onLoad(structuredClone(item), item.id);
+                            setLoadedId(item.id);
+                        }
                     }}
                 >
-                    <option value="">{t('Nouvelle configuration')}</option>
+                    <option value="" className="text-muted-foreground">
+                        {t('New model')}
+                    </option>
                     {saved.map((item) => (
-                        <option key={item.id} value={item.id}>
+                        <option
+                            key={item.id}
+                            value={item.id}
+                            className="text-foreground"
+                        >
                             {item.template.name} · {item.format.toUpperCase()}
                         </option>
                     ))}
                 </select>
-                <Button
-                    type="button"
-                    variant="outline"
-                    disabled={
-                        disabled ||
-                        busy ||
-                        !selected ||
-                        missing.length > 0 ||
-                        !!unsupportedFormat
-                    }
-                    onClick={() => {
-                        if (selected) {
-                            onLoad(structuredClone(selected));
-                            setLoadedId(selected.id);
-                            setAdaptation(null);
-                        }
-                    }}
-                >
-                    {t('Charger')}
-                </Button>
                 <Input
-                    aria-label={t('Nom du modèle')}
+                    aria-label={t('Model name')}
                     className="min-w-48 flex-1"
                     value={template.name}
                     disabled={disabled || busy}
@@ -326,7 +367,7 @@ export function TemplateLibrary({
                     onClick={() => void save(false)}
                 >
                     <Save className="size-4" />
-                    {t('Enregistrer')}
+                    {t('Save model')}
                 </Button>
                 <Button
                     type="button"
@@ -335,12 +376,12 @@ export function TemplateLibrary({
                     onClick={() => void save(true)}
                 >
                     <Copy className="size-4" />
-                    {t('Dupliquer')}
+                    {t('Duplicate model')}
                 </Button>
                 <Button
                     type="button"
                     variant="ghost"
-                    aria-label={t('Supprimer la configuration')}
+                    aria-label={t('Delete model')}
                     disabled={disabled || busy || !selected}
                     onClick={() => void remove()}
                 >
@@ -353,12 +394,12 @@ export function TemplateLibrary({
                     className="text-sm text-amber-700 dark:text-amber-400"
                 >
                     {t(
-                        'Cette configuration nécessite une adaptation avant utilisation ici.',
+                        'This model needs to be adapted before it can be used here.',
                     )}{' '}
                     {unsupportedFormat &&
-                        `${t('Format indisponible :')} ${selected?.format.toUpperCase()}. `}
+                        `${t('Unavailable format:')} ${selected?.format.toUpperCase()}. `}
                     {missing.length > 0 &&
-                        `${t('Variables indisponibles :')} ${missing.join(', ')}`}
+                        `${t('Unavailable variables:')} ${missing.join(', ')}`}
                 </p>
             )}
             {(missing.length > 0 || unsupportedFormat) && !adaptation && (
@@ -373,21 +414,21 @@ export function TemplateLibrary({
                                 id: uniqueId('template'),
                                 template: {
                                     ...structuredClone(selected.template),
-                                    name: `${selected.template.name} — copie`,
+                                    name: `${selected.template.name} — ${t('copy')}`,
                                 },
                             });
                     }}
                 >
-                    {t('Adapter une copie')}
+                    {t('Adapt a copy')}
                 </Button>
             )}
             {adaptation && (
                 <div className="space-y-4 rounded-lg border p-4">
                     <p className="text-sm font-medium">
-                        {t('Adapter la copie avant de la charger')}
+                        {t('Adapt the copy before loading it')}
                     </p>
                     <Input
-                        aria-label={t('Nom de la copie')}
+                        aria-label={t('Copy name')}
                         value={adaptation.template.name}
                         disabled={disabled || busy}
                         onChange={(event) =>
@@ -435,7 +476,7 @@ export function TemplateLibrary({
                             role="status"
                             className="text-sm text-amber-700 dark:text-amber-400"
                         >
-                            {t('Variables à remplacer :')}{' '}
+                            {t('Variables to replace:')}{' '}
                             {adaptationMissing.join(', ')}
                         </p>
                     )}
@@ -449,13 +490,13 @@ export function TemplateLibrary({
                                 !formats.includes(adaptation.format)
                             }
                             onClick={() => {
-                                onLoad(structuredClone(adaptation));
+                                onLoad(structuredClone(adaptation), null);
                                 setLoadedId('');
                                 setSelectedId('');
                                 setAdaptation(null);
                             }}
                         >
-                            {t('Utiliser cette copie')}
+                            {t('Use this copy')}
                         </Button>
                         <Button
                             type="button"
@@ -463,14 +504,14 @@ export function TemplateLibrary({
                             disabled={busy}
                             onClick={() => setAdaptation(null)}
                         >
-                            {t('Annuler')}
+                            {t('Cancel')}
                         </Button>
                     </div>
                 </div>
             )}
             {!userId && (
                 <p className="text-sm text-muted-foreground">
-                    {t('Connectez-vous pour enregistrer vos configurations.')}
+                    {t('Sign in to save your models.')}
                 </p>
             )}
             {error && (
@@ -478,11 +519,6 @@ export function TemplateLibrary({
                     {error}
                 </p>
             )}
-            {/* <p className="text-xs text-muted-foreground">
-                {t(
-                    'Bibliothèque personnelle commune à Products et Billing. Les filtres, données, événements et options de partage ne sont pas enregistrés.',
-                )}
-            </p> */}
         </div>
     );
 }

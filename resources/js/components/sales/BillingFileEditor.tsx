@@ -142,7 +142,7 @@ export default function BillingFileEditor({
             stale={currentPreview?.key !== previewKey}
             filename={currentPreview?.filename}
             caption={t(
-                'Aperçu avec des données d’exemple. Les données réelles seront utilisées lors de la génération du fichier.',
+                'Preview with sample data. Actual data will be used when generating the file.',
             )}
         />
     ) : null;
@@ -164,7 +164,7 @@ export default function BillingFileEditor({
                         value={fileNameDraft}
                         autoFocus
                         className="h-8 max-w-sm text-base font-semibold"
-                        aria-label={t('Nom du modèle de fichier')}
+                        aria-label={t('File model name')}
                         onChange={(event) =>
                             setFileNameDraft(event.target.value)
                         }
@@ -186,7 +186,7 @@ export default function BillingFileEditor({
                             type="button"
                             className="rounded-sm text-left hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                             disabled={!canManage}
-                            title={t('Modifier le nom')}
+                            title={t('Edit name')}
                             onClick={() => {
                                 setFileNameDraft(file.name);
                                 setEditingFileName(true);
@@ -202,13 +202,13 @@ export default function BillingFileEditor({
                     size="icon"
                     title={
                         expanded
-                            ? t('Réduire l’éditeur')
-                            : t('Agrandir l’éditeur')
+                            ? t('Collapse editor')
+                            : t('Expand editor')
                     }
                     aria-label={
                         expanded
-                            ? t('Réduire l’éditeur')
-                            : t('Agrandir l’éditeur')
+                            ? t('Collapse editor')
+                            : t('Expand editor')
                     }
                     onClick={() => onExpandedChange(!expanded)}
                 >
@@ -223,17 +223,27 @@ export default function BillingFileEditor({
                 {!isOrderPdf && (
                     <TemplateLibrary
                         key={file.id}
+                        autoSelectCurrentTemplate
+                        currentTemplateId={file.template_id}
+                        onClearSelection={() =>
+                            onChange({ ...file, template_id: null })
+                        }
                         template={file}
                         format={file.extension}
                         formats={['csv', 'tsv', 'xlsx']}
                         variables={editorContext.variablesForBlock}
                         disabled={!canManage}
-                        onChange={(template) =>
-                            onChange({ ...file, ...fileDefinition(template) })
+                        onChange={(template, savedId) =>
+                            onChange({
+                                ...file,
+                                ...fileDefinition(template),
+                                template_id: savedId ?? file.template_id,
+                            })
                         }
-                        onLoad={(saved) => {
+                        onLoad={(saved, savedId) => {
                             const next = {
                                 ...file,
+                                template_id: savedId,
                                 ...fileDefinition(saved.template),
                                 extension:
                                     saved.format as BillingFileExtension,
@@ -245,7 +255,7 @@ export default function BillingFileEditor({
                     />
                 )}
                 <FileEditorSection
-                    title={t('Paramètres du fichier')}
+                    title={t('File settings')}
                     summary={filenamePreview}
                     open={openSection === 'settings'}
                     onOpenChange={(open) =>
@@ -266,15 +276,15 @@ export default function BillingFileEditor({
                                 )}
                                 title={t(
                                     isOrderPdf
-                                        ? 'Le PDF est toujours généré automatiquement'
+                                        ? 'The PDF is always generated automatically'
                                         : automaticEnabled
-                                          ? 'Génération automatique activée'
-                                          : 'Génération automatique désactivée',
+                                          ? 'Automatic generation enabled'
+                                          : 'Automatic generation disabled',
                                 )}
                                 aria-label={t(
                                     automaticEnabled
-                                        ? 'Désactiver la génération automatique'
-                                        : 'Activer la génération automatique',
+                                        ? 'Disable automatic generation'
+                                        : 'Enable automatic generation',
                                 )}
                                 aria-pressed={automaticEnabled}
                                 onClick={() =>
@@ -299,15 +309,15 @@ export default function BillingFileEditor({
                                 )}
                                 title={t(
                                     isOrderPdf
-                                        ? 'Le PDF est toujours partagé avec les destinataires'
+                                        ? 'The PDF is always shared with recipients'
                                         : sharingEnabled
-                                          ? 'Partage avec les destinataires activé'
-                                          : 'Partage avec les destinataires désactivé',
+                                          ? 'Sharing with recipients enabled'
+                                          : 'Sharing with recipients disabled',
                                 )}
                                 aria-label={t(
                                     sharingEnabled
-                                        ? 'Désactiver le partage'
-                                        : 'Activer le partage',
+                                        ? 'Disable sharing'
+                                        : 'Enable sharing',
                                 )}
                                 aria-pressed={sharingEnabled}
                                 onClick={() =>
@@ -325,7 +335,7 @@ export default function BillingFileEditor({
                     <div className="space-y-4">
                         <div className="flex flex-wrap items-end gap-4">
                             <FormField
-                                label={t('Nom du fichier')}
+                                label={t('File name')}
                                 className="w-1/2 min-w-64"
                             >
                                 <FilenameRuleField
@@ -381,7 +391,7 @@ export default function BillingFileEditor({
                                     </FormField>
                                     {file.extension !== 'xlsx' && (
                                         <label className="flex items-center gap-3 text-sm">
-                                            {t('Séparateur')}
+                                            {t('Delimiter')}
                                             <Select
                                                 value={file.delimiter}
                                                 disabled={!canManage}
@@ -404,20 +414,20 @@ export default function BillingFileEditor({
                                                             <SelectItem value=";">
                                                                 ; (
                                                                 {t(
-                                                                    'point-virgule',
+                                                                    'semicolon',
                                                                 )}
                                                                 )
                                                             </SelectItem>
                                                             <SelectItem value=",">
                                                                 , (
-                                                                {t('virgule')})
+                                                                {t('comma')})
                                                             </SelectItem>
                                                         </>
                                                     ) : (
                                                         <>
                                                             <SelectItem value="\t">
                                                                 {t(
-                                                                    'Tabulation',
+                                                                    'Tab',
                                                                 )}
                                                             </SelectItem>
                                                             <SelectItem value="|">
@@ -434,18 +444,16 @@ export default function BillingFileEditor({
                         </div>
                         {extensionMismatch && file.extension !== 'xlsx' ? (
                             <p className="text-xs text-orange-600 dark:text-orange-400">
-                                {t(
-                                    `Extension suggérée : .${suggestedExtension}`,
-                                )}
+                                {t('Suggested extension:')} .{suggestedExtension}
                             </p>
                         ) : null}
                         <p className="text-xs text-muted-foreground">
-                            {t('Aperçu')} :{' '}
+                            {t('Preview')} :{' '}
                             <span className="font-mono">{filenamePreview}</span>
                         </p>
 
                         {!isOrderPdf ? (
-                            <FormField label={t('Événements')}>
+                            <FormField label={t('Events')}>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button
@@ -523,8 +531,8 @@ export default function BillingFileEditor({
                 {!isOrderPdf && (
                     <>
                         <FileEditorSection
-                            title={t('Contenu du fichier')}
-                            summary={`${file.blocks.length} ${t('blocs')}`}
+                            title={t('File content')}
+                            summary={`${file.blocks.length} ${t('blocks')}`}
                             open={openSection === 'content'}
                             onOpenChange={(open) =>
                                 setOpenSection(open ? 'content' : null)
@@ -550,7 +558,7 @@ export default function BillingFileEditor({
                             />
                         </FileEditorSection>
                         <FileEditorSection
-                            title={t('Aperçu')}
+                            title={t('Preview')}
                             open={openSection === 'preview'}
                             onOpenChange={(open) => {
                                 setOpenSection(open ? 'preview' : null);

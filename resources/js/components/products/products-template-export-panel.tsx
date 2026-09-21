@@ -81,6 +81,7 @@ export function ProductsExportPanel({
     exportUrl,
 }: Props) {
     const { t, locale } = useI18n();
+    const productsLabel = t('Products');
     const { csrf_token: csrfToken } = usePage<SharedData>().props;
     const [format, setFormat] = useState<Format>('csv');
     const [view, setView] = useState<ExportView>('quick');
@@ -101,7 +102,7 @@ export function ProductsExportPanel({
             blocks: [
                 {
                     id: 'products',
-                    name: 'Produits',
+                    name: productsLabel,
                     type: 'items',
                     enabled: true,
                     show_headers: true,
@@ -125,7 +126,7 @@ export function ProductsExportPanel({
                 },
             ],
         }),
-        [options.template, options.columns, quickColumns, quickSettings],
+        [options.template, options.columns, quickColumns, quickSettings, productsLabel],
     );
     // Keep both drafts: returning to the quick view never flattens expert rules.
     const template = view === 'quick' ? quickTemplate : expertTemplate;
@@ -270,13 +271,13 @@ export function ProductsExportPanel({
                     preview: true,
                 }),
             });
-            if (!response.ok) throw new Error(await responseError(response));
+            if (!response.ok) throw new Error(await responseError(response, t));
             if (
                 !response.headers
                     .get('Content-Type')
                     ?.includes('application/json')
             )
-                throw new Error('Votre session a expiré. Rechargez la page.');
+                throw new Error(t('Your session has expired. Reload the page.'));
             const result = (await response.json()) as Preview;
             if (!controller.signal.aborted) {
                 setPreview(result);
@@ -294,7 +295,7 @@ export function ProductsExportPanel({
                 setPreviewError(
                     exception instanceof Error
                         ? exception.message
-                        : 'Aperçu indisponible.',
+                        : t('Preview unavailable.'),
                 );
         } finally {
             if (!controller.signal.aborted) setPreviewLoading(false);
@@ -313,9 +314,9 @@ export function ProductsExportPanel({
     const editorContext = useMemo<FileEditorContextValue>(
         () => ({
             blockLabels: {
-                header: 'Entête',
-                items: 'Liste des produits',
-                footer: 'Pied de fichier',
+                header: 'Header',
+                items: 'Product list',
+                footer: 'File footer',
             },
             variablesForBlock: (type: FileBlockType) => [
                 ...sharedDocumentVariables,
@@ -404,11 +405,11 @@ export function ProductsExportPanel({
                 headers,
                 body: JSON.stringify({ template, format, check: true }),
             });
-            if (!check.ok) throw new Error(await responseError(check));
+            if (!check.ok) throw new Error(await responseError(check, t));
             if (
                 !check.headers.get('Content-Type')?.includes('application/json')
             )
-                throw new Error('Votre session a expiré. Rechargez la page.');
+                throw new Error(t('Your session has expired. Reload the page.'));
             const checked = (await check.json()) as { filename: string };
             if (format === 'csv' || format === 'tsv') {
                 // Native POST download: never accumulate the CSV in a JS Blob.
@@ -438,14 +439,14 @@ export function ProductsExportPanel({
                     body: JSON.stringify({ template, format }),
                 });
                 if (!response.ok)
-                    throw new Error(await responseError(response));
+                    throw new Error(await responseError(response, t));
                 if (
                     !response.headers
                         .get('Content-Type')
                         ?.includes('spreadsheetml.sheet')
                 )
                     throw new Error(
-                        'Impossible de préparer l’export. Rechargez la page.',
+                        t('Unable to prepare the export. Reload the page.'),
                     );
                 const blobUrl = URL.createObjectURL(await response.blob());
                 const link = document.createElement('a');
@@ -458,14 +459,14 @@ export function ProductsExportPanel({
             }
             setNotice(
                 t(
-                    'Téléchargement lancé. Gardez cette vue ouverte pendant la préparation du fichier.',
+                    'Download started. Keep this view open while the file is being prepared.',
                 ),
             );
         } catch (exception) {
             setError(
                 exception instanceof Error
                     ? exception.message
-                    : t('Export impossible.'),
+                    : t('Unable to export.'),
             );
         } finally {
             setBusy(false);
@@ -481,8 +482,8 @@ export function ProductsExportPanel({
             filename={preview?.filename}
             caption={
                 preview
-                    ? `${preview.sample_count} ${t('produits réels sur')} ${number(preview.total)}. ${t('Aperçu limité à 5 produits.')}`
-                    : t('Aperçu limité à 5 produits réels.')
+                    ? `${preview.sample_count} ${t('actual products out of')} ${number(preview.total)}. ${t('Preview limited to 5 products.')}`
+                    : t('Preview limited to 5 actual products.')
             }
         />
     );
@@ -501,14 +502,14 @@ export function ProductsExportPanel({
                             tabIndex={-1}
                             className="scroll-mt-24 text-xl font-semibold outline-none"
                         >
-                            {t('Exporter les produits')}
+                            {t('Export products')}
                         </h1>
                         <p className="text-sm text-muted-foreground">
                             <strong className="text-foreground">
                                 {number(total)}
                             </strong>{' '}
-                            {t('produits filtrés')} · {number(totalRows)}{' '}
-                            {t('lignes de données')}
+                            {t('filtered products')} · {number(totalRows)}{' '}
+                            {t('data rows')}
                         </p>
                     </div>
                     <Button
@@ -518,7 +519,7 @@ export function ProductsExportPanel({
                         onClick={onBack}
                     >
                         <ArrowLeft className="size-4" />
-                        {t('Retour aux produits')}
+                        {t('Back to products')}
                     </Button>
                 </header>
                 <TemplateLibrary
@@ -552,7 +553,7 @@ export function ProductsExportPanel({
                     }}
                 />
                 <FileEditorSection
-                    title={t('Paramètres du fichier')}
+                    title={t('File settings')}
                     summary={filenamePreview}
                     open={openSection === 'settings'}
                     onOpenChange={(open) =>
@@ -562,7 +563,7 @@ export function ProductsExportPanel({
                     <div className="flex flex-wrap items-end gap-4">
                         <div className="w-1/2 min-w-64 space-y-2">
                             <p className="text-sm font-medium">
-                                {t('Nom du fichier')}
+                                {t('File name')}
                             </p>
                             <FilenameRuleField
                                 value={template.filename}
@@ -611,9 +612,9 @@ export function ProductsExportPanel({
                         />
                         {(format === 'csv' || format === 'tsv') && (
                             <label className="flex items-center gap-3 text-sm">
-                                {t('Séparateur')}
+                                {t('Delimiter')}
                                 <select
-                                    aria-label={t('Séparateur CSV')}
+                                    aria-label={t('CSV delimiter')}
                                     disabled={busy}
                                     className={selectClass}
                                     value={template.delimiter}
@@ -640,7 +641,7 @@ export function ProductsExportPanel({
                                     ) : (
                                         <>
                                             <option value={'\t'}>
-                                                {t('Tabulation')}
+                                                {t('Tab')}
                                             </option>
                                             <option value="|">|</option>
                                         </>
@@ -651,8 +652,8 @@ export function ProductsExportPanel({
                     </div>
                 </FileEditorSection>
                 <FileEditorSection
-                    title={t('Contenu du fichier')}
-                    summary={`${template.blocks.length} ${t('blocs')}`}
+                    title={t('File content')}
+                    summary={`${template.blocks.length} ${t('blocks')}`}
                     open={openSection === 'content'}
                     onOpenChange={(open) =>
                         setOpenSection(open ? 'content' : null)
@@ -674,9 +675,9 @@ export function ProductsExportPanel({
                         onValueChange={changeView}
                         className="space-y-5"
                     >
-                        <TabsList aria-label={t('Vue de l’export')}>
+                        <TabsList aria-label={t('Export view')}>
                             <TabsTrigger value="quick" disabled={busy}>
-                                {t('Rapide')}
+                                {t('Quick')}
                             </TabsTrigger>
                             <TabsTrigger value="expert" disabled={busy}>
                                 {t('Expert')}
@@ -692,7 +693,7 @@ export function ProductsExportPanel({
                         </TabsContent>
                         <TabsContent value="expert" className="space-y-4">
                             <select
-                                aria-label={t('Ajouter un champ produit')}
+                                aria-label={t('Add a product field')}
                                 className={selectClass}
                                 value=""
                                 onChange={(event) =>
@@ -708,7 +709,7 @@ export function ProductsExportPanel({
                                 }
                             >
                                 <option value="">
-                                    {t('Ajouter un champ produit…')}
+                                    {t('Add a product field…')}
                                 </option>
                                 {options.columns.map((column) => (
                                     <option key={column.key} value={column.key}>
@@ -728,7 +729,7 @@ export function ProductsExportPanel({
                     </Tabs>
                 </FileEditorSection>
                 <FileEditorSection
-                    title={t('Aperçu')}
+                    title={t('Preview')}
                     open={openSection === 'preview'}
                     onOpenChange={(open) => {
                         setOpenSection(open ? 'preview' : null);
@@ -744,7 +745,7 @@ export function ProductsExportPanel({
                             role="status"
                             className="text-sm text-muted-foreground"
                         >
-                            {t('Aucun produit à exporter.')}
+                            {t('No products to export.')}
                         </p>
                     )}
                     {tooLarge && (
@@ -753,7 +754,7 @@ export function ProductsExportPanel({
                             className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400"
                         >
                             {t(
-                                'La configuration dépasse les limites. Affinez les filtres, réduisez les lignes ou les images, ou choisissez le CSV.',
+                                'The model exceeds the limits. Refine the filters, reduce the rows or images, or choose CSV.',
                             )}
                         </p>
                     )}
@@ -772,10 +773,10 @@ export function ProductsExportPanel({
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-xs text-muted-foreground">
-                            {t('Limite :')} {number(limit)}{' '}
-                            {t('lignes de données')}
+                            {t('Limit:')} {number(limit)}{' '}
+                            {t('data rows')}
                             {format === 'xlsx' &&
-                                ` · ${number(options.limits.xlsx_images)} ${t('miniatures maximum')}`}
+                                ` · ${number(options.limits.xlsx_images)} ${t('maximum thumbnails')}`}
                         </p>
                         <Button
                             type="button"
@@ -792,12 +793,12 @@ export function ProductsExportPanel({
                             ) : (
                                 <Download className="size-4" />
                             )}
-                            {t(busy ? 'Préparation…' : 'Exporter')}
+                            {t(busy ? 'Preparing…' : 'Export')}
                         </Button>
                     </div>
                 </footer>
                 <iframe
-                    title={t('Téléchargement CSV')}
+                    title={t('CSV download')}
                     name={downloadFrame}
                     className="hidden"
                 />
@@ -806,7 +807,10 @@ export function ProductsExportPanel({
     );
 }
 
-async function responseError(response: Response): Promise<string> {
+async function responseError(
+    response: Response,
+    t: (key: string) => string,
+): Promise<string> {
     const payload = (await response.json().catch(() => null)) as {
         errors?: Record<string, string[]>;
         message?: string;
@@ -814,6 +818,6 @@ async function responseError(response: Response): Promise<string> {
     return (
         Object.values(payload?.errors ?? {}).flat()[0] ??
         payload?.message ??
-        'Impossible de préparer le fichier. Rechargez la page ou réduisez la sélection.'
+        t('Unable to prepare the file. Reload the page or reduce the selection.')
     );
 }
