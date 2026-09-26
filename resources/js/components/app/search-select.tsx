@@ -5,9 +5,12 @@ import {
     Camera,
     CameraOff,
     Diameter,
+    EyeOff,
+    FolderTree,
     Loader2,
     MoveVertical,
     SearchIcon,
+    ShoppingCart,
     SlidersHorizontalIcon,
     X,
     Zap,
@@ -121,6 +124,14 @@ export default function SearchSelect({
                 },
             )
             : filters;
+
+    // Les filtres peuvent disparaître (ex. bascule en colonne épinglée) :
+    // on referme le panneau pour éviter une boîte vide.
+    useEffect(() => {
+        if (!hasFilters) {
+            setOpenFilters(false);
+        }
+    }, [hasFilters]);
 
     const toOptions = (arr?: (string | Option)[]) =>
         (arr ?? []).map((s) =>
@@ -367,6 +378,9 @@ export default function SearchSelect({
                                 </>
                             ) : (
                                 <>
+                                    {filter.name === 'category' ? (
+                                        <FolderTree size={14} aria-hidden="true" />
+                                    ) : null}
                                     {filter.name === 'pot' ? (
                                         <Diameter size={14} aria-hidden="true" />
                                     ) : null}
@@ -467,7 +481,18 @@ export default function SearchSelect({
                                     {compactSummary}
                                 </>
                             ) : (
-                                filter.label
+                                <>
+                                    {filter.name === 'category' ? (
+                                        <FolderTree size={14} aria-hidden="true" />
+                                    ) : null}
+                                    {filter.name === 'active' ? (
+                                        <EyeOff size={14} aria-hidden="true" />
+                                    ) : null}
+                                    {filter.name === 'cart' ? (
+                                        <ShoppingCart size={14} aria-hidden="true" />
+                                    ) : null}
+                                    {filter.label}
+                                </>
                             )}
                             <X
                                 size={14}
@@ -575,7 +600,7 @@ export default function SearchSelect({
             </div>
 
             {/* Panneau combiné filtres + propositions */}
-            {(openFilters || (open && value.length >= minQueryLength)) && (
+            {((open && value.length >= minQueryLength) || (openFilters && renderedFilters)) && (
                 <div className="absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover pt-0 pb-4 shadow-lg">
                     <div
                         className={cn(

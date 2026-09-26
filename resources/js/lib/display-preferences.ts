@@ -37,11 +37,15 @@ export type CartConfirmationPreference =
     | 'removeMissingImageLink'
     | 'removeMissingImageLinks';
 
+export type ProductsFiltersLayout = 'popover' | 'docked';
+
 export type PageDisplayPreference = {
     enabled: boolean;
     view: ViewMode;
     rightSidebarOpen: boolean;
     autoOpenCartOnAdd?: boolean;
+    autoApplyFilters?: boolean;
+    filtersLayout?: ProductsFiltersLayout;
 };
 
 const pageViewModes: Record<PreferencePage, ViewMode[]> = {
@@ -85,7 +89,13 @@ const buildDefaultPages = (): Record<PreferencePage, PageDisplayPreference> => {
             enabled: true,
             view: pageViewModes[page][0],
             rightSidebarOpen: false,
-            ...(page === 'products' ? { autoOpenCartOnAdd: true } : {}),
+            ...(page === 'products'
+                ? {
+                      autoOpenCartOnAdd: true,
+                      autoApplyFilters: true,
+                      filtersLayout: 'docked' as ProductsFiltersLayout,
+                  }
+                : {}),
         };
     });
     return pages;
@@ -151,6 +161,14 @@ export function normalizeDisplayPreferences(
                           typeof raw.autoOpenCartOnAdd === 'boolean'
                               ? raw.autoOpenCartOnAdd
                               : true,
+                      autoApplyFilters:
+                          typeof raw.autoApplyFilters === 'boolean'
+                              ? raw.autoApplyFilters
+                              : true,
+                      filtersLayout:
+                          raw.filtersLayout === 'popover'
+                              ? ('popover' as ProductsFiltersLayout)
+                              : ('docked' as ProductsFiltersLayout),
                   }
                 : {}),
         };
@@ -210,6 +228,16 @@ function readLegacyDisplayPreferences(): DisplayPreferences {
         if (['accordion', 'grid'].includes(String(views.users))) {
             preferences.pages.users.view = views.users as ViewMode;
         }
+        if (
+            views.productsFilters === 'docked' ||
+            views.productsFilters === 'popover'
+        ) {
+            preferences.pages.products.filtersLayout = views.productsFilters;
+        }
+    }
+
+    if (localStorage.getItem('products.filters.auto-apply') === '0') {
+        preferences.pages.products.autoApplyFilters = false;
     }
 
     return preferences;
@@ -330,12 +358,23 @@ export function applyDisplayPreferences(
     try {
         const views = JSON.parse(
             localStorage.getItem('views') || '{}',
-        ) as Record<string, ViewMode>;
+        ) as Record<string, ViewMode | string>;
         (['products', 'users'] as PreferencePage[]).forEach((page) => {
             if (normalized.pages[page].enabled)
                 views[page] = normalized.pages[page].view;
             else delete views[page];
         });
+        if (normalized.pages.products.enabled)
+            views.productsFilters =
+                normalized.pages.products.filtersLayout ?? 'popover';
+        else delete views.productsFilters;
+        localStorage.setItem(
+            'products.filters.auto-apply',
+            normalized.pages.products.enabled &&
+            normalized.pages.products.autoApplyFilters
+                ? '1'
+                : '0',
+        );
         localStorage.setItem('views', JSON.stringify(views));
     } catch {
         // A blocked localStorage must not prevent the application from loading.

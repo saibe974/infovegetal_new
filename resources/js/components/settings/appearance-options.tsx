@@ -20,8 +20,11 @@ import {
     Monitor,
     Moon,
     PanelRight,
+    Pin,
+    SlidersHorizontal,
     Sun,
     Table2,
+    WandSparkles,
     type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -379,8 +382,8 @@ export function AppearancePageSettings({
                                                 />
                                                 <span className="grid gap-1">
                                                     <span>
-                                                        Ouvrir le panier après
-                                                        un ajout
+                                                        Ouvrir le panier
+                                                        après un ajout
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">
                                                         Sur ordinateur
@@ -389,7 +392,71 @@ export function AppearancePageSettings({
                                                 </span>
                                             </label>
                                         )}
+                                        {page === 'products' && (
+                                            <label className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+                                                <Checkbox
+                                                    checked={
+                                                        setting.autoApplyFilters
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        onChange(page, {
+                                                            autoApplyFilters:
+                                                                checked ===
+                                                                true,
+                                                        })
+                                                    }
+                                                />
+                                                <WandSparkles className="size-4" />
+                                                Application automatique des
+                                                filtres
+                                            </label>
+                                        )}
                                     </div>
+
+                                    {page === 'products' && (
+                                        <div>
+                                            <div className="text-sm font-medium">
+                                                Emplacement des filtres
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                <ChoiceButton
+                                                    active={
+                                                        (setting.filtersLayout ??
+                                                            'docked') ===
+                                                        'popover'
+                                                    }
+                                                    onClick={() =>
+                                                        onChange(page, {
+                                                            filtersLayout:
+                                                                'popover',
+                                                        })
+                                                    }
+                                                >
+                                                    <SlidersHorizontal />{' '}
+                                                    Recherche
+                                                </ChoiceButton>
+                                                <ChoiceButton
+                                                    active={
+                                                        setting.filtersLayout ===
+                                                        'docked'
+                                                    }
+                                                    onClick={() =>
+                                                        onChange(page, {
+                                                            filtersLayout:
+                                                                'docked',
+                                                        })
+                                                    }
+                                                >
+                                                    <Pin /> Colonne épinglée
+                                                </ChoiceButton>
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                Sur ordinateur uniquement
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

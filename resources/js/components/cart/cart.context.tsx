@@ -185,17 +185,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [userId]);
 
     const [items, setItems] = useState<CartItem[]>(() => {
-        if (typeof window !== 'undefined') {
-            const stored = localStorage.getItem(getCartKey());
-            return parseStoredCart(stored).map((item) => ({
-                ...item,
-                comment: item.comment || cart?.item_comments?.[String(item.product.id)] || '',
-            }));
+        if (typeof window === 'undefined' || !userId) {
+            return [];
         }
-        return [];
+        const stored = localStorage.getItem(getCartKey());
+        return parseStoredCart(stored).map((item) => ({
+            ...item,
+            comment: item.comment || cart?.item_comments?.[String(item.product.id)] || '',
+        }));
     });
     const [orderComment, setOrderCommentState] = useState(() => {
-        if (typeof window === 'undefined') return '';
+        if (typeof window === 'undefined' || !userId) return '';
         return localStorage.getItem(`${getCartKey()}:comment`) ?? cart?.comment ?? '';
     });
 
@@ -314,6 +314,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!userId || typeof window === 'undefined') {
             lastUserRefreshRef.current = null;
+
+            // Déconnexion : le panier est réservé aux utilisateurs connectés
+            setItems((prev) => (prev.length > 0 ? [] : prev));
+            setOrderCommentState((prev) => (prev ? '' : prev));
             return;
         }
 
@@ -367,6 +371,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [cart_refresh_token, userId, items.length]);
 
     useEffect(() => {
+        if (!userId || typeof window === 'undefined') {
+            return;
+        }
+
         localStorage.setItem(getCartKey(), serializeCart(items));
         localStorage.setItem(`${getCartKey()}:comment`, orderComment);
 

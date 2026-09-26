@@ -4,6 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import type { ProductCategory } from '@/types';
 import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     categories: ProductCategory[];
@@ -12,6 +13,11 @@ type Props = {
     onChange: (value: string) => void;
     title?: string;
     allLabel?: string;
+    hideTitle?: boolean;
+    /** Classes appliquées à la liste de l'arbre (ex. plafond de hauteur avec scroll interne). */
+    listClassName?: string;
+    /** Un seul niveau racine déplié à la fois : en ouvrir un referme automatiquement les autres. */
+    singleOpen?: boolean;
 };
 
 export const ALL_CATEGORIES = 'all';
@@ -23,6 +29,9 @@ export function CategoryAccordion({
     onChange,
     title,
     allLabel,
+    hideTitle,
+    listClassName,
+    singleOpen,
 }: Props) {
     const { t } = useI18n();
     const categoryById = new Map(categories.map((category) => [category.id, category]));
@@ -92,10 +101,20 @@ export function CategoryAccordion({
         return false;
     };
 
+    const [openRootId, setOpenRootId] = useState<number | null>(() => {
+        if (!singleOpen) {
+            return null;
+        }
+        const branch = rootCategories.find((parent) => isCategoryInBranch(value, parent.id));
+        return branch ? branch.id : null;
+    });
+
     return (
         <>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title ?? t('Category')}</p>
-            <div className="space-y-2">
+            {!hideTitle && (
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title ?? t('Category')}</p>
+            )}
+            <div className={cn('space-y-2', listClassName)}>
                 <Button
                     type="button"
                     variant="ghost"
@@ -135,7 +154,17 @@ export function CategoryAccordion({
                     }
 
                     return (
-                        <Collapsible key={parent.id} defaultOpen={isBranchSelected} className="rounded-md border border-input">
+                        <Collapsible
+                            key={parent.id}
+                            className="rounded-md border border-input"
+                            defaultOpen={singleOpen ? undefined : isBranchSelected}
+                            open={singleOpen ? openRootId === parent.id : undefined}
+                            onOpenChange={
+                                singleOpen
+                                    ? (open) => setOpenRootId(open ? parent.id : null)
+                                    : undefined
+                            }
+                        >
                             <CollapsibleTrigger asChild>
                                 <Button
                                     type="button"

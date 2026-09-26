@@ -4,6 +4,7 @@ import { SharedData, type BreadcrumbItem as BreadcrumbItemType, type ProductCate
 import { NavUser } from '../users/nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
+import { getEffectiveUser, hasPermission, isDev } from '@/lib/roles';
 import { login, register } from '@/routes';
 import products from '@/routes/products';
 import SearchSelect from '@/components/app/search-select';
@@ -77,6 +78,8 @@ export function AppSidebarHeader({
         collection?: { meta?: { total?: number } };
     }>();
     const { auth } = page.props;
+    const effectiveUser = getEffectiveUser(auth);
+    const canPreview = isDev(effectiveUser) || hasPermission(effectiveUser, 'preview');
     const currentQuery = (page.props.q ?? '').trim();
     const { t } = useI18n();
     const { isOpenId } = useSidebar(); // récupère l'état du sidebar
@@ -420,8 +423,8 @@ export function AppSidebarHeader({
                                     // variant={"destructive"}
                                     className={cn(
                                         "absolute -top-1 -right-1 text-xs bg-red-600 text-white font-extralight size-4",
-                                        items.length > 9 ? " px-2" : " px-1.5",
-                                        items.length === 0 && "hidden"
+                                    items.length > 9 ? " px-2" : " px-1.5",
+                                    (items.length === 0 || !auth.user) && "hidden"
                                     )}
                                 >
                                     {items.length}
@@ -450,7 +453,7 @@ export function AppSidebarHeader({
                             {/* <NavigationMenuContent className=''> */}
                             <SelectLang />
                             <AppearanceToggleDropdown />
-                            <FullscreenButton />
+                            {canPreview && <FullscreenButton />}
                             {/* </NavigationMenuContent> */}
                         </div>
 

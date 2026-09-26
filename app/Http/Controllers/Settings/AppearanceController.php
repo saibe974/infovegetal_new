@@ -109,6 +109,8 @@ class AppearanceController extends Controller
         }
 
         $rules['pages.products.autoOpenCartOnAdd'] = ['required', 'boolean'];
+        $rules['pages.products.autoApplyFilters'] = ['sometimes', 'boolean'];
+        $rules['pages.products.filtersLayout'] = ['sometimes', Rule::in(['popover', 'docked'])];
 
         $validated = $request->validate($rules);
 

@@ -14,8 +14,12 @@ import { ProductsSmallCardsList } from '@/components/products/products-small-car
 import ProductsImportTreatment from '@/components/products/import';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
+import BasicSticky from 'react-sticky-el';
 import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle';
 import { ProductsFilters } from '@/components/products/products-filters';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useStickyTopOffset } from '@/hooks/use-sticky-top-offset';
+import { persistPagePreference } from '@/lib/display-preferences';
 import ProductDetails from '@/components/products/product-details';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { useCart } from '@/components/cart/use-cart';
@@ -200,6 +204,69 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         const views = JSON.parse(localStorage.getItem('views') || '{}');
         return (views.products || 'table') as ViewMode;
     });
+
+    // 'docked' : filtres épinglés en colonne à gauche de la liste ; sinon panneau du SearchSelect
+    const [filtersLayout, setFiltersLayout] = useState<'popover' | 'docked'>(() => {
+        if (typeof window === 'undefined') return 'docked';
+        const views = JSON.parse(localStorage.getItem('views') || '{}');
+        return views.productsFilters === 'popover' ? 'popover' : 'docked';
+    });
+    const isMobile = useIsMobile();
+    const dockedFilters = !isMobile && filtersLayout === 'docked';
+    const filtersStickyTop = useStickyTopOffset('.top-sticky, .header-search', dockedFilters);
+
+    const toggleFiltersPin = () => {
+        setFiltersLayout((current) => {
+            const next = current === 'docked' ? 'popover' : 'docked';
+            if (typeof window !== 'undefined') {
+                const views = JSON.parse(localStorage.getItem('views') || '{}');
+                views.productsFilters = next;
+                localStorage.setItem('views', JSON.stringify(views));
+            }
+            persistPagePreference('products', { filtersLayout: next });
+            return next;
+        });
+    };
+
+    const asideRef = useRef<HTMLElement | null>(null);
+    const filtersColumnRef = useRef<HTMLDivElement | null>(null);
+
+    // Colonne épinglée : réduit sa hauteur au fil du scroll pour que son bas
+    // s'arrête au bas de la liste (jamais au-dessus du footer).
+    useEffect(() => {
+        const aside = asideRef.current;
+        if (!dockedFilters || !aside) {
+            return;
+        }
+
+        const update = () => {
+            const column = filtersColumnRef.current;
+            if (!column) {
+                return;
+            }
+
+            const available = aside.getBoundingClientRect().bottom - filtersStickyTop - 16;
+            if (available < 160) {
+                column.style.visibility = 'hidden';
+                return;
+            }
+
+            column.style.visibility = 'visible';
+            column.style.maxHeight = `${Math.floor(available)}px`;
+        };
+
+        update();
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+        observer?.observe(aside);
+
+        return () => {
+            window.removeEventListener('scroll', update);
+            window.removeEventListener('resize', update);
+            observer?.disconnect();
+        };
+    }, [dockedFilters, filtersStickyTop]);
 
     const buildQueryParams = (nextFilters: FiltersState & CartFilter, searchOverride: string | null = q ?? '') => {
         const params: Record<string, string | number | string[]> = {};
@@ -409,6 +476,22 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueProducts = Array.from(new Map(collection.data.map((p) => [p.id, p])).values());
     const singleProduct = uniqueProducts.length === 1 ? uniqueProducts[0] : null;
 
+    const productsFiltersProps = {
+        categories,
+        categoryOptions,
+        countryOptions,
+        potOptions,
+        heightOptions,
+        active: filtersState.active,
+        categoryId: filtersState.category,
+        country: filtersState.country,
+        pot: filtersState.pot,
+        height: filtersState.height,
+        image: filtersState.image,
+        promo: filtersState.promo,
+        onApply: applyFilters,
+    };
+
     return (
         <>
             <Head title={t('Products')} />
@@ -437,21 +520,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     compactMobile
                     query={q ?? ''}
                     fixedFilters={singleFilters}
-                    filters={(
+                    filters={dockedFilters ? undefined : (
                         <ProductsFilters
-                            categories={categories}
-                            categoryOptions={categoryOptions}
-                            countryOptions={countryOptions}
-                            potOptions={potOptions}
-                            heightOptions={heightOptions}
-                            active={filtersState.active}
-                            categoryId={filtersState.category}
-                            country={filtersState.country}
-                            pot={filtersState.pot}
-                            height={filtersState.height}
-                            image={filtersState.image}
-                            promo={filtersState.promo}
-                            onApply={applyFilters}
+                            {...productsFiltersProps}
+                            pin={{ docked: filtersLayout === 'docked', onToggle: toggleFiltersPin }}
                         />
                     )}
                     filtersActive={filtersActive}
@@ -502,58 +574,84 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     catalogUrl={page.url}
                     exportUrl={products.admin.export.url()}
                 />
-            ) : collection.data.length === 0 ? (
-                <div className='w-full flex flex-col items-center justify-center gap-4'>
-                    {q ? (
-                        <>
-                            <p className='text-lg'>{t('No products match your search.')}</p>
-                            <Button
-                                variant='secondary'
-                                onClick={() => router.visit(products.index().url)}
+            ) : (
+                <div className={dockedFilters ? 'flex gap-6' : undefined}>
+                    {dockedFilters && (
+                        <aside ref={asideRef} className="w-72 shrink-0">
+                            <BasicSticky
+                                topOffset={-filtersStickyTop}
+                                stickyStyle={{ top: filtersStickyTop, width: '18rem', zIndex: 20 }}
                             >
-                                {t('Reset search')}
-                            </Button>
-                        </>
-                    ) : (
-                        <p className='text-lg'>{t('No products available.')}</p>
+                                <div
+                                    ref={filtersColumnRef}
+                                    className="overflow-y-auto"
+                                    style={{ maxHeight: `calc(100dvh - ${filtersStickyTop + 16}px)` }}
+                                >
+                                    <ProductsFilters
+                                        {...productsFiltersProps}
+                                        variant="column"
+                                        pin={{ docked: filtersLayout === 'docked', onToggle: toggleFiltersPin }}
+                                    />
+                                </div>
+                            </BasicSticky>
+                        </aside>
                     )}
-                </div>
-            ) : singleProduct ? (
-                <ProductDetails product={singleProduct} showBackLink={false} />
-            ) :
-                <InfiniteScroll data="collection" buffer={600} className=''>
-                    {viewMode === 'table' ? (
-                        <ProductsTable
-                            collection={{
-                                ...collection,
-                                data: uniqueProducts,
-                            }}
-                            canEdit={canEdit}
-                            canDelete={canDelete}
-                        />
-                    ) : viewMode === 'list' ? (
-                        <ProductsSmallCardsList
-                            products={uniqueProducts}
-                            canEdit={canEdit}
-                            canDelete={canDelete}
-                            showStatusBadge={filtersState.active !== 'active'}
-                        />
-                    ) : (
-                        <ProductsCardsList
-                            products={uniqueProducts}
-                            canEdit={canEdit}
-                            canDelete={canDelete}
-                            showStatusBadge={filtersState.active !== 'active'}
-                        />
-                    )}
-                </InfiniteScroll>
-            }
+                    <div className={dockedFilters ? 'min-w-0 flex-1' : undefined}>
+                        {collection.data.length === 0 ? (
+                            <div className='w-full flex flex-col items-center justify-center gap-4'>
+                                {q ? (
+                                    <>
+                                        <p className='text-lg'>{t('No products match your search.')}</p>
+                                        <Button
+                                            variant='secondary'
+                                            onClick={() => router.visit(products.index().url)}
+                                        >
+                                            {t('Reset search')}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <p className='text-lg'>{t('No products available.')}</p>
+                                )}
+                            </div>
+                        ) : singleProduct ? (
+                            <ProductDetails product={singleProduct} showBackLink={false} />
+                        ) : (
+                            <InfiniteScroll data="collection" buffer={600} className=''>
+                                {viewMode === 'table' ? (
+                                    <ProductsTable
+                                        collection={{
+                                            ...collection,
+                                            data: uniqueProducts,
+                                        }}
+                                        canEdit={canEdit}
+                                        canDelete={canDelete}
+                                    />
+                                ) : viewMode === 'list' ? (
+                                    <ProductsSmallCardsList
+                                        products={uniqueProducts}
+                                        canEdit={canEdit}
+                                        canDelete={canDelete}
+                                        showStatusBadge={filtersState.active !== 'active'}
+                                    />
+                                ) : (
+                                    <ProductsCardsList
+                                        products={uniqueProducts}
+                                        canEdit={canEdit}
+                                        canDelete={canDelete}
+                                        showStatusBadge={filtersState.active !== 'active'}
+                                    />
+                                )}
+                            </InfiniteScroll>
+                        )}
 
-            {!exportView && singleProduct === null && uniqueCount < collection.meta.total &&
-                <div className='w-full h-50 flex items-center justify-center mt-4'>
-                    <Loader2Icon size={50} className='animate-spin text-brand-main' />
+                        {singleProduct === null && uniqueCount < collection.meta.total &&
+                            <div className='w-full h-50 flex items-center justify-center mt-4'>
+                                <Loader2Icon size={50} className='animate-spin text-brand-main' />
+                            </div>
+                        }
+                    </div>
                 </div>
-            }
+            )}
         </>
 
     )

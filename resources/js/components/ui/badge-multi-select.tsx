@@ -42,7 +42,7 @@ export function BadgeMultiSelect({
     renderBadge,
 }: {
     id: string;
-    label: string;
+    label?: string;
     placeholder: string;
     options: BadgeMultiSelectOption[];
     value: string[];
@@ -58,12 +58,14 @@ export function BadgeMultiSelect({
 
     return (
         <div className="space-y-2">
-            <label
-                htmlFor={id}
-                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-            >
-                {label}
-            </label>
+            {label && (
+                <label
+                    htmlFor={id}
+                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                    {label}
+                </label>
+            )}
             <Select<BadgeMultiSelectOption, true>
                 instanceId={id}
                 inputId={id}
@@ -75,6 +77,13 @@ export function BadgeMultiSelect({
                 closeMenuOnSelect={false}
                 hideSelectedOptions={false}
                 maxMenuHeight={160}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                menuPosition="fixed"
+                styles={{
+                    // Le style inline par défaut (zIndex: 1) ferait passer le menu
+                    // sous le header (z-30) et les barres sticky (z-25).
+                    menuPortal: (base) => ({ ...base, zIndex: 50 }),
+                }}
                 isClearable
                 isSearchable={options.length > 8}
                 controlShouldRenderValue
@@ -113,6 +122,7 @@ export function BadgeMultiSelect({
                     ),
                     indicatorSeparator: () => 'mx-1 w-px bg-border',
                     menu: () => 'z-50 mt-1 rounded-md border bg-popover p-1 text-popover-foreground shadow-md',
+                    menuPortal: () => 'z-50',
                     menuList: () => 'max-h-40 overflow-y-auto',
                     option: ({ isFocused, isSelected }) => cn(
                         'cursor-pointer rounded-sm px-2 py-1.5 text-sm',
