@@ -463,3 +463,16 @@ html[data-density='compact'] {
     border-left-color: color-mix(in oklab, var(--border) 40%, var(--foreground) 60%);
   }
 }
+
+/* Widget grid: custom edge resize handles (arrows) */
+.widget-grid .react-grid-item > .react-resizable-handle::after {
+    content: none;
+}
+.widget-grid .react-grid-item > .react-resizable-handle {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 10;
+}
+.widget-grid .react-grid-item:hover > .react-resizable-handle {
+    opacity: 1;
+}

@@ -1,4 +1,5 @@
 import type { DisplayPreferences } from '@/lib/display-preferences';
+import type { DashboardWidgetConfig } from '@/lib/dashboard-preferences';
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -397,6 +398,7 @@ export interface SharedData {
     users?: User[];
     sidebarOpen: boolean;
     appearancePreferences?: DisplayPreferences | null;
+    dashboardLayout?: DashboardWidgetConfig[] | null;
     flash: {
         success?: string;
         error?: string;
