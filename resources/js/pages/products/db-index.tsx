@@ -1,7 +1,6 @@
 import SearchSelect from '@/components/app/search-select';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { DialogUpload } from '@/components/dialog-upload';
-import ProductsImportTreatment from '@/components/products/import';
+import { DbProductActions } from '@/components/products/db-product-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CountryFlag } from '@/components/ui/country-flag';
@@ -32,9 +31,6 @@ import { Head, InfiniteScroll, Link, router, usePage } from '@inertiajs/react';
 import {
     CalendarClockIcon,
     DatabaseIcon,
-    EditIcon,
-    ShellIcon,
-    TrashIcon,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 
@@ -49,69 +45,6 @@ type Props = {
     collection: PaginatedCollection<DbProduct>;
     q?: string | null;
 };
-
-function DbProductActions({ item }: { item: DbProduct }) {
-    const { t } = useI18n();
-
-    return (
-        <div className="flex justify-end gap-2">
-            {item.abilities?.manage ? (
-                <DialogUpload
-                    title={`${t('Update database')} ${item.name}`}
-                    uploadUrl="/upload"
-                    importProcessUrl={products.admin.import.process.url()}
-                    importProcessChunkUrl={products.admin.import.process_chunk.url()}
-                    importCancelUrl={products.admin.import.cancel.url()}
-                    importProgressUrl={(id) =>
-                        products.admin.import.progress.url({ id })
-                    }
-                    postTreatmentComponent={ProductsImportTreatment}
-                    postTreatmentProps={{ dbProductsId: item.id }}
-                    finishedLink={{
-                        label: t('Missing image'),
-                        href: products.images.index.url(),
-                    }}
-                    buttonLabel=""
-                />
-            ) : null}
-            {item.abilities?.update ? (
-                <Button asChild size="icon" variant="outline">
-                    <Link href={dbProducts.edit(item.id).url} title={t('Edit')}>
-                        <EditIcon size={16} />
-                    </Link>
-                </Button>
-            ) : null}
-            {item.abilities?.billing ? (
-                <Button asChild size="icon" variant="outline">
-                    <Link
-                        href={dbProducts.billing(item.id).url}
-                        title={t('Billing')}
-                    >
-                        <ShellIcon size={16} />
-                    </Link>
-                </Button>
-            ) : null}
-            {item.abilities?.delete ? (
-                <Button asChild size="icon" variant="destructive-outline">
-                    <Link
-                        href={dbProducts.destroy(item.id).url}
-                        method="delete"
-                        title={t('Delete')}
-                        onBefore={() =>
-                            confirm(
-                                t(
-                                    'Are you sure you want to delete this database?',
-                                ),
-                            )
-                        }
-                    >
-                        <TrashIcon size={16} />
-                    </Link>
-                </Button>
-            ) : null}
-        </div>
-    );
-}
 
 function DbProductsMiniCards({ items }: { items: DbProduct[] }) {
     const { t } = useI18n();

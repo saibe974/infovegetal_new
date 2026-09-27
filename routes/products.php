@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\DbProductsController as ApiDbProductsController;
+use App\Http\Controllers\Api\DbProductsWidgetController;
 use App\Http\Controllers\CategoryProductsController;
 use App\Http\Controllers\DbProductsController;
 use App\Http\Controllers\MediaController;
@@ -59,6 +60,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->group(function () {
             Route::get('/db-products', [ApiDbProductsController::class, 'index'])
                 ->name('db-products.index');
+            Route::get('/db-products-widget', [DbProductsWidgetController::class, 'index'])
+                ->name('db-products-widget.index');
         });
 
     // Routes admin des produits - nécessite le rôle admin
