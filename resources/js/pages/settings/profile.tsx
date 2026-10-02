@@ -1,6 +1,12 @@
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import {
+    Head,
+    Link,
+    router,
+    useForm,
+    usePage,
+} from '@inertiajs/react';
 import {
     AlertCircle,
     ImageIcon,
@@ -31,6 +37,7 @@ import {
     edit as editAdminUser,
     update as updateAdminUser,
 } from '@/routes/users';
+import { update as updateLoginAlert } from '@/routes/settings/login-alert';
 
 export type UserMetaItem = {
     id: number;
@@ -440,6 +447,8 @@ type PageProps = SharedData & {
     userMeta?: UserMetaItem[];
     metaKeyOptions?: Array<{ value: string; label: string }>;
     metaKeyConfig?: Record<string, { input: string; fields: string[] }>;
+    loginAlert?: boolean;
+    loginAlertEligible?: boolean;
 };
 
 type ProfileFormPayload = {
@@ -525,6 +534,23 @@ export default function Profile({
     );
     const metaKeyOptions = pageProps.metaKeyOptions ?? [];
     const metaKeyConfig = pageProps.metaKeyConfig ?? {};
+
+    const loginAlertEligible = Boolean(pageProps.loginAlertEligible);
+    const [loginAlert, setLoginAlert] = useState(
+        Boolean(pageProps.loginAlert),
+    );
+
+    const toggleLoginAlert = (enabled: boolean) => {
+        setLoginAlert(enabled);
+        router.put(
+            updateLoginAlert().url,
+            { enabled },
+            {
+                preserveScroll: true,
+                onError: () => setLoginAlert(!enabled),
+            },
+        );
+    };
 
     // ── Profile form ─────────────────────────────────────────────────────────
     const initialParentId = targetUserWithParent.parent_id ?? null;
@@ -1001,6 +1027,29 @@ export default function Profile({
                                                     Accepte le mailing
                                                 </Label>
                                             </div>
+                                            {isSelf &&
+                                                loginAlertEligible && (
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            id="login_alert"
+                                                            type="checkbox"
+                                                            checked={
+                                                                loginAlert
+                                                            }
+                                                            onChange={(e) =>
+                                                                toggleLoginAlert(
+                                                                    e.target
+                                                                        .checked,
+                                                                )
+                                                            }
+                                                        />
+                                                        <Label htmlFor="login_alert">
+                                                            {t(
+                                                                'Email me when a user logs in',
+                                                            )}
+                                                        </Label>
+                                                    </div>
+                                                )}
                                         </div>
                                     </CardContent>
                                 </Card>

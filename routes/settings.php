@@ -6,6 +6,7 @@ use App\Http\Controllers\Settings\UserAdditionalInfoController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\DashboardLayoutController;
+use App\Http\Controllers\Settings\LoginAlertController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
@@ -53,6 +54,9 @@ Route::middleware('auth')->group(function () {
 
     Route::put('settings/dashboard-layout', [DashboardLayoutController::class, 'update'])
         ->name('settings.dashboard-layout.update');
+
+    Route::put('settings/login-alert', [LoginAlertController::class, 'update'])
+        ->name('settings.login-alert.update');
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');

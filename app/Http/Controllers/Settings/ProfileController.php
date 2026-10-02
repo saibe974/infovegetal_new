@@ -53,6 +53,8 @@ class ProfileController extends Controller
                 'manage_db' => $this->authorization->canManageClientDatabase($request->user(), $target),
                 'can_access_contracts' => $target->canInvoiceAnyDbProduct(),
             ],
+            'loginAlert' => LoginAlertController::enabledFor($target),
+            'loginAlertEligible' => LoginAlertController::isEligible($target),
             'userMeta' => $target->usersMeta()
                 ->where('key', '!=', UserMeta::APPEARANCE_PREFERENCES_KEY)
                 ->orderBy('sort_order')

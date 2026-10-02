@@ -479,5 +479,16 @@
     "maximum thumbnails": "maximaal aantal miniaturen",
     "Preparing…": "Voorbereiden…",
     "CSV download": "CSV-download",
-    "Unable to prepare the file. Reload the page or reduce the selection.": "Het bestand kan niet worden voorbereid. Laad de pagina opnieuw of verklein de selectie."
+    "Unable to prepare the file. Reload the page or reduce the selection.": "Het bestand kan niet worden voorbereid. Laad de pagina opnieuw of verklein de selectie.",
+    "Recent logins": "Recente aanmeldingen",
+    "No logins recorded yet": "Nog geen aanmeldingen geregistreerd",
+    "Email me when a user logs in": "Stuur mij een e-mail wanneer een gebruiker zich aanmeldt",
+    "New login": "Nieuwe aanmelding",
+    "New login: :name": "Nieuwe aanmelding: :name",
+    ":name just logged in.": ":name heeft zich zojuist aangemeld.",
+    "User": "Gebruiker",
+    "Date": "Datum",
+    "IP address": "IP-adres",
+    "Browser": "Browser",
+    "You receive this email because you enabled login alerts in your profile settings.": "U ontvangt deze e-mail omdat u aanmeldingsmeldingen hebt ingeschakeld in uw profielinstellingen."
 }

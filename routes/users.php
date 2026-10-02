@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ImpersonationController;
+use App\Http\Controllers\Api\RecentLoginsWidgetController;
 use App\Http\Controllers\RolePermissionManagementController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('admin/users/{user}/role', [UserManagementController::class, 'updateRole'])->whereNumber('user')->name('users.updateRole');
     Route::get('admin/users/{user}/db', [UserManagementController::class, 'db'])->whereNumber('user')->name('users.db');
     Route::post('admin/users/{user}/db', [UserManagementController::class, 'editDb'])->whereNumber('user')->name('users.editDb');
+
+    // Widget dashboard : 10 dernières connexions (dev/admin/commercial)
+    Route::get('/api/recent-logins-widget', [RecentLoginsWidgetController::class, 'index'])
+        ->middleware(['verified', 'role_or_impersonator:admin|dev|commercial'])
+        ->name('api.recent-logins-widget.index');
 });
 
 // Gestion des utilisateurs réservée aux admins

@@ -480,5 +480,16 @@
     "maximum thumbnails": "maximum thumbnails",
     "Preparing…": "Preparing…",
     "CSV download": "CSV download",
-    "Unable to prepare the file. Reload the page or reduce the selection.": "Unable to prepare the file. Reload the page or reduce the selection."
+    "Unable to prepare the file. Reload the page or reduce the selection.": "Unable to prepare the file. Reload the page or reduce the selection.",
+    "Recent logins": "Recent logins",
+    "No logins recorded yet": "No logins recorded yet",
+    "Email me when a user logs in": "Email me when a user logs in",
+    "New login": "New login",
+    "New login: :name": "New login: :name",
+    ":name just logged in.": ":name just logged in.",
+    "User": "User",
+    "Date": "Date",
+    "IP address": "IP address",
+    "Browser": "Browser",
+    "You receive this email because you enabled login alerts in your profile settings.": "You receive this email because you enabled login alerts in your profile settings."
 }

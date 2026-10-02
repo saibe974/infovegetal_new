@@ -480,5 +480,16 @@
     "maximum thumbnails": "Vorschaubilder maximal",
     "Preparing…": "Wird vorbereitet…",
     "CSV download": "CSV-Download",
-    "Unable to prepare the file. Reload the page or reduce the selection.": "Die Datei kann nicht vorbereitet werden. Laden Sie die Seite neu oder verkleinern Sie die Auswahl."
+    "Unable to prepare the file. Reload the page or reduce the selection.": "Die Datei kann nicht vorbereitet werden. Laden Sie die Seite neu oder verkleinern Sie die Auswahl.",
+    "Recent logins": "Letzte Anmeldungen",
+    "No logins recorded yet": "Noch keine Anmeldungen erfasst",
+    "Email me when a user logs in": "Bei einer Benutzeranmeldung per E-Mail benachrichtigen",
+    "New login": "Neue Anmeldung",
+    "New login: :name": "Neue Anmeldung: :name",
+    ":name just logged in.": ":name hat sich gerade angemeldet.",
+    "User": "Benutzer",
+    "Date": "Datum",
+    "IP address": "IP-Adresse",
+    "Browser": "Browser",
+    "You receive this email because you enabled login alerts in your profile settings.": "Sie erhalten diese E-Mail, weil Sie Anmeldebenachrichtigungen in Ihren Profileinstellungen aktiviert haben."
 }

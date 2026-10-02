@@ -498,5 +498,16 @@
     "maximum thumbnails": "miniatures maximum",
     "Preparing…": "Préparation…",
     "CSV download": "Téléchargement CSV",
-    "Unable to prepare the file. Reload the page or reduce the selection.": "Impossible de préparer le fichier. Rechargez la page ou réduisez la sélection."
+    "Unable to prepare the file. Reload the page or reduce the selection.": "Impossible de préparer le fichier. Rechargez la page ou réduisez la sélection.",
+    "Recent logins": "Connexions récentes",
+    "No logins recorded yet": "Aucune connexion enregistrée",
+    "Email me when a user logs in": "M'alerter par e-mail lors d'une connexion",
+    "New login": "Nouvelle connexion",
+    "New login: :name": "Nouvelle connexion : :name",
+    ":name just logged in.": ":name vient de se connecter.",
+    "User": "Utilisateur",
+    "Date": "Date",
+    "IP address": "Adresse IP",
+    "Browser": "Navigateur",
+    "You receive this email because you enabled login alerts in your profile settings.": "Vous recevez cet e-mail car vous avez activé les alertes de connexion dans vos paramètres de profil."
 }

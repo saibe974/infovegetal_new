@@ -3,6 +3,7 @@ import { WidgetGrid, type WidgetDefinition, type WidgetType } from '@/components
 import { CartsList } from '@/components/cart/carts-list';
 import { CommercialBalance } from '@/components/dashboard/commercial-balance';
 import { DbProductsWidget } from '@/components/dashboard/db-products-widget';
+import { RecentLoginsWidget } from '@/components/dashboard/recent-logins-widget';
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
 import { normalizeDashboardLayout, saveDashboardLayout, type DashboardWidgetConfig } from '@/lib/dashboard-preferences';
@@ -17,6 +18,7 @@ const WIDGET_CATALOG: Record<string, { label: string; defaults: Partial<LayoutIt
     carts: { label: 'Carts', defaults: { w: 12, h: 6 } },
     'commercial-balance': { label: 'Commercial balance', defaults: { w: 12, h: 4 } },
     'db-products': { label: 'Product databases', defaults: { w: 4, h: 5, minW: 3, minH: 4 } },
+    'recent-logins': { label: 'Recent logins', defaults: { w: 4, h: 5, minW: 3, minH: 4 } },
 };
 
 const WIDGET_TYPES: WidgetType[] = Object.entries(WIDGET_CATALOG).map(([type, { label }]) => ({ type, label }));
@@ -29,6 +31,8 @@ function renderWidgetContent(type: string) {
             return <CommercialBalance />;
         case 'db-products':
             return <DbProductsWidget />;
+        case 'recent-logins':
+            return <RecentLoginsWidget />;
         default:
             return <CartsList />;
     }
