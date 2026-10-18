@@ -32,9 +32,14 @@ class CartTcpdfService
 
     private function buildDocument($pdf, array $payload): void
     {
+        $user = $payload['user'] ?? null;
+        if ($user && method_exists($user, 'loadMissing')) {
+            $user->loadMissing('usersMeta');
+        }
+
         $pdf->SetCreator((string) config('app.name', 'Laravel'));
         $pdf->SetAuthor((string) config('app.name', 'Laravel'));
-        $pdf->SetTitle('Panier de commande');
+        $pdf->SetTitle('Bon de commande');
         $pdf->SetSubject('Commande client');
         $pdf->setPrintHeader(false);
         $pdf->setPrintFooter(true);
@@ -58,7 +63,6 @@ class CartTcpdfService
         $y = 8.0;
         $y = $this->renderTopHeader($pdf, $payload, $y);
         $y = $this->renderContacts($pdf, $payload, $y + 2.0);
-        $y = $this->renderClientBox($pdf, $payload, $y + 2.0);
         $y = $this->renderProductsTable($pdf, $payload, $y + 3.0);
         $y = $this->renderComments($pdf, $payload, $y + 4.0);
         $this->renderRollSummary($pdf, $payload, $y + 4.0);
@@ -76,13 +80,13 @@ class CartTcpdfService
         $pdf->SetTextColor(22, 101, 52);
         $pdf->SetFont('dejavusans', 'B', 16);
         $pdf->SetXY($left, $y);
-        $pdf->Cell($width, 7, 'Panier de commande', 0, 1, 'C');
+        $pdf->Cell($width, 7, 'Bon de commande', 0, 1, 'C');
 
         $pdf->SetTextColor(55, 65, 81);
         $pdf->SetFont('dejavusans', '', 8.5);
         if (! empty($payload['order_number'])) {
             $pdf->SetX($left);
-            $pdf->Cell($width, 4, 'Commande n'.(string) $payload['order_number'], 0, 1, 'C');
+            $pdf->Cell($width, 4, 'Commande n°'.(string) $payload['order_number'], 0, 1, 'C');
         }
 
         $pdf->SetX($left);
@@ -97,18 +101,20 @@ class CartTcpdfService
         $commercial = $payload['commercial'] ?? null;
 
         if (! $facturant && ! $commercial) {
-            return $y;
+            return $this->renderClientBox($pdf, $payload, $y);
         }
 
         $left = 8.0;
         $gap = 4.0;
-        $colW = (194.0 - $gap) / 2;
-        $boxH = 34.0;
+        $colW = 96.0;
+        $boxH = 27.5;
+        $totalH = $boxH * 2 + $gap;
 
         $this->drawContactBox($pdf, $left, $y, $colW, $boxH, 'Facturant', $facturant);
-        $this->drawContactBox($pdf, $left + $colW + $gap, $y, $colW, $boxH, 'Commercial', $commercial);
+        $this->drawContactBox($pdf, $left, $y + $boxH + $gap, $colW, $boxH, 'Commercial', $commercial);
+        $this->drawClientBox($pdf, $left + $colW + $gap, $y, 194.0 - $colW - $gap, $totalH, $payload['user']);
 
-        return $y + $boxH;
+        return $y + $totalH;
     }
 
     private function drawContactBox($pdf, float $x, float $y, float $w, float $h, string $label, $contact): void
@@ -168,22 +174,105 @@ class CartTcpdfService
         $user = $payload['user'];
         $x = 8.0;
         $w = 194.0;
-        $h = 13.0;
+        $h = 13.0 + 4.2 * min(8, count($this->clientAddressLines($user)));
 
+        $this->drawClientBox($pdf, $x, $y, $w, $h, $user);
+
+        return $y + $h;
+    }
+
+    private function clientAddressLines($user): array
+    {
+        $lines = [];
+        $road = trim((string) ($user->address_road ?? ''));
+        if ($road !== '') {
+            $lines[] = $road;
+        }
+        $zipTown = trim((string) ($user->address_zip ?? '').' '.(string) ($user->address_town ?? ''));
+        if ($zipTown !== '') {
+            $lines[] = $zipTown;
+        }
+
+        return [...$lines, ...$this->clientMetaLines($user)];
+    }
+
+    private function clientMetaLines($user): array
+    {
+        $metas = $user->usersMeta ?? collect();
+        $lines = [];
+
+        foreach (['phone' => 'Tel', 'mobile' => 'Mobile'] as $key => $label) {
+            foreach ($metas->where('key', $key) as $meta) {
+                $value = $this->metaStringValue($meta->value ?? null);
+                if ($value === '') {
+                    continue;
+                }
+                $title = trim((string) ($meta->title ?? ''));
+                $lines[] = ($title !== '' ? $title : $label).' : '.$value;
+            }
+        }
+
+        foreach ($metas->where('key', 'adress') as $meta) {
+            $data = json_decode((string) ($meta->value ?? ''), true);
+            if (! is_array($data)) {
+                continue;
+            }
+            $road = trim((string) ($data['number'] ?? '').' '.(string) ($data['road'] ?? ''));
+            $zipTown = trim((string) ($data['zip'] ?? '').' '.(string) ($data['town'] ?? ''));
+            $address = trim($road.($zipTown !== '' ? ', '.$zipTown : ''));
+            if ($address === '') {
+                continue;
+            }
+            $title = trim((string) ($meta->title ?? ''));
+            $lines[] = ($title !== '' ? $title : 'Adresse').' : '.$address;
+        }
+
+        return $lines;
+    }
+
+    private function metaStringValue($value): string
+    {
+        if (is_array(json_decode((string) $value, true))) {
+            return '';
+        }
+
+        return trim((string) $value);
+    }
+
+    private function drawClientBox($pdf, float $x, float $y, float $w, float $h, $user): void
+    {
         $pdf->SetFillColor(247, 250, 249);
         $pdf->SetDrawColor(34, 197, 94);
         $pdf->Rect($x, $y, $w, $h, 'DF');
 
+        $logoPath = $this->resolveUserLogoPath($user);
+        $textX = $x + 2;
+        if ($logoPath) {
+            $pdf->Image($logoPath, $x + 2, $y + 2.2, 12.0, 5.5, '', '', '', true, 150, '', false, false, 0, 'CM', false, false);
+            $textX = $x + 16;
+        }
+
+        $textW = $w - ($textX - $x) - 2;
+
         $pdf->SetFont('dejavusans', 'B', 8.5);
         $pdf->SetTextColor(17, 24, 39);
-        $pdf->SetXY($x + 2, $y + 2.2);
-        $pdf->Cell($w - 4, 4, 'Client : '.(string) ($user->name ?? ''), 0, 1, 'L');
+        $pdf->SetXY($textX, $y + 2.2);
+        $pdf->Cell($textW, 4, 'Client : '.(string) ($user->name ?? ''), 0, 1, 'L');
 
         $pdf->SetFont('dejavusans', '', 8.5);
-        $pdf->SetXY($x + 2, $y + 6.8);
-        $pdf->Cell($w - 4, 4, 'Email : '.(string) ($user->email ?? ''), 0, 1, 'L');
+        $pdf->SetXY($textX, $y + 6.8);
+        $pdf->Cell($textW, 4, 'Email : '.(string) ($user->email ?? ''), 0, 1, 'L');
 
-        return $y + $h;
+        $addressLines = $this->clientAddressLines($user);
+        if ($addressLines !== []) {
+            $pdf->SetTextColor(55, 65, 81);
+            $lineY = $y + 11.2;
+            foreach (array_slice($addressLines, 0, 8) as $line) {
+                $pdf->SetXY($textX, $lineY);
+                $pdf->Cell($textW, 4, $this->truncateText($line, 60), 0, 1, 'L');
+                $lineY += 4.2;
+            }
+        }
     }
 
     private function renderProductsTable($pdf, array $payload, float $y): float
@@ -246,11 +335,11 @@ class CartTcpdfService
                 $cx += $cw;
             }
 
-            $this->drawCountryFlag($pdf, $x + 1.3, $y + 5.2, 7.2, 4.9, $country);
+            $this->drawCountryFlag($pdf, $x + ($cols[0] - 7.2) / 2, $y + ($rowH - 4.9) / 2, 7.2, 4.9, $country);
 
             $thumbPath = $this->resolveProductThumbPath($product);
             if ($thumbPath) {
-                $pdf->Image($thumbPath, $x + $cols[0] + 1.5, $y + 1.5, $cols[1] - 3, $rowH - 3, '', '', '', true, 120, '', false, false, 0, false, false, false);
+                $pdf->Image($thumbPath, $x + $cols[0] + 1.5, $y + 1.5, $cols[1] - 3, $rowH - 3, '', '', '', true, 120, '', false, false, 0, 'CM', false, false);
             } else {
                 $pdf->SetTextColor(100, 116, 139);
                 $pdf->SetXY($x + $cols[0], $y + 5.3);
@@ -289,10 +378,12 @@ class CartTcpdfService
             $pdf->SetFont('dejavusans', '', 8.2);
             $tx += $cols[2];
             if ($eanBarcode) {
-                $pdf->write1DBarcode($eanBarcode, 'EAN13', $tx + 1.2, $y + 1.4, $cols[3] - 2.4, 8.4, 0.28, $barcodeStyle, 'N');
+                $eanW = 95 * 0.28;
+                $eanX = $tx + ($cols[3] - $eanW) / 2;
+                $pdf->write1DBarcode($eanBarcode, 'EAN13', $eanX, $y + 5.4, $eanW, 8.4, 0.28, $barcodeStyle, 'N');
             }
             $pdf->SetFont('dejavusans', '', 7.4);
-            $pdf->SetXY($tx, $y + 10.6);
+            $pdf->SetXY($tx, $y + 14.6);
             $pdf->Cell($cols[3], 4.0, $eanLabel, 0, 0, 'C');
 
             $tx += $cols[3];
@@ -488,35 +579,22 @@ class CartTcpdfService
                 $y += 8.0;
             }
 
-            // Bandeau fournisseur
+            // Bandeau fournisseur (une seule ligne : flag, etages, cartons, coef)
             $pdf->SetFillColor(240, 253, 244);
             $pdf->SetDrawColor(187, 247, 208);
             $pdf->Rect($x, $y, $contentW, 8.0, 'DF');
 
-            $pdf->SetTextColor(17, 24, 39);
-            $pdf->SetFont('dejavusans', 'B', 9.0);
-            $pdf->SetXY($x + 2, $y + 1.7);
-            $pdf->Cell(120, 4, $this->truncateText((string) ($supplier['name'] ?? '-'), 64), 0, 0, 'L');
-
-            $pdf->SetFont('dejavusans', '', 8.0);
-            $pdf->SetTextColor(55, 65, 81);
-            $pdf->SetXY($x + 118, $y + 1.7);
-            $pdf->Cell(74, 4, 'Rolls: '.(int) ($supplier['roll_count'] ?? 0).'  |  Coef moy: '.number_format((float) ($supplier['coef_avg'] ?? 0), 1, ',', ' ').'%', 0, 0, 'R');
-            $y += 9.5;
-
             $country = strtoupper((string) ($supplier['country'] ?? ''));
-            $this->drawCountryFlag($pdf, $x + 1.0, $y + 0.8, 7.0, 4.6, $country);
+            $this->drawCountryFlag($pdf, $x + 2.0, $y + 1.7, 7.0, 4.6, $country);
 
-            $pdf->SetTextColor(75, 85, 99);
-            $pdf->SetFont('dejavusans', '', 7.8);
-            $meta = 'Pays: '.($country !== '' ? $country : '-')
-                .'  |  Mini: '.(int) ($supplier['mini'] ?? 0)
-                .'  |  Etages: '.(int) ($supplier['floor_count'] ?? 0)
+            $pdf->SetTextColor(55, 65, 81);
+            $pdf->SetFont('dejavusans', '', 8.0);
+            $meta = 'Etages: '.(int) ($supplier['floor_count'] ?? 0)
                 .'  |  Cartons: '.(int) ($supplier['carton_count'] ?? 0)
-                .'  |  Perte: '.number_format((float) ($supplier['loss_total'] ?? 0), 1, ',', ' ');
-            $pdf->SetXY($x + 9.0, $y + 1.0);
-            $pdf->Cell($contentW - 10, 4, $meta, 0, 0, 'L');
-            $y += 7.0;
+                .'  |  Coef moy: '.number_format((float) ($supplier['coef_avg'] ?? 0), 1, ',', ' ').'%';
+            $pdf->SetXY($x + 10.0, $y + 1.7);
+            $pdf->Cell($contentW - 12, 4, $meta, 0, 0, 'L');
+            $y += 9.5;
 
             if (empty($rolls)) {
                 $pdf->SetTextColor(100, 116, 139);
@@ -561,7 +639,7 @@ class CartTcpdfService
                 $pdf->SetTextColor(22, 101, 52);
                 $pdf->SetFont('dejavusans', 'B', 10.0);
                 $pdf->SetXY($x, $startY);
-                $pdf->Cell($contentW, 5, 'Rolls - '.$this->truncateText((string) ($supplier['name'] ?? '-'), 52), 0, 1, 'L');
+                $pdf->Cell($contentW, 5, 'Rolls (suite)', 0, 1, 'L');
                 $startY += 6.5;
             }
 

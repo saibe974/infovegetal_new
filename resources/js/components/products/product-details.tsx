@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, MoveVertical, CircleSlash2 } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ArrowLeftCircle, MoveVertical, CircleSlash2, Sprout } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
 import { useContext } from 'react';
@@ -24,6 +24,15 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
     const isAuthenticated = !!user;
+    const isPrivileged = !!auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
+
+    const filterByProducer = (producerId: number) => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        params.delete('producer');
+        params.append('producer[]', String(producerId));
+        router.visit(`/products?${params.toString()}`, { preserveScroll: true });
+    };
 
     const { price, price_floor: priceFloor, price_roll: priceRoll } = resolveProductPrices(product);
     const canOrder = isAuthenticated && (price !== null || priceFloor !== null || priceRoll !== null);
@@ -99,6 +108,23 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                                     <p className="text-sm text-muted-foreground mt-1 capitalize">
                                         {product.category.name}
                                     </p>
+                                )}
+                                {product.producer ? (
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1 mt-1 text-sm text-muted-foreground transition-colors hover:text-brand-main"
+                                        title={t('Filter by producer')}
+                                        onClick={() => filterByProducer(product.producer!.id)}
+                                    >
+                                        <Sprout className="size-3.5" />
+                                        <span>
+                                            {isPrivileged
+                                                ? (product.producer.name || `#${product.producer.id}`)
+                                                : `#${product.producer.id}`}
+                                        </span>
+                                    </button>
+                                ) : (
+                                    <p className="mt-1 text-sm text-muted-foreground">-</p>
                                 )}
                             </CardTitle>
                         </CardHeader>

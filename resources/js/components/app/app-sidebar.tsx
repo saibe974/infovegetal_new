@@ -96,6 +96,7 @@ export function AppSidebar() {
                 title: t('Products'),
                 href: products.index(),
                 icon: FlowerIcon,
+                featured: true,
                 subItems: []
             },
         ];
@@ -214,6 +215,7 @@ export function AppSidebar() {
                 title: t('Products'),
                 href: products.index(),
                 icon: FlowerIcon,
+                featured: true,
             },
             {
                 title: t('Contact'),

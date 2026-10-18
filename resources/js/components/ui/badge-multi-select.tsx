@@ -13,6 +13,19 @@ export type BadgeMultiSelectOption = {
     icon?: ReactNode;
 };
 
+// Portail partagé marque d'un attribut data : permet aux conteneurs hôtes
+// (SearchSelect, etc.) d'ignorer les clics dans le menu react-select.
+const getPortalTarget = (): HTMLElement | undefined => {
+    if (typeof document === 'undefined') return undefined;
+    let portal = document.querySelector<HTMLElement>('[data-react-select-portal]');
+    if (!portal) {
+        portal = document.createElement('div');
+        portal.setAttribute('data-react-select-portal', '');
+        document.body.appendChild(portal);
+    }
+    return portal;
+};
+
 function BadgeOption(props: OptionProps<BadgeMultiSelectOption, true>) {
     return (
         <components.Option {...props}>
@@ -77,7 +90,7 @@ export function BadgeMultiSelect({
                 closeMenuOnSelect={false}
                 hideSelectedOptions={false}
                 maxMenuHeight={160}
-                menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
+                menuPortalTarget={getPortalTarget()}
                 menuPosition="fixed"
                 styles={{
                     // Le style inline par défaut (zIndex: 1) ferait passer le menu

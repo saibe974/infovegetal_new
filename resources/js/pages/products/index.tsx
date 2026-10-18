@@ -38,6 +38,7 @@ type FiltersState = {
     country: string[];
     pot: string[];
     height: string[];
+    producer: string[];
     image: 'all' | 'with' | 'without';
     promo: boolean;
 };
@@ -48,6 +49,7 @@ type RawFilters = {
     country?: string[] | string | null;
     pot?: string[] | string | null;
     height?: string[] | string | null;
+    producer?: string[] | string | null;
     image?: string | null;
     promo?: boolean | null;
 };
@@ -67,6 +69,7 @@ type Props = {
     countryOptions?: string[];
     potOptions?: string[];
     heightOptions?: string[];
+    producerOptions?: { id: number; name: string }[];
 };
 
 const normalizeMultiFilter = (value?: string[] | string | null): string[] => {
@@ -80,6 +83,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
     country: normalizeMultiFilter(raw?.country),
     pot: normalizeMultiFilter(raw?.pot),
     height: normalizeMultiFilter(raw?.height),
+    producer: normalizeMultiFilter(raw?.producer),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
     promo: raw?.promo === true,
     cart: cartFilter?.cart,
@@ -89,7 +93,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], exportOptions }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], producerOptions = [], exportOptions }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -196,6 +200,16 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         filtersState.height.length > 0
             ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
             : null,
+        filtersState.producer.length > 0
+            ? {
+                name: 'producer',
+                label: filtersState.producer.map((id) => {
+                    const producer = producerOptions.find((option) => String(option.id) === String(id));
+                    return producer?.name || `#${id}`;
+                }).join(', '),
+                values: filtersState.producer,
+            }
+            : null,
         filtersState.cart ? { name: 'cart', label: `${t('Cart')} (${cartItems.length})` } : null,
     ].filter((item): item is NonNullable<typeof item> => Boolean(item?.label));
 
@@ -252,7 +266,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             }
 
             column.style.visibility = 'visible';
-            column.style.maxHeight = `${Math.floor(available)}px`;
+            // Ne jamais dépasser le viewport, sinon le bas de la colonne reste
+            // hors d'atteinte et le défilement interne devient impossible.
+            const maxViewport = Math.max(160, window.innerHeight - filtersStickyTop - 16);
+            column.style.maxHeight = `${Math.min(Math.floor(available), Math.floor(maxViewport))}px`;
         };
 
         update();
@@ -298,6 +315,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.height = nextFilters.height;
         }
 
+        if (nextFilters.producer.length > 0) {
+            params.producer = nextFilters.producer;
+        }
+
         if (nextFilters.image !== 'all') {
             params.image = nextFilters.image;
         }
@@ -328,7 +349,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo' | 'cart') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'cart') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
@@ -340,6 +361,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             nextFilters.pot = [];
         } else if (key === 'height') {
             nextFilters.height = [];
+        } else if (key === 'producer') {
+            nextFilters.producer = [];
         } else if (key === 'image') {
             nextFilters.image = 'all';
         } else if (key === 'promo') {
@@ -367,6 +390,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             country: [],
             pot: [],
             height: [],
+            producer: [],
             image: 'all',
             promo: false,
             cart: undefined,
@@ -482,11 +506,13 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         countryOptions,
         potOptions,
         heightOptions,
+        producerOptions,
         active: filtersState.active,
         categoryId: filtersState.category,
         country: filtersState.country,
         pot: filtersState.pot,
         height: filtersState.height,
+        producer: filtersState.producer,
         image: filtersState.image,
         promo: filtersState.promo,
         onApply: applyFilters,
@@ -527,7 +553,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo' | 'cart')}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'cart')}
                     clearAll={clearAllFilters}
                 />
                 {/* </div> */}
@@ -584,7 +610,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                             >
                                 <div
                                     ref={filtersColumnRef}
-                                    className="overflow-y-auto"
+                                    className="overflow-y-auto overscroll-contain"
                                     style={{ maxHeight: `calc(100dvh - ${filtersStickyTop + 16}px)` }}
                                 >
                                     <ProductsFilters

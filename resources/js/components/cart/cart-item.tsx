@@ -16,9 +16,10 @@ export type CartItemProps = {
     quantity: number;
     comment?: string;
     pricingOverride?: CartPricing;
+    isHighlighted?: boolean;
 };
 
-export function CartItem({ product, quantity, comment = '', pricingOverride }: CartItemProps) {
+export function CartItem({ product, quantity, comment = '', pricingOverride, isHighlighted = false }: CartItemProps) {
     const { t } = useI18n();
     const { removeFromCart, updateQuantity, updateComment } = useContext(CartContext);
     const [isCommentOpen, setIsCommentOpen] = useState(false);
@@ -40,7 +41,7 @@ export function CartItem({ product, quantity, comment = '', pricingOverride }: C
         : (quantity >= unite ? getCondQuantity(product) : unite);
 
     return (
-        <div className="group relative w-full border-b pb-3 last:border-b-0">
+        <div className={cn('group relative w-full border-b pb-3 last:border-b-0', isHighlighted && 'cart-item-highlight')}>
             <div className="flex gap-2.5">
                 {/* Image produit */}
                 <div className="relative shrink-0">

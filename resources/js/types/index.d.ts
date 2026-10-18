@@ -236,6 +236,7 @@ export interface Product {
     price_roll?: number | null;
     price_promo?: number | null;
     producer_id?: number | null;
+    producer?: { id: number; name: string } | null;
     tva_id?: number | null;
     cond?: number | 1;
     floor?: number | null;
@@ -367,6 +368,7 @@ export interface NavItem {
     icon?: LucideIcon | null;
     isActive?: boolean;
     target?: string;
+    featured?: boolean;
 }
 
 export interface NavItemExtended extends NavItem {

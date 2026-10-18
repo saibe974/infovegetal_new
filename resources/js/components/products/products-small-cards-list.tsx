@@ -13,6 +13,7 @@ import {
     CircleSlash2,
     Edit,
     MoveVertical,
+    Sprout,
     Trash2,
     X,
     Zap,
@@ -36,6 +37,15 @@ export function ProductsSmallCardsList({
     const { t } = useI18n();
     const { auth } = usePage<SharedData>().props;
     const { items } = useContext(CartContext);
+    const isPrivileged = !!auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
+
+    const filterByProducer = (producerId: number) => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        params.delete('producer');
+        params.append('producer[]', String(producerId));
+        router.visit(`/products?${params.toString()}`, { preserveScroll: true });
+    };
 
     const buildShowUrl = (id: number) => {
         if (typeof window === 'undefined') return `/products/${id}`;
@@ -178,6 +188,27 @@ export function ProductsSmallCardsList({
                                                     {String(product.ref)}
                                                 </p>
                                             ) : null}
+                                            {product.producer ? (
+                                                <button
+                                                    type="button"
+                                                    className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full border border-brand-main/30 bg-brand-main/10 px-2 py-0.5 text-left text-xs not-italic text-foreground transition-colors hover:border-brand-main hover:bg-brand-main/20"
+                                                    title={t('Filter by producer')}
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        filterByProducer(product.producer!.id);
+                                                    }}
+                                                >
+                                                    <Sprout className="size-3 shrink-0" />
+                                                    <span className="truncate">
+                                                        {isPrivileged
+                                                            ? (product.producer.name || `#${product.producer.id}`)
+                                                            : `#${product.producer.id}`}
+                                                    </span>
+                                                </button>
+                                            ) : (
+                                                <span className="mt-0.5 text-xs text-muted-foreground">-</span>
+                                            )}
                                         </div>
                                     </div>
 

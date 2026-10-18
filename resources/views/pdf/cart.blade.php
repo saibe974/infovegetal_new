@@ -266,9 +266,9 @@
 </head>
 <body>
     <div class="header">
-        <h1>Panier de commande</h1>
+        <h1>Bon de commande</h1>
         @if(!empty($order_number))
-            <p>Commande n{{ $order_number }}</p>
+            <p>Commande n°{{ $order_number }}</p>
         @endif
         <p>Date : {{ now()->format('d/m/Y H:i') }}</p>
     </div>

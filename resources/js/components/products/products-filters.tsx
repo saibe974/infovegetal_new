@@ -5,7 +5,7 @@ import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ProductCategory } from "@/types";
-import { Camera, CameraOff, Check, Diameter, MoveVertical, Pin, PinOff, RotateCcw, WandSparkles, X, Zap } from "lucide-react";
+import { Camera, CameraOff, Check, Diameter, MoveVertical, Pin, PinOff, RotateCcw, Sprout, WandSparkles, X, Zap } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { CategoryAccordion } from "./category-accordion";
 import { BadgeMultiSelect } from "../ui/badge-multi-select";
@@ -22,6 +22,12 @@ type ProductsFilterValues = {
     height: string[];
     image: ImageFilter;
     promo: boolean;
+    producer: string[];
+};
+
+type ProducerOption = {
+    id: number;
+    name: string;
 };
 
 type ProductsFiltersProps = {
@@ -30,11 +36,13 @@ type ProductsFiltersProps = {
     countryOptions: string[];
     potOptions: string[];
     heightOptions: string[];
+    producerOptions?: ProducerOption[];
     active: FilterActive;
     categoryId: number | null;
     country?: string[];
     pot?: string[];
     height?: string[];
+    producer?: string[];
     image?: ImageFilter | null;
     promo?: boolean | null;
     onApply: (filters: ProductsFilterValues) => void;
@@ -78,10 +86,12 @@ export function ProductsFilters({
     countryOptions,
     potOptions,
     heightOptions,
+    producerOptions = [],
     categoryId,
     country,
     pot,
     height,
+    producer,
     image,
     promo,
     onApply,
@@ -90,7 +100,7 @@ export function ProductsFilters({
     pin,
 }: ProductsFiltersProps) {
     const { t } = useI18n();
-    const { locale } = usePage<SharedData>().props;
+    const { locale, auth } = usePage<SharedData>().props;
     const isColumn = variant === 'column';
     const [localActive, setLocalActive] = useState<FilterActive>(active);
     const ALL_CATEGORIES = "all";
@@ -98,14 +108,15 @@ export function ProductsFilters({
     const [localCountry, setLocalCountry] = useState<string[]>(country ?? []);
     const [localPot, setLocalPot] = useState<string[]>(pot ?? []);
     const [localHeight, setLocalHeight] = useState<string[]>(height ?? []);
+    const [localProducer, setLocalProducer] = useState<string[]>(producer ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
     const [localPromo, setLocalPromo] = useState(Boolean(promo));
     const [autoApply, setAutoApply] = useState(() => {
         if (typeof window === 'undefined') return true;
         return window.localStorage.getItem('products.filters.auto-apply') !== '0';
     });
-    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${image ?? 'all'}|${Boolean(promo)}`;
-    const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localImage}|${localPromo}`;
+    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${(producer ?? []).join(',')}|${image ?? 'all'}|${Boolean(promo)}`;
+    const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localProducer.join(',')}|${localImage}|${localPromo}`;
     const lastAutoAppliedRef = useRef(incomingKey);
     const previousIncomingKeyRef = useRef(incomingKey);
 
@@ -115,9 +126,10 @@ export function ProductsFilters({
         setLocalCountry(country ?? []);
         setLocalPot(pot ?? []);
         setLocalHeight(height ?? []);
+        setLocalProducer(producer ?? []);
         setLocalImage(image === 'with' || image === 'without' ? image : 'all');
         setLocalPromo(Boolean(promo));
-    }, [active, categoryId, country, pot, height, image, promo]);
+    }, [active, categoryId, country, pot, height, producer, image, promo]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -143,16 +155,18 @@ export function ProductsFilters({
             country: localCountry,
             pot: localPot,
             height: localHeight,
+            producer: localProducer,
             image: localImage,
             promo: localPromo,
         });
-    }, [autoApply, incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localImage, localPromo, onApply]);
+    }, [autoApply, incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localProducer, localImage, localPromo, onApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
         || localCountry.length > 0
         || localPot.length > 0
         || localHeight.length > 0
+        || localProducer.length > 0
         || localImage !== 'all'
         || localPromo;
 
@@ -164,6 +178,7 @@ export function ProductsFilters({
             country: localCountry,
             pot: localPot,
             height: localHeight,
+            producer: localProducer,
             image: localImage,
             promo: localPromo,
         });
@@ -171,17 +186,18 @@ export function ProductsFilters({
     };
 
     const reset = () => {
-        const resetKey = `all|${ALL_CATEGORIES}||||all|false`;
+        const resetKey = `all|${ALL_CATEGORIES}|||||all|false`;
 
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
         setLocalCountry([]);
         setLocalPot([]);
         setLocalHeight([]);
+        setLocalProducer([]);
         setLocalImage('all');
         setLocalPromo(false);
         lastAutoAppliedRef.current = resetKey;
-        onApply({ active: 'all', category: null, country: [], pot: [], height: [], image: 'all', promo: false });
+        onApply({ active: 'all', category: null, country: [], pot: [], height: [], producer: [], image: 'all', promo: false });
         closeFilters?.();
     };
 
@@ -285,6 +301,17 @@ export function ProductsFilters({
                     <span>{value}</span>
                 </SummaryFilterBadge>
             ))}
+
+            {localProducer.map((value) => {
+                const producer = producerOptions.find((option) => String(option.id) === value);
+                const label = producer?.name || value;
+                return (
+                    <SummaryFilterBadge key={`producer-${value}`} title={label} onRemove={() => setLocalProducer((values) => values.filter((item) => item !== value))}>
+                        <Sprout className="size-3.5" />
+                        <span>{label}</span>
+                    </SummaryFilterBadge>
+                );
+            })}
         </>
     );
 
@@ -495,6 +522,25 @@ export function ProductsFilters({
                             }))}
                             value={localHeight}
                             onChange={setLocalHeight}
+                        />
+                    )}
+
+                    {producerOptions.length >= 1 && (
+                        <BadgeMultiSelect
+                            id="product-producer-filter"
+                            label={isColumn ? undefined : t('Producer')}
+                            placeholder={t('All producers')}
+                            options={producerOptions.map((producer) => {
+                                const isPrivileged = auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
+                                const label = isPrivileged && producer.name ? producer.name : `#${producer.id}`;
+                                return {
+                                    value: String(producer.id),
+                                    label,
+                                    icon: <Sprout className="size-3.5 shrink-0" />,
+                                };
+                            })}
+                            value={localProducer}
+                            onChange={setLocalProducer}
                         />
                     )}
 

@@ -74,6 +74,7 @@ class ProductCatalogQuery
         $country = $multiValue('country');
         $pot = $multiValue('pot');
         $height = $multiValue('height');
+        $producer = $multiValue('producer');
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
@@ -88,6 +89,7 @@ class ProductCatalogQuery
             'country' => $country,
             'pot' => $pot,
             'height' => $height,
+            'producer' => $producer,
             'image' => $image,
             'promo' => $promo,
         ];
@@ -160,6 +162,16 @@ class ProductCatalogQuery
 
         if (! in_array('height', $skip, true) && ! empty($filters['height'])) {
             $q->whereIn('height', $filters['height']);
+        }
+
+        if (! in_array('producer', $skip, true) && ! empty($filters['producer'])) {
+            $q->where(function ($producerQuery) use ($filters) {
+                $producerQuery
+                    ->whereIn('producer_id', $filters['producer'])
+                    ->orWhereHas('producer', function ($producer) use ($filters) {
+                        $producer->whereIn('name', $filters['producer']);
+                    });
+            });
         }
 
         if (! in_array('image', $skip, true)) {

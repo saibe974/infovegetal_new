@@ -63,6 +63,7 @@ export type CartContextType = {
     setOrderComment: (comment: string) => void;
     clearCart: (options?: { skipConfirmation?: boolean }) => void;
     refreshCart: () => Promise<void>;
+    lastAddedProductId: number | null;
 };
 
 export const CartContext = createContext<CartContextType>({
@@ -75,6 +76,7 @@ export const CartContext = createContext<CartContextType>({
     setOrderComment: () => { },
     clearCart: () => { },
     refreshCart: async () => { },
+    lastAddedProductId: null,
 });
 
 const sanitizeProductForStorage = (product: Product): Product => {
@@ -198,6 +200,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (typeof window === 'undefined' || !userId) return '';
         return localStorage.getItem(`${getCartKey()}:comment`) ?? cart?.comment ?? '';
     });
+    const [lastAddedProductId, setLastAddedProductId] = useState<number | null>(null);
 
     const itemsRef = useRef<CartItem[]>(items);
     const restoredCartIdRef = useRef<number | null>(null);
@@ -386,6 +389,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [items, orderComment, userId, getCartKey]);
 
     const addToCart = (product: Product, quantity: number = 1) => {
+        setLastAddedProductId(product.id);
         setItems((prev) => {
             const unite = getUniteQuantity(product);
             const quantityToAdd = getAddQuantity(product, quantity);
@@ -501,7 +505,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart, lastAddedProductId }}>
             {children}
             <ConfirmationDialog
                 open={confirmationRequest !== null}

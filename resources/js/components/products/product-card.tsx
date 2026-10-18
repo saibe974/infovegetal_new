@@ -3,7 +3,7 @@ import { Link, router, usePage } from "@inertiajs/react";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Zap } from "lucide-react";
+import { Edit as EditIcon, Trash as TrashIcon, Check as CheckIcon, X as XIcon, MoveVertical, CircleSlash2, Sprout, Zap } from "lucide-react";
 import { type Product, SharedData } from "@/types";
 import { CartContext } from "@/components/cart/cart.context";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,17 @@ export function ProductCard({
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
     const isAuthenticated = !!user;
+    const isPrivileged = !!auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
+
+    const filterByProducer = (e: React.MouseEvent, producerId: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        params.delete('producer');
+        params.append('producer[]', String(producerId));
+        router.visit(`/products?${params.toString()}`, { preserveScroll: true });
+    };
 
     const name = String(product?.name ?? "");
     const description = String(product?.description ?? "");
@@ -137,11 +148,6 @@ export function ProductCard({
                             <span className="block text-lg font-semibold whitespace-nowrap overflow-hidden text-ellipsis group-hover:underline underline-offset-3 transition-all duration-300">
                                 {name.charAt(0).toUpperCase() + name.slice(1)}
                             </span>
-                            {product?.ref ? (
-                                <span className="block truncate text-xs font-medium italic text-gray-500">
-                                    {t('Ref')}: {String(product.ref)}
-                                </span>
-                            ) : null}
                         </div>
                         {(canEdit || canDelete) && (
                             <div className="flex shrink-0 items-center">
@@ -178,6 +184,30 @@ export function ProductCard({
                                     </Button>
                                 )}
                             </div>
+                        )}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                        {product?.ref ? (
+                            <span className="min-w-0 truncate text-xs font-medium italic text-gray-500">
+                                {t('Ref')}: {String(product.ref)}
+                            </span>
+                        ) : null}
+                        {product?.producer ? (
+                            <button
+                                type="button"
+                                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-main/30 bg-brand-main/10 px-2 py-0.5 text-xs text-foreground transition-colors hover:border-brand-main hover:bg-brand-main/20"
+                                title={t('Filter by producer')}
+                                onClick={(e) => filterByProducer(e, product.producer!.id)}
+                            >
+                                <Sprout className="size-3 shrink-0" />
+                                <span>
+                                    {isPrivileged
+                                        ? (product.producer.name || `#${product.producer.id}`)
+                                        : `#${product.producer.id}`}
+                                </span>
+                            </button>
+                        ) : (
+                            <span className="ml-auto text-xs text-muted-foreground">-</span>
                         )}
                     </div>
                 </CardTitle>

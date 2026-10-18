@@ -476,3 +476,19 @@ html[data-density='compact'] {
 .widget-grid .react-grid-item:hover > .react-resizable-handle {
     opacity: 1;
 }
+
+/* Highlight temporaire du dernier produit ajoute au panier */
+@keyframes cart-item-highlight {
+    0%,
+    55% {
+        background-color: color-mix(in oklab, var(--brand-main) 12%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
+.cart-item-highlight {
+    animation: cart-item-highlight 1.8s ease-out forwards;
+    border-radius: 0.5rem;
+}

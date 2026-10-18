@@ -51,7 +51,24 @@ export function CartSidebarHeader() {
     const isAuthenticated = !!user;
     const cartId = cart?.id;
 
-    const { items, clearCart } = useContext(CartContext);
+    const { items, clearCart, lastAddedProductId } = useContext(CartContext);
+
+    const orderedItems = useMemo(() => {
+        const sorted = [...items].sort((a, b) =>
+            String(a.product.name ?? '').localeCompare(String(b.product.name ?? ''), 'fr', { sensitivity: 'base' }),
+        );
+
+        if (lastAddedProductId === null) {
+            return sorted;
+        }
+
+        const lastAdded = sorted.find((item) => item.product.id === lastAddedProductId);
+        if (!lastAdded) {
+            return sorted;
+        }
+
+        return [lastAdded, ...sorted.filter((item) => item.product.id !== lastAddedProductId)];
+    }, [items, lastAddedProductId]);
     const { isSaving, saveMessage, handleSaveCart } = useCartOrder();
     const [isPreparingNewCart, setIsPreparingNewCart] = useState(false);
     const [newCartMessage, setNewCartMessage] = useState<string | null>(null);
@@ -525,7 +542,7 @@ export function CartSidebarHeader() {
                                 </>
                             )}
 
-                            {items.map((item) => (
+                            {orderedItems.map((item) => (
                                 <CartItem
                                     key={item.product.id}
                                     product={item.product}
@@ -534,6 +551,7 @@ export function CartSidebarHeader() {
                                     pricingOverride={
                                         pricingByProductId[item.product.id]
                                     }
+                                    isHighlighted={item.product.id === lastAddedProductId}
                                 />
                             ))}
                         </div>

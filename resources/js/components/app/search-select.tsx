@@ -313,6 +313,15 @@ export default function SearchSelect({
                 return;
             }
 
+            // Allow interactions with react-select menus portaled to <body>
+            // (BadgeMultiSelect) : sinon le panneau se ferme avant le clic.
+            if (
+                target instanceof Element &&
+                target.closest('[data-react-select-portal]')
+            ) {
+                return;
+            }
+
             setOpenFilters(false);
             setOpen(false);
             setHighlightedIndex(-1);

@@ -54,6 +54,7 @@ class ProductController extends Controller
         $country = $filters['country'];
         $pot = $filters['pot'];
         $height = $filters['height'];
+        $producer = $filters['producer'];
         $image = $filters['image'];
         $promo = $filters['promo'];
         $applySearch = $catalog->applySearch(...);
@@ -107,7 +108,22 @@ class ProductController extends Controller
             ->values()
             ->all();
 
-        $query = $catalog->query()->with(['category', 'tags', 'dbProduct']);
+        $producerOptions = (clone $optionsBaseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['producer']))
+            ->leftJoin('producers', 'products.producer_id', '=', 'producers.id')
+            ->whereNotNull('products.producer_id')
+            ->select('producers.id', 'producers.name')
+            ->distinct()
+            ->orderBy('producers.name')
+            ->get()
+            ->map(fn ($producer) => [
+                'id' => (int) $producer->id,
+                'name' => (string) $producer->name,
+            ])
+            ->values()
+            ->all();
+
+        $query = $catalog->query()->with(['category', 'tags', 'dbProduct', 'producer']);
 
         $products = $query->paginate(24);
         $user = $request->user();
@@ -213,6 +229,7 @@ class ProductController extends Controller
                 'country' => $country,
                 'pot' => $pot,
                 'height' => $height,
+                'producer' => $producer,
                 'image' => $image,
                 'promo' => $promo,
             ],
@@ -227,6 +244,7 @@ class ProductController extends Controller
             'countryOptions' => $countryOptions,
             'potOptions' => $potOptions,
             'heightOptions' => $heightOptions,
+            'producerOptions' => $producerOptions,
             'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions(
                 tap(clone $baseQuery, fn ($q) => $applyFilters($q, $filters)),
                 $search
@@ -473,7 +491,7 @@ class ProductController extends Controller
 
         abort_unless($isAdminView || $product->isOrderableAt(), 404);
 
-        $product->load(['category', 'tags']);
+        $product->load(['category', 'tags', 'producer']);
 
         return Inertia::render('products/show', [
             'product' => new ProductResource($product),

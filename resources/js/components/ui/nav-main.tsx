@@ -8,6 +8,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { type NavItem, type NavItemExtended } from '@/types';
+import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronRight } from 'lucide-react';
@@ -236,7 +237,10 @@ export function NavMainExtended({
                                     <SidebarMenuButton
                                         asChild
                                         isActive={isActive}
-                                        className={menuButtonClassName}
+                                        className={cn(
+                                            menuButtonClassName,
+                                            item.featured && 'font-semibold bg-emerald-500/10! text-emerald-700! hover:bg-emerald-500/15! hover:text-emerald-700! active:bg-emerald-500/15! active:text-emerald-700! data-[active=true]:bg-emerald-500/15! data-[active=true]:text-emerald-700! dark:text-emerald-300! dark:hover:text-emerald-300! dark:active:text-emerald-300! dark:data-[active=true]:text-emerald-300!',
+                                        )}
                                         tooltip={!isOpenId('main') ? {
                                             children: item.title,
                                             side: 'right',
@@ -299,7 +303,10 @@ export function NavMainExtended({
                                 <SidebarMenuButton
                                     asChild
                                     isActive={isActive}
-                                    className={menuButtonClassName}
+                                    className={cn(
+                                        menuButtonClassName,
+                                        item.featured && 'font-semibold bg-emerald-500/10! text-emerald-700! hover:bg-emerald-500/15! hover:text-emerald-700! active:bg-emerald-500/15! active:text-emerald-700! data-[active=true]:bg-emerald-500/15! data-[active=true]:text-emerald-700! dark:text-emerald-300! dark:hover:text-emerald-300! dark:active:text-emerald-300! dark:data-[active=true]:text-emerald-300!',
+                                    )}
                                     tooltip={!isOpenId('main') ? { children: item.title } : undefined}
                                 >
                                     <Link href={item.href} prefetch onClick={collapseAll}>
