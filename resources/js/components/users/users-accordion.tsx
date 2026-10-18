@@ -236,7 +236,7 @@ function UsersAccordionHeader({
                     className={`${accordionGridClass} px-3 py-3`}
                     style={getAccordionGridStyle(visibleColumns)}
                 >
-                    <div className="flex justify-end pr-4">
+                    <div className="flex justify-start">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

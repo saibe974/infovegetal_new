@@ -2,6 +2,16 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Settings2 } from 'lucide-react';
 import { getCartPricing } from '@/components/cart/cart-pricing';
 import { useI18n } from '@/lib/i18n';
 import { type Product, type SharedData } from '@/types';
@@ -12,6 +22,18 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
 type CartStatus = 'current' | 'processing' | 'processed';
+
+type OptionalColumn = 'client' | 'articles' | 'total' | 'date' | 'status' | 'actions';
+type ColumnVisibility = Record<OptionalColumn, boolean>;
+
+const defaultColumnVisibility: ColumnVisibility = {
+    client: true,
+    articles: true,
+    total: true,
+    date: true,
+    status: true,
+    actions: true,
+};
 
 type CartProduct = Product & { pivot?: { quantity: number } };
 
@@ -39,6 +61,51 @@ export function CartsList() {
     const [replaceConfirmCart, setReplaceConfirmCart] = useState<CartSummary | null>(null);
     const [previewPdf, setPreviewPdf] = useState<{ url: string; cartId: number } | null>(null);
     const [previewLoadingCartId, setPreviewLoadingCartId] = useState<number | null>(null);
+
+    const [visibleColumns, setVisibleColumns] = useState<ColumnVisibility>(() => {
+        if (typeof window === 'undefined') return defaultColumnVisibility;
+
+        try {
+            const stored = JSON.parse(
+                localStorage.getItem('cartsListColumns') || '{}',
+            ) as Partial<ColumnVisibility>;
+
+            return {
+                client: stored.client ?? true,
+                articles: stored.articles ?? true,
+                total: stored.total ?? true,
+                date: stored.date ?? true,
+                status: stored.status ?? true,
+                actions: stored.actions ?? true,
+            };
+        } catch {
+            return defaultColumnVisibility;
+        }
+    });
+
+    const saveVisibleColumns = (columns: ColumnVisibility) => {
+        setVisibleColumns(columns);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cartsListColumns', JSON.stringify(columns));
+        }
+    };
+
+    const handleColumnVisibilityChange = (column: OptionalColumn, visible: boolean) => {
+        saveVisibleColumns({ ...visibleColumns, [column]: visible });
+    };
+
+    const resetColumns = () => saveVisibleColumns(defaultColumnVisibility);
+
+    const configurableColumns: Array<{ key: OptionalColumn; label: string }> = [
+        { key: 'client', label: t('Client') },
+        { key: 'articles', label: t('Articles') },
+        { key: 'total', label: t('Total') },
+        { key: 'date', label: t('Date') },
+        { key: 'status', label: t('Statut') },
+        { key: 'actions', label: t('Actions') },
+    ];
+
+    const visibleColumnsCount = configurableColumns.filter((column) => visibleColumns[column.key]).length;
 
     const getCartStorageKey = (userId: number) => `cart:${userId}`;
 
@@ -234,26 +301,65 @@ export function CartsList() {
 
     return (
         <div className="rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-            <div className="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
+            {/* <div className="border-b border-sidebar-border/70 px-4 py-3 dark:border-sidebar-border">
                 <h2 className="text-lg font-semibold">{t('Commandes')}</h2>
                 <p className="text-sm text-muted-foreground">{t('Gestion des commandes par fournisseur')}</p>
-            </div>
+            </div> */}
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-muted/40">
                         <tr>
-                            <th className="px-4 py-3 font-medium">{t('ID')}</th>
-                            <th className="px-4 py-3 font-medium">{t('Client')}</th>
-                            <th className="px-4 py-3 font-medium">{t('Articles')}</th>
-                            <th className="px-4 py-3 font-medium">{t('Total')}</th>
-                            <th className="px-4 py-3 font-medium">{t('Statut')}</th>
-                            <th className="px-4 py-3 font-medium">{t('Actions')}</th>
+                            <th className="px-4 py-3 font-medium">
+                                <div className="flex items-center gap-2">
+                                    <span>{t('ID')}</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="ghost"
+                                                className="size-7"
+                                                title={t('Choisir les colonnes')}
+                                                aria-label={t('Choisir les colonnes')}
+                                            >
+                                                <Settings2 className="size-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="start" className="w-56">
+                                            <DropdownMenuLabel>{t('Colonnes affichees')}</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {configurableColumns.map((column) => (
+                                                <DropdownMenuCheckboxItem
+                                                    key={column.key}
+                                                    checked={visibleColumns[column.key]}
+                                                    onCheckedChange={(checked) =>
+                                                        handleColumnVisibilityChange(column.key, Boolean(checked))
+                                                    }
+                                                    onSelect={(event) => event.preventDefault()}
+                                                >
+                                                    {column.label}
+                                                </DropdownMenuCheckboxItem>
+                                            ))}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onSelect={resetColumns}>
+                                                {t('Reinitialiser les colonnes')}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </th>
+                            {visibleColumns.client && <th className="px-4 py-3 font-medium">{t('Client')}</th>}
+                            {visibleColumns.articles && <th className="px-4 py-3 font-medium">{t('Articles')}</th>}
+                            {visibleColumns.total && <th className="px-4 py-3 font-medium">{t('Total')}</th>}
+                            {visibleColumns.date && <th className="px-4 py-3 font-medium">{t('Date')}</th>}
+                            {visibleColumns.status && <th className="px-4 py-3 font-medium">{t('Statut')}</th>}
+                            {visibleColumns.actions && <th className="px-4 py-3 font-medium">{t('Actions')}</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                <td colSpan={1 + visibleColumnsCount} className="px-4 py-8 text-center text-muted-foreground">
                                     {t('Aucune commande')}
                                 </td>
                             </tr>
@@ -268,13 +374,23 @@ export function CartsList() {
                                 }
                             >
                                 <td className={`px-4 py-3 ${cart.id === openedCartId ? 'font-semibold text-brand-main' : ''}`}>#{cart.id}</td>
-                                <td className="px-4 py-3">
-                                    <div className="font-medium">{cart.user?.name ?? t('Inconnu')}</div>
-                                    <div className="text-xs text-muted-foreground">{cart.user?.email ?? ''}</div>
-                                </td>
-                                <td className="px-4 py-3">{cart.totalQty}</td>
-                                <td className="px-4 py-3">{formatCurrency(cart.total)}</td>
-                                <td className="px-4 py-3">
+                                {visibleColumns.client && (
+                                    <td className="px-4 py-3">
+                                        <div className="font-medium">{cart.user?.name ?? t('Inconnu')}</div>
+                                        <div className="text-xs text-muted-foreground">{cart.user?.email ?? ''}</div>
+                                    </td>
+                                )}
+                                {visibleColumns.articles && <td className="px-4 py-3">{cart.totalQty}</td>}
+                                {visibleColumns.total && <td className="px-4 py-3">{formatCurrency(cart.total)}</td>}
+                                {visibleColumns.date && (
+                                    <td className="px-4 py-3">
+                                        {cart.updated_at
+                                            ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(cart.updated_at))
+                                            : '-'}
+                                    </td>
+                                )}
+                                {visibleColumns.status && (
+                                    <td className="px-4 py-3">
                                     <Select
                                         value={cart.status}
                                         onValueChange={(value) => handleStatusChange(cart.id, value as CartStatus)}
@@ -289,7 +405,9 @@ export function CartsList() {
                                         </SelectContent>
                                     </Select>
                                 </td>
-                                <td className="px-4 py-3">
+                                )}
+                                {visibleColumns.actions && (
+                                    <td className="px-4 py-3">
                                     <ButtonsActions
                                         className="justify-end"
                                         preview={() => void handlePreview(cart)}
@@ -303,6 +421,7 @@ export function CartsList() {
                                         }
                                     />
                                 </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

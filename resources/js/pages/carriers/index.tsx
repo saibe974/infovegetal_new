@@ -1,4 +1,13 @@
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -24,7 +33,19 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import { CountryFlag } from '@/components/ui/country-flag';
 import { StickyBar } from '@/components/ui/sticky-bar';
 import { useI18n } from '@/lib/i18n';
-import { EditIcon, TrashIcon } from 'lucide-react';
+import { EditIcon, Settings2, TrashIcon } from 'lucide-react';
+
+type OptionalColumn = 'name' | 'bases' | 'days' | 'taxgo' | 'zones' | 'actions';
+type ColumnVisibility = Record<OptionalColumn, boolean>;
+
+const defaultColumnVisibility: ColumnVisibility = {
+    name: true,
+    bases: true,
+    days: true,
+    taxgo: true,
+    zones: true,
+    actions: true,
+};
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -157,6 +178,49 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
+    const [visibleColumns, setVisibleColumns] = useState<ColumnVisibility>(() => {
+        if (typeof window === 'undefined') return defaultColumnVisibility;
+
+        try {
+            const stored = JSON.parse(
+                localStorage.getItem('carriersListColumns') || '{}',
+            ) as Partial<ColumnVisibility>;
+
+            return {
+                name: stored.name ?? true,
+                bases: stored.bases ?? true,
+                days: stored.days ?? true,
+                taxgo: stored.taxgo ?? true,
+                zones: stored.zones ?? true,
+                actions: stored.actions ?? true,
+            };
+        } catch {
+            return defaultColumnVisibility;
+        }
+    });
+
+    const saveVisibleColumns = (columns: ColumnVisibility) => {
+        setVisibleColumns(columns);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('carriersListColumns', JSON.stringify(columns));
+        }
+    };
+
+    const handleColumnVisibilityChange = (column: OptionalColumn, visible: boolean) => {
+        saveVisibleColumns({ ...visibleColumns, [column]: visible });
+    };
+
+    const resetColumns = () => saveVisibleColumns(defaultColumnVisibility);
+
+    const configurableColumns: Array<{ key: OptionalColumn; label: string }> = [
+        { key: 'name', label: t('Name') },
+        { key: 'bases', label: t('Deliverable bases') },
+        { key: 'days', label: t('Days') },
+        { key: 'taxgo', label: t('Taxgo') },
+        { key: 'zones', label: t('Zones') },
+        { key: 'actions', label: t('Actions') },
+    ];
+
     const handleSearch = (s: string) => {
         setSearch(s);
         if (timerRef.current) {
@@ -218,25 +282,80 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <SortableTableHead field="id">ID</SortableTableHead>
-                            <SortableTableHead field="name">
-                                {t('Name')}
+                            <SortableTableHead field="id">
+                                <div className="flex items-center gap-1">
+                                    <span>ID</span>
+                                    <span
+                                        onPointerDown={(event) => event.stopPropagation()}
+                                        onClick={(event) => event.stopPropagation()}
+                                    >
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="size-7"
+                                                    title={t('Choisir les colonnes')}
+                                                    aria-label={t('Choisir les colonnes')}
+                                                >
+                                                    <Settings2 className="size-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start" className="w-56">
+                                                <DropdownMenuLabel>{t('Colonnes affichees')}</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {configurableColumns.map((column) => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={column.key}
+                                                        checked={visibleColumns[column.key]}
+                                                        onCheckedChange={(checked) =>
+                                                            handleColumnVisibilityChange(column.key, Boolean(checked))
+                                                        }
+                                                        onSelect={(event) => event.preventDefault()}
+                                                    >
+                                                        {column.label}
+                                                    </DropdownMenuCheckboxItem>
+                                                ))}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onSelect={resetColumns}>
+                                                    {t('Reinitialiser les colonnes')}
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </span>
+                                </div>
                             </SortableTableHead>
-                            <TableHead>
-                                {t('Deliverable bases')}
-                            </TableHead>
-                            <SortableTableHead field="days">
-                                {t('Days')}
-                            </SortableTableHead>
-                            <SortableTableHead field="taxgo">
-                                {t('Taxgo')}
-                            </SortableTableHead>
-                            <SortableTableHead field="zones_count">
-                                {t('Zones')}
-                            </SortableTableHead>
-                            <TableHead className="text-end">
-                                {t('Actions')}
-                            </TableHead>
+                            {visibleColumns.name && (
+                                <SortableTableHead field="name">
+                                    {t('Name')}
+                                </SortableTableHead>
+                            )}
+                            {visibleColumns.bases && (
+                                <TableHead>
+                                    {t('Deliverable bases')}
+                                </TableHead>
+                            )}
+                            {visibleColumns.days && (
+                                <SortableTableHead field="days">
+                                    {t('Days')}
+                                </SortableTableHead>
+                            )}
+                            {visibleColumns.taxgo && (
+                                <SortableTableHead field="taxgo">
+                                    {t('Taxgo')}
+                                </SortableTableHead>
+                            )}
+                            {visibleColumns.zones && (
+                                <SortableTableHead field="zones_count">
+                                    {t('Zones')}
+                                </SortableTableHead>
+                            )}
+                            {visibleColumns.actions && (
+                                <TableHead className="text-end">
+                                    {t('Actions')}
+                                </TableHead>
+                            )}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -247,47 +366,58 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                         ).map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell>{item.id}</TableCell>
-                                <TableCell>
-                                    <Link
-                                        href={carriers.edit(item.id as number)}
-                                        className="font-medium hover:underline"
-                                    >
-                                        {item.name}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                        {item.db_products?.map((db) => (
-                                            <span
-                                                key={db.id}
-                                                className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs"
-                                            >
-                                                <CountryFlag
-                                                    countryCode={db.country}
-                                                    title={db.name}
-                                                    className="h-2.5 w-auto rounded-[2px]"
-                                                />
-                                                {db.name}
-                                                {db.supplement_per_roll > 0
-                                                    ? ' + ' +
-                                                      db.supplement_per_roll.toLocaleString(
-                                                          'fr-FR',
-                                                      ) +
-                                                      ' ' +
-                                                      t('€/roll')
-                                                    : ''}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    {formatDays(item.days, t)}
-                                </TableCell>
-                                <TableCell>
-                                    <TaxgoInput carrier={item} />
-                                </TableCell>
-                                <TableCell>{item.zones_count ?? 0}</TableCell>
-                                <TableCell>
+                                {visibleColumns.name && (
+                                    <TableCell>
+                                        <Link
+                                            href={carriers.edit(item.id as number)}
+                                            className="font-medium hover:underline"
+                                        >
+                                            {item.name}
+                                        </Link>
+                                    </TableCell>
+                                )}
+                                {visibleColumns.bases && (
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1">
+                                            {item.db_products?.map((db) => (
+                                                <span
+                                                    key={db.id}
+                                                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs"
+                                                >
+                                                    <CountryFlag
+                                                        countryCode={db.country}
+                                                        title={db.name}
+                                                        className="h-2.5 w-auto rounded-[2px]"
+                                                    />
+                                                    {db.name}
+                                                    {db.supplement_per_roll > 0
+                                                        ? ' + ' +
+                                                          db.supplement_per_roll.toLocaleString(
+                                                              'fr-FR',
+                                                          ) +
+                                                          ' ' +
+                                                          t('€/roll')
+                                                        : ''}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                )}
+                                {visibleColumns.days && (
+                                    <TableCell>
+                                        {formatDays(item.days, t)}
+                                    </TableCell>
+                                )}
+                                {visibleColumns.taxgo && (
+                                    <TableCell>
+                                        <TaxgoInput carrier={item} />
+                                    </TableCell>
+                                )}
+                                {visibleColumns.zones && (
+                                    <TableCell>{item.zones_count ?? 0}</TableCell>
+                                )}
+                                {visibleColumns.actions && (
+                                    <TableCell>
                                     <div className="flex justify-end gap-2">
                                         <Button
                                             asChild
@@ -325,6 +455,7 @@ export default withAppLayout(breadcrumbs, true, ({ collection, q }: Props) => {
                                         </Button>
                                     </div>
                                 </TableCell>
+                                )}
                             </TableRow>
                         ))}
                     </TableBody>
