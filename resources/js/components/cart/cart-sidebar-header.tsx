@@ -12,7 +12,7 @@ import {
     Trash2Icon,
     Truck,
 } from 'lucide-react';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import HeadingSmall from '../heading-small';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -69,6 +69,16 @@ export function CartSidebarHeader() {
 
         return [lastAdded, ...sorted.filter((item) => item.product.id !== lastAddedProductId)];
     }, [items, lastAddedProductId]);
+    const cartListRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (lastAddedProductId === null) {
+            return;
+        }
+
+        cartListRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [lastAddedProductId]);
+
     const { isSaving, saveMessage, handleSaveCart } = useCartOrder();
     const [isPreparingNewCart, setIsPreparingNewCart] = useState(false);
     const [newCartMessage, setNewCartMessage] = useState<string | null>(null);
@@ -527,7 +537,10 @@ export function CartSidebarHeader() {
                         )}
                     </SidebarHeader>
 
-                    <SidebarContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+                    <SidebarContent
+                        ref={cartListRef}
+                        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto"
+                    >
                         <div className="my-2 flex w-full flex-col items-center justify-center gap-2">
                             {items.length === 0 && (
                                 <>

@@ -426,6 +426,26 @@ export function ProductsFilters({
 
             <div className={cn('grid gap-6', !isColumn && 'md:grid-cols-2')}>
                 <div className={cn('space-y-2', !isColumn && 'md:border-r md:pr-6')}>
+                    {countries.length >= 2 && (
+                        <BadgeMultiSelect
+                            id="product-country-filter"
+                            label={isColumn ? undefined : t('Country')}
+                            placeholder={t('All countries')}
+                            options={countries.map((code) => {
+                                const countryLabel = getCountryLabel(code);
+                                const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
+                                return {
+                                    value: code,
+                                    label: countryLabel,
+                                    icon: Flag ? <Flag title={countryLabel} className="w-4 shrink-0" /> : undefined,
+                                };
+                            })}
+                            value={localCountry}
+                            onChange={setLocalCountry}
+                            showAllOptionsWhenEmpty
+                        />
+                    )}
+
                     {!singleCategory && (
                         <CategoryAccordion
                             categories={categories}
@@ -474,26 +494,6 @@ export function ProductsFilters({
                         <Zap className="size-4" />
                         <span>{t('PROMO')}</span>
                     </label>
-
-                    {countries.length >= 2 && (
-                        <BadgeMultiSelect
-                            id="product-country-filter"
-                            label={isColumn ? undefined : t('Country')}
-                            placeholder={t('All countries')}
-                            options={countries.map((code) => {
-                                const countryLabel = getCountryLabel(code);
-                                const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
-                                return {
-                                    value: code,
-                                    label: countryLabel,
-                                    icon: Flag ? <Flag title={countryLabel} className="w-4 shrink-0" /> : undefined,
-                                };
-                            })}
-                            value={localCountry}
-                            onChange={setLocalCountry}
-                            showAllOptionsWhenEmpty
-                        />
-                    )}
 
                     {availablePotOptions.length >= 2 && (
                         <BadgeMultiSelect
