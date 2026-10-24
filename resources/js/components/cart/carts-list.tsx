@@ -153,6 +153,18 @@ export function CartsList() {
         const isImpersonating = !!auth?.impersonate_from;
         const currentImpersonatedUserId = auth?.user?.id;
 
+        const refreshCsrfToken = async (response: Response) => {
+            const payload = await response.json();
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && typeof payload.csrf_token === 'string') {
+                meta.setAttribute('content', payload.csrf_token);
+            }
+        };
+
+        if (!isImpersonating && currentImpersonatedUserId === targetUserId) {
+            return;
+        }
+
         if (isImpersonating && currentImpersonatedUserId === targetUserId) {
             return;
         }
@@ -169,6 +181,7 @@ export function CartsList() {
             if (!leaveResponse.ok) {
                 throw new Error('Unable to leave impersonation');
             }
+            await refreshCsrfToken(leaveResponse);
         }
 
         const takeResponse = await fetch(impersonateTake({ id: targetUserId }).url, {
@@ -182,6 +195,7 @@ export function CartsList() {
         if (!takeResponse.ok) {
             throw new Error('Impersonation failed');
         }
+        await refreshCsrfToken(takeResponse);
     };
 
     const startImpersonateAndEditCart = async (cart: CartSummary) => {

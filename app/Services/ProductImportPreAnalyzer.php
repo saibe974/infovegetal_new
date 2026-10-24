@@ -10,6 +10,7 @@ class ProductImportPreAnalyzer
         'name' => ['name', 'nom', 'designation', 'design', 'libelle', 'product-name', 'product'],
         'price' => ['price', 'prix', 'tarif', 'prix-ht', 'price-ht', 'prix-unitaire', 'pu'],
         'stock' => ['stock', 'qty', 'quantity', 'quantite', 'disponible', 'availability'],
+        'unite' => ['unite', 'unite-carton', 'minimum', 'mini', 'minimum-de-commande', 'quantite-minimale', 'quantite-minimum', 'min-order', 'minimum-order-quantity', 'moq'],
         'category_products_id' => ['category', 'categorie', 'famille', 'rayon', 'catalogue'],
         'description' => ['description', 'desc', 'details'],
         'img_link' => ['image', 'img', 'photo', 'image-url', 'photo-url'],
@@ -53,6 +54,7 @@ class ProductImportPreAnalyzer
             $nonEmptyCells = array_values(array_filter($cells, fn (string $value) => $value !== ''));
             if ($nonEmptyCells === []) {
                 $ranked[] = ['index' => $row['index'], 'score' => 0];
+
                 continue;
             }
 
@@ -64,11 +66,13 @@ class ProductImportPreAnalyzer
                     foreach ($aliases as $alias) {
                         if ($normalized === $alias) {
                             $score += 6;
+
                             continue 3;
                         }
 
                         if ($normalized !== '' && str_contains($normalized, $alias)) {
                             $score += 3;
+
                             continue 3;
                         }
                     }
@@ -116,7 +120,7 @@ class ProductImportPreAnalyzer
         for ($columnIndex = 0; $columnIndex < $maxColumns; $columnIndex++) {
             $label = trim((string) ($headerCells[$columnIndex] ?? ''));
             if ($label === '') {
-                $label = 'Column ' . ($columnIndex + 1);
+                $label = 'Column '.($columnIndex + 1);
             }
 
             $normalizedKey = $this->sourceReader->normalizeKey($label);
@@ -197,6 +201,7 @@ class ProductImportPreAnalyzer
             foreach ($aliases as $alias) {
                 if ($normalizedKey === $alias) {
                     $score += 8;
+
                     continue;
                 }
 

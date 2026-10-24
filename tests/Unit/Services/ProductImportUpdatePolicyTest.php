@@ -46,6 +46,11 @@ test('an empty selection only updates importer lifecycle fields', function () {
         ->toBe(['active', 'db_products_id']);
 });
 
+test('legacy minimum mappings update the persisted minimum quantity', function () {
+    expect(resolveProductImportUpdateColumns(['minimum'], 'peplant'))
+        ->toBe(['unite', 'active', 'db_products_id']);
+});
+
 test('block category updates can be enabled independently from column mappings', function () {
     expect(resolveProductImportUpdateColumns(['category_products_id'], 'ddk'))
         ->toBe(['category_products_id', 'active', 'db_products_id'])

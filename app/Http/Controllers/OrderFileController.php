@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
+use App\Services\UserManagementAuthorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -47,18 +49,21 @@ class OrderFileController extends Controller
 
     public function cartPdf(Request $request, int $cart)
     {
-        $query = $request->user()->files()->where('cart_id', $cart)->where('mime', 'application/pdf');
+        $order = app(UserManagementAuthorizationService::class)
+            ->scopeManageableOrders($request->user(), Cart::query())->findOrFail($cart);
+        $query = $order->user->files()->where('cart_id', $cart)->where('mime', 'application/pdf');
         $file = (clone $query)->where('document_key', 'order-pdf')->first()
             ?? $query->whereNotNull('document_key')->latest('id')->firstOrFail();
 
-        return $this->serve($request, $file->id, true);
+        return $this->serve($request, $file->id, true, $order->user);
     }
 
-    private function serve(Request $request, int $id, bool $inline)
+    private function serve(Request $request, int $id, bool $inline, ?\App\Models\User $owner = null)
     {
-        $file = $request->user()->files()->findOrFail($id);
+        $owner ??= $request->user();
+        $file = $owner->files()->findOrFail($id);
         abort_unless($file->disk === 'public'
-            && str_starts_with($file->file_path, 'user-meta/'.$request->user()->id.'/')
+            && str_starts_with($file->file_path, 'user-meta/'.$owner->id.'/')
             && ! str_contains($file->file_path, '..')
             && ! str_contains($file->file_path, '\\'), 404);
         abort_unless(Storage::disk('public')->exists($file->file_path), 404);

@@ -16,7 +16,7 @@ class ImpersonationController extends Controller
     {
     }
 
-    public function take(Request $request, int $id, ?string $guardName = null): RedirectResponse
+    public function take(Request $request, int $id, ?string $guardName = null): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $guardName = $guardName ?? $this->manager->getDefaultSessionGuard();
 
@@ -41,6 +41,10 @@ class ImpersonationController extends Controller
             // Par defaut, on reste en mode gestion (droits admin conserves).
             $request->session()->put(self::STRICT_MODE_SESSION_KEY, false);
 
+            if ($request->ajax()) {
+                return response()->json(['csrf_token' => $request->session()->token()]);
+            }
+
             // Log::info('users.impersonation.started', [
             //     'actor_id' => $request->user()->authorizationActor()->id,
             //     'effective_user_id' => $request->user()->id,
@@ -56,7 +60,7 @@ class ImpersonationController extends Controller
         return redirect()->back();
     }
 
-    public function leave(Request $request): RedirectResponse
+    public function leave(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         if (!$this->manager->isImpersonating()) {
             abort(403, 'Not impersonating');
@@ -67,6 +71,10 @@ class ImpersonationController extends Controller
 
         $this->manager->leave();
         $request->session()->forget(self::STRICT_MODE_SESSION_KEY);
+
+        if ($request->ajax()) {
+            return response()->json(['csrf_token' => $request->session()->token()]);
+        }
 
         // Log::info('users.impersonation.ended', [
         //     'actor_id' => $actor->id,

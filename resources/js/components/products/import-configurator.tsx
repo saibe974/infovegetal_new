@@ -55,6 +55,7 @@ const TARGET_FIELDS = [
     { value: 'description', label: 'description' },
     { value: 'img_link', label: 'img_link' },
     { value: 'cond', label: 'cond' },
+    { value: 'unite', label: 'Minimum de commande (unite)' },
     { value: 'floor', label: 'floor' },
     { value: 'roll', label: 'roll' },
     { value: 'tva_id', label: 'tva_id' },

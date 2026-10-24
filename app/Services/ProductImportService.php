@@ -124,7 +124,7 @@ class ProductImportService
             $upsertRows = [];
 
             // Précharger les IDs valides de category_products
-            static $validCategoryIds = null;
+            $validCategoryIds = null;
             if ($validCategoryIds === null) {
                 try {
                     $validCategoryIds = \App\Models\CategoryProducts::pluck('id')->all();
@@ -352,12 +352,18 @@ class ProductImportService
                             'price_promo' => null,
                             'producer_id' => null,
                             'tva_id' => null,
-                            'cond' => null,
+                            'cond' => is_numeric($resolve($mapped, $defaultsMap, 'cond')) ? (int) $resolve($mapped, $defaultsMap, 'cond') : null,
                             'floor' => null,
                             'roll' => null,
                             'unite' => null,
                         ];
                     }
+
+                    // Apply the same minimum policy after every source-specific treatment.
+                    $newRow['unite'] = $this->resolveMinimumQuantity(
+                        $resolve($mapped, $defaultsMap, 'unite') ?? $resolve($mapped, $defaultsMap, 'minimum'),
+                        $newRow['cond'] ?? null,
+                    );
 
                     if ($categoryMode === 'block') {
                         $newRow['category_products_id'] = is_string($currentBlockCategory) && $currentBlockCategory !== ''
@@ -760,6 +766,7 @@ class ProductImportService
         // source-specific treatment. Translate it to the actual products
         // column written by that treatment before filtering the upsert.
         $fieldAliases = [
+            'minimum' => 'unite',
             'category_products_name' => 'category_products_id',
             'prix_etage' => 'price_floor',
             'prix_roll' => 'price_roll',
@@ -774,6 +781,17 @@ class ProductImportService
         $selectedFields = array_values(array_intersect($importableFields, $normalizedFields));
 
         return array_values(array_unique(array_merge($selectedFields, ['active', 'db_products_id'])));
+    }
+
+    private function resolveMinimumQuantity(mixed $minimum, mixed $condition): ?int
+    {
+        foreach ([$minimum, $condition] as $value) {
+            if (is_numeric($value) && (int) $value > 0) {
+                return (int) $value;
+            }
+        }
+
+        return null;
     }
 
     private function isValidEan13(mixed $value): bool
