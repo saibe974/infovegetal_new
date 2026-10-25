@@ -106,11 +106,16 @@
             margin: 1px 0;
         }
         .contact-logo {
+            width: auto;
+            height: auto;
             max-height: 50px;
-            max-width: 120px;
-            margin-bottom: 6px;
+            max-width: 70px;
+            object-fit: contain;
+            margin: 0;
             display: block;
         }
+        .contact-with-logo { position: relative; padding-left: 82px; min-height: 50px; }
+        .contact-with-logo > .contact-logo { position: absolute; left: 0; top: 0; }
         .product-thumb {
             width: 46px;
             height: 46px;
@@ -279,20 +284,11 @@
             @if($entry['contact'])
             @php
                 $c = $entry['contact'];
-                $logo = $c->usersMeta->firstWhere('key', 'logo');
-                $logoPath = null;
-                if ($logo && $logo->value) {
-                    if (\Illuminate\Support\Facades\Storage::disk('public')->exists($logo->value)) {
-                        $logoPath = \Illuminate\Support\Facades\Storage::disk('public')->path($logo->value);
-                    } elseif (\Illuminate\Support\Facades\Storage::disk('local')->exists($logo->value)) {
-                        $logoPath = \Illuminate\Support\Facades\Storage::disk('local')->path($logo->value);
-                    } elseif (file_exists($logo->value)) {
-                        $logoPath = $logo->value;
-                    }
-                }
+                $logoPath = app(\App\Services\CartTcpdfService::class)->resolveUserLogoPath($c);
                 $addrLine = trim(($c->address_zip ?? '') . ' ' . ($c->address_town ?? ''));
             @endphp
             <div class="contact-block">
+                <div class="{{ $logoPath ? 'contact-with-logo' : '' }}">
                 <div class="contact-label">{{ $entry['label'] }}</div>
                 @if($logoPath)
                     <img class="contact-logo" src="{{ $logoPath }}" alt="Logo {{ $c->name }}">
@@ -310,6 +306,7 @@
                 @if($c->email)
                     <div class="contact-detail">{{ $c->email }}</div>
                 @endif
+                </div>
             </div>
             @endif
         @endforeach
@@ -317,8 +314,31 @@
     @endif
 
     <div class="user-info">
-        <p><strong>Client :</strong> {{ $user->name }}</p>
-        <p><strong>Email :</strong> {{ $user->email }}</p>
+        @php
+            $clientLogoPath = app(\App\Services\CartTcpdfService::class)->resolveUserLogoPath($user);
+        @endphp
+        <div class="{{ $clientLogoPath ? 'contact-with-logo' : '' }}">
+        @if($clientLogoPath)
+            <img class="contact-logo" src="{{ $clientLogoPath }}" alt="Logo {{ $user->name }}">
+        @endif
+        <div class="contact-label">Client{{ trim((string) ($user->ref ?? '')) !== '' ? ' - '.trim((string) $user->ref) : '' }}</div>
+        <div class="contact-name">{{ $user->name }}</div>
+        <div class="contact-detail">{{ $user->email }}</div>
+        @php
+            $clientMetaLines = app(\App\Services\CartTcpdfService::class)->clientMetaLines($user);
+        @endphp
+        @if($clientMetaLines !== [])
+            <div style="margin-top: 10px;">
+                @foreach($clientMetaLines as $line)
+                    @if($line === '')
+                        <div style="height: 8px;"></div>
+                    @else
+                        <div class="contact-detail">{{ $line }}</div>
+                    @endif
+                @endforeach
+            </div>
+        @endif
+        </div>
     </div>
 
     @php

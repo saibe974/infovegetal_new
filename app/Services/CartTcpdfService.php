@@ -108,7 +108,7 @@ class CartTcpdfService
         $gap = 4.0;
         $colW = 96.0;
         $boxH = 27.5;
-        $totalH = $boxH * 2 + $gap;
+        $totalH = max($boxH * 2 + $gap, $this->clientBoxHeight($pdf, $payload['user'], 94.0));
 
         $this->drawContactBox($pdf, $left, $y, $colW, $boxH, 'Facturant', $facturant);
         $this->drawContactBox($pdf, $left, $y + $boxH + $gap, $colW, $boxH, 'Commercial', $commercial);
@@ -135,7 +135,7 @@ class CartTcpdfService
         $logoPath = $this->resolveUserLogoPath($contact);
         $textX = $x + 2;
         if ($logoPath) {
-            $pdf->Image($logoPath, $x + 2, $y + 6, 18, 8.5, '', '', '', true, 150, '', false, false, 0, false, false, false);
+            $this->drawUserLogo($pdf, $logoPath, $x + 2, $y + 6, 18, 8.5);
             $textX = $x + 22;
         }
 
@@ -174,7 +174,7 @@ class CartTcpdfService
         $user = $payload['user'];
         $x = 8.0;
         $w = 194.0;
-        $h = 13.0 + 4.2 * min(8, count($this->clientAddressLines($user)));
+        $h = $this->clientBoxHeight($pdf, $user, $w);
 
         $this->drawClientBox($pdf, $x, $y, $w, $h, $user);
 
@@ -193,12 +193,30 @@ class CartTcpdfService
             $lines[] = $zipTown;
         }
 
-        return [...$lines, ...$this->clientMetaLines($user)];
+        $metas = $this->clientMetaLines($user);
+
+        return $metas === [] ? $lines : [...$lines, '', ...$metas];
     }
 
-    private function clientMetaLines($user): array
+    private function clientBoxHeight($pdf, $user, float $width): float
     {
-        $metas = $user->usersMeta ?? collect();
+        $pdf->SetFont('dejavusans', '', 8.5);
+        $textWidth = $width - ($this->resolveUserLogoPath($user) ? 18 : 4);
+        $height = 16.6;
+        foreach ($this->clientAddressLines($user) as $line) {
+            $height += $line === '' ? 3.0 : max(4.2, $pdf->getStringHeight($textWidth, $line));
+        }
+
+        return $height;
+    }
+
+    public function clientMetaLines($user): array
+    {
+        // The authenticated user's relation may already contain only UI metadata.
+        // Query contact metadata explicitly rather than trusting a partial relation.
+        $metas = $user instanceof \App\Models\User && $user->exists
+            ? $user->usersMeta()->whereIn('key', ['phone', 'mobile', 'adress'])->orderBy('sort_order')->orderBy('id')->get()
+            : ($user->usersMeta ?? collect());
         $lines = [];
 
         foreach (['phone' => 'Tel', 'mobile' => 'Mobile'] as $key => $label) {
@@ -208,7 +226,11 @@ class CartTcpdfService
                     continue;
                 }
                 $title = trim((string) ($meta->title ?? ''));
-                $lines[] = ($title !== '' ? $title : $label).' : '.$value;
+                if ($lines !== []) {
+                    $lines[] = '';
+                }
+                $lines[] = ($title !== '' ? $title : $label).' :';
+                $lines[] = $value;
             }
         }
 
@@ -219,12 +241,20 @@ class CartTcpdfService
             }
             $road = trim((string) ($data['number'] ?? '').' '.(string) ($data['road'] ?? ''));
             $zipTown = trim((string) ($data['zip'] ?? '').' '.(string) ($data['town'] ?? ''));
-            $address = trim($road.($zipTown !== '' ? ', '.$zipTown : ''));
+            $address = implode(', ', array_filter([$road, $zipTown], fn ($part) => $part !== ''));
             if ($address === '') {
                 continue;
             }
             $title = trim((string) ($meta->title ?? ''));
-            $lines[] = ($title !== '' ? $title : 'Adresse').' : '.$address;
+            if ($lines !== []) {
+                $lines[] = '';
+            }
+            $lines[] = ($title !== '' ? $title : 'Adresse').' :';
+            foreach ([$road, $zipTown] as $part) {
+                if ($part !== '') {
+                    $lines[] = $part;
+                }
+            }
         }
 
         return $lines;
@@ -248,29 +278,39 @@ class CartTcpdfService
         $logoPath = $this->resolveUserLogoPath($user);
         $textX = $x + 2;
         if ($logoPath) {
-            $pdf->Image($logoPath, $x + 2, $y + 2.2, 12.0, 5.5, '', '', '', true, 150, '', false, false, 0, 'CM', false, false);
+            $this->drawUserLogo($pdf, $logoPath, $x + 2, $y + 2.2, 12.0, 5.5);
             $textX = $x + 16;
         }
 
         $textW = $w - ($textX - $x) - 2;
 
+        $pdf->SetFont('dejavusans', '', 7.5);
+        $pdf->SetTextColor(107, 114, 128);
+        $pdf->SetXY($textX, $y + 2.2);
+        $clientRef = trim((string) ($user->ref ?? ''));
+        $pdf->Cell($textW, 3.5, 'CLIENT'.($clientRef !== '' ? ' - '.$clientRef : ''), 0, 1, 'L');
+
         $pdf->SetFont('dejavusans', 'B', 8.5);
         $pdf->SetTextColor(17, 24, 39);
-        $pdf->SetXY($textX, $y + 2.2);
-        $pdf->Cell($textW, 4, 'Client : '.(string) ($user->name ?? ''), 0, 1, 'L');
+        $pdf->SetXY($textX, $y + 6.4);
+        $pdf->Cell($textW, 4, (string) ($user->name ?? ''), 0, 1, 'L');
 
         $pdf->SetFont('dejavusans', '', 8.5);
-        $pdf->SetXY($textX, $y + 6.8);
+        $pdf->SetXY($textX, $y + 10.4);
         $pdf->Cell($textW, 4, 'Email : '.(string) ($user->email ?? ''), 0, 1, 'L');
 
         $addressLines = $this->clientAddressLines($user);
         if ($addressLines !== []) {
             $pdf->SetTextColor(55, 65, 81);
-            $lineY = $y + 11.2;
-            foreach (array_slice($addressLines, 0, 8) as $line) {
-                $pdf->SetXY($textX, $lineY);
-                $pdf->Cell($textW, 4, $this->truncateText($line, 60), 0, 1, 'L');
-                $lineY += 4.2;
+            $lineY = $y + 14.8;
+            foreach ($addressLines as $line) {
+                if ($line === '') {
+                    $lineY += 3.0;
+                    continue;
+                }
+                $lineH = max(4.2, $pdf->getStringHeight($textW, $line));
+                $pdf->MultiCell($textW, $lineH, $line, 0, 'L', false, 1, $textX, $lineY);
+                $lineY += $lineH;
             }
         }
     }
@@ -910,18 +950,49 @@ class CartTcpdfService
         }
     }
 
-    private function resolveUserLogoPath($user): ?string
+    private function drawUserLogo($pdf, string $path, float $x, float $y, float $maxWidth, float $maxHeight): void
+    {
+        $size = @getimagesize($path);
+        if (! $size || $size[0] <= 0 || $size[1] <= 0) {
+            return;
+        }
+
+        $scale = min($maxWidth / $size[0], $maxHeight / $size[1]);
+        $width = $size[0] * $scale;
+        $height = $size[1] * $scale;
+        $pdf->Image($path, $x, $y, $width, $height, '', '', '', true, 150);
+    }
+
+    public function resolveUserLogoPath($user): ?string
     {
         if (! $user || ! isset($user->usersMeta)) {
             return null;
         }
 
-        $logo = $user->usersMeta->firstWhere('key', 'logo');
-        if (! $logo || empty($logo->value)) {
-            return null;
-        }
-
-        $value = (string) $logo->value;
+        foreach ($user->usersMeta->where('key', 'logo')->reverse() as $logo) {
+            $value = trim((string) ($logo->value ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            $data = json_decode($value, true);
+            if (is_array($data)) {
+                $media = ! empty($data['media_id'])
+                    ? $user->media()->whereKey((int) $data['media_id'])->first()
+                    : null;
+                if ($media) {
+                    $path = $media->getPath();
+                    if (is_file($path) && is_readable($path)) {
+                        return $path;
+                    }
+                }
+                $urlPath = parse_url((string) ($data['url'] ?? ''), PHP_URL_PATH);
+                $value = is_string($urlPath) && str_starts_with($urlPath, '/storage/')
+                    ? rawurldecode(substr($urlPath, strlen('/storage/')))
+                    : '';
+            }
+            if ($value === '') {
+                continue;
+            }
         if (Storage::disk('public')->exists($value)) {
             return Storage::disk('public')->path($value);
         }
@@ -930,6 +1001,7 @@ class CartTcpdfService
         }
         if (is_file($value) && is_readable($value)) {
             return $value;
+        }
         }
 
         return null;
