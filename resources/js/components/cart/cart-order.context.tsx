@@ -1,8 +1,12 @@
+import type { SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
 import React, {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import { getCartPricing } from './cart-pricing';
@@ -34,15 +38,11 @@ export type PdfResult = {
     url: string;
     filename: string;
     orderNumber: string | null;
+    orderId?: number;
     itemsTotal?: number;
     shippingTotal?: number;
     csvCount?: number;
     origin: 'save' | 'order';
-};
-
-export type OrderConflict = {
-    orderNumber?: string | null;
-    resolve: (action: 'new' | 'append') => void;
 };
 
 export type CartOrderContextType = {
@@ -51,7 +51,6 @@ export type CartOrderContextType = {
     pdfPhaseIndex: number;
     pdfCurrentGroup: { index: number; total: number; label: string } | null;
     pdfResult: PdfResult | null;
-    orderConflict: OrderConflict | null;
     saveMessage: string | null;
     handleSaveCart: (overrides?: CartOrderOverrides) => Promise<void>;
     handleGenerateTcpdf: (overrides?: CartOrderOverrides) => Promise<void>;
@@ -66,7 +65,6 @@ const CartOrderContext = createContext<CartOrderContextType>({
     pdfPhaseIndex: 0,
     pdfCurrentGroup: null,
     pdfResult: null,
-    orderConflict: null,
     saveMessage: null,
     handleSaveCart: async () => {},
     handleGenerateTcpdf: async () => {},
@@ -87,6 +85,13 @@ function getCsrfToken(): string {
 
 export function CartOrderProvider({ children }: { children: React.ReactNode }) {
     const { items, orderComment, clearCart } = useContext(CartContext);
+    const { cart, auth } = usePage<SharedData>().props;
+    const draftId = useRef<number | null>(cart?.id ?? null);
+    const submissionKey = useRef(crypto.randomUUID());
+    useEffect(() => {
+        draftId.current = cart?.id ?? null;
+        submissionKey.current = crypto.randomUUID();
+    }, [cart?.id, auth.user?.id]);
 
     const [isSaving, setIsSaving] = useState(false);
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
@@ -97,7 +102,6 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
         label: string;
     } | null>(null);
     const [pdfResult, setPdfResult] = useState<PdfResult | null>(null);
-    const [orderConflict] = useState<OrderConflict | null>(null);
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
     const buildTransportSelection = useCallback(
@@ -185,6 +189,8 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
 
             return {
                 payload: {
+                    cart_id: draftId.current,
+                    submission_key: submissionKey.current,
                     items: itemsPricing.map(
                         ({ product, quantity, comment, pricing }) => ({
                             id: product.id,
@@ -272,6 +278,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 const data = await response.json();
 
                 if (response.ok) {
+                    draftId.current = data.order_id ?? draftId.current;
                     if (data?.pdf_download_url && data?.pdf_filename) {
                         setPdfResult({
                             url: data.pdf_download_url,
@@ -349,6 +356,23 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 const blob = await response.blob();
+                // Clear only after the server has committed the submitted order.
+                clearCart({ skipConfirmation: true });
+                localStorage.setItem(
+                    `cart:submitted:${auth.user?.id}`,
+                    String(Date.now()),
+                );
+                draftId.current = null;
+                submissionKey.current = crypto.randomUUID();
+                const prefixes = [
+                    `cart:discounts:${auth.user?.id}:`,
+                    `cart:carrier-overrides:${auth.user?.id}:`,
+                ];
+                Object.keys(localStorage)
+                    .filter((key) =>
+                        prefixes.some((prefix) => key.startsWith(prefix)),
+                    )
+                    .forEach((key) => localStorage.removeItem(key));
                 const csvCount = Number(
                     response.headers.get('x-generated-csv-count') ?? 0,
                 );
@@ -367,8 +391,12 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
 
                 setPdfResult({
                     url,
+                    orderId:
+                        Number(response.headers.get('x-order-id')) || undefined,
                     filename: extractedFilename,
-                    orderNumber: orderMatch ? orderMatch[1] : null,
+                    orderNumber:
+                        response.headers.get('x-order-number') ??
+                        (orderMatch ? orderMatch[1] : null),
                     itemsTotal,
                     shippingTotal: deliveryTotal,
                     csvCount: Number.isFinite(csvCount) ? csvCount : 0,
@@ -376,9 +404,17 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 });
 
                 setSaveMessage(
-                    'Commande enregistree et PDF genere avec succes',
+                    'Commande transmise. Votre panier a été vidé. Retrouvez votre commande dans Mes commandes ; elle ne peut plus être modifiée depuis le panier.',
                 );
                 setTimeout(() => setSaveMessage(null), 3000);
+                router.reload({
+                    only: [
+                        'cart',
+                        'cart_transport_selection',
+                        'cart_discounts',
+                        'cart_coupon_code',
+                    ],
+                });
             } catch {
                 setSaveMessage('Erreur lors de la generation TCPDF');
             } finally {
@@ -386,7 +422,7 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
                 setIsPdfGenerating(false);
             }
         },
-        [items, buildPayload, pdfResult],
+        [items, buildPayload, pdfResult, clearCart, auth.user?.id],
     );
 
     const value = useMemo(
@@ -396,7 +432,6 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
             pdfPhaseIndex,
             pdfCurrentGroup,
             pdfResult,
-            orderConflict,
             saveMessage,
             handleSaveCart,
             handleGenerateTcpdf,
@@ -410,7 +445,6 @@ export function CartOrderProvider({ children }: { children: React.ReactNode }) {
             pdfPhaseIndex,
             pdfCurrentGroup,
             pdfResult,
-            orderConflict,
             saveMessage,
             handleSaveCart,
             handleGenerateTcpdf,

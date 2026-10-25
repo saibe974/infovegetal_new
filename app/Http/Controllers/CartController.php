@@ -12,6 +12,7 @@ use App\Services\CartTcpdfService;
 use App\Services\OrderCsvService;
 use App\Services\OrderDocumentService;
 use App\Services\OrderSnapshotService;
+use App\Services\OrderWorkflowService;
 use App\Services\PdfRollDistributionService;
 use App\Services\PriceCalculatorService;
 use App\Services\ProductMediaService;
@@ -33,7 +34,11 @@ class CartController extends Controller
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $cart = $user->cart()->with('products')->firstOrCreate([]);
+        $cart = DB::transaction(function () use ($user) {
+            \App\Models\User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+            return $user->cart()->where('status', 'current')->with('products')->firstOrCreate(['status' => 'current']);
+        });
 
         return response()->json($cart->load('products'));
     }
@@ -42,6 +47,11 @@ class CartController extends Controller
      * Place an order: persist cart, generate PDF, store it and notify stakeholders.
      */
     public function placeOrder(Request $request, OrderSnapshotService $orderSnapshotService)
+    {
+        return DB::transaction(fn () => $this->submitOrder($request, $orderSnapshotService));
+    }
+
+    private function submitOrder(Request $request, OrderSnapshotService $orderSnapshotService)
     {
         $data = $request->validate([
             'items' => 'required|array|min:1',
@@ -66,36 +76,7 @@ class CartController extends Controller
         $user = Auth::user();
         $shippingByDb = $this->normalizeShippingByDb($data['shipping_by_db'] ?? null);
 
-        $existingProcessing = Cart::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'processing')
-            ->latest('updated_at')
-            ->first();
-
-        $choice = $data['choice'] ?? null;
-
-        if ($existingProcessing && ! $choice) {
-            return response()->json([
-                'requires_choice' => true,
-                'existing_order' => [
-                    'id' => $existingProcessing->id,
-                    'number' => $this->formatOrderNumber((int) $existingProcessing->id),
-                ],
-                'message' => 'Une commande est deja en cours de traitement. Choisissez ajouter ou nouvelle commande.',
-            ], 409);
-        }
-
-        $cart = null;
-        if ($existingProcessing && $choice === 'append') {
-            $cart = $existingProcessing;
-        } elseif (! $existingProcessing || $choice === 'new') {
-            $cart = Cart::create([
-                'user_id' => $user->id,
-                'status' => 'processing',
-            ]);
-        } else {
-            $cart = $existingProcessing;
-        }
+        $cart = $this->submissionCart($request);
 
         $discounts = array_key_exists('discounts', $data)
             ? $this->normalizeDiscounts($data['discounts'], $user)
@@ -106,13 +87,6 @@ class CartController extends Controller
             $productId = (int) $item['id'];
             $qty = (int) $item['quantity'];
             $requestedByProductId[$productId] = ($requestedByProductId[$productId] ?? 0) + $qty;
-        }
-
-        if ($choice === 'append' && $existingProcessing) {
-            $existingByProductId = $cart->products()->pluck('quantity', 'products.id')->map(fn ($q) => (int) $q)->toArray();
-            foreach ($existingByProductId as $productId => $existingQty) {
-                $requestedByProductId[(int) $productId] = ($requestedByProductId[(int) $productId] ?? 0) + $existingQty;
-            }
         }
 
         $syncData = [];
@@ -423,11 +397,13 @@ class CartController extends Controller
         $this->assertProductsOrderable([(int) $request->product_id], 'product_id');
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $cart = $user->cart()->firstOrCreate([]);
-        $quantity = $request->input('quantity', 1);
-        $cart->products()->syncWithoutDetaching([
-            $request->product_id => ['quantity' => $quantity],
-        ]);
+        DB::transaction(function () use ($user, $request) {
+            \App\Models\User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $cart = $user->cart()->where('status', 'current')->firstOrCreate(['status' => 'current']);
+            $cart->products()->syncWithoutDetaching([
+                $request->product_id => ['quantity' => $request->input('quantity', 1)],
+            ]);
+        });
 
         return response()->json(['message' => 'Produit ajouté au panier']);
     }
@@ -437,10 +413,11 @@ class CartController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
         ]);
-        $cart = Auth::user()->cart;
-        if ($cart) {
-            $cart->products()->detach($request->product_id);
-        }
+        DB::transaction(function () use ($request) {
+            \App\Models\User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            $cart = $request->user()->cart()->where('status', 'current')->first();
+            $cart?->products()->detach($request->product_id);
+        });
 
         return response()->json(['message' => 'Produit retiré du panier']);
     }
@@ -479,6 +456,19 @@ class CartController extends Controller
     }
 
     public function save(Request $request, CartTcpdfService $cartTcpdfService)
+    {
+        return DB::transaction(function () use ($request, $cartTcpdfService) {
+            \App\Models\User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            if ($request->filled('cart_id')) {
+                abort_unless(Cart::whereKey($request->integer('cart_id'))->where('user_id', $request->user()->id)->where('status', 'current')->exists(), 409,
+                    'Ce panier a déjà été transmis. Actualisez la page.');
+            }
+
+            return $this->saveDraft($request, $cartTcpdfService);
+        });
+    }
+
+    private function saveDraft(Request $request, CartTcpdfService $cartTcpdfService)
     {
         $data = $request->validate([
             'items' => 'required|array',
@@ -595,7 +585,12 @@ class CartController extends Controller
             abort(403, 'Unauthorized');
         }
 
-        $cart->delete();
+        DB::transaction(function () use ($cart) {
+            \App\Models\User::whereKey($cart->user_id)->lockForUpdate()->firstOrFail();
+            $locked = Cart::whereKey($cart->id)->lockForUpdate()->firstOrFail();
+            abort_unless($locked->status === 'current', 403, 'Seul un panier non transmis peut être supprimé.');
+            $locked->delete();
+        });
 
         if ($request->header('X-Inertia')) {
             return redirect()->back(303);
@@ -606,32 +601,13 @@ class CartController extends Controller
 
     public function updateStatus(Request $request, Cart $cart)
     {
-        /** @var \App\Models\User|null $user */
-        $user = Auth::user();
-        if (! $user || (! $user->hasRole('admin') && $cart->user_id !== $user->id)) {
-            abort(403, 'Unauthorized');
-        }
+        $user = $request->user();
+        abort_unless((int) $cart->user_id === (int) $user->id && $cart->status === 'current', 403,
+            'Une commande transmise ne peut plus redevenir un panier.');
+        $request->validate(['status' => 'required|in:current']);
 
-        $data = $request->validate([
-            'status' => 'required|in:current,processing,processed',
-        ]);
-
-        if ($data['status'] === 'current') {
-            Cart::query()
-                ->where('user_id', $cart->user_id)
-                ->where('id', '!=', $cart->id)
-                ->where('status', 'current')
-                ->update(['status' => 'processed']);
-        }
-
-        $cart->status = $data['status'];
-        $cart->save();
-
-        if ($request->header('X-Inertia')) {
-            return redirect()->back(303);
-        }
-
-        return response()->json(['message' => 'Statut mis a jour', 'status' => $cart->status]);
+        return $request->header('X-Inertia') ? back(303)
+            : response()->json(['message' => 'Panier actif', 'status' => 'current']);
     }
 
     /**
@@ -777,6 +753,11 @@ class CartController extends Controller
      */
     public function generatePdfTcpdf(Request $request, CartTcpdfService $cartTcpdfService, OrderSnapshotService $orderSnapshotService)
     {
+        return DB::transaction(fn () => $this->submitTcpdf($request, $cartTcpdfService, $orderSnapshotService));
+    }
+
+    private function submitTcpdf(Request $request, CartTcpdfService $cartTcpdfService, OrderSnapshotService $orderSnapshotService)
+    {
         $data = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|integer|exists:products,id',
@@ -812,22 +793,7 @@ class CartController extends Controller
             $requestedByProductId[$productId] = ($requestedByProductId[$productId] ?? 0) + $qty;
         }
 
-        $cart = Cart::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'processing')
-            ->latest('updated_at')
-            ->first();
-
-        if ($cart && $cart->orderHeaders()->exists()) {
-            $cart = null;
-        }
-
-        if (! $cart) {
-            $cart = Cart::create([
-                'user_id' => $user->id,
-                'status' => 'processing',
-            ]);
-        }
+        $cart = $this->submissionCart($request);
 
         $storedCurrentDiscounts = Cart::query()
             ->where('user_id', $user->id)
@@ -872,6 +838,8 @@ class CartController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$result['pdf_filename'].'"',
             'X-Generated-Csv-Count' => (string) count($result['csv_files'] ?? []),
+            'X-Order-Id' => (string) $result['order_id'],
+            'X-Order-Number' => (string) $result['order_number'],
         ]);
     }
 
@@ -1350,7 +1318,32 @@ class CartController extends Controller
                     ['source' => $source],
                 );
             }
+            app(OrderWorkflowService::class)->initialize($cart);
         });
+    }
+
+    private function submissionCart(Request $request): Cart
+    {
+        $request->validate(['cart_id' => 'nullable|integer|min:1', 'submission_key' => 'nullable|uuid']);
+        \App\Models\User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+        abort_if($request->input('choice') === 'append', 422, 'Une commande transmise ne peut plus être complétée par le client.');
+        if ($request->filled('submission_key')) {
+            abort_if(Cart::where('submission_key', $request->input('submission_key'))->exists(), 409, 'Cette commande a déjà été transmise.');
+        }
+        $query = Cart::where('user_id', $request->user()->id)->where('status', 'current');
+        if ($request->filled('cart_id')) {
+            $cart = $query->whereKey($request->integer('cart_id'))->lockForUpdate()->first();
+            abort_unless($cart, 409, 'Ce panier a déjà été transmis. Actualisez la page.');
+        } else {
+            $cart = $query->latest('updated_at')->lockForUpdate()->first();
+            $cart ??= Cart::create(['user_id' => $request->user()->id, 'status' => 'current']);
+        }
+        $cart->status = 'processing';
+        $cart->submission_key = $request->input('submission_key');
+        $cart->save();
+        $request->session()->forget('cart_filter_ids');
+
+        return $cart;
     }
 
     private function computeShippingFromRollDistribution(array $rollDistribution, array $pivotsByDbProductId): float

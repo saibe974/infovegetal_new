@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -156,7 +155,7 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -186,18 +185,23 @@ class UserManagementAuthorizationService
         }
 
         if ($scope['branch']) {
-            return $query->whereHas('user', function (Builder $userQuery) use ($actor) {
-                $userQuery
-                    ->where('_lft', '>=', $actor->_lft)
-                    ->where('_rgt', '<=', $actor->_rgt)
-                    ->whereDoesntHave('roles', function (Builder $roleQuery) {
-                        $roleQuery->whereIn('name', self::PROTECTED_ROLE_NAMES);
+            return $query->where(function (Builder $orderQuery) use ($actor) {
+                $orderQuery->whereJsonContains('workflow->participants', (int) $actor->id)
+                    ->orWhereHas('user', function (Builder $userQuery) use ($actor) {
+                        $userQuery
+                            ->where('_lft', '>=', $actor->_lft)
+                            ->where('_rgt', '<=', $actor->_rgt)
+                            ->whereDoesntHave('roles', function (Builder $roleQuery) {
+                                $roleQuery->whereIn('name', self::PROTECTED_ROLE_NAMES);
+                            });
                     });
             });
         }
 
         // Compatibilite legacy: sans permission explicite, on limite a ses propres commandes.
-        return $query->where('user_id', $actor->id);
+        return $query->where(fn (Builder $orderQuery) => $orderQuery
+            ->where('user_id', $actor->id)
+            ->orWhereJsonContains('workflow->participants', (int) $actor->id));
     }
 
     public function canCreate(User $actor, ?User $parent = null, array $requestedRoleNames = []): bool
@@ -205,7 +209,7 @@ class UserManagementAuthorizationService
         $actor = $this->resolveActor($actor);
         $scope = $this->resolveUserActionScope($actor, 'create');
 
-        if (!$scope['all'] && !$scope['branch']) {
+        if (! $scope['all'] && ! $scope['branch']) {
             return false;
         }
 
@@ -213,12 +217,12 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if (!$this->canAssignRequestedRoles($actor, null, $requestedRoleNames)
-            && !$this->canAssignRequestedRolesForCreation($actor, $requestedRoleNames)) {
+        if (! $this->canAssignRequestedRoles($actor, null, $requestedRoleNames)
+            && ! $this->canAssignRequestedRolesForCreation($actor, $requestedRoleNames)) {
             return false;
         }
 
-        if ($parent && $parent->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($parent && $parent->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -255,7 +259,7 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -272,7 +276,7 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -289,11 +293,11 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
-        if (!$this->canAccessTargetByScope(
+        if (! $this->canAccessTargetByScope(
             $actor,
             $target,
             'assign_roles',
@@ -310,7 +314,7 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -327,6 +331,7 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
         $scope = $this->resolveUserActionScope($actor, 'move');
+
         return $scope['all'] || $scope['branch'];
     }
 
@@ -335,15 +340,15 @@ class UserManagementAuthorizationService
         $actor = $this->resolveActor($actor);
         $scope = $this->resolveUserActionScope($actor, 'move');
 
-        if (!$scope['all'] && !$scope['branch']) {
+        if (! $scope['all'] && ! $scope['branch']) {
             return false;
         }
 
-        if ($target->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($target->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
-        if (!$this->canAccessTargetByScope(
+        if (! $this->canAccessTargetByScope(
             $actor,
             $target,
             'move',
@@ -369,7 +374,7 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if ($newParent->hasProtectedManagementRole() && !$this->canManageProtectedTarget($actor)) {
+        if ($newParent->hasProtectedManagementRole() && ! $this->canManageProtectedTarget($actor)) {
             return false;
         }
 
@@ -385,7 +390,7 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if (!$actor->isAncestorOf($newParent)) {
+        if (! $actor->isAncestorOf($newParent)) {
             return false;
         }
 
@@ -432,7 +437,7 @@ class UserManagementAuthorizationService
             || $this->hasPermission($actor, 'users.db_products.access')
             || $this->hasOwnClientManagementCapability($actor);
 
-        if (!$canAccessDatabase) {
+        if (! $canAccessDatabase) {
             return false;
         }
 
@@ -468,11 +473,11 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if ($target && !$this->canManageTarget($actor, $target, allowSelf: true)) {
+        if ($target && ! $this->canManageTarget($actor, $target, allowSelf: true)) {
             return [];
         }
 
-        if (!$this->hasRoleManagementCapability($actor)) {
+        if (! $this->hasRoleManagementCapability($actor)) {
             return [];
         }
 
@@ -510,20 +515,20 @@ class UserManagementAuthorizationService
     {
         $actor = $this->resolveActor($actor);
 
-        if (!$this->canAssignPermissions($actor, $target)) {
+        if (! $this->canAssignPermissions($actor, $target)) {
             return [];
         }
 
         return $actor->getAllPermissions()
             ->pluck('name')
-            ->filter(fn (string $name) => !in_array($name, self::NON_DELEGABLE_PERMISSION_NAMES, true))
+            ->filter(fn (string $name) => ! in_array($name, self::NON_DELEGABLE_PERMISSION_NAMES, true))
             ->unique()
             ->values()
             ->all();
     }
 
     /**
-     * @param array<int, int> $selectedPermissionIds
+     * @param  array<int, int>  $selectedPermissionIds
      */
     public function arePermissionIdsDelegable(User $actor, User $target, array $selectedPermissionIds): bool
     {
@@ -544,8 +549,8 @@ class UserManagementAuthorizationService
     }
 
     /**
-     * @param array<int, int> $selectedPermissionIds
-     * @param array<int, int> $roleIds
+     * @param  array<int, int>  $selectedPermissionIds
+     * @param  array<int, int>  $roleIds
      * @return array<int, string>
      */
     public function explicitPermissionNames(array $selectedPermissionIds, array $roleIds): array
@@ -568,7 +573,7 @@ class UserManagementAuthorizationService
             return $query;
         }
 
-        if (!$scope['branch']) {
+        if (! $scope['branch']) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -585,7 +590,7 @@ class UserManagementAuthorizationService
         $actor = $this->resolveActor($actor);
         $scope = $this->resolveUserActionScope($actor, 'impersonate');
 
-        if (!$scope['all'] && !$scope['branch']) {
+        if (! $scope['all'] && ! $scope['branch']) {
             return $query->whereRaw('1 = 0');
         }
 
@@ -611,7 +616,7 @@ class UserManagementAuthorizationService
             return null;
         }
 
-        if (!$scope['branch']) {
+        if (! $scope['branch']) {
             return null;
         }
 
@@ -630,7 +635,7 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if ($target->hasProtectedManagementRole() && !$actor->hasRole('admin')) {
+        if ($target->hasProtectedManagementRole() && ! $actor->hasRole('admin')) {
             return false;
         }
 
@@ -638,7 +643,7 @@ class UserManagementAuthorizationService
             return true;
         }
 
-        if (!$this->hasHierarchicalUserAccess($actor)) {
+        if (! $this->hasHierarchicalUserAccess($actor)) {
             return false;
         }
 
@@ -650,7 +655,7 @@ class UserManagementAuthorizationService
         $actor = $this->resolveActor($actor);
         $requestedRoleNames = array_values(array_unique(array_filter($requestedRoleNames)));
 
-        if ($target && $target->hasProtectedManagementRole() && !$actor->hasRole('admin')) {
+        if ($target && $target->hasProtectedManagementRole() && ! $actor->hasRole('admin')) {
             return false;
         }
 
@@ -668,7 +673,7 @@ class UserManagementAuthorizationService
             return false;
         }
 
-        if ($target && $actor->hasRole('admin') && $actor->isSameAs($target) && !in_array('admin', $requestedRoleNames, true)) {
+        if ($target && $actor->hasRole('admin') && $actor->isSameAs($target) && ! in_array('admin', $requestedRoleNames, true)) {
             return false;
         }
 
@@ -696,7 +701,7 @@ class UserManagementAuthorizationService
         }
 
         if ($actor->hasRole('dev')) {
-            return !in_array('admin', $requestedRoleNames, true);
+            return ! in_array('admin', $requestedRoleNames, true);
         }
 
         $requestedRoles = Role::query()
@@ -833,7 +838,7 @@ class UserManagementAuthorizationService
             return true;
         }
 
-        if (!$scope['branch']) {
+        if (! $scope['branch']) {
             return false;
         }
 

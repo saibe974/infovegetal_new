@@ -1,7 +1,15 @@
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ButtonsActions } from '@/components/buttons-actions';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getCartPricing } from '@/components/cart/cart-pricing';
+import { OrderStatusBadge } from '@/components/cart/order-status-badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -11,19 +19,38 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Settings2 } from 'lucide-react';
-import { getCartPricing } from '@/components/cart/cart-pricing';
 import { useI18n } from '@/lib/i18n';
+import { formatCurrency } from '@/lib/utils';
 import { type Product, type SharedData } from '@/types';
-import { leave as impersonateLeave, take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import { router, usePage } from '@inertiajs/react';
+import { Settings2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/utils';
 
-type CartStatus = 'current' | 'processing' | 'processed';
+type CartStatus =
+    | 'current'
+    | 'processing'
+    | 'delivering'
+    | 'delivered'
+    | 'closed'
+    | 'processed';
 
-type OptionalColumn = 'client' | 'articles' | 'total' | 'date' | 'status' | 'actions';
+const statusLabels: Record<string, string> = {
+    current: 'En cours',
+    processing: 'En cours de traitement',
+    delivering: 'En cours de livraison',
+    delivered: 'Livrée',
+    closed: 'Clôturée',
+    processed: 'Traitée (ancienne commande)',
+};
+
+type OptionalColumn =
+    | 'client'
+    | 'articles'
+    | 'total'
+    | 'date'
+    | 'status'
+    | 'actions';
 type ColumnVisibility = Record<OptionalColumn, boolean>;
 
 const defaultColumnVisibility: ColumnVisibility = {
@@ -35,11 +62,12 @@ const defaultColumnVisibility: ColumnVisibility = {
     actions: true,
 };
 
-type CartProduct = Product & { pivot?: { quantity: number } };
+type CartProduct = Product & { pivot?: { quantity: number; comment?: string } };
 
 type CartSummary = {
     id: number;
     status: CartStatus;
+    comment?: string;
     computed_total?: number;
     items_total?: number;
     shipping_total?: number;
@@ -52,36 +80,43 @@ type CartSummary = {
 
 export function CartsList() {
     const { t } = useI18n();
-    const { carts, auth, cart } = usePage<SharedData & { carts: CartSummary[] }>().props;
+    const { carts, auth, cart } = usePage<
+        SharedData & { carts: CartSummary[] }
+    >().props;
     const openedCartId = cart?.id ?? null;
-    const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
-    const [impersonatingCartId, setImpersonatingCartId] = useState<number | null>(null);
-    const [deleteConfirmCart, setDeleteConfirmCart] = useState<CartSummary | null>(null);
-    const [replaceConfirmCart, setReplaceConfirmCart] = useState<CartSummary | null>(null);
-    const [previewPdf, setPreviewPdf] = useState<{ url: string; cartId: number } | null>(null);
-    const [previewLoadingCartId, setPreviewLoadingCartId] = useState<number | null>(null);
+    const [deleteConfirmCart, setDeleteConfirmCart] =
+        useState<CartSummary | null>(null);
+    const [previewPdf, setPreviewPdf] = useState<{
+        url: string;
+        cartId: number;
+    } | null>(null);
+    const [previewLoadingCartId, setPreviewLoadingCartId] = useState<
+        number | null
+    >(null);
 
-    const [visibleColumns, setVisibleColumns] = useState<ColumnVisibility>(() => {
-        if (typeof window === 'undefined') return defaultColumnVisibility;
+    const [visibleColumns, setVisibleColumns] = useState<ColumnVisibility>(
+        () => {
+            if (typeof window === 'undefined') return defaultColumnVisibility;
 
-        try {
-            const stored = JSON.parse(
-                localStorage.getItem('cartsListColumns') || '{}',
-            ) as Partial<ColumnVisibility>;
+            try {
+                const stored = JSON.parse(
+                    localStorage.getItem('cartsListColumns') || '{}',
+                ) as Partial<ColumnVisibility>;
 
-            return {
-                client: stored.client ?? true,
-                articles: stored.articles ?? true,
-                total: stored.total ?? true,
-                date: stored.date ?? true,
-                status: stored.status ?? true,
-                actions: stored.actions ?? true,
-            };
-        } catch {
-            return defaultColumnVisibility;
-        }
-    });
+                return {
+                    client: stored.client ?? true,
+                    articles: stored.articles ?? true,
+                    total: stored.total ?? true,
+                    date: stored.date ?? true,
+                    status: stored.status ?? true,
+                    actions: stored.actions ?? true,
+                };
+            } catch {
+                return defaultColumnVisibility;
+            }
+        },
+    );
 
     const saveVisibleColumns = (columns: ColumnVisibility) => {
         setVisibleColumns(columns);
@@ -90,7 +125,10 @@ export function CartsList() {
         }
     };
 
-    const handleColumnVisibilityChange = (column: OptionalColumn, visible: boolean) => {
+    const handleColumnVisibilityChange = (
+        column: OptionalColumn,
+        visible: boolean,
+    ) => {
         saveVisibleColumns({ ...visibleColumns, [column]: visible });
     };
 
@@ -105,136 +143,30 @@ export function CartsList() {
         { key: 'actions', label: t('Actions') },
     ];
 
-    const visibleColumnsCount = configurableColumns.filter((column) => visibleColumns[column.key]).length;
-
-    const getCartStorageKey = (userId: number) => `cart:${userId}`;
-
-    const readCartItemsLength = (userId: number): number => {
-        const raw = localStorage.getItem(getCartStorageKey(userId));
-        if (!raw) return 0;
-
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed.length : 0;
-        } catch {
-            return 0;
-        }
-    };
-
-    const writeCartToLocalStorage = (cart: CartSummary, userId: number) => {
-        const items = (cart.products ?? []).map((product) => ({
-            product,
-            quantity: product.pivot?.quantity ?? 1,
-        }));
-
-        localStorage.setItem(getCartStorageKey(userId), JSON.stringify(items));
-    };
-
-    const markCartAsCurrent = async (cartId: number) => {
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content;
-
-        const response = await fetch(`/cart/${cartId}/status`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken || '',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify({ status: 'current' }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Unable to activate cart for edition');
-        }
-    };
-
-    const switchImpersonationToUser = async (targetUserId: number) => {
-        const isImpersonating = !!auth?.impersonate_from;
-        const currentImpersonatedUserId = auth?.user?.id;
-
-        const refreshCsrfToken = async (response: Response) => {
-            const payload = await response.json();
-            const meta = document.querySelector('meta[name="csrf-token"]');
-            if (meta && typeof payload.csrf_token === 'string') {
-                meta.setAttribute('content', payload.csrf_token);
-            }
-        };
-
-        if (!isImpersonating && currentImpersonatedUserId === targetUserId) {
-            return;
-        }
-
-        if (isImpersonating && currentImpersonatedUserId === targetUserId) {
-            return;
-        }
-
-        if (isImpersonating) {
-            const leaveResponse = await fetch(impersonateLeave().url, {
-                method: 'GET',
-                credentials: 'include',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-
-            if (!leaveResponse.ok) {
-                throw new Error('Unable to leave impersonation');
-            }
-            await refreshCsrfToken(leaveResponse);
-        }
-
-        const takeResponse = await fetch(impersonateTake({ id: targetUserId }).url, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        });
-
-        if (!takeResponse.ok) {
-            throw new Error('Impersonation failed');
-        }
-        await refreshCsrfToken(takeResponse);
-    };
-
-    const startImpersonateAndEditCart = async (cart: CartSummary) => {
-        const userId = cart.user?.id;
-        if (!userId) {
-            toast.error(t('Impossible de modifier cette commande: client introuvable'));
-            return;
-        }
-
-        setImpersonatingCartId(cart.id);
-
-        try {
-            writeCartToLocalStorage(cart, userId);
-
-            await switchImpersonationToUser(userId);
-            await markCartAsCurrent(cart.id);
-
-            router.visit('/cart/checkout');
-        } catch {
-            toast.error(t('Erreur lors du passage en impersonation'));
-        } finally {
-            setImpersonatingCartId(null);
-            setReplaceConfirmCart(null);
-        }
-    };
+    const visibleColumnsCount = configurableColumns.filter(
+        (column) => visibleColumns[column.key],
+    ).length;
 
     const handleEdit = (cart: CartSummary) => {
-        const userId = cart.user?.id;
-        if (!userId) {
-            toast.error(t('Impossible de modifier cette commande: client introuvable'));
-            return;
+        if (cart.status === 'current' && cart.user?.id === auth.user?.id) {
+            localStorage.setItem(
+                `cart:${auth.user?.id}`,
+                JSON.stringify(
+                    (cart.products ?? []).map((product) => ({
+                        product,
+                        quantity: product.pivot?.quantity ?? 1,
+                        comment: product.pivot?.comment ?? '',
+                    })),
+                ),
+            );
+            localStorage.setItem(
+                `cart:${auth.user?.id}:comment`,
+                cart.comment ?? '',
+            );
+            window.location.assign('/cart/checkout');
+        } else {
+            router.visit('/orders/' + cart.id);
         }
-
-        if (readCartItemsLength(userId) > 0) {
-            setReplaceConfirmCart(cart);
-            return;
-        }
-
-        void startImpersonateAndEditCart(cart);
     };
 
     const rows = useMemo(() => {
@@ -246,14 +178,21 @@ export function CartsList() {
                 return sum + pricing.lineTotal;
             }, 0);
             const storedTotal =
-                typeof cart.items_total === 'number' || typeof cart.shipping_total === 'number'
-                    ? (Number(cart.items_total ?? 0) + Number(cart.shipping_total ?? 0))
+                typeof cart.items_total === 'number' ||
+                typeof cart.shipping_total === 'number'
+                    ? Number(cart.items_total ?? 0) +
+                      Number(cart.shipping_total ?? 0)
                     : null;
             const total =
                 storedTotal !== null
                     ? storedTotal
-                    : (typeof cart.computed_total === 'number' ? cart.computed_total : fallbackTotal);
-            const totalQty = items.reduce((sum, product) => sum + (product.pivot?.quantity ?? 0), 0);
+                    : typeof cart.computed_total === 'number'
+                      ? cart.computed_total
+                      : fallbackTotal;
+            const totalQty = items.reduce(
+                (sum, product) => sum + (product.pivot?.quantity ?? 0),
+                0,
+            );
 
             return {
                 ...cart,
@@ -262,16 +201,6 @@ export function CartsList() {
             };
         });
     }, [carts]);
-
-    const handleStatusChange = (cartId: number, status: CartStatus) => {
-        setUpdatingId(cartId);
-        router.put(`/cart/${cartId}/status`, { status }, {
-            onSuccess: () => toast.success(t('Statut mis a jour')),
-            onError: () => toast.error(t('Erreur lors de la mise a jour du statut')),
-            onFinish: () => setUpdatingId(null),
-            preserveScroll: true,
-        });
-    };
 
     const handleDelete = (cartId: number) => {
         setDeletingId(cartId);
@@ -293,7 +222,10 @@ export function CartsList() {
         try {
             let foundUrl: string | null = null;
             for (const url of candidateUrls) {
-                const response = await fetch(url, { method: 'HEAD', credentials: 'include' });
+                const response = await fetch(url, {
+                    method: 'HEAD',
+                    credentials: 'include',
+                });
                 if (response.ok) {
                     foundUrl = url;
                     break;
@@ -307,7 +239,7 @@ export function CartsList() {
 
             setPreviewPdf({ url: foundUrl, cartId: cart.id });
         } catch {
-            toast.error(t('Erreur lors de l\'ouverture de l\'aperçu'));
+            toast.error(t("Erreur lors de l'ouverture de l'aperçu"));
         } finally {
             setPreviewLoadingCartId(null);
         }
@@ -333,47 +265,102 @@ export function CartsList() {
                                                 size="icon"
                                                 variant="ghost"
                                                 className="size-7"
-                                                title={t('Choisir les colonnes')}
-                                                aria-label={t('Choisir les colonnes')}
+                                                title={t(
+                                                    'Choisir les colonnes',
+                                                )}
+                                                aria-label={t(
+                                                    'Choisir les colonnes',
+                                                )}
                                             >
                                                 <Settings2 className="size-4" />
                                             </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="start" className="w-56">
-                                            <DropdownMenuLabel>{t('Colonnes affichees')}</DropdownMenuLabel>
+                                        <DropdownMenuContent
+                                            align="start"
+                                            className="w-56"
+                                        >
+                                            <DropdownMenuLabel>
+                                                {t('Colonnes affichees')}
+                                            </DropdownMenuLabel>
                                             <DropdownMenuSeparator />
-                                            {configurableColumns.map((column) => (
-                                                <DropdownMenuCheckboxItem
-                                                    key={column.key}
-                                                    checked={visibleColumns[column.key]}
-                                                    onCheckedChange={(checked) =>
-                                                        handleColumnVisibilityChange(column.key, Boolean(checked))
-                                                    }
-                                                    onSelect={(event) => event.preventDefault()}
-                                                >
-                                                    {column.label}
-                                                </DropdownMenuCheckboxItem>
-                                            ))}
+                                            {configurableColumns.map(
+                                                (column) => (
+                                                    <DropdownMenuCheckboxItem
+                                                        key={column.key}
+                                                        checked={
+                                                            visibleColumns[
+                                                                column.key
+                                                            ]
+                                                        }
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            handleColumnVisibilityChange(
+                                                                column.key,
+                                                                Boolean(
+                                                                    checked,
+                                                                ),
+                                                            )
+                                                        }
+                                                        onSelect={(event) =>
+                                                            event.preventDefault()
+                                                        }
+                                                    >
+                                                        {column.label}
+                                                    </DropdownMenuCheckboxItem>
+                                                ),
+                                            )}
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onSelect={resetColumns}>
-                                                {t('Reinitialiser les colonnes')}
+                                            <DropdownMenuItem
+                                                onSelect={resetColumns}
+                                            >
+                                                {t(
+                                                    'Reinitialiser les colonnes',
+                                                )}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
                             </th>
-                            {visibleColumns.client && <th className="px-4 py-3 font-medium">{t('Client')}</th>}
-                            {visibleColumns.articles && <th className="px-4 py-3 font-medium">{t('Articles')}</th>}
-                            {visibleColumns.total && <th className="px-4 py-3 font-medium">{t('Total')}</th>}
-                            {visibleColumns.date && <th className="px-4 py-3 font-medium">{t('Date')}</th>}
-                            {visibleColumns.status && <th className="px-4 py-3 font-medium">{t('Statut')}</th>}
-                            {visibleColumns.actions && <th className="px-4 py-3 font-medium">{t('Actions')}</th>}
+                            {visibleColumns.client && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Client')}
+                                </th>
+                            )}
+                            {visibleColumns.articles && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Articles')}
+                                </th>
+                            )}
+                            {visibleColumns.total && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Total')}
+                                </th>
+                            )}
+                            {visibleColumns.date && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Date')}
+                                </th>
+                            )}
+                            {visibleColumns.status && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Statut')}
+                                </th>
+                            )}
+                            {visibleColumns.actions && (
+                                <th className="px-4 py-3 font-medium">
+                                    {t('Actions')}
+                                </th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-sidebar-border/70 dark:divide-sidebar-border">
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={1 + visibleColumnsCount} className="px-4 py-8 text-center text-muted-foreground">
+                                <td
+                                    colSpan={1 + visibleColumnsCount}
+                                    className="px-4 py-8 text-center text-muted-foreground"
+                                >
                                     {t('Aucune commande')}
                                 </td>
                             </tr>
@@ -387,54 +374,103 @@ export function CartsList() {
                                         : 'hover:bg-muted/30'
                                 }
                             >
-                                <td className={`px-4 py-3 ${cart.id === openedCartId ? 'font-semibold text-brand-main' : ''}`}>#{cart.id}</td>
+                                <td
+                                    className={`px-4 py-3 ${cart.id === openedCartId ? 'font-semibold text-brand-main' : ''}`}
+                                >
+                                    #{cart.id}
+                                </td>
                                 {visibleColumns.client && (
                                     <td className="px-4 py-3">
-                                        <div className="font-medium">{cart.user?.name ?? t('Inconnu')}</div>
-                                        <div className="text-xs text-muted-foreground">{cart.user?.email ?? ''}</div>
+                                        <div className="font-medium">
+                                            {cart.user?.name ?? t('Inconnu')}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {cart.user?.email ?? ''}
+                                        </div>
                                     </td>
                                 )}
-                                {visibleColumns.articles && <td className="px-4 py-3">{cart.totalQty}</td>}
-                                {visibleColumns.total && <td className="px-4 py-3">{formatCurrency(cart.total)}</td>}
+                                {visibleColumns.articles && (
+                                    <td className="px-4 py-3">
+                                        {cart.totalQty}
+                                    </td>
+                                )}
+                                {visibleColumns.total && (
+                                    <td className="px-4 py-3">
+                                        {formatCurrency(cart.total)}
+                                    </td>
+                                )}
                                 {visibleColumns.date && (
                                     <td className="px-4 py-3">
                                         {cart.updated_at
-                                            ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(cart.updated_at))
+                                            ? new Intl.DateTimeFormat('fr-FR', {
+                                                  dateStyle: 'medium',
+                                                  timeStyle: 'short',
+                                              }).format(
+                                                  new Date(cart.updated_at),
+                                              )
                                             : '-'}
                                     </td>
                                 )}
                                 {visibleColumns.status && (
                                     <td className="px-4 py-3">
-                                    <Select
-                                        value={cart.status}
-                                        onValueChange={(value) => handleStatusChange(cart.id, value as CartStatus)}
-                                    >
-                                        <SelectTrigger className="w-[190px]" disabled={updatingId === cart.id}>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="current">{t('En cours')}</SelectItem>
-                                            <SelectItem value="processing">{t('En cours de traitement')}</SelectItem>
-                                            <SelectItem value="processed">{t('Traite')}</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </td>
+                                        <OrderStatusBadge
+                                            status={cart.status}
+                                            label={t(
+                                                statusLabels[cart.status] ??
+                                                    cart.status,
+                                            )}
+                                        />
+                                    </td>
                                 )}
                                 {visibleColumns.actions && (
                                     <td className="px-4 py-3">
-                                    <ButtonsActions
-                                        className="justify-end"
-                                        preview={() => void handlePreview(cart)}
-                                        edit={() => handleEdit(cart)}
-                                        delete={() => setDeleteConfirmCart(cart)}
-                                        saving={
-                                            deletingId === cart.id ||
-                                            updatingId === cart.id ||
-                                            impersonatingCartId === cart.id ||
-                                            previewLoadingCartId === cart.id
-                                        }
-                                    />
-                                </td>
+                                        <div className="flex items-center justify-end gap-2">
+                                            {cart.status !== 'current' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        handleEdit(cart)
+                                                    }
+                                                >
+                                                    Suivre
+                                                </Button>
+                                            )}
+                                            <ButtonsActions
+                                                className="justify-end"
+                                                preview={() =>
+                                                    void handlePreview(cart)
+                                                }
+                                                edit={
+                                                    cart.status === 'current' &&
+                                                    cart.user?.id ===
+                                                        auth.user?.id
+                                                        ? () => handleEdit(cart)
+                                                        : undefined
+                                                }
+                                                delete={
+                                                    cart.status === 'current' &&
+                                                    (cart.user?.id ===
+                                                        auth.user?.id ||
+                                                        auth.user?.roles?.some(
+                                                            (role) =>
+                                                                role.name ===
+                                                                'admin',
+                                                        ))
+                                                        ? () =>
+                                                              setDeleteConfirmCart(
+                                                                  cart,
+                                                              )
+                                                        : undefined
+                                                }
+                                                saving={
+                                                    deletingId === cart.id ||
+                                                    previewLoadingCartId ===
+                                                        cart.id
+                                                }
+                                            />
+                                        </div>
+                                    </td>
                                 )}
                             </tr>
                         ))}
@@ -442,22 +478,38 @@ export function CartsList() {
                 </table>
             </div>
 
-            <Dialog open={deleteConfirmCart !== null} onOpenChange={(open) => !open && setDeleteConfirmCart(null)}>
+            <Dialog
+                open={deleteConfirmCart !== null}
+                onOpenChange={(open) => !open && setDeleteConfirmCart(null)}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{t('Confirmer la suppression')}</DialogTitle>
+                        <DialogTitle>
+                            {t('Confirmer la suppression')}
+                        </DialogTitle>
                         <DialogDescription>
-                            {t('Voulez-vous vraiment supprimer cette commande ? Cette action est irreversible.')}
+                            {t(
+                                'Voulez-vous vraiment supprimer cette commande ? Cette action est irreversible.',
+                            )}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="flex-col gap-2 sm:flex-row">
-                        <Button variant="outline" onClick={() => setDeleteConfirmCart(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setDeleteConfirmCart(null)}
+                        >
                             {t('Annuler')}
                         </Button>
                         <Button
                             variant="destructive"
-                            onClick={() => deleteConfirmCart && handleDelete(deleteConfirmCart.id)}
-                            disabled={!!deleteConfirmCart && deletingId === deleteConfirmCart.id}
+                            onClick={() =>
+                                deleteConfirmCart &&
+                                handleDelete(deleteConfirmCart.id)
+                            }
+                            disabled={
+                                !!deleteConfirmCart &&
+                                deletingId === deleteConfirmCart.id
+                            }
                         >
                             {t('Supprimer')}
                         </Button>
@@ -465,29 +517,10 @@ export function CartsList() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={replaceConfirmCart !== null} onOpenChange={(open) => !open && setReplaceConfirmCart(null)}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t('Panier deja rempli')}</DialogTitle>
-                        <DialogDescription>
-                            {t('Le panier courant de ce client n\'est pas vide. Voulez-vous le remplacer par cette commande avant de modifier ?')}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="flex-col gap-2 sm:flex-row">
-                        <Button variant="outline" onClick={() => setReplaceConfirmCart(null)}>
-                            {t('Annuler')}
-                        </Button>
-                        <Button
-                            onClick={() => replaceConfirmCart && void startImpersonateAndEditCart(replaceConfirmCart)}
-                            disabled={!!replaceConfirmCart && impersonatingCartId === replaceConfirmCart.id}
-                        >
-                            {t('Remplacer et modifier')}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={previewPdf !== null} onOpenChange={(open) => !open && setPreviewPdf(null)}>
+            <Dialog
+                open={previewPdf !== null}
+                onOpenChange={(open) => !open && setPreviewPdf(null)}
+            >
                 <DialogContent className="sm:max-w-5xl">
                     <DialogHeader>
                         <DialogTitle>{t('Apercu de la commande')}</DialogTitle>
@@ -505,12 +538,19 @@ export function CartsList() {
                         )}
                     </div>
                     <DialogFooter className="flex-col gap-2 sm:flex-row">
-                        <Button variant="outline" onClick={() => setPreviewPdf(null)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setPreviewPdf(null)}
+                        >
                             {t('Fermer')}
                         </Button>
                         {previewPdf && (
                             <Button asChild>
-                                <a href={previewPdf.url} target="_blank" rel="noreferrer">
+                                <a
+                                    href={previewPdf.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
                                     {t('Ouvrir dans un nouvel onglet')}
                                 </a>
                             </Button>

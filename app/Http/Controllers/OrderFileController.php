@@ -51,11 +51,17 @@ class OrderFileController extends Controller
     {
         $order = app(UserManagementAuthorizationService::class)
             ->scopeManageableOrders($request->user(), Cart::query())->findOrFail($cart);
-        $query = $order->user->files()->where('cart_id', $cart)->where('mime', 'application/pdf');
+        $owner = $order->user;
+        if (! $request->user()->hasRole('admin')
+            && in_array((int) $request->user()->id, $order->workflow['participants'] ?? [], true)) {
+            // Assigned parties receive the copy scoped to their product databases.
+            $owner = $request->user();
+        }
+        $query = $owner->files()->where('cart_id', $cart)->where('mime', 'application/pdf');
         $file = (clone $query)->where('document_key', 'order-pdf')->first()
             ?? $query->whereNotNull('document_key')->latest('id')->firstOrFail();
 
-        return $this->serve($request, $file->id, true, $order->user);
+        return $this->serve($request, $file->id, true, $owner);
     }
 
     private function serve(Request $request, int $id, bool $inline, ?\App\Models\User $owner = null)

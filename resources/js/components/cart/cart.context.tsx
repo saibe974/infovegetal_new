@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useState, useEffect, useRef } from 'react';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
 import { type SharedData } from '@/types';
 import {
@@ -223,6 +223,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [cart]);
 
     const [pendingProductId, setPendingProductId] = useState<number | null>(null);
+
+    useEffect(() => {
+        const onSubmission = (event: StorageEvent) => {
+            if (userId && event.key === `cart:submitted:${userId}`) {
+                itemsRef.current = [];
+                setItems([]);
+                setOrderCommentState('');
+                router.reload({ only: ['cart', 'cart_transport_selection', 'cart_discounts', 'cart_coupon_code'] });
+            }
+        };
+        window.addEventListener('storage', onSubmission);
+        return () => window.removeEventListener('storage', onSubmission);
+    }, [userId]);
 
     // Vérifier s'il y a une intention d'ajout au panier après connexion
     useEffect(() => {
@@ -464,6 +477,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const setOrderComment = (comment: string) => setOrderCommentState(comment.slice(0, 2000));
 
     const clearCartImmediately = () => {
+        itemsRef.current = [];
+        localStorage.setItem(getCartKey(), '[]');
+        localStorage.setItem(`${getCartKey()}:comment`, '');
         setItems([]);
         setOrderCommentState('');
     };

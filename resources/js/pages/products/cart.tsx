@@ -502,6 +502,17 @@ export default withAppLayout<Props>(
         } | null>(null);
         const [couponMessage, setCouponMessage] = useState<string | null>(null);
         const [isCheckingCoupon, setIsCheckingCoupon] = useState(false);
+        useEffect(() => {
+            if (items.length === 0) {
+                setCouponDraft('');
+                setAppliedCoupon(null);
+                setCouponMessage(null);
+                setDiscountsByDb({});
+                setCarrierOverrides({});
+                setDeliveryDate('');
+                setOpenCommentProductIds(new Set());
+            }
+        }, [items.length]);
         const hasRefreshedCartRef = useRef(false);
 
         useEffect(() => {
@@ -927,14 +938,13 @@ export default withAppLayout<Props>(
                     ) as HTMLMetaElement
                 )?.content;
 
-                const response = await fetch(`/cart/${cartId}/status`, {
-                    method: 'PUT',
+                const response = await fetch(`/cart/${cartId}`, {
+                    method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': csrfToken || '',
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify({ status: 'processed' }),
                 });
 
                 if (!response.ok) {

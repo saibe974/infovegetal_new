@@ -34,6 +34,10 @@ yarn-error.log
 .dev.json
 
 /docs
-/_docs/
+/_docs/*
+!/_docs/AVANCEMENT.md
+!/_docs/BusinessRules.md
+!/_docs/LegacyMigrationMatrix.md
+!/_docs/ORDER_WORKFLOW.md
 
 deploy.ps1

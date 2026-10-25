@@ -20,6 +20,8 @@ class Cart extends Model
     ];
 
     protected $casts = [
+        'workflow' => 'array',
+        'revision' => 'integer',
         'items_total' => 'decimal:2',
         'shipping_total' => 'decimal:2',
         'transport_selection' => 'array',
@@ -29,6 +31,21 @@ class Cart extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(OrderComment::class);
+    }
+
+    public function issues(): HasMany
+    {
+        return $this->hasMany(OrderIssue::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(OrderDocument::class);
     }
 
     public function products()
