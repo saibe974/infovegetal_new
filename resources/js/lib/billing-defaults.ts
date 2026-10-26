@@ -105,7 +105,9 @@ const normalizeBlocks = (
                                   `block-${blockIndex + 1}-column-${columnIndex + 1}`,
                           ),
                           name: String(
-                              column.name || `Colonne ${columnIndex + 1}`,
+                              column.name === undefined
+                                  ? `Colonne ${columnIndex + 1}`
+                                  : (column.name ?? ''),
                           ),
                       }))
                     : legacyColumns;
@@ -174,7 +176,11 @@ const normalizeFiles = (
             const columns = Array.isArray(file.columns)
                 ? file.columns.map((column, columnIndex) => ({
                       id: String(column.id || `column-${columnIndex + 1}`),
-                      name: String(column.name || `Colonne ${columnIndex + 1}`),
+                      name: String(
+                          column.name === undefined
+                              ? `Colonne ${columnIndex + 1}`
+                              : (column.name ?? ''),
+                      ),
                   }))
                 : [];
 

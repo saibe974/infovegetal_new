@@ -354,7 +354,6 @@ class OrderCsvService
             ? $template['delimiter']
             : ';';
         $stream = fopen('php://temp', 'w+');
-        fwrite($stream, "\xEF\xBB\xBF");
 
         $writeValues = function (array $values) use ($stream, $delimiter, $width): void {
             fputcsv($stream, array_pad($values, $width, ''), $delimiter, '"', '');

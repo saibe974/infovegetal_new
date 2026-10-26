@@ -39,7 +39,7 @@ class FileExportTemplateController extends Controller
             'template.blocks.*.columns' => ['required', 'array', 'min:1', 'max:40'],
             'template.blocks.*.columns.*' => ['array:id,name'],
             'template.blocks.*.columns.*.id' => ['required', 'string', 'max:100'],
-            'template.blocks.*.columns.*.name' => ['required', 'string', 'max:120'],
+            'template.blocks.*.columns.*.name' => ['present', 'nullable', 'string', 'max:120'],
             'template.blocks.*.rows' => ['required', 'array', 'min:1', 'max:5'],
             'template.blocks.*.rows.*' => ['array:id,cells'],
             'template.blocks.*.rows.*.id' => ['required', 'string', 'max:100'],
@@ -50,6 +50,10 @@ class FileExportTemplateController extends Controller
             $data['template']['delimiter'] = "\t";
         }
         foreach ($data['template']['blocks'] as &$block) {
+            foreach ($block['columns'] as &$column) {
+                $column['name'] ??= '';
+            }
+            unset($column);
             foreach ($block['rows'] as &$row) {
                 $row['cells'] = array_map(fn ($value) => $value ?? '', $row['cells']);
             }

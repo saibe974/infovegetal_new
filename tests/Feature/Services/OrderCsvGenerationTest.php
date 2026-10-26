@@ -9,7 +9,28 @@ use App\Services\OrderCsvService;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
-it('persists billing profiles and CSV files together', function (): void {
+it('writes UTF-8 CSV and TSV without a BOM and with the selected separator', function (string $delimiter, string $hex, ?string $extension): void {
+    $contents = app(OrderCsvService::class)->render([
+        'delimiter' => $delimiter,
+        'extension' => $extension,
+        'columns' => [['id' => 'sku', 'name' => 'SKU'], ['id' => 'name', 'name' => '']],
+        'rows' => [['cells' => ['sku' => 'ABC', 'name' => 'Végétal']]],
+    ], collect(), []);
+
+    expect($contents)->toBe("SKU{$delimiter}\nABC{$delimiter}Végétal\n")
+        ->and(bin2hex(substr($contents, 3, 1)))->toBe($hex)
+        ->and(mb_check_encoding($contents, 'UTF-8'))->toBeTrue();
+})->with([
+    'tab 0x09' => ["\t", '09', 'tsv'],
+    'pipe 0x7c' => ['|', '7c', 'tsv'],
+    'legacy tab' => ["\t", '09', null],
+    'legacy pipe' => ['|', '7c', null],
+    'CSV semicolon' => [';', '3b', 'csv'],
+    'CSV comma' => [',', '2c', 'csv'],
+    'legacy CSV' => [';', '3b', null],
+]);
+
+it('persists billing profiles and delimited files together', function (string $delimiter, string $extension): void {
     $admin = User::factory()->withoutTwoFactor()->create();
     $admin->assignRole(Role::findOrCreate('admin', 'web'));
 
@@ -34,8 +55,8 @@ it('persists billing profiles and CSV files together', function (): void {
             'events' => ['order', 'delivery'],
             'enabled' => true,
             'shared' => false,
-            'delimiter' => ';',
-            'extension' => 'csv',
+            'delimiter' => $delimiter,
+            'extension' => $extension,
             'system' => true,
             'blocks' => [[
                 'id' => 'items',
@@ -43,7 +64,7 @@ it('persists billing profiles and CSV files together', function (): void {
                 'type' => 'items',
                 'enabled' => true,
                 'show_headers' => true,
-                'columns' => [['id' => 'reference', 'name' => 'Reference']],
+                'columns' => [['id' => 'reference', 'name' => null]],
                 'rows' => [[
                     'id' => 'item-row',
                     'cells' => ['reference' => '%product.reference%'],
@@ -83,7 +104,11 @@ it('persists billing profiles and CSV files together', function (): void {
     expect($stored->defaults['default_profile_id'])->toBe('grossiste')
         ->and($stored->defaults['profiles'])->toEqual($defaults['profiles'])
         ->and($stored->defaults['files'])->toEqual($defaults['files']);
-});
+})->with([
+    'CSV semicolon' => [';', 'csv'],
+    'TSV tab 0x09' => ["\t", 'tsv'],
+    'TSV pipe' => ['|', 'tsv'],
+]);
 
 it('stores enabled order CSV templates for the configured billing user', function (): void {
     Storage::fake('public');

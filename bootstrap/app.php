@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'locale']);
 
         // File templates may intentionally contain tabs and leading/trailing text.
-        $middleware->trimStrings(except: [fn (\Illuminate\Http\Request $request) => $request->is('admin/products/export', 'file-export-templates', 'file-export-templates/*')]);
+        $middleware->trimStrings(except: [fn (\Illuminate\Http\Request $request) => $request->is('admin/products/export', 'file-export-templates', 'file-export-templates/*', 'db-products/*/billing')]);
 
         $middleware->web(append: [
             SetLocale::class,

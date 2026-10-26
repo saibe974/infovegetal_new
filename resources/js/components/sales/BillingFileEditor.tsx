@@ -425,7 +425,7 @@ export default function BillingFileEditor({
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <SelectItem value="\t">
+                                                            <SelectItem value={'\t'}>
                                                                 {t(
                                                                     'Tab',
                                                                 )}

@@ -277,6 +277,24 @@ try {
         ),
     );
     assert.equal(await page.evaluate(() => window.billingFile.delimiter), '\t');
+    const selectBillingDelimiter = async (value) => {
+        await page.click('label [role="combobox"]');
+        await page.waitForSelector('[role="option"]');
+        await page.evaluate((value) => {
+            [...document.querySelectorAll('[role="option"]')]
+                .find((option) => option.textContent.trim() === value)
+                .click();
+        }, value);
+        await settle();
+    };
+    await selectBillingDelimiter('|');
+    assert.equal(await page.evaluate(() => window.billingFile.delimiter), '|');
+    await selectBillingDelimiter('Tabulation');
+    assert.equal(
+        await page.evaluate(() => window.billingFile.delimiter.charCodeAt(0)),
+        0x09,
+    );
+    assert.equal(await page.evaluate(() => window.billingFile.delimiter.length), 1);
     const unknown = await page.evaluate((definition) => {
         definition.blocks[0].rows[0].cells.sku =
             '%calc:quantity*unit_price|decimal:2%';

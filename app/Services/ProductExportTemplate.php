@@ -33,7 +33,7 @@ class ProductExportTemplate
             'blocks.*.show_headers' => ['required', 'boolean'],
             'blocks.*.columns' => ['required', 'array', 'min:1', 'max:40'],
             'blocks.*.columns.*.id' => ['required', 'string', 'max:100'],
-            'blocks.*.columns.*.name' => ['required', 'string', 'max:120'],
+            'blocks.*.columns.*.name' => ['present', 'nullable', 'string', 'max:120'],
             'blocks.*.rows' => ['required', 'array', 'min:1', 'max:5'],
             'blocks.*.rows.*.id' => ['required', 'string', 'max:100'],
             'blocks.*.rows.*.cells' => ['present', 'array', 'max:40'],

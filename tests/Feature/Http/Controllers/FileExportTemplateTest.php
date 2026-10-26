@@ -47,10 +47,12 @@ it('preserves tab delimiters, literal whitespace and empty cells', function () {
     $payload = libraryTemplatePayload();
     $payload['format'] = 'tsv';
     $payload['template']['delimiter'] = "\t";
+    $payload['template']['blocks'][0]['columns'][0]['name'] = '';
     $payload['template']['blocks'][0]['rows'][0]['cells']['id'] = '  literal  ';
     $payload['template']['blocks'][0]['rows'][0]['cells']['sku'] = '';
     $this->postJson('/file-export-templates', $payload)->assertOk();
     $this->getJson('/file-export-templates')->assertJsonPath('0.template.delimiter', "\t")
+        ->assertJsonPath('0.template.blocks.0.columns.0.name', '')
         ->assertJsonPath('0.template.blocks.0.rows.0.cells.id', '  literal  ')
         ->assertJsonPath('0.template.blocks.0.rows.0.cells.sku', '');
 });
