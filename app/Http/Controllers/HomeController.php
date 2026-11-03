@@ -6,6 +6,7 @@ use App\Http\Resources\CategoryProductsResource;
 use App\Http\Resources\ProductResource;
 use App\Models\CategoryProducts;
 use App\Models\Product;
+use App\Services\ProductCatalogQuery;
 use Illuminate\Http\Request;
 use App\Http\Controllers\ProductController;
 
@@ -46,7 +47,7 @@ class HomeController extends Controller
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
-        $promo = $request->boolean('promo');
+        $promo = $request->has('promo') ? $request->boolean('promo') : null;
 
         $filters = [
             'category' => $categoryId,
@@ -80,18 +81,24 @@ class HomeController extends Controller
                 $q->imageAvailability($filters['image']);
             }
 
-            if (!in_array('promo', $skip, true) && $filters['promo']) {
-                $q->whereNotNull('price_promo')
-                    ->where('price_promo', '>', 0)
-                    ->where(function ($promoQuery) {
-                        $promoQuery
-                            ->whereNull('price_roll')
-                            ->orWhereColumn('price_promo', '<>', 'price_roll');
-                    });
+            if (! in_array('promo', $skip, true) && $filters['promo'] !== null) {
+                $method = $filters['promo'] ? 'where' : 'whereNot';
+                $q->$method(function ($promoQuery) {
+                    $promoQuery->whereNotNull('price_promo')
+                        ->where('price_promo', '>', 0)
+                        ->where(function ($promoQuery) {
+                            $promoQuery
+                                ->whereNull('price_roll')
+                                ->orWhereColumn('price_promo', '<>', 'price_roll');
+                        });
+                });
             }
         };
 
+        $catalog = new ProductCatalogQuery($request);
+        $catalog->applySearch($baseQuery, $search);
         $optionsBaseQuery = clone $baseQuery;
+        $binaryOptions = ProductCatalogQuery::binaryFilterOptions($optionsBaseQuery, $filters, $applyFilters);
 
         $categoryOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['category']))
@@ -170,6 +177,8 @@ class HomeController extends Controller
             'countryOptions' => $countryOptions,
             'potOptions' => $potOptions,
             'heightOptions' => $heightOptions,
+            'imageOptions' => $binaryOptions['image'],
+            'promoOptions' => $binaryOptions['promo'],
         ]);
     }
 

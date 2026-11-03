@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\ProductController;
 use App\Models\Product;
+use App\Services\ProductCatalogQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +55,38 @@ function imageFilterPayload(string $image): array
 
     return is_string($content) ? json_decode($content, true) : [];
 }
+
+it('offers image and promo states only when available under the other filters', function (): void {
+    $ids = [];
+    foreach (['FR', 'NL'] as $country) {
+        $ids[$country] = DB::table('db_products')->insertGetId([
+            'name' => "facet-{$country}",
+            'country' => $country,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    $with = createImageFilterProduct('facet-with', $ids['FR'], 'https://example.test/image.jpg');
+    $with->update(['price_promo' => 5]);
+    $without = createImageFilterProduct('facet-without', $ids['FR']);
+    $dutch = createImageFilterProduct('facet-dutch', $ids['NL'], 'https://example.test/image.jpg');
+    $dutch->update(['price_promo' => 5]);
+
+    foreach ([
+        [['country' => ['FR']], ['image' => ['with', 'without'], 'promo' => [true, false]]],
+        [['country' => ['NL']], ['image' => ['with'], 'promo' => [true]]],
+        [['country' => ['FR'], 'image' => 'with'], ['image' => ['with', 'without'], 'promo' => [true]]],
+        [['country' => ['FR'], 'promo' => '1'], ['image' => ['with'], 'promo' => [true, false]]],
+        [['country' => ['DE']], ['image' => [], 'promo' => []]],
+    ] as [$params, $expected]) {
+        $catalog = new ProductCatalogQuery(Request::create('/products', 'GET', $params));
+        $base = Product::query()->whereIn('id', [$with->id, $without->id, $dutch->id]);
+
+        expect(ProductCatalogQuery::binaryFilterOptions($base, $catalog->filters, $catalog->applyFilters(...)))
+            ->toBe($expected);
+    }
+});
 
 it('filters products with a local media image or an external image link', function (): void {
     $dbProductId = DB::table('db_products')->insertGetId([

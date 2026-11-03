@@ -24,7 +24,6 @@ import {
     SlidersHorizontal,
     Sun,
     Table2,
-    WandSparkles,
     type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -390,27 +389,6 @@ export function AppearancePageSettings({
                                                         uniquement
                                                     </span>
                                                 </span>
-                                            </label>
-                                        )}
-                                        {page === 'products' && (
-                                            <label className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-                                                <Checkbox
-                                                    checked={
-                                                        setting.autoApplyFilters
-                                                    }
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        onChange(page, {
-                                                            autoApplyFilters:
-                                                                checked ===
-                                                                true,
-                                                        })
-                                                    }
-                                                />
-                                                <WandSparkles className="size-4" />
-                                                Application automatique des
-                                                filtres
                                             </label>
                                         )}
                                     </div>

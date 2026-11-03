@@ -5,12 +5,12 @@ import { usePage } from "@inertiajs/react";
 import { SharedData } from "@/types";
 import * as Flags from "country-flag-icons/react/3x2";
 import { type ProductCategory } from "@/types";
-import { Camera, CameraOff, Check, Diameter, MoveVertical, Pin, PinOff, RotateCcw, Sprout, WandSparkles, X, Zap } from "lucide-react";
-import { Checkbox } from "../ui/checkbox";
+import { Camera, CameraOff, Diameter, MoveVertical, Pin, PinOff, RotateCcw, Sprout, X, Zap } from "lucide-react";
+import { ThreeStateCheckbox } from "../ui/three-state-checkbox";
 import { CategoryAccordion } from "./category-accordion";
 import { BadgeMultiSelect } from "../ui/badge-multi-select";
 import { cn } from "@/lib/utils";
-import { persistPagePreference } from '@/lib/display-preferences';
+import { canViewProducerNames } from '@/lib/roles';
 
 type FilterActive = 'all' | 'active' | 'inactive';
 type ImageFilter = 'all' | 'with' | 'without';
@@ -21,7 +21,7 @@ type ProductsFilterValues = {
     pot: string[];
     height: string[];
     image: ImageFilter;
-    promo: boolean;
+    promo: boolean | null;
     producer: string[];
 };
 
@@ -36,6 +36,8 @@ type ProductsFiltersProps = {
     countryOptions: string[];
     potOptions: string[];
     heightOptions: string[];
+    imageOptions: ('with' | 'without')[];
+    promoOptions: boolean[];
     producerOptions?: ProducerOption[];
     active: FilterActive;
     categoryId: number | null;
@@ -86,6 +88,8 @@ export function ProductsFilters({
     countryOptions,
     potOptions,
     heightOptions,
+    imageOptions,
+    promoOptions,
     producerOptions = [],
     categoryId,
     country,
@@ -101,6 +105,7 @@ export function ProductsFilters({
 }: ProductsFiltersProps) {
     const { t } = useI18n();
     const { locale, auth } = usePage<SharedData>().props;
+    const showProducerNames = canViewProducerNames(auth?.user);
     const isColumn = variant === 'column';
     const [localActive, setLocalActive] = useState<FilterActive>(active);
     const ALL_CATEGORIES = "all";
@@ -110,14 +115,10 @@ export function ProductsFilters({
     const [localHeight, setLocalHeight] = useState<string[]>(height ?? []);
     const [localProducer, setLocalProducer] = useState<string[]>(producer ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
-    const [localPromo, setLocalPromo] = useState(Boolean(promo));
-    const [autoApply, setAutoApply] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        return window.localStorage.getItem('products.filters.auto-apply') !== '0';
-    });
-    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${(producer ?? []).join(',')}|${image ?? 'all'}|${Boolean(promo)}`;
+    const [localPromo, setLocalPromo] = useState<boolean | null>(promo ?? null);
+    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${(producer ?? []).join(',')}|${image ?? 'all'}|${promo ?? null}`;
     const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localProducer.join(',')}|${localImage}|${localPromo}`;
-    const lastAutoAppliedRef = useRef(incomingKey);
+    const lastAppliedRef = useRef(incomingKey);
     const previousIncomingKeyRef = useRef(incomingKey);
 
     useEffect(() => {
@@ -128,27 +129,21 @@ export function ProductsFilters({
         setLocalHeight(height ?? []);
         setLocalProducer(producer ?? []);
         setLocalImage(image === 'with' || image === 'without' ? image : 'all');
-        setLocalPromo(Boolean(promo));
+        setLocalPromo(promo ?? null);
     }, [active, categoryId, country, pot, height, producer, image, promo]);
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            window.localStorage.setItem('products.filters.auto-apply', autoApply ? '1' : '0');
-        }
-    }, [autoApply]);
 
     useEffect(() => {
         if (previousIncomingKeyRef.current !== incomingKey) {
             previousIncomingKeyRef.current = incomingKey;
-            lastAutoAppliedRef.current = incomingKey;
+            lastAppliedRef.current = incomingKey;
             return;
         }
 
-        if (!autoApply || localKey === incomingKey || lastAutoAppliedRef.current === localKey) {
+        if (localKey === incomingKey || lastAppliedRef.current === localKey) {
             return;
         }
 
-        lastAutoAppliedRef.current = localKey;
+        lastAppliedRef.current = localKey;
         onApply({
             active: localActive,
             category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
@@ -159,7 +154,7 @@ export function ProductsFilters({
             image: localImage,
             promo: localPromo,
         });
-    }, [autoApply, incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localProducer, localImage, localPromo, onApply]);
+    }, [incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localProducer, localImage, localPromo, onApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
@@ -168,25 +163,11 @@ export function ProductsFilters({
         || localHeight.length > 0
         || localProducer.length > 0
         || localImage !== 'all'
-        || localPromo;
+        || localPromo !== null;
 
-
-    const apply = () => {
-        onApply({
-            active: localActive,
-            category: localCategory !== ALL_CATEGORIES ? Number(localCategory) : null,
-            country: localCountry,
-            pot: localPot,
-            height: localHeight,
-            producer: localProducer,
-            image: localImage,
-            promo: localPromo,
-        });
-        closeFilters?.();
-    };
 
     const reset = () => {
-        const resetKey = `all|${ALL_CATEGORIES}|||||all|false`;
+        const resetKey = `all|${ALL_CATEGORIES}|||||all|null`;
 
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
@@ -195,9 +176,9 @@ export function ProductsFilters({
         setLocalHeight([]);
         setLocalProducer([]);
         setLocalImage('all');
-        setLocalPromo(false);
-        lastAutoAppliedRef.current = resetKey;
-        onApply({ active: 'all', category: null, country: [], pot: [], height: [], producer: [], image: 'all', promo: false });
+        setLocalPromo(null);
+        lastAppliedRef.current = resetKey;
+        onApply({ active: 'all', category: null, country: [], pot: [], height: [], producer: [], image: 'all', promo: null });
         closeFilters?.();
     };
 
@@ -231,14 +212,60 @@ export function ProductsFilters({
         new Set([...(heightOptions || []), ...localHeight].map((value) => String(value)))
     ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    const categoryChoices = categoryOptions.length > 0
-        ? categories.filter((category) => categoryOptions.includes(category.id))
-        : categories;
+    const categoryChoices = categories.filter((category) => categoryOptions.includes(category.id));
 
-    const singleCategory = categoryChoices.length === 1 ? categoryChoices[0] : null;
+
     const selectedCategory = localCategory !== ALL_CATEGORIES
         ? categories.find((category) => category.id === Number(localCategory))
         : null;
+
+    const countryFilters = (
+        <>{countryOptions.length >= 2 && (
+                        <div className="space-y-2">
+                            {!isColumn && (
+                                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {t('Country')}
+                                </span>
+                            )}
+                            <div id="product-country-filter" role="group" aria-label={t('Country')} className="flex flex-wrap gap-1.5">
+                                {countries.map((code) => {
+                                    const countryLabel = getCountryLabel(code);
+                                    const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string; preserveAspectRatio?: string }>>)[code];
+                                    const selected = localCountry.length === 0 || localCountry.some((value) => normalizeCountry(value) === code);
+
+                                    return (
+                                        <button
+                                            key={code}
+                                            type="button"
+                                            title={countryLabel}
+                                            aria-label={countryLabel}
+                                            aria-pressed={selected}
+                                            onClick={() => setLocalCountry((values) => {
+                                                const activeCountries = values.length === 0 ? countries : values;
+                                                const next = activeCountries.some((value) => normalizeCountry(value) === code)
+                                                    ? activeCountries.filter((value) => normalizeCountry(value) !== code)
+                                                    : [...activeCountries, code];
+                                                return countries.every((country) => next.some((value) => normalizeCountry(value) === country)) ? [] : next;
+                                            })}
+                                            className={cn(
+                                                'inline-flex aspect-video w-9 shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                                                selected
+                                                    ? 'border-brand-main/40 bg-brand-main/10 hover:bg-brand-main/20'
+                                                    : 'border-input bg-muted/40 hover:bg-muted',
+                                            )}
+                                        >
+                                            {Flag ? (
+                                                <Flag preserveAspectRatio="xMidYMid slice" title={countryLabel} className={cn('block h-full w-full object-cover transition-[filter,opacity]', !selected && 'grayscale opacity-40')} />
+                                            ) : (
+                                                <span className={cn('text-xs', !selected && 'text-muted-foreground opacity-40')}>{code}</span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}</>
+    );
 
     const summaryBadges = (
         <>
@@ -252,10 +279,10 @@ export function ProductsFilters({
                 </SummaryFilterBadge>
             )}
 
-            {localPromo && (
-                <SummaryFilterBadge title={t('PROMO')} onRemove={() => setLocalPromo(false)}>
+            {localPromo !== null && (
+                <SummaryFilterBadge title={t(localPromo ? 'With promo' : 'Without promo')} onRemove={() => setLocalPromo(null)}>
                     <Zap className="size-3.5" />
-                    <span>{t('PROMO')}</span>
+                    <span>{t(localPromo ? 'With promo' : 'Without promo')}</span>
                 </SummaryFilterBadge>
             )}
 
@@ -270,23 +297,6 @@ export function ProductsFilters({
                     <span>{selectedCategory.name}</span>
                 </SummaryFilterBadge>
             )}
-
-            {localCountry.map((code) => {
-                const normalizedCode = normalizeCountry(code) ?? code;
-                const countryLabel = getCountryLabel(normalizedCode);
-                const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[normalizedCode];
-
-                return (
-                    <SummaryFilterBadge
-                        key={`country-${normalizedCode}`}
-                        title={countryLabel}
-                        onRemove={() => setLocalCountry((values) => values.filter((value) => value !== code))}
-                    >
-                        {Flag ? <Flag title={countryLabel} className="w-4" /> : null}
-                        <span>{countryLabel}</span>
-                    </SummaryFilterBadge>
-                );
-            })}
 
             {localPot.map((value) => (
                 <SummaryFilterBadge key={`pot-${value}`} title={value} onRemove={() => setLocalPot((values) => values.filter((item) => item !== value))}>
@@ -304,7 +314,7 @@ export function ProductsFilters({
 
             {localProducer.map((value) => {
                 const producer = producerOptions.find((option) => String(option.id) === value);
-                const label = producer?.name || value;
+                const label = showProducerNames && producer?.name ? producer.name : `#${value}`;
                 return (
                     <SummaryFilterBadge key={`producer-${value}`} title={label} onRemove={() => setLocalProducer((values) => values.filter((item) => item !== value))}>
                         <Sprout className="size-3.5" />
@@ -344,38 +354,12 @@ export function ProductsFilters({
                                     variant="ghost"
                                     size="icon"
                                     className="size-7"
-                                    title={t('Apply auto')}
-                                    aria-label={t('Apply auto')}
-                                    aria-pressed={autoApply}
-                                    onClick={() => {
-                                        const next = !autoApply;
-                                        setAutoApply(next);
-                                        persistPagePreference('products', { autoApplyFilters: next });
-                                    }}
-                                >
-                                    <WandSparkles className={cn('size-4', autoApply && 'text-brand-main')} />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7"
                                     title={t('Reset')}
                                     aria-label={t('Reset')}
                                     onClick={reset}
                                     disabled={!hasFilters}
                                 >
                                     <RotateCcw className="size-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7"
-                                    title={t('Apply filters')}
-                                    aria-label={t('Apply filters')}
-                                    onClick={apply}
-                                    disabled={autoApply}
-                                >
-                                    <Check className="size-4" />
                                 </Button>
                             </div>
                         </div>
@@ -400,24 +384,9 @@ export function ProductsFilters({
                         </div>
 
                         <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-3">
-                            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-                                <Checkbox
-                                    checked={autoApply}
-                                    onCheckedChange={(checked) => {
-                                        setAutoApply(checked === true);
-                                        persistPagePreference('products', { autoApplyFilters: checked === true });
-                                    }}
-                                />
-                                <WandSparkles className="size-4" />
-                                <span>{t('Apply auto')}</span>
-                            </label>
                             <Button variant="ghost" size="sm" onClick={reset} disabled={!hasFilters}>
                                 <RotateCcw className="size-4" />
                                 {t('Reset')}
-                            </Button>
-                            <Button size="sm" onClick={apply} disabled={autoApply}>
-                                <Check className="size-4" />
-                                {t('Apply filters')}
                             </Button>
                         </div>
                     </>
@@ -426,76 +395,24 @@ export function ProductsFilters({
 
             <div className={cn('grid gap-6', !isColumn && 'md:grid-cols-2')}>
                 <div className={cn('space-y-2', !isColumn && 'md:border-r md:pr-6')}>
-                    {countries.length >= 2 && (
-                        <BadgeMultiSelect
-                            id="product-country-filter"
-                            label={isColumn ? undefined : t('Country')}
-                            placeholder={t('All countries')}
-                            options={countries.map((code) => {
-                                const countryLabel = getCountryLabel(code);
-                                const Flag = (Flags as Record<string, ComponentType<{ title?: string; className?: string }>>)[code];
-                                return {
-                                    value: code,
-                                    label: countryLabel,
-                                    icon: Flag ? <Flag title={countryLabel} className="w-4 shrink-0" /> : undefined,
-                                };
-                            })}
-                            value={localCountry}
-                            onChange={setLocalCountry}
-                            showAllOptionsWhenEmpty
-                        />
-                    )}
-
-                    {!singleCategory && (
+                    {isColumn && countryFilters}
+                    {categoryChoices.length >= 2 && (
+                        <div className="rounded-md border border-border/60 p-2">
                         <CategoryAccordion
                             categories={categories}
                             categoryOptions={categoryOptions}
                             value={localCategory}
                             onChange={setLocalCategory}
                             hideTitle={isColumn}
-                            listClassName={isColumn ? 'max-h-[45vh] overflow-y-auto pr-1' : undefined}
                             singleOpen={isColumn}
                         />
+                        </div>
                     )}
                 </div>
 
                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        {!isColumn && (
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Image')}</p>
-                        )}
-                        <div className="flex flex-wrap gap-x-4 gap-y-2">
-                            <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={localImage === 'with'}
-                                    onCheckedChange={(checked) => {
-                                        setLocalImage(checked ? 'with' : localImage === 'with' ? 'all' : localImage);
-                                    }}
-                                />
-                                <span>{t('With image')}</span>
-                            </label>
-                            <label className="flex cursor-pointer items-center gap-2 text-sm">
-                                <Checkbox
-                                    checked={localImage === 'without'}
-                                    onCheckedChange={(checked) => {
-                                        setLocalImage(checked ? 'without' : localImage === 'without' ? 'all' : localImage);
-                                    }}
-                                />
-                                <span>{t('Without image')}</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <Checkbox
-                            checked={localPromo}
-                            onCheckedChange={(checked) => setLocalPromo(checked === true)}
-                        />
-                        <Zap className="size-4" />
-                        <span>{t('PROMO')}</span>
-                    </label>
-
-                    {availablePotOptions.length >= 2 && (
+                    {!isColumn && countryFilters}
+                    {potOptions.length >= 2 && (
                         <BadgeMultiSelect
                             id="product-pot-filter"
                             label={isColumn ? undefined : t('Pot diameter')}
@@ -510,7 +427,7 @@ export function ProductsFilters({
                         />
                     )}
 
-                    {availableHeightOptions.length >= 2 && (
+                    {heightOptions.length >= 2 && (
                         <BadgeMultiSelect
                             id="product-height-filter"
                             label={isColumn ? undefined : t('Height')}
@@ -525,14 +442,13 @@ export function ProductsFilters({
                         />
                     )}
 
-                    {producerOptions.length >= 1 && (
+                    {producerOptions.length >= 2 && (
                         <BadgeMultiSelect
                             id="product-producer-filter"
                             label={isColumn ? undefined : t('Producer')}
                             placeholder={t('All producers')}
                             options={producerOptions.map((producer) => {
-                                const isPrivileged = auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
-                                const label = isPrivileged && producer.name ? producer.name : `#${producer.id}`;
+                                const label = showProducerNames && producer.name ? producer.name : `#${producer.id}`;
                                 return {
                                     value: String(producer.id),
                                     label,
@@ -544,6 +460,33 @@ export function ProductsFilters({
                         />
                     )}
 
+                <div className={cn('flex flex-col items-start gap-4', imageOptions.length < 2 && promoOptions.length < 2 && 'hidden')}>
+                    {imageOptions.length >= 2 && (
+                        <ThreeStateCheckbox
+                            label={t('Image')}
+                            checked={localImage === 'all' ? 'indeterminate' : localImage === 'with'}
+                            onCheckedChange={(checked) => setLocalImage(checked === 'indeterminate' ? 'all' : checked ? 'with' : 'without')}
+                            stateLabels={{
+                                checked: t('With image'),
+                                unchecked: t('Without image'),
+                                indeterminate: t('Any image'),
+                            }}
+                        />
+                    )}
+                    {promoOptions.length >= 2 && (
+                        <ThreeStateCheckbox
+                            label={t('PROMO')}
+                            checked={localPromo === null ? 'indeterminate' : localPromo}
+                            onCheckedChange={(checked) => setLocalPromo(checked === 'indeterminate' ? null : checked)}
+                            stateLabels={{
+                                checked: t('With promo'),
+                                unchecked: t('Without promo'),
+                                indeterminate: t('Any image'),
+                            }}
+                        />
+                    )}
+
+                </div>
                 </div>
             </div>
         </div>

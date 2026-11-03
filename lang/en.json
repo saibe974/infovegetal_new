@@ -1,4 +1,10 @@
 {
+    "Producer": "Producer",
+    "Producers": "Producers",
+    "All producers": "All producers",
+    "With promo": "With promo",
+    "Without promo": "Without promo",
+    "Any image": "Any",
     "No filters": "No filters",
     "Image": "Image",
     "With image": "With image",

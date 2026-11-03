@@ -63,6 +63,8 @@ class ProductController extends Controller
         $optionsBaseQuery = clone $baseQuery;
         $applySearch($optionsBaseQuery, $search);
 
+        $binaryOptions = ProductCatalogQuery::binaryFilterOptions($optionsBaseQuery, $filters, $applyFilters);
+
         $categoryOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['category']))
             ->whereNotNull('category_products_id')
@@ -244,6 +246,8 @@ class ProductController extends Controller
             'countryOptions' => $countryOptions,
             'potOptions' => $potOptions,
             'heightOptions' => $heightOptions,
+            'imageOptions' => $binaryOptions['image'],
+            'promoOptions' => $binaryOptions['promo'],
             'producerOptions' => $producerOptions,
             'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions(
                 tap(clone $baseQuery, fn ($q) => $applyFilters($q, $filters)),

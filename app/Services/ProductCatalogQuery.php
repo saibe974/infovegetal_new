@@ -78,7 +78,7 @@ class ProductCatalogQuery
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
-        $promo = $request->boolean('promo');
+        $promo = $request->has('promo') ? $request->boolean('promo') : null;
         $categoryBranchIds = $categoryId
             ? CategoryProducts::descendantsAndSelf($categoryId)->pluck('id')->map(fn ($id) => (int) $id)->all()
             : [];
@@ -178,15 +178,36 @@ class ProductCatalogQuery
             $q->imageAvailability($filters['image']);
         }
 
-        if (! in_array('promo', $skip, true) && $filters['promo']) {
-            $q->whereNotNull('price_promo')
-                ->where('price_promo', '>', 0)
-                ->where(function ($promoQuery) {
-                    $promoQuery
-                        ->whereNull('price_roll')
-                        ->orWhereColumn('price_promo', '<>', 'price_roll');
-                });
+        if (! in_array('promo', $skip, true) && $filters['promo'] !== null) {
+            $method = $filters['promo'] ? 'where' : 'whereNot';
+            $q->$method(function ($promoQuery) {
+                $promoQuery->whereNotNull('price_promo')
+                    ->where('price_promo', '>', 0)
+                    ->where(function ($promoQuery) {
+                        $promoQuery
+                            ->whereNull('price_roll')
+                            ->orWhereColumn('price_promo', '<>', 'price_roll');
+                    });
+            });
         }
+    }
+
+    /** Available states under the other filters, excluding each facet's own selection. */
+    public static function binaryFilterOptions(Builder $baseQuery, array $filters, callable $applyFilters): array
+    {
+        $options = [];
+        foreach (['image' => ['with', 'without'], 'promo' => [true, false]] as $key => $states) {
+            $options[$key] = [];
+            foreach ($states as $state) {
+                $query = clone $baseQuery;
+                $applyFilters($query, array_replace($filters, [$key => $state]));
+                if ($query->exists()) {
+                    $options[$key][] = $state;
+                }
+            }
+        }
+
+        return $options;
     }
 
     public function query(): Builder

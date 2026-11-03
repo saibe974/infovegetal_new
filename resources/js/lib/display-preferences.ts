@@ -44,7 +44,6 @@ export type PageDisplayPreference = {
     view: ViewMode;
     rightSidebarOpen: boolean;
     autoOpenCartOnAdd?: boolean;
-    autoApplyFilters?: boolean;
     filtersLayout?: ProductsFiltersLayout;
 };
 
@@ -92,7 +91,6 @@ const buildDefaultPages = (): Record<PreferencePage, PageDisplayPreference> => {
             ...(page === 'products'
                 ? {
                       autoOpenCartOnAdd: true,
-                      autoApplyFilters: true,
                       filtersLayout: 'docked' as ProductsFiltersLayout,
                   }
                 : {}),
@@ -160,10 +158,6 @@ export function normalizeDisplayPreferences(
                       autoOpenCartOnAdd:
                           typeof raw.autoOpenCartOnAdd === 'boolean'
                               ? raw.autoOpenCartOnAdd
-                              : true,
-                      autoApplyFilters:
-                          typeof raw.autoApplyFilters === 'boolean'
-                              ? raw.autoApplyFilters
                               : true,
                       filtersLayout:
                           raw.filtersLayout === 'popover'
@@ -234,10 +228,6 @@ function readLegacyDisplayPreferences(): DisplayPreferences {
         ) {
             preferences.pages.products.filtersLayout = views.productsFilters;
         }
-    }
-
-    if (localStorage.getItem('products.filters.auto-apply') === '0') {
-        preferences.pages.products.autoApplyFilters = false;
     }
 
     return preferences;
@@ -368,13 +358,6 @@ export function applyDisplayPreferences(
             views.productsFilters =
                 normalized.pages.products.filtersLayout ?? 'popover';
         else delete views.productsFilters;
-        localStorage.setItem(
-            'products.filters.auto-apply',
-            normalized.pages.products.enabled &&
-            normalized.pages.products.autoApplyFilters
-                ? '1'
-                : '0',
-        );
         localStorage.setItem('views', JSON.stringify(views));
     } catch {
         // A blocked localStorage must not prevent the application from loading.

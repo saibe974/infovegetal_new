@@ -33,6 +33,10 @@ export function hasAnyRole(user: User | null | undefined, roles: string[]): bool
     return user.roles.some(r => roles.includes(r.name));
 }
 
+export function canViewProducerNames(user: User | null | undefined): boolean {
+    return hasAnyRole(user, ['dev', 'admin', 'commercial']);
+}
+
 /**
  * Vérifie si l'utilisateur a tous les rôles spécifiés
  */

@@ -34,7 +34,7 @@ type FiltersState = {
     pot: string[];
     height: string[];
     image: ImageFilter;
-    promo: boolean;
+    promo: boolean | null;
 };
 
 type HomeFilterProps = {
@@ -59,7 +59,7 @@ const normalizeFilters = (raw?: HomeFilterProps): FiltersState => ({
     pot: normalizeMultiFilter(raw?.pot),
     height: normalizeMultiFilter(raw?.height),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
-    promo: raw?.promo === true,
+    promo: raw?.promo ?? null,
 });
 
 export function AppSidebarHeader({
@@ -75,6 +75,8 @@ export function AppSidebarHeader({
         countryOptions?: string[];
         potOptions?: string[];
         heightOptions?: string[];
+        imageOptions?: ('with' | 'without')[];
+        promoOptions?: boolean[];
         collection?: { meta?: { total?: number } };
     }>();
     const { auth } = page.props;
@@ -141,7 +143,7 @@ export function AppSidebarHeader({
                 value: filtersState.image,
             }
             : null,
-        filtersState.promo ? { name: 'promo', label: t('PROMO') } : null,
+        filtersState.promo !== null ? { name: 'promo', label: t(filtersState.promo ? 'With promo' : 'Without promo') } : null,
         filtersState.active === 'inactive' ? { name: 'active', label: filtersState.active } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
         filtersState.country.length > 0
@@ -193,8 +195,8 @@ export function AppSidebarHeader({
             params.image = nextFilters.image;
         }
 
-        if (nextFilters.promo) {
-            params.promo = 1;
+        if (nextFilters.promo !== null) {
+            params.promo = nextFilters.promo ? 1 : 0;
         }
 
         return params;
@@ -229,7 +231,7 @@ export function AppSidebarHeader({
         } else if (key === 'image') {
             nextFilters.image = 'all';
         } else if (key === 'promo') {
-            nextFilters.promo = false;
+            nextFilters.promo = null;
         }
 
         applyFiltersAndNavigate(nextFilters);
@@ -243,7 +245,7 @@ export function AppSidebarHeader({
             pot: [],
             height: [],
             image: 'all',
-            promo: false,
+            promo: null,
         };
 
         setSearch('');
@@ -353,6 +355,8 @@ export function AppSidebarHeader({
                                     countryOptions={countryOptions}
                                     potOptions={potOptions}
                                     heightOptions={heightOptions}
+                                    imageOptions={page.props.imageOptions ?? []}
+                                    promoOptions={page.props.promoOptions ?? []}
                                     active={filtersState.active}
                                     categoryId={filtersState.category}
                                     country={filtersState.country}

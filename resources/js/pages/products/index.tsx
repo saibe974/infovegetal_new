@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2Icon } from 'lucide-react';
 import SearchSelect, { type Option as SearchOption } from '@/components/app/search-select';
 import { DialogUpload } from '@/components/dialog-upload';
-import { getEffectiveUser, isAdmin, hasPermission } from '@/lib/roles';
+import { getEffectiveUser, isAdmin, hasPermission, canViewProducerNames } from '@/lib/roles';
 import ProductsTable from '@/components/products/products-table';
 import { ProductsCardsList } from '@/components/products/products-cards-list';
 import { ProductsSmallCardsList } from '@/components/products/products-small-cards-list';
@@ -40,7 +40,7 @@ type FiltersState = {
     height: string[];
     producer: string[];
     image: 'all' | 'with' | 'without';
-    promo: boolean;
+    promo: boolean | null;
 };
 
 type RawFilters = {
@@ -69,6 +69,8 @@ type Props = {
     countryOptions?: string[];
     potOptions?: string[];
     heightOptions?: string[];
+    imageOptions?: ('with' | 'without')[];
+    promoOptions?: boolean[];
     producerOptions?: { id: number; name: string }[];
 };
 
@@ -85,7 +87,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
     height: normalizeMultiFilter(raw?.height),
     producer: normalizeMultiFilter(raw?.producer),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
-    promo: raw?.promo === true,
+    promo: raw?.promo ?? null,
     cart: cartFilter?.cart,
 });
 
@@ -93,10 +95,11 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], producerOptions = [], exportOptions }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], imageOptions = [], promoOptions = [], producerOptions = [], exportOptions }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
+    const showProducerNames = canViewProducerNames(auth?.user);
     const effectiveUser = getEffectiveUser(auth);
     const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
     const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
@@ -182,8 +185,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 value: filtersState.image,
             }
             : null,
-        filtersState.promo
-            ? { name: 'promo', label: t('PROMO') }
+        filtersState.promo !== null
+            ? { name: 'promo', label: t(filtersState.promo ? 'With promo' : 'Without promo') }
             : null,
         filtersState.active === 'inactive' ? { name: 'active', label: t('Inactive') } : null,
         filtersState.category !== null ? { name: 'category', label: getCategoryName(filtersState.category) || '' } : null,
@@ -205,7 +208,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 name: 'producer',
                 label: filtersState.producer.map((id) => {
                     const producer = producerOptions.find((option) => String(option.id) === String(id));
-                    return producer?.name || `#${id}`;
+                    return showProducerNames && producer?.name ? producer.name : `#${id}`;
                 }).join(', '),
                 values: filtersState.producer,
             }
@@ -323,8 +326,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.image = nextFilters.image;
         }
 
-        if (nextFilters.promo) {
-            params.promo = 1;
+        if (nextFilters.promo !== null) {
+            params.promo = nextFilters.promo ? 1 : 0;
         }
 
         if (nextFilters.cart) {
@@ -366,7 +369,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         } else if (key === 'image') {
             nextFilters.image = 'all';
         } else if (key === 'promo') {
-            nextFilters.promo = false;
+            nextFilters.promo = null;
         } else if (key === 'cart') {
             nextFilters.cart = undefined;
             // Seulement effacer le filtre session, pas le panier lui-même
@@ -392,7 +395,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             height: [],
             producer: [],
             image: 'all',
-            promo: false,
+            promo: null,
             cart: undefined,
         };
 
@@ -506,6 +509,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         countryOptions,
         potOptions,
         heightOptions,
+        imageOptions,
+        promoOptions,
         producerOptions,
         active: filtersState.active,
         categoryId: filtersState.category,
