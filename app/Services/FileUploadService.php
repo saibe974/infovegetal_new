@@ -2,116 +2,39 @@
 
 namespace App\Services;
 
-use App\Models\File;
-use App\Models\User;
-use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class FileUploadService
 {
-    public function __construct(
-        private Filesystem $disk
-    ) {
-        $this->disk = Storage::disk('public');
-    }
-
     public function handleRegularUpload(Request $request): JsonResponse
     {
-        $uploadedFile = $request->file('file');
+        abort_unless(Auth::check(), 401);
+        $request->validate(['file' => ['required', 'file', 'max:'.intdiv(config('uploads.max_bytes'), 1024)]]);
+        $uploaded = $request->file('file');
+        $name = $uploaded->getClientOriginalName();
+        $policy = app(ImportUploadPolicy::class);
+        $mime = $policy->validateFile($uploaded->getRealPath(), $name, $uploaded->getSize());
+        $path = $uploaded->storeAs('imports/'.Auth::id(), Str::uuid().'.'.$policy->validateName($name), 'local');
+        abort_unless($path, 500);
 
-        if (! $uploadedFile instanceof UploadedFile) {
-            throw new \InvalidArgumentException('Invalid file upload');
-        }
+        return $this->record($name, $path, $uploaded->getSize(), $mime);
+    }
 
-        // Get original filename
-        $originalName = $uploadedFile->getClientOriginalName();
-
-        // Generate safe filename from original name
-        $fileName = $this->generateSafeFilename($originalName);
-
-        // Use Laravel's putFileAs for better file handling
-        $filePath = $this->disk->putFileAs('imports', $uploadedFile, $fileName);
-
-        // Save file info to database
-        $file = $this->createFileRecord($originalName, $filePath, $uploadedFile->getSize(), $uploadedFile->getMimeType() ?: null);
-
-        // Return success response with upload identifier
-        return $this->createSuccessResponse($file, [
-            'uploadId' => (string) $file->id,
+    public function record(string $name, string $path, int $size, string $mime): JsonResponse
+    {
+        abort_unless(Auth::check(), 401);
+        $file = Auth::user()->files()->create([
+            'file_name' => $name, 'file_path' => $path, 'file_size' => $size, 'disk' => 'local', 'mime' => $mime,
         ]);
-    }
+        Cache::put('import:'.$file->id, [
+            'status' => 'uploaded', 'path' => $path, 'disk' => 'local', 'owner_id' => Auth::id(),
+            'original_name' => $name, 'size' => $size,
+        ], now()->addHour());
 
-    private function generateSafeFilename(string $originalName): string
-    {
-        // Sanitize the filename
-        $name = pathinfo($originalName, PATHINFO_FILENAME);
-        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
-
-        // Remove unsafe characters and replace with underscores
-        $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $name);
-
-        // Ensure filename isn't too long (max 100 chars for the name part)
-        if (strlen($safeName) > 100) {
-            $safeName = substr($safeName, 0, 100);
-        }
-
-        // Combine name and extension
-        $fileName = $safeName.($extension ? '.'.$extension : '');
-
-        // Check if file already exists and add counter if needed
-        $counter = 1;
-
-        while ($this->disk->exists("imports/{$fileName}")) {
-            $fileName = $safeName.'_'.$counter.($extension ? '.'.$extension : '');
-            $counter++;
-        }
-
-        return $fileName;
-    }
-
-    private function createFileRecord(string $fileName, string $filePath, int $fileSize, ?string $mime): File
-    {
-        $user = Auth::user();
-
-        if (! $user instanceof User) {
-            throw new \RuntimeException('Unable to save file record without an authenticated user.');
-        }
-
-        $file = $user->files()->create([
-            'file_name' => $fileName,
-            'file_path' => $filePath,
-            'file_size' => $fileSize,
-            'disk' => 'public',
-            'mime' => $mime,
-        ]);
-
-        Cache::put(
-            "import:{$file->id}",
-            [
-                'status' => 'uploaded',
-                'path' => $file->file_path,
-                'disk' => $file->disk,
-                'original_name' => $file->file_name,
-                'size' => $file->file_size,
-            ],
-            now()->addHour(),
-        );
-
-        return $file;
-    }
-
-    private function createSuccessResponse(File $file, array $extra = []): JsonResponse
-    {
-        return response()->json(array_merge([
-            'id' => $file->id,
-            'file' => $file->file_name,
-            'path' => $file->file_path,
-            'size' => $file->file_size,
-        ], $extra));
+        return response()->json(['id' => $file->id, 'uploadId' => (string) $file->id, 'file' => $name, 'path' => $path, 'size' => $size]);
     }
 }

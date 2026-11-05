@@ -42,21 +42,21 @@ class OrderDocumentService
         $path = sprintf('user-meta/%d/commandes/%s/commande-%d-%s-%s.%s',
             $ownerId, $date->format('Y/m'), $cart->id, substr(hash('sha256', $key), 0, 16),
             hash('sha256', $contents), $extension);
-        if (! Storage::disk('public')->put($path, $contents)) {
+        if (! Storage::disk('local')->put($path, $contents)) {
             throw new \RuntimeException('Impossible de sauvegarder le document de commande.');
         }
         $file = File::query()->updateOrCreate($identity, [
             'file_name' => basename(str_replace('\\', '/', $filename)),
-            'file_path' => $path, 'file_size' => strlen($contents), 'disk' => 'public',
+            'file_path' => $path, 'file_size' => strlen($contents), 'disk' => 'local',
             'document_date' => $date->format('Y-m-d'), 'mime' => $mime,
         ]);
-        if ($existing && $existing->file_path !== $path && $existing->disk === 'public' && str_starts_with($existing->file_path, "user-meta/{$ownerId}/commandes/")) {
-            Storage::disk('public')->delete($existing->file_path);
+        if ($existing && $existing->file_path !== $path && $existing->disk === 'local' && str_starts_with($existing->file_path, "user-meta/{$ownerId}/commandes/")) {
+            Storage::disk('local')->delete($existing->file_path);
         }
 
         return [
             'file_id' => $file->id, 'owner_user_id' => $ownerId, 'filename' => $file->file_name,
-            'relative_path' => $path, 'disk' => 'public', 'mime' => $mime,
+            'relative_path' => $path, 'disk' => 'local', 'mime' => $mime,
             'download_url' => route('order-files.download', $file->id),
         ];
     }

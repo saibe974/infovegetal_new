@@ -5,6 +5,13 @@
 
     RewriteEngine On
 
+    # Private imports and order documents must only be served by Laravel.
+    RewriteRule ^storage/(imports|commandes)(/|$) - [F,L,NC]
+    RewriteRule ^storage/user-meta/[0-9]+/commandes(/|$) - [F,L,NC]
+    RewriteRule ^storage/user-meta/.*\.(pdf|csv|tsv|xlsx?|zip)$ - [F,L,NC]
+    RewriteRule ^storage/.*\.(php[0-9]*|phtml|phar|cgi|pl|py|shtml|asp|aspx|jsp)(\.|$) - [F,L,NC]
+    RewriteRule (^|/)(\.env[^/]*|\.git)(/|$) - [F,L,NC]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

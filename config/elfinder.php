@@ -14,11 +14,16 @@ return [
 
     'roots' => [
         [
-                'driver' => 'LocalFileSystem',
-                'path' => storage_path('app/public'),
-                'URL' => env('APP_URL') . '/storage',
-                'alias' => 'Fichiers',
-                'accessControl' => 'Barryvdh\Elfinder\Elfinder::checkAccess',
+            'driver' => 'LocalFileSystem',
+            'path' => storage_path('app/public'),
+            'URL' => env('APP_URL').'/storage',
+            'alias' => 'Fichiers',
+            'uploadDeny' => ['all'],
+            'uploadAllow' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+            'uploadOrder' => ['deny', 'allow'],
+            'uploadMaxSize' => '10M',
+            'disabled' => ['mkfile', 'edit', 'put', 'extract', 'archive', 'netmount'],
+            'accessControl' => 'Barryvdh\Elfinder\Elfinder::checkAccess',
         ],
     ],
 

@@ -81,6 +81,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Product import endpoints: admin ou permissions users.db_products.manage.*
     Route::prefix('admin/products/import')->name('products.admin.import.')->middleware([
         'role_or_permission_or_impersonator:admin|users.db_products.manage.all|users.db_products.manage.his',
+        \App\Http\Middleware\EnsureImportOwner::class,
     ])->group(function () {
         Route::post('/process', [ProductController::class, 'importProcess'])->name('process');
         Route::post('/process-chunk', [ProductController::class, 'importProcessChunk'])->name('process_chunk');

@@ -14,7 +14,7 @@ class OrderFileController extends Controller
     {
         $filters = $request->validate(['year' => 'nullable|integer|between:1900,9999', 'month' => 'nullable|integer|between:1,12']);
         $query = $request->user()->files()
-            ->where('disk', 'public')
+            ->whereIn('disk', ['local', 'public'])
             ->where('file_path', 'like', 'user-meta/'.$request->user()->id.'/%');
         $years = (clone $query)->select('document_date')->distinct()->pluck('document_date')
             ->filter()
@@ -68,14 +68,14 @@ class OrderFileController extends Controller
     {
         $owner ??= $request->user();
         $file = $owner->files()->findOrFail($id);
-        abort_unless($file->disk === 'public'
+        abort_unless(in_array($file->disk, ['local', 'public'], true)
             && str_starts_with($file->file_path, 'user-meta/'.$owner->id.'/')
             && ! str_contains($file->file_path, '..')
             && ! str_contains($file->file_path, '\\'), 404);
-        abort_unless(Storage::disk('public')->exists($file->file_path), 404);
+        abort_unless(Storage::disk($file->disk)->exists($file->file_path), 404);
         abort_if($inline && $file->mime !== 'application/pdf', 404);
 
-        return Storage::disk('public')->response($file->file_path, $file->file_name, [
+        return Storage::disk($file->disk)->response($file->file_path, $file->file_name, [
             'Content-Type' => $file->mime,
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',

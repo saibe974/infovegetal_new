@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\Api\RecentLoginsWidgetController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\RolePermissionManagementController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -41,11 +41,11 @@ Route::middleware(['role_or_impersonator:admin'])->group(function () {
     Route::delete('admin/users/roles-permissions/permissions/{permission}', [RolePermissionManagementController::class, 'destroyPermission'])->whereNumber('permission')->name('users.roles_permissions.permissions.destroy');
 
     // CSV import/export endpoints for users
-    Route::post('admin/users/import/process', [UserManagementController::class, 'process'])->name('users.import.process');
-    Route::post('admin/users/import/process-chunk', [UserManagementController::class, 'processChunk'])->name('users.import.process_chunk');
-    Route::post('admin/users/import/cancel', [UserManagementController::class, 'cancel'])->name('users.import.cancel');
-    Route::get('admin/users/import/progress/{id}', [UserManagementController::class, 'progress'])->name('users.import.progress');
-    Route::get('admin/users/import/report/{id}', [UserManagementController::class, 'report'])->name('users.import.report');
+    Route::post('admin/users/import/process', [UserManagementController::class, 'process'])->name('users.import.process')->middleware(\App\Http\Middleware\EnsureImportOwner::class);
+    Route::post('admin/users/import/process-chunk', [UserManagementController::class, 'processChunk'])->name('users.import.process_chunk')->middleware(\App\Http\Middleware\EnsureImportOwner::class);
+    Route::post('admin/users/import/cancel', [UserManagementController::class, 'cancel'])->name('users.import.cancel')->middleware(\App\Http\Middleware\EnsureImportOwner::class);
+    Route::get('admin/users/import/progress/{id}', [UserManagementController::class, 'progress'])->name('users.import.progress')->middleware(\App\Http\Middleware\EnsureImportOwner::class);
+    Route::get('admin/users/import/report/{id}', [UserManagementController::class, 'report'])->name('users.import.report')->middleware(\App\Http\Middleware\EnsureImportOwner::class);
 });
 
 // Impersonation

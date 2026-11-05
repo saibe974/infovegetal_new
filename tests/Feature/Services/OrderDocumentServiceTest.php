@@ -11,8 +11,8 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
-    Storage::fake('local');
     Storage::fake('public');
+    Storage::fake('local');
     $this->client = User::factory()->withoutTwoFactor()->create();
     $this->cart = Cart::create(['user_id' => $this->client->id, 'status' => 'processing']);
     $this->documents = app(OrderDocumentService::class);
@@ -25,9 +25,9 @@ it('keeps one record and the original period when a document is regenerated', fu
     expect($second['file_id'])->toBe($first['file_id'])
         ->and($second['relative_path'])->toStartWith('user-meta/'.$this->client->id.'/commandes/2025/12/')
         ->and(File::count())->toBe(1);
-    Storage::disk('public')->assertMissing($first['relative_path']);
-    Storage::disk('public')->assertExists($second['relative_path']);
-    expect(Storage::disk('local')->allFiles())->toBe([]);
+    Storage::disk('local')->assertMissing($first['relative_path']);
+    Storage::disk('local')->assertExists($second['relative_path']);
+    expect(Storage::disk('public')->allFiles())->toBe([]);
 });
 
 it('prevents collisions between orders using the same display filename', function () {
@@ -35,7 +35,7 @@ it('prevents collisions between orders using the same display filename', functio
     $first = $this->documents->store($this->cart, $this->client->id, 'order-pdf', 'commande.pdf', 'first', 'application/pdf');
     $second = $this->documents->store($otherCart, $this->client->id, 'order-pdf', 'commande.pdf', 'second', 'application/pdf');
     expect($second['relative_path'])->not->toBe($first['relative_path']);
-    Storage::disk('public')->assertExists([$first['relative_path'], $second['relative_path']]);
+    Storage::disk('local')->assertExists([$first['relative_path'], $second['relative_path']]);
 });
 
 it('serves only the authenticated owner even when the visitor is an administrator', function () {
@@ -63,7 +63,7 @@ it('lists personal files with year and month filters', function () {
 
 it('rejects missing files and forged paths even on a record owned by the caller', function () {
     $copy = $this->documents->store($this->cart, $this->client->id, 'order-pdf', 'mine.pdf', 'mine', 'application/pdf');
-    Storage::disk('public')->delete($copy['relative_path']);
+    Storage::disk('local')->delete($copy['relative_path']);
     $this->actingAs($this->client)->get($copy['download_url'])->assertNotFound();
     File::find($copy['file_id'])->update(['file_path' => 'user-meta/'.$this->client->id.'/commandes/../secret.pdf']);
     $this->get($copy['download_url'])->assertNotFound();
@@ -89,14 +89,14 @@ it('creates one personal PDF per actor with only their databases and totals', fu
     ];
     $copies = $this->documents->storePdfs($this->cart, $this->client, $payload, 'commande.pdf', fn ($scoped) => json_encode(['bases' => $scoped['items']->map(fn ($item) => $item['product']->db_products_id)->all(), 'total' => $scoped['total']]));
     expect($copies)->toHaveCount(4)->and(File::count())->toBe(4);
-    expect(json_decode(Storage::disk('public')->get($copies[$billing->id]['relative_path']), true))->toBe(['bases' => [1], 'total' => 105]);
-    expect(json_decode(Storage::disk('public')->get($copies[$otherBilling->id]['relative_path']), true))->toBe(['bases' => [2], 'total' => 220]);
-    expect(json_decode(Storage::disk('public')->get($copies[$this->client->id]['relative_path']), true))->toBe(['bases' => [1, 2], 'total' => 325]);
+    expect(json_decode(Storage::disk('local')->get($copies[$billing->id]['relative_path']), true))->toBe(['bases' => [1], 'total' => 105]);
+    expect(json_decode(Storage::disk('local')->get($copies[$otherBilling->id]['relative_path']), true))->toBe(['bases' => [2], 'total' => 220]);
+    expect(json_decode(Storage::disk('local')->get($copies[$this->client->id]['relative_path']), true))->toBe(['bases' => [1, 2], 'total' => 325]);
     expect($copies[$billing->id]['relative_path'])->not->toBe($copies[$seller->id]['relative_path']);
 });
 
 it('does not publish a file record if writing fails', function () {
-    Storage::shouldReceive('disk')->with('public')->andReturn($disk = Mockery::mock());
+    Storage::shouldReceive('disk')->with('local')->andReturn($disk = Mockery::mock());
     $disk->shouldReceive('put')->once()->andReturn(false);
     expect(fn () => $this->documents->store($this->cart, $this->client->id, 'order-pdf', 'test.pdf', 'test', 'application/pdf'))->toThrow(RuntimeException::class);
     expect(File::count())->toBe(0);
