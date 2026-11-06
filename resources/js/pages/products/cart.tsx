@@ -2,6 +2,7 @@ import { ButtonsActions } from '@/components/buttons-actions';
 import {
     getCarrierOverridesStorageKey,
     readCarrierOverrides,
+    subscribeToCarrierOverrides,
     writeCarrierOverrides,
     type CarrierOverrides,
 } from '@/components/cart/cart-carrier-storage';
@@ -22,6 +23,7 @@ import {
     buildCartTransportContext,
     calculateCartShipping,
     getCarrierOptions,
+    refreshCartTransport,
 } from '@/components/cart/cart-shipping';
 import { CartContext } from '@/components/cart/cart.context';
 import { getProductCartImage } from '@/components/products/product-cart-image';
@@ -254,9 +256,19 @@ const CarrierAwareDatePicker = ({
         const carrierDate = getCarrierMinimumDeliveryDate(carrier);
         return carrierDate > latestDate ? carrierDate : latestDate;
     }, '');
+    const carrierSelectionKey = groupedItems
+        .map(
+            (group) =>
+                `${group.id}:${carrierOverrides[group.id]?.carrierId ?? group.carrierOptions?.[0]?.carrierId ?? ''}`,
+        )
+        .join('|');
+    const previousCarrierSelection = useRef(carrierSelectionKey);
 
     useEffect(() => {
         if (!minimumDate) return;
+        const carrierChanged =
+            previousCarrierSelection.current !== carrierSelectionKey;
+        previousCarrierSelection.current = carrierSelectionKey;
 
         const deliveryWeekday = deliveryDate
             ? getDayOfWeek(deliveryDate)
@@ -265,10 +277,21 @@ const CarrierAwareDatePicker = ({
             deliveryWeekday !== null &&
             allowedDays.size > 0 &&
             !allowedDays.has(deliveryWeekday);
-        if (!deliveryDate || deliveryDate < minimumDate || invalidWeekday) {
+        if (
+            carrierChanged ||
+            !deliveryDate ||
+            deliveryDate < minimumDate ||
+            invalidWeekday
+        ) {
             setDeliveryDate(minimumDate);
         }
-    }, [allowedDays, deliveryDate, minimumDate, setDeliveryDate]);
+    }, [
+        allowedDays,
+        deliveryDate,
+        minimumDate,
+        setDeliveryDate,
+        carrierSelectionKey,
+    ]);
 
     return (
         <div className="space-y-2">
@@ -299,6 +322,7 @@ export default withAppLayout<Props>(
             cart_db_countries: cartDbCountries = {},
             cart_carriers: cartCarriers = {},
             cart_transport_options: cartTransportOptions = {},
+            cart_transport_attributes: cartTransportAttributes = {},
             cart_transport_selection: storedTransportSelection = {},
             cart_discounts: storedDiscounts = {},
             cart_coupon_code: storedCouponCode = '',
@@ -330,6 +354,10 @@ export default withAppLayout<Props>(
                         taxgo: number;
                         tariffs: Record<string, number | string | null>;
                     }
+                >;
+                cart_transport_attributes?: Record<
+                    number,
+                    Record<string, unknown>
                 >;
                 cart_transport_selection?: Record<
                     string,
@@ -451,6 +479,20 @@ export default withAppLayout<Props>(
                 return localOverrides ?? getStoredTransportSelection();
             });
         const carrierStorageKeyRef = useRef(carrierOverridesStorageKey);
+        useEffect(
+            () =>
+                subscribeToCarrierOverrides(
+                    carrierOverridesStorageKey,
+                    (next) => {
+                        setCarrierOverrides((previous) =>
+                            JSON.stringify(previous) === JSON.stringify(next)
+                                ? previous
+                                : next,
+                        );
+                    },
+                ),
+            [carrierOverridesStorageKey],
+        );
 
         useEffect(() => {
             if (typeof window === 'undefined') {
@@ -554,13 +596,17 @@ export default withAppLayout<Props>(
 
         const itemsPricing = useMemo(
             () =>
-                items.map((item) => ({
+                refreshCartTransport(
+                    items,
+                    cartTransportAttributes,
+                    cartTransportOptions,
+                ).map((item) => ({
                     product: item.product,
                     quantity: item.quantity,
                     comment: item.comment,
                     pricing: getCartPricing(item.product, item.quantity),
                 })),
-            [items],
+            [items, cartTransportAttributes, cartTransportOptions],
         );
 
         const getGroupKey = (product: {
@@ -891,6 +937,7 @@ export default withAppLayout<Props>(
                         transport: cartTransportOptions[transportKey],
                     },
                 }));
+                setDeliveryDate('');
             },
             [cartTransportOptions, t],
         );
@@ -2033,9 +2080,7 @@ export default withAppLayout<Props>(
                                                 </span>
                                             </div>
                                             <div className="flex flex-col text-sm font-semibold">
-                                                <span>
-                                                    {t('Sales rep')} :{' '}
-                                                </span>
+                                                <span>{t('Sales rep')} : </span>
                                                 <span className="text-right">
                                                     {!group.commercial ? (
                                                         '-'

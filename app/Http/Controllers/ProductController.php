@@ -133,19 +133,14 @@ class ProductController extends Controller
         $dbUserTransportByDbId = [];
 
         if ($user) {
-            $userDbProducts = $user->dbProducts()->get();
-            foreach ($userDbProducts as $dbProduct) {
-                $pivotAttributes = $dbProduct->pivot?->attributes;
-                if (! $pivotAttributes) {
-                    continue;
-                }
-
-                $decoded = is_string($pivotAttributes)
-                    ? json_decode($pivotAttributes, true)
-                    : $pivotAttributes;
-
-                if (is_array($decoded)) {
-                    $dbUserAttributesByDbId[(int) $dbProduct->id] = $decoded;
+            $dbIds = $user->dbProducts()->pluck('db_products.id')
+                ->merge($products->getCollection()->pluck('db_products_id'))
+                ->filter()->unique();
+            $priceCalculator = app(\App\Services\PriceCalculatorService::class);
+            foreach ($dbIds as $dbId) {
+                $attrs = $priceCalculator->resolveUserAttributes($user, (int) $dbId);
+                if (is_array($attrs)) {
+                    $dbUserAttributesByDbId[(int) $dbId] = $attrs;
                 }
             }
 
@@ -222,6 +217,9 @@ class ProductController extends Controller
         $dbProducts = \App\Models\DbProducts::select(['id', 'name', 'description', 'country'])->orderBy('name')->get();
 
         return Inertia::render('products/index', [
+            'cart_transport_attributes' => $dbUserAttributesByDbId,
+            'cart_transport_options' => app(\App\Services\TransportOptionsResolver::class)->resolve($dbUserAttributesByDbId),
+            'cart_transport_db_names' => $dbProducts->pluck('name', 'id'),
             'q' => $search,
             'exportOptions' => ProductExportService::options(),
             'collection' => Inertia::scroll(fn () => ProductResource::collection($products)),

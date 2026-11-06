@@ -8,8 +8,8 @@ use App\Models\CarrierZone;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -191,4 +191,25 @@ it('returns no transport context when no choice is provided', function (): void 
     expect($payload['component'] ?? null)->toBe('products/index')
         ->and($collection)->toHaveCount(1)
         ->and($collection[0]['db_user_transport'] ?? null)->toBeNull();
+});
+it('loads current commercial transport conditions instead of stale catalogue pivot attributes', function (): void {
+    $user = User::factory()->create();
+    $billing = User::factory()->create();
+    $db = \App\Models\DbProducts::create(['name' => 'Current supplier']);
+    $carrier = Carrier::create(['name' => 'Current carrier', 'taxgo' => 10]);
+    $carrier->dbProducts()->attach($db->id);
+    $zone = CarrierZone::create(['carrier_id' => $carrier->id, 'name' => 'Current zone', 'tariffs' => ['mini' => 200, '2' => 100]]);
+    $product = createProductWithTransportChoice('Current transport product', $user, $db->id, ['fact' => $billing->id, 't' => null]);
+    $choices = json_encode([['carrier_id' => $carrier->id, 'zone_id' => $zone->id]]);
+    \App\Models\DbProductBillingUser::create(['db_product_id' => $db->id, 'billing_user_id' => $billing->id, 'active' => true, 'defaults' => ['t' => $choices, 'p' => 'price_depart']]);
+    \App\Models\ClientSalesCondition::create(['client_user_id' => $user->id, 'db_product_id' => $db->id, 'billing_user_id' => $billing->id, 'seller_user_id' => null, 'active' => true, 'conditions_override' => []]);
+    $payload = productControllerPayload($user);
+    $loaded = collect($payload['props']['collection']['data'])->firstWhere('id', $product->id);
+    expect($loaded['db_user_attributes']['t'])->toBe($choices)
+        ->and($loaded['db_user_transport']['tariffs']['mini'])->toBe(200)
+        ->and($loaded['db_user_transport']['carrier_id'])->toBe($carrier->id);
+    $this->actingAs($user)->get(route('cart.checkout', absolute: false))
+        ->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+        ->where("cart_transport_attributes.{$db->id}.t", $choices)
+        ->where("cart_transport_options.{$carrier->id}:{$zone->id}.tariffs.mini", 200));
 });

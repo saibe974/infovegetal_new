@@ -6,7 +6,6 @@ use App\Models\DbProductBillingUser;
 use App\Models\DbProductSellerUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\DB;
 
 class DbProductsResource extends JsonResource
 {
@@ -67,10 +66,14 @@ class DbProductsResource extends JsonResource
                         return null;
                     }
 
-                    $sellers = $billingUser->relationLoaded('sellers')
-                        ? $billingUser->sellers
-                            ->filter(fn ($seller) => (bool) ($seller->pivot?->active ?? true))
-                            ->map(function ($seller) use ($sellerManageById, $billingUser, $sellerRuleByKey) {
+                    $sellers = $this->relationLoaded('sellerRules')
+                        ? $this->sellerRules
+                            ->filter(fn ($rule) => (bool) $rule->active && (int) $rule->billing_user_id === (int) $billingUser->id)
+                            ->map(function ($rule) use ($sellerManageById, $billingUser, $sellerRuleByKey) {
+                                $seller = $rule->sellerUser;
+                                if (! $seller) {
+                                    return null;
+                                }
 
                                 $sellerDefaultsKey = sprintf('%d:%d', (int) ($billingUser->id ?? 0), (int) $seller->id);
                                 $sellerRule = $sellerRuleByKey[$sellerDefaultsKey] ?? [
@@ -95,6 +98,7 @@ class DbProductsResource extends JsonResource
                                     'can_manage' => (bool) ($sellerRule['can_manage'] ?? $sellerManageById[(int) $seller->id] ?? false),
                                 ];
                             })
+                            ->filter()
                             ->values()
                             ->all()
                         : [];
@@ -189,13 +193,7 @@ class DbProductsResource extends JsonResource
             return true;
         }
 
-        return DB::table('db_product_billing_user as dbu')
-            ->join('billing_user_seller_user as bs', 'bs.billing_user_id', '=', 'dbu.billing_user_id')
-            ->where('dbu.db_product_id', (int) $this->id)
-            ->where('dbu.active', true)
-            ->where('bs.seller_user_id', $actorId)
-            ->where('bs.active', true)
-            ->exists();
+        return false;
     }
 
     private function normalizeBillingDefaults(mixed $defaults): array

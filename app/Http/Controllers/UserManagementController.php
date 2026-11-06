@@ -1070,7 +1070,7 @@ class UserManagementController extends Controller
             'attributes' => ['nullable', 'array'],
             'merge' => ['nullable', 'boolean'],
             'sales_conditions' => ['nullable', 'array'],
-            'sales_conditions.*.db_product_id' => ['required', 'integer', 'exists:db_products,id'],
+            'sales_conditions.*.db_product_id' => ['required', 'integer', 'distinct', 'exists:db_products,id'],
             'sales_conditions.*.billing_user_id' => ['required', 'integer', 'exists:users,id'],
             'sales_conditions.*.seller_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'sales_conditions.*.conditions_override' => ['nullable', 'array'],
@@ -1079,6 +1079,33 @@ class UserManagementController extends Controller
         $dbIds = array_map('intval', (array) $request->input('db_ids', []));
         $attributes = $request->input('attributes', []);
         $merge = $request->boolean('merge');
+
+        foreach ((array) $request->input('sales_conditions', []) as $index => $condition) {
+            $dbId = (int) $condition['db_product_id'];
+            $billingId = (int) $condition['billing_user_id'];
+            $billingExists = \App\Models\DbProductBillingUser::query()
+                ->where('db_product_id', $dbId)
+                ->where('billing_user_id', $billingId)
+                ->where('active', true)
+                ->exists();
+
+            if (! in_array($dbId, $dbIds, true) || ! $billingExists) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "sales_conditions.$index.billing_user_id" => 'Le facturant doit être associé à la base sélectionnée.',
+                ]);
+            }
+
+            if (isset($condition['seller_user_id']) && ! \App\Models\DbProductSellerUser::query()
+                ->where('db_product_id', $dbId)
+                ->where('billing_user_id', $billingId)
+                ->where('seller_user_id', (int) $condition['seller_user_id'])
+                ->where('active', true)
+                ->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "sales_conditions.$index.seller_user_id" => 'Le commercial doit être associé à ce facturant dans cette base.',
+                ]);
+            }
+        }
 
         $allCurrent = $user->dbProducts()
             ->get()
@@ -1161,6 +1188,19 @@ class UserManagementController extends Controller
             if (! isset($syncData[$dbId]['can_manage'])) {
                 $syncData[$dbId]['can_manage'] = false;
             }
+        }
+
+        // Keep legacy consumers in sync, including an explicit absence of a seller.
+        foreach ((array) $request->input('sales_conditions', []) as $condition) {
+            $dbId = (int) $condition['db_product_id'];
+            if (! isset($syncData[$dbId])) {
+                continue;
+            }
+            $attrs = $this->decodeJsonPivotAttributes($syncData[$dbId]['attributes'] ?? null);
+            $attrs['fact'] = (int) $condition['billing_user_id'];
+            $attrs['com'] = isset($condition['seller_user_id']) ? (int) $condition['seller_user_id'] : null;
+            $syncData[$dbId]['attributes'] = json_encode($this->normalizeSalesConditions($attrs));
+            $next[$dbId] = $this->normalizeSalesConditions($attrs);
         }
 
         $user->dbProducts()->sync($syncData);
@@ -1295,14 +1335,10 @@ class UserManagementController extends Controller
                     ->where('active', true)
                     ->with([
                         'billingUser' => fn ($billingQuery) => $billingQuery
-                            ->select('users.id', 'users.name', 'users.email')
-                            ->with([
-                                'sellers' => fn ($sellersQuery) => $sellersQuery
-                                    ->select('users.id', 'users.name', 'users.email')
-                                    ->wherePivot('active', true),
-                            ]),
+                            ->select('users.id', 'users.name', 'users.email'),
                     ]),
                 'sellerRules' => fn ($query) => $query
+                    ->with('sellerUser:id,name,email')
                     ->where('active', true)
                     ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
             ])

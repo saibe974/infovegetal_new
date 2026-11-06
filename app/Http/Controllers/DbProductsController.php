@@ -158,21 +158,17 @@ class DbProductsController extends Controller
                 ->where('active', true)
                 ->with([
                     'billingUser' => fn ($billingUserQuery) => $billingUserQuery
-                        ->select('users.id', 'users.name', 'users.email')
-                        ->with([
-                            'sellers' => fn ($sellersQuery) => $sellersQuery
-                                ->select('users.id', 'users.name', 'users.email')
-                                ->wherePivot('active', true),
-                        ]),
+                        ->select('users.id', 'users.name', 'users.email'),
                 ]),
             'sellerRules' => fn ($query) => $query
+                ->with('sellerUser:id,name,email')
                 ->where('active', true)
                 ->select('id', 'db_product_id', 'seller_user_id', 'billing_user_id', 'conditions', 'use_billing_profile', 'billing_profile_id', 'seller_defaults', 'can_manage', 'active'),
         ]);
 
         if (! $permissions['can_manage_all'] && ! $permissions['is_db_manager']) {
             $filteredRules = $db_product->billingRules
-                ->filter(function (DbProductBillingUser $rule) use ($user) {
+                ->filter(function (DbProductBillingUser $rule) use ($user, $db_product) {
                     $billingUser = $rule->relationLoaded('billingUser') ? $rule->billingUser : null;
 
                     if (! $billingUser) {
@@ -183,11 +179,8 @@ class DbProductsController extends Controller
                         return true;
                     }
 
-                    if (! $billingUser->relationLoaded('sellers')) {
-                        return false;
-                    }
-
-                    return $billingUser->sellers->contains(fn (User $seller) => (int) $seller->id === (int) $user->id);
+                    return $db_product->sellerRules->contains(fn (DbProductSellerUser $sellerRule) => (int) $sellerRule->billing_user_id === (int) $billingUser->id
+                        && (int) $sellerRule->seller_user_id === (int) $user->id);
                 })
                 ->values();
 
@@ -710,12 +703,7 @@ class DbProductsController extends Controller
             }
 
             if (! empty($sellerIds)) {
-                $activeRows = [];
                 foreach ($sellerIds as $sellerId) {
-                    $activeRows[$sellerId] = [
-                        'active' => true,
-                    ];
-
                     $sellerRule = DbProductSellerUser::query()->firstOrNew([
                         'db_product_id' => (int) $dbProduct->id,
                         'seller_user_id' => (int) $sellerId,
@@ -764,27 +752,12 @@ class DbProductsController extends Controller
                     ]);
                 }
 
-                $billingUser->sellers()->syncWithoutDetaching($activeRows);
-
-                $billingUser->sellers()
-                    ->whereNotIn('users.id', $sellerIds)
-                    ->each(function (User $seller) use ($billingUserId): void {
-                        DB::table('billing_user_seller_user')
-                            ->where('billing_user_id', (int) $billingUserId)
-                            ->where('seller_user_id', (int) $seller->id)
-                            ->update(['active' => false, 'updated_at' => now()]);
-                    });
-
                 DbProductSellerUser::query()
                     ->where('db_product_id', (int) $dbProduct->id)
                     ->where('billing_user_id', (int) $billingUserId)
                     ->whereNotIn('seller_user_id', $sellerIds)
                     ->update(['active' => false, 'updated_at' => now()]);
             } else {
-                DB::table('billing_user_seller_user')
-                    ->where('billing_user_id', $billingUserId)
-                    ->update(['active' => false, 'updated_at' => now()]);
-
                 DbProductSellerUser::query()
                     ->where('db_product_id', (int) $dbProduct->id)
                     ->where('billing_user_id', (int) $billingUserId)
@@ -875,21 +848,11 @@ class DbProductsController extends Controller
             ->where('active', true)
             ->exists();
 
-        $isSeller = DB::table('db_product_billing_user as dbu')
-            ->join('billing_user_seller_user as bs', 'bs.billing_user_id', '=', 'dbu.billing_user_id')
-            ->where('dbu.db_product_id', (int) $dbProduct->id)
-            ->where('dbu.active', true)
-            ->where('bs.seller_user_id', (int) $user->id)
-            ->where('bs.active', true)
+        $isSeller = DbProductSellerUser::query()
+            ->where('db_product_id', (int) $dbProduct->id)
+            ->where('seller_user_id', (int) $user->id)
+            ->where('active', true)
             ->exists();
-
-        if (! $isSeller) {
-            $isSeller = DbProductSellerUser::query()
-                ->where('db_product_id', (int) $dbProduct->id)
-                ->where('seller_user_id', (int) $user->id)
-                ->where('active', true)
-                ->exists();
-        }
 
         $canManageSellersByPermission = $this->hasPermissionSafe($user, 'db_products.billing.manage_sellers');
         $canDelegateByPermission = $this->hasPermissionSafe($user, 'db_products.billing.delegate_manage');
@@ -922,7 +885,8 @@ class DbProductsController extends Controller
                 $q->where('billing_user_id', (int) $actor->id)
                     ->orWhereExists(function ($sub) use ($actor) {
                         $sub->selectRaw('1')
-                            ->from('billing_user_seller_user as bs')
+                            ->from('db_product_seller_user as bs')
+                            ->whereColumn('bs.db_product_id', 'db_product_billing_user.db_product_id')
                             ->whereColumn('bs.billing_user_id', 'db_product_billing_user.billing_user_id')
                             ->where('bs.seller_user_id', (int) $actor->id)
                             ->where('bs.active', true);

@@ -108,10 +108,10 @@ class PriceCalculatorService
             ->latest('id')
             ->first(['billing_user_id', 'seller_user_id', 'conditions_override']);
 
-        $billingUserId = isset($legacyAttributes['fact']) ? (int) $legacyAttributes['fact'] : (int) ($clientRule?->billing_user_id ?? 0);
-        $sellerUserId = isset($legacyAttributes['com'])
-            ? (int) $legacyAttributes['com']
-            : ($clientRule?->seller_user_id !== null ? (int) $clientRule->seller_user_id : null);
+        $billingUserId = $clientRule ? (int) $clientRule->billing_user_id : (int) ($legacyAttributes['fact'] ?? 0);
+        $sellerUserId = $clientRule
+            ? ($clientRule->seller_user_id !== null ? (int) $clientRule->seller_user_id : null)
+            : (isset($legacyAttributes['com']) ? (int) $legacyAttributes['com'] : null);
 
         if ($billingUserId <= 0) {
             return null;

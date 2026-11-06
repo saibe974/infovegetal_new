@@ -29,7 +29,7 @@ import {
     type User,
     type dbProduct,
 } from '@/types';
-import { Form, Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { TrashIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -245,6 +245,8 @@ export default function UserDbPage() {
     );
 
     const [search, setSearch] = useState('');
+    const [saveErrors, setSaveErrors] = useState<string[]>([]);
+    const [saving, setSaving] = useState(false);
     const [deliveryRaw, setDeliveryRaw] = useState('');
     const [lmRaw, setLmRaw] = useState('');
     const [tvatRaw, setTvatRaw] = useState('');
@@ -259,7 +261,7 @@ export default function UserDbPage() {
                     : null,
                 seller_user_id:
                     row.seller_user_id !== null &&
-                        row.seller_user_id !== undefined
+                    row.seller_user_id !== undefined
                         ? Number(row.seller_user_id)
                         : null,
                 conditions_override: normalizeConditions(
@@ -279,12 +281,6 @@ export default function UserDbPage() {
     });
 
     const [activeIndex, setActiveIndex] = useState<number>(0);
-
-    useEffect(() => {
-        setDeliveryRaw('');
-        setLmRaw('');
-        setTvatRaw('');
-    }, [activeIndex]);
 
     const dbOptions = useMemo(
         () =>
@@ -429,8 +425,8 @@ export default function UserDbPage() {
 
         const profileId = activeSellerData.use_billing_profile
             ? (activeSellerData.billing_profile_id ??
-                activeBillingDefaults.default_profile_id ??
-                null)
+              activeBillingDefaults.default_profile_id ??
+              null)
             : null;
 
         if (!profileId) {
@@ -505,16 +501,16 @@ export default function UserDbPage() {
 
         const billingToSellerBase = activeSellerData.use_billing_profile
             ? normalizeConditions(
-                activeBillingDefaults.profiles.find(
-                    (p) =>
-                        p.id ===
-                        String(
-                            activeSellerData.billing_profile_id ??
-                            activeBillingDefaults.default_profile_id ??
-                            '',
-                        ),
-                )?.conditions ?? billingBase,
-            )
+                  activeBillingDefaults.profiles.find(
+                      (p) =>
+                          p.id ===
+                          String(
+                              activeSellerData.billing_profile_id ??
+                                  activeBillingDefaults.default_profile_id ??
+                                  '',
+                          ),
+                  )?.conditions ?? billingBase,
+              )
             : normalizeConditions(activeSellerData.conditions ?? {});
 
         return normalizeConditions({
@@ -608,7 +604,21 @@ export default function UserDbPage() {
                     return row;
                 }
 
-                return { ...row, ...patch };
+                const changesActor =
+                    ('billing_user_id' in patch &&
+                        patch.billing_user_id !== row.billing_user_id) ||
+                    ('seller_user_id' in patch &&
+                        patch.seller_user_id !== row.seller_user_id);
+                return changesActor
+                    ? {
+                          ...row,
+                          ...patch,
+                          conditions_override: getProfileIndependentConditions(
+                              row.conditions_override,
+                          ),
+                          profile_selection_key: '',
+                      }
+                    : { ...row, ...patch };
             }),
         );
     };
@@ -616,23 +626,23 @@ export default function UserDbPage() {
     const mergedSource =
         selectedProfileKey === '__custom__'
             ? normalizeConditions({
-                ...inheritedConditions,
-                ...(activeRow?.conditions_override ?? {}),
-            })
+                  ...inheritedConditions,
+                  ...(activeRow?.conditions_override ?? {}),
+              })
             : selectedProfile
-                ? normalizeConditions({
+              ? normalizeConditions({
                     ...inheritedConditions,
                     ...selectedProfile.conditions,
                     ...(activeRow?.conditions_override ?? {}),
                 })
-                : inheritedConditions;
+              : inheritedConditions;
 
     const merged: SalesConditions = { ...DEFAULT_VALUES, ...mergedSource };
     const selectedProfileBase = selectedProfile
         ? normalizeConditions({
-            ...inheritedConditions,
-            ...selectedProfile.conditions,
-        })
+              ...inheritedConditions,
+              ...selectedProfile.conditions,
+          })
         : inheritedConditions;
     const activeIndependentOverrides = getProfileIndependentConditions(
         diffConditions(selectedProfileBase, merged),
@@ -692,6 +702,13 @@ export default function UserDbPage() {
         {},
     );
 
+    useEffect(() => {
+        setDeliveryRaw('');
+        setLmRaw('');
+        setTvatRaw('');
+        setCarrierTvaRaw({});
+    }, [activeRow?.db_product_id]);
+
     const carrierAssignments: CarrierAssignment[] = useMemo(() => {
         if (merged.t === null || merged.t === undefined || merged.t === '')
             return [];
@@ -745,8 +762,8 @@ export default function UserDbPage() {
 
         const seller = row.seller_user_id
             ? (billing.sellers ?? []).find(
-                (item) => Number(item.id) === Number(row.seller_user_id),
-            )
+                  (item) => Number(item.id) === Number(row.seller_user_id),
+              )
             : null;
 
         const sellerDefaults = normalizeBillingDefaultsToProfiles(
@@ -759,16 +776,16 @@ export default function UserDbPage() {
         const billingToSellerBase = seller
             ? (seller.use_billing_profile ?? true)
                 ? normalizeConditions(
-                    billingDefaults.profiles.find(
-                        (p) =>
-                            p.id ===
-                            String(
-                                seller.billing_profile_id ??
-                                billingDefaults.default_profile_id ??
-                                '',
-                            ),
-                    )?.conditions ?? billingBase,
-                )
+                      billingDefaults.profiles.find(
+                          (p) =>
+                              p.id ===
+                              String(
+                                  seller.billing_profile_id ??
+                                      billingDefaults.default_profile_id ??
+                                      '',
+                              ),
+                      )?.conditions ?? billingBase,
+                  )
                 : normalizeConditions(seller.conditions ?? {})
             : billingBase;
 
@@ -781,19 +798,23 @@ export default function UserDbPage() {
             return normalizeConditions(row.conditions_override);
         }
 
-        if (!row.profile_selection_key) {
+        if (row.profile_selection_key === null) {
+            return normalizeConditions(row.conditions_override);
+        }
+
+        if (row.profile_selection_key === '') {
             return getProfileIndependentConditions(row.conditions_override);
         }
 
         const profilePool = seller
             ? sellerDefaults.profiles.map((profile) => ({
-                key: `seller:${profile.id}`,
-                conditions: normalizeConditions(profile.conditions),
-            }))
+                  key: `seller:${profile.id}`,
+                  conditions: normalizeConditions(profile.conditions),
+              }))
             : billingDefaults.profiles.map((profile) => ({
-                key: `billing:${profile.id}`,
-                conditions: normalizeConditions(profile.conditions),
-            }));
+                  key: `billing:${profile.id}`,
+                  conditions: normalizeConditions(profile.conditions),
+              }));
 
         const selected = profilePool.find(
             (profile) => profile.key === row.profile_selection_key,
@@ -812,6 +833,11 @@ export default function UserDbPage() {
     };
 
     const submit = () => {
+        if (rows.some((row) => !row.billing_user_id)) {
+            setSaveErrors([t('Select a billing user')]);
+            return;
+        }
+        setSaveErrors([]);
         const normalizedRows = rows
             .filter(
                 (row) =>
@@ -838,12 +864,15 @@ export default function UserDbPage() {
         router.post(
             `/admin/users/${targetUser.id}/db`,
             {
-                merge: true,
+                merge: false,
                 db_ids: dbIds,
                 sales_conditions: normalizedRows,
             },
             {
                 preserveScroll: true,
+                onStart: () => setSaving(true),
+                onError: (errors) => setSaveErrors(Object.values(errors)),
+                onFinish: () => setSaving(false),
             },
         );
     };
@@ -856,16 +885,29 @@ export default function UserDbPage() {
                 <div className="space-y-4">
                     <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
                         <div className="ml-auto">
-                            <Button type="button" onClick={submit}>
+                            <Button
+                                type="button"
+                                onClick={submit}
+                                disabled={saving}
+                            >
                                 {t('Save')}
                             </Button>
                         </div>
                     </StickyBar>
+                    {saveErrors.length > 0 && (
+                        <div role="alert" className="text-sm text-destructive">
+                            {saveErrors.map((error, index) => (
+                                <p key={index}>{error}</p>
+                            ))}
+                        </div>
+                    )}
 
-                    <Form
-                        method="post"
-                        action={`/admin/users/${targetUser.id}/db`}
+                    <form
                         className="space-y-4"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            submit();
+                        }}
                     >
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
                             <Card className="space-y-4 p-6">
@@ -982,7 +1024,10 @@ export default function UserDbPage() {
                                 </div>
                             </Card>
 
-                            <Card className="space-y-4 p-6 xl:col-span-2">
+                            <Card
+                                key={activeRow?.db_product_id ?? 'empty'}
+                                className="space-y-4 p-6 xl:col-span-2"
+                            >
                                 {!activeRow ? (
                                     <p className="text-sm text-muted-foreground">
                                         {t(
@@ -998,24 +1043,24 @@ export default function UserDbPage() {
                                                         activeRow.db_product_id,
                                                     ),
                                                 )?.country && (
-                                                        <CountryFlag
-                                                            countryCode={
-                                                                dbById.get(
-                                                                    Number(
-                                                                        activeRow.db_product_id,
-                                                                    ),
-                                                                )!.country!
-                                                            }
-                                                            title={
-                                                                dbById.get(
-                                                                    Number(
-                                                                        activeRow.db_product_id,
-                                                                    ),
-                                                                )!.country!
-                                                            }
-                                                            className="w-5"
-                                                        />
-                                                    )}
+                                                    <CountryFlag
+                                                        countryCode={
+                                                            dbById.get(
+                                                                Number(
+                                                                    activeRow.db_product_id,
+                                                                ),
+                                                            )!.country!
+                                                        }
+                                                        title={
+                                                            dbById.get(
+                                                                Number(
+                                                                    activeRow.db_product_id,
+                                                                ),
+                                                            )!.country!
+                                                        }
+                                                        className="w-5"
+                                                    />
+                                                )}
                                                 {
                                                     dbById.get(
                                                         Number(
@@ -1027,11 +1072,9 @@ export default function UserDbPage() {
                                         </CardHeader>
                                         <CardContent className="space-y-6 px-0">
                                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                                <FormField
-                                                    label={t('Bill-to')}
-                                                >
+                                                <FormField label={t('Bill-to')}>
                                                     {billingOptions.length <=
-                                                        1 ? (
+                                                    1 ? (
                                                         <Input
                                                             disabled
                                                             readOnly
@@ -1061,7 +1104,7 @@ export default function UserDbPage() {
                                                                                 /\s+/,
                                                                             )
                                                                             .pop() ??
-                                                                        '',
+                                                                            '',
                                                                     );
                                                                 if (
                                                                     !Number.isInteger(
@@ -1104,27 +1147,15 @@ export default function UserDbPage() {
                                                     )}
 
                                                     {activeRow.seller_user_id ? (
-                                                        <div
-                                                            className="w-full rounded-md border border-border bg-muted/40 px-3 py-2"
-                                                            title={
-                                                                activeBillingProfile
-                                                                    ? formatSalesConditionsSummary(
-                                                                        activeBillingProfile.conditions,
-                                                                        t(
-                                                                            'Direct sale',
-                                                                        ),
-                                                                    )
-                                                                    : undefined
-                                                            }
-                                                        >
-                                                            <span className="block truncate font-medium">
+                                                        <div className="rounded-md border bg-muted/40 px-3 py-2">
+                                                            <span className="block font-medium">
                                                                 {activeBillingProfile?.name ??
                                                                     t(
                                                                         'Assigned billing profile',
                                                                     )}
                                                             </span>
-                                                            {activeBillingProfile ? (
-                                                                <span className="block truncate text-xs text-muted-foreground">
+                                                            {activeBillingProfile && (
+                                                                <span className="block text-xs text-muted-foreground">
                                                                     {formatSalesConditionsSummary(
                                                                         activeBillingProfile.conditions,
                                                                         t(
@@ -1132,310 +1163,194 @@ export default function UserDbPage() {
                                                                         ),
                                                                     )}
                                                                 </span>
-                                                            ) : null}
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <></>
-                                                    )}
-                                                </FormField>
-
-                                                {!activeRow.seller_user_id ? (
-                                                    <FormField
-                                                        label={t('Sales rep')}
-                                                    >
-                                                        {sellerOptions.length >
-                                                            0 ? (
+                                                    ) : activeRow.billing_user_id ? (
+                                                        <>
                                                             <Select
                                                                 value={
-                                                                    activeRow.seller_user_id
-                                                                        ? String(
-                                                                            activeRow.seller_user_id,
-                                                                        )
-                                                                        : 'none'
+                                                                    selectedProfileKey
                                                                 }
-                                                                onValueChange={(
-                                                                    val,
-                                                                ) => {
-                                                                    if (
-                                                                        val ===
-                                                                        'none'
-                                                                    ) {
-                                                                        updateRow(
-                                                                            activeIndex,
-                                                                            {
-                                                                                seller_user_id:
-                                                                                    null,
-                                                                                profile_selection_key:
-                                                                                    null,
-                                                                            },
-                                                                        );
-                                                                        return;
-                                                                    }
-
-                                                                    const id =
-                                                                        Number(
-                                                                            val,
-                                                                        );
-                                                                    if (
-                                                                        !Number.isInteger(
-                                                                            id,
-                                                                        ) ||
-                                                                        id <= 0
-                                                                    ) {
-                                                                        return;
-                                                                    }
-
-                                                                    updateRow(
-                                                                        activeIndex,
-                                                                        {
-                                                                            seller_user_id:
-                                                                                id,
-                                                                            profile_selection_key:
-                                                                                null,
-                                                                        },
-                                                                    );
-                                                                }}
+                                                                onValueChange={
+                                                                    selectProfile
+                                                                }
                                                             >
                                                                 <SelectTrigger>
                                                                     <SelectValue
                                                                         placeholder={t(
-                                                                            'Select a sales rep',
+                                                                            activeRow.seller_user_id
+                                                                                ? 'Select a seller profile'
+                                                                                : 'Select a billing profile',
                                                                         )}
                                                                     />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="none">
+                                                                    <SelectItem value="__custom__">
                                                                         {t(
-                                                                            'No sales rep',
+                                                                            'Custom setup',
                                                                         )}
                                                                     </SelectItem>
-                                                                    {sellerOptions.map(
+                                                                    {activeProfileOptions.map(
                                                                         (
-                                                                            seller,
+                                                                            profile,
                                                                         ) => (
                                                                             <SelectItem
                                                                                 key={
-                                                                                    seller.value
+                                                                                    profile.key
                                                                                 }
                                                                                 value={
-                                                                                    seller.value
+                                                                                    profile.key
                                                                                 }
                                                                             >
-                                                                                {
-                                                                                    seller.label
-                                                                                }
+                                                                                <span className="block">
+                                                                                    {
+                                                                                        profile.label
+                                                                                    }
+                                                                                </span>
+                                                                                <span className="block text-xs text-muted-foreground">
+                                                                                    {formatSalesConditionsSummary(
+                                                                                        profile.conditions,
+                                                                                        t(
+                                                                                            'Direct sale',
+                                                                                        ),
+                                                                                    )}
+                                                                                </span>
                                                                             </SelectItem>
                                                                         ),
                                                                     )}
                                                                 </SelectContent>
                                                             </Select>
-                                                        ) : (
-                                                            <Input
-                                                                disabled
-                                                                readOnly
-                                                                value={t(
+                                                            {
+                                                                customConditionsForm
+                                                            }
+                                                        </>
+                                                    ) : null}
+                                                </FormField>
+                                                <FormField
+                                                    label={t('Sales rep')}
+                                                >
+                                                    <Select
+                                                        disabled={
+                                                            !activeRow.billing_user_id ||
+                                                            sellerOptions.length ===
+                                                                0
+                                                        }
+                                                        value={
+                                                            activeRow.seller_user_id
+                                                                ? String(
+                                                                      activeRow.seller_user_id,
+                                                                  )
+                                                                : 'none'
+                                                        }
+                                                        onValueChange={(
+                                                            value,
+                                                        ) =>
+                                                            updateRow(
+                                                                activeIndex,
+                                                                {
+                                                                    seller_user_id:
+                                                                        value ===
+                                                                        'none'
+                                                                            ? null
+                                                                            : Number(
+                                                                                  value,
+                                                                              ),
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue
+                                                                placeholder={t(
                                                                     'No sales rep',
                                                                 )}
-                                                                placeholder={t(
-                                                                    'Sales rep',
-                                                                )}
                                                             />
-                                                        )}
-                                                        <Select
-                                                            value={
-                                                                selectedProfileKey
-                                                            }
-                                                            onValueChange={
-                                                                selectProfile
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue
-                                                                    placeholder={t(
-                                                                        'Select a billing profile',
-                                                                    )}
-                                                                />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="__custom__">
-                                                                    {t(
-                                                                        'Custom setup',
-                                                                    )}
-                                                                </SelectItem>
-                                                                {billingProfiles.map(
-                                                                    (
-                                                                        profile,
-                                                                    ) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                profile.key
-                                                                            }
-                                                                            value={
-                                                                                profile.key
-                                                                            }
-                                                                        >
-                                                                            <span className="block">
-                                                                                {
-                                                                                    profile.label
-                                                                                }
-                                                                            </span>
-                                                                            <span className="block text-xs text-muted-foreground">
-                                                                                {formatSalesConditionsSummary(
-                                                                                    profile.conditions,
-                                                                                    t(
-                                                                                        'Direct sale',
-                                                                                    ),
-                                                                                )}
-                                                                            </span>
-                                                                        </SelectItem>
-                                                                    ),
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">
+                                                                {t(
+                                                                    'No sales rep',
                                                                 )}
-                                                            </SelectContent>
-                                                        </Select>
-
-                                                        {customConditionsForm}
-                                                    </FormField>
-                                                ) : (
-                                                    <FormField
-                                                        label={t('Sales rep')}
-                                                    >
-                                                        <Select
-                                                            value={
-                                                                activeRow.seller_user_id
-                                                                    ? String(
-                                                                        activeRow.seller_user_id,
-                                                                    )
-                                                                    : 'none'
-                                                            }
-                                                            onValueChange={(
-                                                                val,
-                                                            ) => {
-                                                                if (
-                                                                    val ===
-                                                                    'none'
-                                                                ) {
-                                                                    updateRow(
-                                                                        activeIndex,
+                                                            </SelectItem>
+                                                            {sellerOptions.map(
+                                                                (seller) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            seller.value
+                                                                        }
+                                                                        value={
+                                                                            seller.value
+                                                                        }
+                                                                    >
                                                                         {
-                                                                            seller_user_id:
-                                                                                null,
-                                                                            profile_selection_key:
-                                                                                null,
-                                                                        },
-                                                                    );
-                                                                    return;
+                                                                            seller.label
+                                                                        }
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {activeRow.seller_user_id ? (
+                                                        <>
+                                                            <Select
+                                                                value={
+                                                                    selectedProfileKey
                                                                 }
-
-                                                                const id =
-                                                                    Number(val);
-                                                                if (
-                                                                    !Number.isInteger(
-                                                                        id,
-                                                                    ) ||
-                                                                    id <= 0
-                                                                ) {
-                                                                    return;
+                                                                onValueChange={
+                                                                    selectProfile
                                                                 }
-
-                                                                updateRow(
-                                                                    activeIndex,
-                                                                    {
-                                                                        seller_user_id:
-                                                                            id,
-                                                                        profile_selection_key:
-                                                                            null,
-                                                                    },
-                                                                );
-                                                            }}
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue
-                                                                    placeholder={t(
-                                                                        'Select a sales rep',
-                                                                    )}
-                                                                />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">
-                                                                    {t(
-                                                                        'No sales rep',
-                                                                    )}
-                                                                </SelectItem>
-                                                                {sellerOptions.map(
-                                                                    (
-                                                                        seller,
-                                                                    ) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                seller.value
-                                                                            }
-                                                                            value={
-                                                                                seller.value
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                seller.label
-                                                                            }
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Select
-                                                            value={
-                                                                selectedProfileKey
-                                                            }
-                                                            onValueChange={
-                                                                selectProfile
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue
-                                                                    placeholder={t(
-                                                                        'Select a seller profile',
-                                                                    )}
-                                                                />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="__custom__">
-                                                                    {t(
-                                                                        'Custom setup',
-                                                                    )}
-                                                                </SelectItem>
-                                                                {sellerProfiles.map(
-                                                                    (
-                                                                        profile,
-                                                                    ) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                profile.key
-                                                                            }
-                                                                            value={
-                                                                                profile.key
-                                                                            }
-                                                                        >
-                                                                            <span className="block">
-                                                                                {
-                                                                                    profile.label
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue
+                                                                        placeholder={t(
+                                                                            activeRow.seller_user_id
+                                                                                ? 'Select a seller profile'
+                                                                                : 'Select a billing profile',
+                                                                        )}
+                                                                    />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="__custom__">
+                                                                        {t(
+                                                                            'Custom setup',
+                                                                        )}
+                                                                    </SelectItem>
+                                                                    {activeProfileOptions.map(
+                                                                        (
+                                                                            profile,
+                                                                        ) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    profile.key
                                                                                 }
-                                                                            </span>
-                                                                            <span className="block text-xs text-muted-foreground">
-                                                                                {formatSalesConditionsSummary(
-                                                                                    profile.conditions,
-                                                                                    t(
-                                                                                        'Direct sale',
-                                                                                    ),
-                                                                                )}
-                                                                            </span>
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-
-                                                        {customConditionsForm}
-                                                    </FormField>
-                                                )}
+                                                                                value={
+                                                                                    profile.key
+                                                                                }
+                                                                            >
+                                                                                <span className="block">
+                                                                                    {
+                                                                                        profile.label
+                                                                                    }
+                                                                                </span>
+                                                                                <span className="block text-xs text-muted-foreground">
+                                                                                    {formatSalesConditionsSummary(
+                                                                                        profile.conditions,
+                                                                                        t(
+                                                                                            'Direct sale',
+                                                                                        ),
+                                                                                    )}
+                                                                                </span>
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            {
+                                                                customConditionsForm
+                                                            }
+                                                        </>
+                                                    ) : null}
+                                                </FormField>
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1472,9 +1387,7 @@ export default function UserDbPage() {
                                                                 )}
                                                             </SelectItem>
                                                             <SelectItem value="price">
-                                                                {t(
-                                                                    'Price',
-                                                                )}
+                                                                {t('Price')}
                                                             </SelectItem>
                                                             <SelectItem value="price_floor">
                                                                 {t(
@@ -1525,10 +1438,10 @@ export default function UserDbPage() {
                                                                         <Select
                                                                             value={
                                                                                 assignment.carrier_id !==
-                                                                                    null
+                                                                                null
                                                                                     ? String(
-                                                                                        assignment.carrier_id,
-                                                                                    )
+                                                                                          assignment.carrier_id,
+                                                                                      )
                                                                                     : 'none'
                                                                             }
                                                                             onValueChange={(
@@ -1541,17 +1454,17 @@ export default function UserDbPage() {
                                                                                 next[
                                                                                     index
                                                                                 ] =
-                                                                                {
-                                                                                    carrier_id:
-                                                                                        v ===
+                                                                                    {
+                                                                                        carrier_id:
+                                                                                            v ===
                                                                                             'none'
-                                                                                            ? null
-                                                                                            : Number(
-                                                                                                v,
-                                                                                            ),
-                                                                                    zone_id:
-                                                                                        null,
-                                                                                };
+                                                                                                ? null
+                                                                                                : Number(
+                                                                                                      v,
+                                                                                                  ),
+                                                                                        zone_id:
+                                                                                            null,
+                                                                                    };
                                                                                 updateCarrierAssignments(
                                                                                     next,
                                                                                 );
@@ -1608,10 +1521,10 @@ export default function UserDbPage() {
                                                                         <Select
                                                                             value={
                                                                                 assignment.zone_id !==
-                                                                                    null
+                                                                                null
                                                                                     ? String(
-                                                                                        assignment.zone_id,
-                                                                                    )
+                                                                                          assignment.zone_id,
+                                                                                      )
                                                                                     : 'none'
                                                                             }
                                                                             onValueChange={(
@@ -1624,18 +1537,18 @@ export default function UserDbPage() {
                                                                                 next[
                                                                                     index
                                                                                 ] =
-                                                                                {
-                                                                                    ...next[
-                                                                                    index
-                                                                                    ],
-                                                                                    zone_id:
-                                                                                        v ===
+                                                                                    {
+                                                                                        ...next[
+                                                                                            index
+                                                                                        ],
+                                                                                        zone_id:
+                                                                                            v ===
                                                                                             'none'
-                                                                                            ? null
-                                                                                            : Number(
-                                                                                                v,
-                                                                                            ),
-                                                                                };
+                                                                                                ? null
+                                                                                                : Number(
+                                                                                                      v,
+                                                                                                  ),
+                                                                                    };
                                                                                 updateCarrierAssignments(
                                                                                     next,
                                                                                 );
@@ -1686,18 +1599,18 @@ export default function UserDbPage() {
                                                                             )}
                                                                             value={
                                                                                 index in
-                                                                                    carrierTvaRaw
+                                                                                carrierTvaRaw
                                                                                     ? carrierTvaRaw[
-                                                                                    index
-                                                                                    ]
+                                                                                          index
+                                                                                      ]
                                                                                     : assignment.tva !==
-                                                                                        null &&
+                                                                                            null &&
                                                                                         assignment.tva !==
-                                                                                        undefined
-                                                                                        ? String(
+                                                                                            undefined
+                                                                                      ? String(
                                                                                             assignment.tva,
                                                                                         )
-                                                                                        : ''
+                                                                                      : ''
                                                                             }
                                                                             onChange={(
                                                                                 e,
@@ -1731,12 +1644,12 @@ export default function UserDbPage() {
                                                                                     next[
                                                                                         index
                                                                                     ] =
-                                                                                    {
-                                                                                        ...next[
-                                                                                        index
-                                                                                        ],
-                                                                                        tva: num,
-                                                                                    };
+                                                                                        {
+                                                                                            ...next[
+                                                                                                index
+                                                                                            ],
+                                                                                            tva: num,
+                                                                                        };
                                                                                     updateCarrierAssignments(
                                                                                         next,
                                                                                     );
@@ -1748,9 +1661,9 @@ export default function UserDbPage() {
                                                                                         prev,
                                                                                     ) => {
                                                                                         const next =
-                                                                                        {
-                                                                                            ...prev,
-                                                                                        };
+                                                                                            {
+                                                                                                ...prev,
+                                                                                            };
                                                                                         delete next[
                                                                                             index
                                                                                         ];
@@ -1814,7 +1727,7 @@ export default function UserDbPage() {
                                                                 deliveryRaw ||
                                                                 String(
                                                                     merged.l ??
-                                                                    0,
+                                                                        0,
                                                                 )
                                                             }
                                                             onChange={(e) => {
@@ -1858,7 +1771,7 @@ export default function UserDbPage() {
                                                                 lmRaw ||
                                                                 String(
                                                                     merged.lm ??
-                                                                    0,
+                                                                        0,
                                                                 )
                                                             }
                                                             onChange={(e) => {
@@ -1901,11 +1814,11 @@ export default function UserDbPage() {
                                                                 tvatRaw !== ''
                                                                     ? tvatRaw
                                                                     : merged.tvat ===
-                                                                        null ||
+                                                                            null ||
                                                                         merged.tvat ===
-                                                                        undefined
-                                                                        ? ''
-                                                                        : String(
+                                                                            undefined
+                                                                      ? ''
+                                                                      : String(
                                                                             merged.tvat,
                                                                         )
                                                             }
@@ -1925,13 +1838,13 @@ export default function UserDbPage() {
                                                                             e
                                                                                 .target
                                                                                 .value ===
-                                                                                ''
+                                                                            ''
                                                                                 ? null
                                                                                 : Number.isFinite(
-                                                                                    num,
-                                                                                )
-                                                                                    ? num
-                                                                                    : merged.tvat,
+                                                                                        num,
+                                                                                    )
+                                                                                  ? num
+                                                                                  : merged.tvat,
                                                                     },
                                                                 );
                                                             }}
@@ -1947,7 +1860,7 @@ export default function UserDbPage() {
                                 )}
                             </Card>
                         </div>
-                    </Form>
+                    </form>
                 </div>
             </SettingsLayout>
         </AppLayout>

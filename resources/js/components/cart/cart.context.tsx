@@ -1,3 +1,4 @@
+import { CatalogTransportProvider } from './catalog-transport-context';
 import React, { createContext, useCallback, useState, useEffect, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { type Product } from '@/types';
@@ -522,7 +523,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, updateComment, orderComment, setOrderComment, clearCart, refreshCart, lastAddedProductId }}>
-            {children}
+            <CatalogTransportProvider items={items}>{children}</CatalogTransportProvider>
             <ConfirmationDialog
                 open={confirmationRequest !== null}
                 title={

@@ -112,7 +112,7 @@ class ProductResource extends JsonResource
      */
     public static function resolveTransportChoiceFromAttributes(array $attrs): array
     {
-        $legacyCarrierId = (int) ($attrs['t'] ?? 0);
+        $legacyCarrierId = is_numeric($attrs['t'] ?? null) ? (int) $attrs['t'] : 0;
         $legacyZoneId = (int) ($attrs['z'] ?? 0);
 
         if ($legacyCarrierId > 0 && $legacyZoneId > 0) {

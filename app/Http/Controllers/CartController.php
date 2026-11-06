@@ -310,66 +310,11 @@ class CartController extends Controller
         foreach ($transportDbProductIds as $dbProductId) {
             $resolvedAttributes = $priceCalculator->resolveUserAttributes($user, $dbProductId);
             if (is_array($resolvedAttributes)) {
-                $transportAttributeSets[] = $resolvedAttributes;
+                $transportAttributeSets[(int) $dbProductId] = $resolvedAttributes;
             }
         }
 
-        $carrierZonePairs = [];
-        $seenPairs = [];
-        foreach ($transportAttributeSets as $attrs) {
-            $parsed = isset($attrs['t']) && is_string($attrs['t'])
-                ? json_decode($attrs['t'], true)
-                : ($attrs['t'] ?? null);
-            $options = is_array($parsed) ? $parsed : [];
-            if (! is_array($parsed) && ! empty($attrs['t']) && is_numeric($attrs['t']) && ! empty($attrs['z'])) {
-                $options[] = ['carrier_id' => (int) $attrs['t'], 'zone_id' => (int) $attrs['z']];
-            }
-            foreach ($options as $option) {
-                if (! is_array($option)) {
-                    continue;
-                }
-                $cid = (int) ($option['carrier_id'] ?? 0);
-                $zid = (int) ($option['zone_id'] ?? 0);
-                if ($cid <= 0 || $zid <= 0) {
-                    continue;
-                }
-                $key = $cid.':'.$zid;
-                if (! isset($seenPairs[$key])) {
-                    $seenPairs[$key] = true;
-                    $carrierZonePairs[] = ['carrier_id' => $cid, 'zone_id' => $zid];
-                }
-            }
-        }
-
-        $transportOptions = [];
-        if (! empty($carrierZonePairs)) {
-            $carrierIds = array_unique(array_map(fn ($p) => $p['carrier_id'], $carrierZonePairs));
-            $zoneIds = array_unique(array_map(fn ($p) => $p['zone_id'], $carrierZonePairs));
-            $carriersData = \App\Models\Carrier::query()
-                ->whereIn('id', $carrierIds)
-                ->with('dbProducts')->get(['id', 'taxgo'])
-                ->keyBy('id');
-            $zonesData = \App\Models\CarrierZone::query()
-                ->whereIn('id', $zoneIds)
-                ->get(['id', 'carrier_id', 'name', 'tariffs'])
-                ->groupBy('carrier_id');
-            foreach ($carrierZonePairs as $pair) {
-                $carrier = $carriersData->get($pair['carrier_id']);
-                $zone = $zonesData->get($pair['carrier_id'])?->firstWhere('id', $pair['zone_id']);
-                if (! $carrier || ! $zone) {
-                    continue;
-                }
-                $key = $pair['carrier_id'].':'.$pair['zone_id'];
-                $transportOptions[$key] = [
-                    'carrier_id' => (int) $carrier->id,
-                    'zone_id' => (int) $zone->id,
-                    'zone_name' => (string) ($zone->name ?? ''),
-                    'taxgo' => (float) ($carrier->taxgo ?? 0),
-                    'supplements_by_db' => $carrier->supplementsByDb(),
-                    'tariffs' => is_array($zone->tariffs) ? $zone->tariffs : [],
-                ];
-            }
-        }
+        $transportOptions = app(\App\Services\TransportOptionsResolver::class)->resolve($transportAttributeSets);
 
         $activeCart = Cart::query()
             ->where('user_id', $user->id)
@@ -382,6 +327,7 @@ class CartController extends Controller
             'cart_db_countries' => $dbProductCountries,
             'cart_carriers' => $carriers,
             'cart_transport_options' => $transportOptions,
+            'cart_transport_attributes' => $transportAttributeSets,
             'cart_transport_selection' => $activeCart?->transport_selection ?? [],
             'cart_discounts' => $activeCart?->discounts ?? [],
             'cart_coupon_code' => $activeCart?->coupon_code,

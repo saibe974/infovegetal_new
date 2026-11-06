@@ -7,6 +7,7 @@ import type { CartItem } from './cart.context';
 type DbUserAttributes = Record<string, unknown>;
 export type CartTransportOption = {
     carrier_id: number;
+    carrier_name?: string;
     zone_id: number;
     zone_name: string;
     taxgo: number;
@@ -50,6 +51,32 @@ export type TransportOverrides = Record<
     number,
     { carrierId: number; zoneId: number }
 >;
+
+// Cart products can come from local storage or an earlier catalogue response.
+// Checkout conditions and tariffs take precedence over those cached values.
+export const refreshCartTransport = (
+    items: CartItem[],
+    attributesByDb: Record<number, DbUserAttributes>,
+    transportOptions: Record<string, CartTransportOption>,
+): CartItem[] =>
+    items.map((item) => {
+        const dbId = Number(
+            item.product.db_products_id ?? item.product.dbProduct?.id ?? 0,
+        );
+        const attrs = attributesByDb[dbId];
+        if (!attrs) return item;
+        const choice = resolveTransportChoice(attrs, null);
+        return {
+            ...item,
+            product: {
+                ...item.product,
+                db_user_attributes: attrs,
+                db_user_transport:
+                    transportOptions[`${choice.carrierId}:${choice.zoneId}`] ??
+                    null,
+            },
+        };
+    });
 
 const toNumber = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -347,6 +374,40 @@ const pickZoneTariff = (
     return base;
 };
 
+export const getCatalogTransportPricing = (transport: CartTransportOption) => {
+    // Match the transport embedded in rendered unit prices. Minimums and
+    // per-database supplements are charged separately in cart shipping.
+    const rate = 1 + Math.max(0, toNumber(transport.taxgo)) / 100;
+    const costPerRoll = (count: number) =>
+        pickZoneTariff(count, transport.tariffs) * rate;
+    const pricePerRoll = costPerRoll(1);
+    const candidates = new Set([2]);
+    Object.keys(transport.tariffs)
+        .filter((key) => key !== 'mini')
+        .forEach((key) => {
+            const range = parseTariffKey(key);
+            if (!range) return;
+            candidates.add(Math.max(2, Math.ceil(range.min)));
+            if (range.max !== null)
+                candidates.add(Math.max(2, Math.floor(range.max) + 1));
+        });
+    const nextRollCount = [...candidates]
+        .sort((a, b) => a - b)
+        .find(
+            (count) =>
+                roundCurrency(costPerRoll(count)) < roundCurrency(pricePerRoll),
+        );
+    return {
+        pricePerRoll,
+        nextTier: nextRollCount
+            ? {
+                  rollCount: nextRollCount,
+                  pricePerRoll: roundCurrency(costPerRoll(nextRollCount)),
+              }
+            : null,
+    };
+};
+
 export const calculateRenderedTransportCost = (
     rollFillRates: number[],
     pricePerRoll: number,
@@ -512,9 +573,7 @@ export const calculateCartShipping = (
         const override = overrides?.[id];
         if (override && attrs) {
             const overriddenTransport =
-                transportOptions?.[
-                    override.carrierId + ':' + override.zoneId
-                ];
+                transportOptions?.[override.carrierId + ':' + override.zoneId];
             if (overriddenTransport) {
                 attrs = { ...attrs, t: override.carrierId, z: override.zoneId };
                 transport = overriddenTransport;

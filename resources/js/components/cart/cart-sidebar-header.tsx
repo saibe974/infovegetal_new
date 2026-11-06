@@ -39,12 +39,15 @@ import {
     type CartTransportOption,
 } from './cart-shipping';
 import { CartContext } from './cart.context';
+import { CatalogCarrierSelector } from './catalog-carrier-selector';
+import { useCatalogTransport } from './catalog-transport-context';
 
 const validateCartButtonClassName =
     'bg-brand-main text-white dark:text-black hover:bg-brand-main-hover disabled:opacity-50';
 
 export function CartSidebarHeader() {
     const { t } = useI18n();
+    const catalogTransport = useCatalogTransport();
 
     const { auth, cart } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -55,20 +58,51 @@ export function CartSidebarHeader() {
 
     const orderedItems = useMemo(() => {
         const sorted = [...items].sort((a, b) =>
-            String(a.product.name ?? '').localeCompare(String(b.product.name ?? ''), 'fr', { sensitivity: 'base' }),
+            String(a.product.name ?? '').localeCompare(
+                String(b.product.name ?? ''),
+                'fr',
+                { sensitivity: 'base' },
+            ),
         );
 
         if (lastAddedProductId === null) {
             return sorted;
         }
 
-        const lastAdded = sorted.find((item) => item.product.id === lastAddedProductId);
+        const lastAdded = sorted.find(
+            (item) => item.product.id === lastAddedProductId,
+        );
         if (!lastAdded) {
             return sorted;
         }
 
-        return [lastAdded, ...sorted.filter((item) => item.product.id !== lastAddedProductId)];
+        return [
+            lastAdded,
+            ...sorted.filter((item) => item.product.id !== lastAddedProductId),
+        ];
     }, [items, lastAddedProductId]);
+    const supplierGroups = useMemo(() => {
+        const groups = new Map<
+            number,
+            { id: number; name: string; items: typeof orderedItems }
+        >();
+        for (const item of orderedItems) {
+            const id = Number(
+                item.product.db_products_id ?? item.product.dbProduct?.id ?? 0,
+            );
+            const group = groups.get(id) ?? {
+                id,
+                name:
+                    catalogTransport.names[id] ??
+                    item.product.dbProduct?.name ??
+                    `Base #${id}`,
+                items: [],
+            };
+            group.items.push(item);
+            groups.set(id, group);
+        }
+        return [...groups.values()];
+    }, [orderedItems, catalogTransport.names]);
     const cartListRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -102,8 +136,8 @@ export function CartSidebarHeader() {
     }, [carrierStorageKey]);
 
     const transportOptions = useMemo(
-        () =>
-            Object.fromEntries(
+        () => ({
+            ...Object.fromEntries(
                 Object.values(carrierOverrides)
                     .filter(
                         (
@@ -117,7 +151,9 @@ export function CartSidebarHeader() {
                         choice.transport,
                     ]),
             ),
-        [carrierOverrides],
+            ...catalogTransport.options,
+        }),
+        [carrierOverrides, catalogTransport.options],
     );
 
     const shipping = useMemo(
@@ -517,22 +553,6 @@ export function CartSidebarHeader() {
                                         </div>
                                     )}
                                 </div>
-
-                                {items.length > 0 && (
-                                    <div className="mt-1">
-                                        <ProductRollMini
-                                            items={items}
-                                            getSupplierPrice={(supplier) =>
-                                                shipping.bySupplier[
-                                                    supplier.supplierId
-                                                ] ?? 0
-                                            }
-                                            onSupplierClick={
-                                                setSelectedRollSupplierId
-                                            }
-                                        />
-                                    </div>
-                                )}
                             </>
                         )}
                     </SidebarHeader>
@@ -555,17 +575,51 @@ export function CartSidebarHeader() {
                                 </>
                             )}
 
-                            {orderedItems.map((item) => (
-                                <CartItem
-                                    key={item.product.id}
-                                    product={item.product}
-                                    quantity={item.quantity}
-                                    comment={item.comment}
-                                    pricingOverride={
-                                        pricingByProductId[item.product.id]
-                                    }
-                                    isHighlighted={item.product.id === lastAddedProductId}
-                                />
+                            {supplierGroups.map((group) => (
+                                <section
+                                    key={group.id}
+                                    aria-label={group.name}
+                                    className="w-full rounded-lg border border-border/70"
+                                >
+                                    <div className="flex items-center gap-2 rounded-t-lg border-b bg-muted/40 px-2 py-1.5">
+                                        <ProductRollMini
+                                            compact
+                                            className="min-w-0 flex-1"
+                                            items={group.items}
+                                            getSupplierPrice={(supplier) =>
+                                                shipping.bySupplier[
+                                                    supplier.supplierId
+                                                ] ?? 0
+                                            }
+                                            onSupplierClick={
+                                                setSelectedRollSupplierId
+                                            }
+                                        />
+                                        <CatalogCarrierSelector
+                                            dbId={group.id}
+                                            compact
+                                        />
+                                    </div>
+                                    <div className="space-y-3 p-2.5">
+                                        {group.items.map((item) => (
+                                            <CartItem
+                                                key={item.product.id}
+                                                product={item.product}
+                                                quantity={item.quantity}
+                                                comment={item.comment}
+                                                pricingOverride={
+                                                    pricingByProductId[
+                                                        item.product.id
+                                                    ]
+                                                }
+                                                isHighlighted={
+                                                    item.product.id ===
+                                                    lastAddedProductId
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
                             ))}
                         </div>
                     </SidebarContent>

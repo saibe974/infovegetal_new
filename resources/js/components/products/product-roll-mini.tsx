@@ -10,6 +10,7 @@ type ProductRollMiniProps = {
     className?: string;
     getSupplierPrice?: (supplier: SupplierDistribution) => number | null;
     onSupplierClick?: (supplierId: number) => void;
+    compact?: boolean;
 };
 
 const clamp = (value: number, min = 0, max = 100): number => Math.min(max, Math.max(min, value));
@@ -45,7 +46,7 @@ const TrolleyIcon = ({ fill = 0, isFull = false }: { fill?: number; isFull?: boo
     );
 };
 
-export function ProductRollMini({ items, className, getSupplierPrice, onSupplierClick }: ProductRollMiniProps) {
+export function ProductRollMini({ items, className, getSupplierPrice, onSupplierClick, compact = false }: ProductRollMiniProps) {
     const distribution = useMemo(() => buildRollDistribution(items), [items]);
     const suppliers = Object.values(distribution.suppliers);
 
@@ -80,14 +81,14 @@ export function ProductRollMini({ items, className, getSupplierPrice, onSupplier
                     <button
                         key={supplier.supplierId}
                         type="button"
-                        className="flex w-full items-center gap-3 border-b border-accent px-0 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className={cn('flex w-full items-center px-0 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', compact ? 'gap-1.5 py-0.5' : 'gap-3 border-b border-accent py-2')}
                         onClick={() => onSupplierClick?.(supplier.supplierId)}
                         disabled={!onSupplierClick}
                         aria-label={`View roll details${supplier.name ? ` for ${supplier.name}` : ''}`}
                     >
                         <CountryFlag countryCode={supplier.country} className="w-4" />
 
-                        <div className="flex items-center gap-1">
+                        <div className={cn('flex items-center gap-1', compact && 'min-w-0 overflow-x-auto')}>
                             {fullRolls > 0 && (
                                 <div className="relative">
                                     <TrolleyIcon isFull={true} />
@@ -109,7 +110,7 @@ export function ProductRollMini({ items, className, getSupplierPrice, onSupplier
                             })}
                         </div>
 
-                        <div className="ml-auto flex flex-col items-end text-[10px]">
+                        <div className="ml-auto flex shrink-0 flex-col items-end text-[10px]">
                             <span className="font-semibold">{Math.round(supplier.coefAvg * 10) / 10}%</span>
                             <span>{supplierPrice !== null ? formatCurrency(supplierPrice) : 'devis'}</span>
                         </div>
