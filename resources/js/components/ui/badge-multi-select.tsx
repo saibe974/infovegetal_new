@@ -6,6 +6,8 @@ import Select, {
     type OptionProps,
 } from 'react-select';
 import type { ReactNode } from 'react';
+import CreatableSelect from 'react-select/creatable';
+import { useI18n } from '@/lib/i18n';
 
 export type BadgeMultiSelectOption = {
     value: string;
@@ -53,6 +55,7 @@ export function BadgeMultiSelect({
     onChange,
     showAllOptionsWhenEmpty = false,
     renderBadge,
+    allowCreate = false,
 }: {
     id: string;
     label?: string;
@@ -62,11 +65,15 @@ export function BadgeMultiSelect({
     onChange: (values: string[]) => void;
     showAllOptionsWhenEmpty?: boolean;
     renderBadge?: (option: BadgeMultiSelectOption) => ReactNode;
+    allowCreate?: boolean;
 }) {
+    const { t } = useI18n();
+    const SelectComponent = allowCreate ? CreatableSelect : Select;
     const selectedOptions = showAllOptionsWhenEmpty && value.length === 0
         ? options
         : value
-            .map((selectedValue) => options.find((option) => option.value === selectedValue))
+            .map((selectedValue) => options.find((option) => option.value === selectedValue)
+                ?? (allowCreate ? { value: selectedValue, label: selectedValue } : undefined))
             .filter((option): option is BadgeMultiSelectOption => Boolean(option));
 
     return (
@@ -79,7 +86,7 @@ export function BadgeMultiSelect({
                     {label}
                 </label>
             )}
-            <Select<BadgeMultiSelectOption, true>
+            <SelectComponent<BadgeMultiSelectOption, true>
                 instanceId={id}
                 inputId={id}
                 isMulti
@@ -98,7 +105,18 @@ export function BadgeMultiSelect({
                     menuPortal: (base) => ({ ...base, zIndex: 50 }),
                 }}
                 isClearable
-                isSearchable={options.length > 8}
+                isSearchable={allowCreate || options.length > 8}
+                {...(allowCreate ? {
+                    formatCreateLabel: (input: string) => `${t('Create')} « ${input.trim()} »`,
+                    isValidNewOption: (input: string) => {
+                        const normalized = input.trim().toLocaleLowerCase();
+                        return /[\p{L}\p{N}]/u.test(normalized)
+                            && normalized.length <= 255
+                            && ![...options.map((option) => option.value), ...value]
+                                .some((existing) => existing.trim().toLocaleLowerCase() === normalized);
+                    },
+                    onCreateOption: (input: string) => onChange([...value, input.trim()]),
+                } : {})}
                 controlShouldRenderValue
                 components={{ Option: BadgeOption }}
                 formatOptionLabel={(option, context) => context.context === 'value' && renderBadge ? renderBadge(option) : (

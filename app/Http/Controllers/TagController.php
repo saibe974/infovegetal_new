@@ -101,7 +101,17 @@ class TagController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $name = $request->input('name');
+        if (is_string($name)) {
+            $request->merge(['name' => trim($name), 'slug' => (string) str($name)->trim()->lower()->slug('-')]);
+        }
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['required', 'string', 'max:255', 'unique:tags,slug'],
+        ]);
+        Tag::create($data);
+
+        return redirect()->route('tags-products.index')->with('success', 'Tag créé');
     }
 
     /**

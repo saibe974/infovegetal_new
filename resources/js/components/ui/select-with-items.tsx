@@ -11,6 +11,7 @@ export type SelectOption = {
     label: string;
     value: string;
     img?: React.ReactNode;
+    depth?: number;
 };
 
 type Props = {
@@ -52,7 +53,12 @@ export function SelectWithItems({
                 </SelectTrigger>
                 <SelectContent>
                     {items.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
+                        <SelectItem
+                            key={item.value}
+                            value={item.value}
+                            textValue={item.label}
+                            style={item.depth === undefined ? undefined : { paddingInlineStart: `${8 + item.depth * 20}px` }}
+                        >
                             {item.img && item.img}{item.label}
                         </SelectItem>
                     ))}

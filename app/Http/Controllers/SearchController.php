@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Product;
 use App\Models\CategoryProducts;
 use App\Models\Tag;
 use App\Models\User;
 use App\Services\PromotionProductCatalogService;
+use App\Services\ProductCatalogQuery;
 
 class SearchController extends Controller
 {
@@ -19,7 +19,7 @@ class SearchController extends Controller
             return response()->json(['propositions' => []]);
         }
 
-        $limit = (int)($request->integer('limit') ?: 10);
+        $limit = max(1, min(50, (int) ($request->integer('limit') ?: 10)));
 
         if ($context === 'promotion-products') {
             $user = $request->user();
@@ -41,11 +41,13 @@ class SearchController extends Controller
         }
 
         if ($context === 'products') {
-            $query = Product::with(['category','tags'])->orderFromRequest($request);
-            $categoryItems = $this->productCategoryPropositions($search, $limit);
+            $productCatalog = new ProductCatalogQuery($request);
+            $query = clone $productCatalog->baseQuery;
+            $productCatalog->applyFilters($query, $productCatalog->filters);
+            $categoryItems = $this->productCategoryPropositions($search, $limit, productQuery: $query);
             $remaining = max(0, $limit - count($categoryItems));
             $productItems = $remaining > 0
-                ? array_slice(ProductController::getSearchPropositions($query, $search), 0, $remaining)
+                ? array_slice(ProductController::getSearchPropositions($query, $search, $remaining), 0, $remaining)
                 : [];
 
             return response()->json([
@@ -145,11 +147,20 @@ class SearchController extends Controller
         return response()->json(['propositions' => []]);
     }
 
-    private function productCategoryPropositions(string $search, int $limit, ?array $allowedCategories = null): array
+    private function productCategoryPropositions(string $search, int $limit, ?array $allowedCategories = null, ?\Illuminate\Database\Eloquent\Builder $productQuery = null): array
     {
         $tokens = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         $query = CategoryProducts::query();
+
+        if ($productQuery !== null) {
+            $availableProducts = (clone $productQuery)->reorder()
+                ->join('category_products as product_category', 'products.category_products_id', '=', 'product_category.id')
+                ->whereColumn('product_category._lft', '>=', 'category_products._lft')
+                ->whereColumn('product_category._rgt', '<=', 'category_products._rgt')
+                ->selectRaw('1');
+            $query->whereExists($availableProducts->toBase());
+        }
 
         if ($allowedCategories !== null) {
             $allowedIds = array_column($allowedCategories, 'id');

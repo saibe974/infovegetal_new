@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\ProductController;
 use App\Models\Product;
+use App\Models\CategoryProducts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -34,6 +35,27 @@ function createMultiFilterProduct(string $suffix, int $dbProductId, string $pot,
         'height' => $height,
     ]);
 }
+
+it('excludes the all-categories root from available category choices', function (): void {
+    $root = CategoryProducts::create(['name' => 'Toutes catégories']);
+    $category = CategoryProducts::create(['name' => 'Buxus']);
+    $category->appendToNode($root)->save();
+    $database = createMultiFilterDatabase('NL');
+    createMultiFilterProduct('buxus-root', $database, '12', '40')->update(['category_products_id' => $root->id]);
+    createMultiFilterProduct('buxus-category', $database, '12', '40')->update(['category_products_id' => $category->id]);
+
+    foreach (['buxus', 'buxus-root'] as $search) {
+        $request = Request::create(route('products.index'), 'GET', ['q' => $search], [], [], [
+            'HTTP_X_INERTIA' => 'true',
+            'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+        ]);
+        $response = app(ProductController::class)->index($request)->toResponse($request);
+        $payload = json_decode($response->getContent(), true);
+
+        expect($payload['props']['categoryOptions'])->toBe($search === 'buxus' ? [$category->id] : [])
+            ->and($payload['props']['collection']['data'])->toHaveCount($search === 'buxus' ? 2 : 1);
+    }
+});
 
 it('filters products with multiple countries, pot diameters and heights', function (): void {
     $frDatabase = createMultiFilterDatabase('FR');

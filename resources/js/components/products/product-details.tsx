@@ -1,15 +1,19 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeftCircle, MoveVertical, CircleSlash2, Sprout } from 'lucide-react';
+import { ArrowLeftCircle, MoveVertical, CircleSlash2, Sprout, Pencil, Trash2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { CartContext } from '@/components/cart/cart.context';
 import { useContext } from 'react';
 import { Lens } from '@/components/ui/lens';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { type Product, SharedData } from '@/types';
 import { resolveProductPrices } from '@/lib/resolve-product-prices';
 import { ProductOrderButtons } from '@/components/products/product-order-buttons';
+import { CountryFlag } from '@/components/ui/country-flag';
+import { Button } from '@/components/ui/button';
+import { getEffectiveUser, hasPermission, isAdmin } from '@/lib/roles';
+import products from '@/routes/products';
 
 type Props = {
     product: Product;
@@ -25,6 +29,16 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
     const user = auth?.user;
     const isAuthenticated = !!user;
     const isPrivileged = !!auth?.user?.roles?.some((role) => ['dev', 'admin', 'commercial'].includes(role.name));
+    const effectiveUser = getEffectiveUser(auth);
+    const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
+    const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
+    const countryCode = product.dbProduct?.country?.trim().toUpperCase();
+
+    const deleteProduct = () => {
+        if (confirm(t('Êtes-vous sûr de vouloir supprimer ce produit ?'))) {
+            router.delete(products.admin.destroy.url(product.id));
+        }
+    };
 
     const filterByProducer = (producerId: number) => {
         if (typeof window === 'undefined') return;
@@ -39,8 +53,8 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
+            <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-4">
+                <div className="flex w-max max-w-full items-center gap-4">
                     {showBackLink && (
                         <Link
                             href="#"
@@ -53,15 +67,30 @@ export default function ProductDetails({ product, showBackLink = true }: Props) 
                             <ArrowLeftCircle size={35} />
                         </Link>
                     )}
-                    <div>
-                        <h1 className="text-3xl font-bold capitalize">{product.name}</h1>
+                    <div className="flex min-w-0 items-center gap-3">
+                        {countryCode && <CountryFlag countryCode={countryCode} className="w-7 shrink-0" />}
+                        <h1 className="w-max max-w-full text-3xl font-bold break-words capitalize">{product.name}</h1>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="ml-auto flex w-max flex-wrap items-center justify-end gap-3">
                     {product.active ? (
                         <Badge variant="default" className="bg-green-600">{t('En stock')}</Badge>
                     ) : (
                         <Badge variant="destructive">{t('Rupture')}</Badge>
+                    )}
+                    {canEdit && (
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={products.admin.edit.url(product.id)}>
+                                <Pencil className="size-4" />
+                                {t('Edit')}
+                            </Link>
+                        </Button>
+                    )}
+                    {canDelete && (
+                        <Button variant="destructive" size="sm" onClick={deleteProduct}>
+                            <Trash2 className="size-4" />
+                            {t('Delete')}
+                        </Button>
                     )}
                 </div>
             </div>

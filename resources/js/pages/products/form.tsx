@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 // import { ImageInput } from '@/components/ui/image-input';
 import { Input } from '@/components/ui/input';
+import { CountryFlag } from '@/components/ui/country-flag';
 // import {
 //     type SelectOption,
 //     SelectWithItems,
@@ -13,11 +14,12 @@ import { Input } from '@/components/ui/input';
 import { withAppLayout } from '@/layouts/app-layout';
 import products from '@/routes/products';
 import type { BreadcrumbItem, ProductDetailed } from '@/types';
+import { SelectWithItems } from '@/components/ui/select-with-items';
+import { BadgeMultiSelect } from '@/components/ui/badge-multi-select';
 import { useForm, Link } from '@inertiajs/react';
 import { ArrowLeftCircle, SaveIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import SearchSelect from '@/components/app/search-select';
 import { useState, FormEvent } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -27,6 +29,8 @@ import { toast } from 'sonner';
 
 type Props = {
     product: ProductDetailed;
+    categories: { id: number; name: string; parent_id: number | null }[];
+    tagOptions: string[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -41,26 +45,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 
-export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
+export default withAppLayout<Props>(breadcrumbs, false, ({ product, categories = [], tagOptions = [] }) => {
     const { t } = useI18n();
     const initialTags = product.tags?.map((tagItem) => tagItem.name) ?? [];
-    const [tag, setTag] = useState('')
     const [tags, setTags] = useState<string[]>(initialTags)
+    const categoriesById = new Map(categories.map((category) => [category.id, category]));
+    const categoryItems = categories.map((category) => {
+        const names = [category.name];
+        const visited = new Set([category.id]);
+        let parentId = category.parent_id;
+        while (parentId !== null && !visited.has(parentId)) {
+            visited.add(parentId);
+            const parent = categoriesById.get(parentId);
+            if (!parent) break;
+            names.unshift(parent.name);
+            parentId = parent.parent_id;
+        }
+        return { value: String(category.id), label: category.name, depth: names.length - 1 };
+    });
     const [previewImage, setPreviewImage] = useState(product.image_original ?? product.image_medium ?? product.img_link ?? '/images/placeholder.png');
     const [imgLinkRemoved, setImgLinkRemoved] = useState(!product.img_link);
     const [removeImgLinkProcessing, setRemoveImgLinkProcessing] = useState(false);
     const [removeImgLinkStatus, setRemoveImgLinkStatus] = useState<string | null>(null);
 
     console.log('[FORM] Component rendered with product:', product.id, product.name);
-
-    const writeTags = (t: string) => {
-        setTag(t)
-        const nextTags = t
-            .split(/\s+/)
-            .map((value) => value.trim())
-            .filter((value) => value.length > 0);
-        setTags(nextTags);
-    }
 
     const handleRemoveMissingImgLink = async () => {
         if (!product.id || removeImgLinkProcessing || imgLinkRemoved) {
@@ -114,7 +122,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         ref: string;
         ean13: string;
         description: string;
-        tags: string;
+        tags: string[];
+        category_products_id: number | null;
         pot: string;
         height: string;
         cond: string;
@@ -132,7 +141,8 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
         ref: String(product.ref || ''),
         ean13: String(product.ean13 || ''),
         description: product.description || '',
-        tags: initialTags.join(','),
+        tags: initialTags,
+        category_products_id: product.category_products_id == null ? null : Number(product.category_products_id),
         pot: String(product.pot ?? ''),
         height: String(product.height || ''),
         cond: String(product.cond ?? ''),
@@ -153,12 +163,12 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
 
         transform((payload) => ({
             ...payload,
-            tags: tags.join(','),
+            tags,
         }));
 
         console.log('[FORM] Submit data prepared:', {
             ...data,
-            tags: tags.join(','),
+            tags,
         });
 
         if (product.id) {
@@ -260,6 +270,22 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                                 aria-invalid={!!currentErrors['ean13']}
                                             />
                                         </FormField>
+                                        <FormField label={t('Database')} htmlFor="product-database">
+                                            <div className="relative">
+                                                {product.dbProduct?.country && (
+                                                    <CountryFlag
+                                                        countryCode={product.dbProduct.country}
+                                                        className="pointer-events-none absolute top-1/2 left-3 w-5 -translate-y-1/2 opacity-50"
+                                                    />
+                                                )}
+                                                <Input
+                                                    id="product-database"
+                                                    value={product.dbProduct?.name ?? t('N/A')}
+                                                    disabled
+                                                    className={product.dbProduct?.country ? 'pl-10' : undefined}
+                                                />
+                                            </div>
+                                        </FormField>
                                     </div>
 
                                     <FormField label={t('Description')} htmlFor="description" error={currentErrors['description']}>
@@ -275,15 +301,26 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product }) => {
                                         />
                                     </FormField>
 
-                                    <FormField label={t('Tags')} error={currentErrors['tags']}>
-                                        <SearchSelect
-                                            value={tag}
-                                            onChange={writeTags}
-                                            onSubmit={() => { }}
-                                            placeholder=''
-                                            selection={tags}
-                                            filters={false}
-                                            search={false}
+                                    <FormField label={t('Category')} htmlFor="product-category" error={currentErrors.category_products_id}>
+                                        <SelectWithItems
+                                            id="product-category"
+                                            name="category_products_id"
+                                            className="w-full"
+                                            items={[{ value: 'none', label: t('No category') }, ...categoryItems]}
+                                            defaultValue={data.category_products_id === null ? 'none' : String(data.category_products_id)}
+                                            onValueChange={(value) => setData('category_products_id', value === 'none' ? null : Number(value))}
+                                            aria-invalid={!!currentErrors.category_products_id}
+                                        />
+                                    </FormField>
+
+                                    <FormField label={t('Tags')} htmlFor="product-tags" error={currentErrors.tags || Object.entries(currentErrors).find(([key]) => key.startsWith('tags.'))?.[1]}>
+                                        <BadgeMultiSelect
+                                            id="product-tags"
+                                            value={tags}
+                                            onChange={setTags}
+                                            options={Array.from(new Set([...tagOptions, ...tags])).map((name) => ({ value: name, label: name }))}
+                                            placeholder={t('Choisir ou créer des tags')}
+                                            allowCreate
                                         />
                                     </FormField>
                                 </Card>

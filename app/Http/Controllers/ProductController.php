@@ -8,6 +8,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\Carrier;
 use App\Models\CategoryProducts;
 use App\Models\Product;
+use App\Models\Tag;
 use App\Services\ProductCatalogQuery;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
@@ -65,9 +66,11 @@ class ProductController extends Controller
 
         $binaryOptions = ProductCatalogQuery::binaryFilterOptions($optionsBaseQuery, $filters, $applyFilters);
 
+        $taxonomyRootId = CategoryProducts::query()->whereKey(1)->whereNull('parent_id')->value('id');
         $categoryOptions = (clone $optionsBaseQuery)
             ->tap(fn ($q) => $applyFilters($q, $filters, ['category']))
             ->whereNotNull('category_products_id')
+            ->when($taxonomyRootId !== null, fn ($q) => $q->where('category_products_id', '<>', $taxonomyRootId))
             ->select('category_products_id')
             ->distinct()
             ->orderBy('category_products_id')
@@ -493,7 +496,7 @@ class ProductController extends Controller
 
         abort_unless($isAdminView || $product->isOrderableAt(), 404);
 
-        $product->load(['category', 'tags', 'producer']);
+        $product->load(['category', 'tags', 'producer', 'dbProduct']);
 
         return Inertia::render('products/show', [
             'product' => new ProductResource($product),
@@ -505,10 +508,12 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
-        $product->load(['tags']);
+        $product->load(['tags', 'dbProduct']);
 
         return Inertia::render('products/form', [
             'product' => new ProductResource($product),
+            'categories' => CategoryProducts::query()->defaultOrder()->get(['id', 'name', 'parent_id']),
+            'tagOptions' => Tag::query()->orderBy('name')->pluck('name'),
         ]);
     }
 
@@ -544,7 +549,7 @@ class ProductController extends Controller
     {
         $product->delete();
 
-        return redirect()->back()->with('success', 'Produit supprimé');
+        return redirect()->route('products.index')->with('success', 'Produit supprimé');
     }
 
     private function handleFormRequest(Product $product, FormProductRequest $request)
@@ -615,7 +620,7 @@ class ProductController extends Controller
     /**
      * Génère les propositions triées selon la logique de recherche.
      */
-    public static function getSearchPropositions(Builder $query, ?string $search)
+    public static function getSearchPropositions(Builder $query, ?string $search, ?int $limit = null)
     {
         if (empty($search)) {
             return [];
@@ -646,6 +651,14 @@ class ProductController extends Controller
         $clonedQuery->getQuery()->orders = null; // Supprime les ORDER BY
         $applyNameSearch($clonedQuery, $search);
 
+        if ($limit !== null) {
+            $clonedQuery
+                ->orderByRaw('CASE WHEN LOWER(name) LIKE ? THEN 0 ELSE 1 END', [$lowerSearch.'%'])
+                ->orderByRaw('LENGTH(name)')
+                ->orderBy('name')
+                ->limit(max(50, $limit * 5));
+        }
+
         $propositions = $clonedQuery
             ->selectRaw('MIN(id) as id, name, MIN(created_at) as created_at')
             ->groupBy('name')
@@ -672,6 +685,10 @@ class ProductController extends Controller
         if ($cleaned->isEmpty()) {
             $refQuery = clone $query;
             $refQuery->getQuery()->orders = null;
+
+            if ($limit !== null) {
+                $refQuery->orderBy('ref')->limit($limit);
+            }
 
             $refSuggestions = $refQuery
                 ->whereNotNull('ref')

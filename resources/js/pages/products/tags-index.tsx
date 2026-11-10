@@ -3,7 +3,7 @@ import products from '@/routes/products';
 import { useRef, useState } from 'react';
 import { PaginatedCollection } from '@/types';
 import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
-import { Link, InfiniteScroll, usePage, router, Head } from '@inertiajs/react';
+import { Link, InfiniteScroll, usePage, router, Head, useForm } from '@inertiajs/react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Button } from '@/components/ui/button';
 import { EditIcon, TrashIcon } from 'lucide-react';
@@ -13,6 +13,9 @@ import tagsProducts from '@/routes/tags-products';
 import { useI18n } from '@/lib/i18n';
 import { Badge } from '@/components/ui/badge';
 import { ButtonsActions } from '@/components/buttons-actions';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
 
 type Tag = {
     id: number;
@@ -49,6 +52,8 @@ export default withAppLayout(
         const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
         const [fetching, setFetching] = useState(false);
         const [search, setSearch] = useState('');
+        const [createOpen, setCreateOpen] = useState(false);
+        const tagForm = useForm<{ name: string; slug?: string }>({ name: '' });
         const [searchPropositionsState, setSearchPropositions] = useState<string[]>(searchPropositions ?? []);
 
         const handleSearch = (s: string) => {
@@ -120,9 +125,40 @@ export default withAppLayout(
                         </Button>
                     </div> */}
                     <ButtonsActions
-                        add={() => { }}
+                        add={() => {
+                            tagForm.reset();
+                            tagForm.clearErrors();
+                            setCreateOpen(true);
+                        }}
                     />
                 </StickyBar>
+
+                <Dialog open={createOpen} onOpenChange={(open) => { if (!tagForm.processing) setCreateOpen(open); }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{t('Add Tag')}</DialogTitle>
+                            <DialogDescription>{t('Le slug est généré automatiquement à partir du nom.')}</DialogDescription>
+                        </DialogHeader>
+                        <form className="space-y-4" onSubmit={(event) => {
+                            event.preventDefault();
+                            tagForm.post(tagsProducts.store.url(), {
+                                onSuccess: () => {
+                                    setCreateOpen(false);
+                                    tagForm.reset();
+                                },
+                            });
+                        }}>
+                            <FormField label={t('Name')} htmlFor="tag-name" error={tagForm.errors.name}>
+                                <Input id="tag-name" value={tagForm.data.name} onChange={(event) => tagForm.setData('name', event.target.value)} maxLength={255} required autoFocus disabled={tagForm.processing} aria-invalid={!!tagForm.errors.name} />
+                            </FormField>
+                            {tagForm.errors.slug && <p role="alert" className="text-sm text-destructive">{tagForm.errors.slug}</p>}
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={tagForm.processing}>{t('Cancel')}</Button>
+                                <Button type="submit" disabled={tagForm.processing}>{t('Create')}</Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 <InfiniteScroll data="collection">
                     <Table>

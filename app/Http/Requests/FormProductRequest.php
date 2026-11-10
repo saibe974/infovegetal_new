@@ -31,7 +31,9 @@ class FormProductRequest extends FormRequest
             'ean13' => ['nullable', 'string', 'max:13'],
             'description' => ['nullable', 'string'],
             'img_link' => ['nullable', 'string', 'max:2048'],
-            'tags' => ['nullable'],
+            'category_products_id' => ['nullable', 'integer', 'exists:category_products,id'],
+            'tags' => ['nullable', 'array', 'max:100'],
+            'tags.*' => ['required', 'string', 'max:255', 'regex:/[\p{L}\p{N}]/u'],
             'pot' => ['nullable', 'numeric', 'min:0'],
             'height' => ['nullable', 'regex:/^\d+(-\d+)?$/', 'max:20'],
             'cond' => ['nullable', 'integer', 'min:0'],
@@ -44,5 +46,14 @@ class FormProductRequest extends FormRequest
             'available_from' => ['nullable', 'date'],
             'available_until' => ['nullable', 'date', 'after:available_from'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('tags') && is_string($this->input('tags'))) {
+            $this->merge([
+                'tags' => array_values(array_filter(array_map('trim', preg_split('/[,;\n]+/', $this->input('tags'))))),
+            ]);
+        }
     }
 }

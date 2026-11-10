@@ -111,6 +111,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const searchPropositions = page.props.searchPropositions ?? [];
     // const timerRef = useRef<ReturnType<typeof setTimeout>(undefined);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const propositionsRequestRef = useRef<AbortController | null>(null);
+    useEffect(() => () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        propositionsRequestRef.current?.abort();
+    }, []);
     const [fetching, setFetching] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -148,9 +153,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         return normalized;
     };
 
-    const categoryChoices = categoryOptions.length > 0
-        ? categories.filter((category) => categoryOptions.includes(category.id))
-        : categories;
+    const categoryChoices = categories.filter((category) =>
+        categoryOptions.includes(category.id) && !(category.id === 1 && category.parent_id == null)
+    );
     const countries = Array.from(
         new Set(
             countryOptions
@@ -229,7 +234,14 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         return views.productsFilters === 'popover' ? 'popover' : 'docked';
     });
     const isMobile = useIsMobile();
-    const dockedFilters = !isMobile && filtersLayout === 'docked';
+    const hasAvailableFilters = categoryChoices.length >= 2
+        || countryOptions.length >= 2
+        || potOptions.length >= 2
+        || heightOptions.length >= 2
+        || producerOptions.length >= 2
+        || imageOptions.length >= 2
+        || promoOptions.length >= 2;
+    const dockedFilters = !isMobile && filtersLayout === 'docked' && hasAvailableFilters;
     const filtersStickyTop = useStickyTopOffset('.top-sticky, .header-search', dockedFilters);
 
     const toggleFiltersPin = () => {
@@ -386,10 +398,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         applyFilters(nextFilters);
     }
 
-    const clearAllFilters = () => {
+    const resetFilters = (searchQuery: string | null = null, category: number | null = null) => {
         const nextFilters: FiltersState & CartFilter = {
             active: 'all',
-            category: null,
+            category,
             country: [],
             pot: [],
             height: [],
@@ -414,7 +426,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             }).catch(err => console.error('Erreur clear cart:', err));
         }
 
-        router.get(window.location.pathname, buildQueryParams(nextFilters, null), {
+        router.get(window.location.pathname, buildQueryParams(nextFilters, searchQuery), {
             preserveState: exportView,
             reset: exportView ? ['collection'] : [],
             replace: true,
@@ -422,26 +434,45 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         });
     };
 
+    const clearAllFilters = () => resetFilters();
+
     // Local state for client-fetched propositions to avoid Inertia refresh
     const [searchPropositionsState, setSearchPropositions] = useState<Array<string | SearchOption>>(searchPropositions ?? []);
 
     const handleSearch = (s: string) => {
         setSearch(s);
+        propositionsRequestRef.current?.abort();
+        setSearchPropositions([]);
         if (timerRef.current) {
             clearTimeout(timerRef.current);
         }
         if (s.length < 2) {
+            setFetching(false);
             return;
         }
-        router.cancelAll();
+        const controller = new AbortController();
+        propositionsRequestRef.current = controller;
         setFetching(true);
         timerRef.current = setTimeout(async () => {
             try {
-                const res = await fetch(`/search-propositions?context=products&q=${encodeURIComponent(s)}&limit=10`);
+                const params = new URLSearchParams({ context: 'products', limit: '10' });
+                Object.entries(buildQueryParams(filtersState, s)).forEach(([key, value]) => {
+                    if (Array.isArray(value)) {
+                        value.forEach((item) => params.append(`${key}[]`, item));
+                    } else {
+                        params.set(key, String(value));
+                    }
+                });
+                const res = await fetch(`/search-propositions?${params}`, { signal: controller.signal });
+                if (!res.ok) return;
                 const json = await res.json();
-                setSearchPropositions((json.propositions || []) as Array<string | SearchOption>);
+                if (!controller.signal.aborted) {
+                    setSearchPropositions((json.propositions || []) as Array<string | SearchOption>);
+                }
+            } catch (error) {
+                if (!controller.signal.aborted) console.error('Erreur propositions produits:', error);
             } finally {
-                setFetching(false);
+                if (!controller.signal.aborted) setFetching(false);
             }
         }, 300);
     }
@@ -478,15 +509,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     };
 
     const handleSelectOption = (option: SearchOption) => {
-        if (option.kind !== 'category' || typeof option.id !== 'number') {
-            return false;
+        if (option.kind === 'category' && typeof option.id === 'number') {
+            resetFilters(null, option.id);
+        } else {
+            resetFilters(option.value);
         }
-
-        setSearch('');
-        applyFilters({
-            ...filtersState,
-            category: option.id,
-        });
 
         return true;
     };
@@ -551,7 +578,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                     compactMobile
                     query={q ?? ''}
                     fixedFilters={singleFilters}
-                    filters={dockedFilters ? undefined : (
+                    filters={dockedFilters || !hasAvailableFilters ? undefined : (
                         <ProductsFilters
                             {...productsFiltersProps}
                             pin={{ docked: filtersLayout === 'docked', onToggle: toggleFiltersPin }}
