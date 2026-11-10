@@ -49,6 +49,7 @@ const itemVariables = [
     '%product.price_promo%',
     '%quantity%',
     '%unit_price%',
+    '%unit_buy_price%',
     '%line_total%',
     '%comment%',
 ];
@@ -126,6 +127,7 @@ export const previewItems: Array<Record<string, string>> = [
         'product.price_promo': '8.90',
         quantity: '2',
         unit_price: '12.50',
+        unit_buy_price: '10.00',
         line_total: '25.00',
         comment: '',
     },
@@ -148,6 +150,7 @@ export const previewItems: Array<Record<string, string>> = [
         'product.price_promo': '25.00',
         quantity: '4',
         unit_price: '30.00',
+        unit_buy_price: '24.00',
         line_total: '120.00',
         comment: '',
     },
@@ -161,7 +164,7 @@ export const variableFormatType = (
         /^(?:document|order|delivery|invoice|credit_note)\.(?:count|items_total|shipping_total|total)$/.test(
             variableName,
         ) ||
-        /^(?:product\.(?:cond|floor|roll|pot)|quantity|unit_price|line_total)$/.test(
+        /^(?:product\.(?:cond|floor|roll|pot)|quantity|unit_price|unit_buy_price|line_total)$/.test(
             variableName,
         )
     ) {

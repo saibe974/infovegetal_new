@@ -286,8 +286,11 @@ class DbProductsController extends Controller
             ->values()
             ->all();
 
-        $this->syncBillableUsers($db_product, $billableUserIds);
-        $this->syncDbProductBillingRules($db_product, $billingUsers);
+        if ($permissions['can_manage_billing_users']) {
+            $this->syncBillableUsers($db_product, $billableUserIds);
+        }
+
+        $this->syncDbProductBillingRules($db_product, $billingUsers, $permissions['can_manage_billing_users']);
 
         return redirect()->route('db-products.billing', $db_product)->with('success', __('Billing rules updated.'));
     }
@@ -478,7 +481,7 @@ class DbProductsController extends Controller
 
     private function validateBillingPayload(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'billing_users' => ['nullable', 'array'],
             'billing_users.*.billing_user_id' => ['required', 'integer', 'exists:users,id'],
             'billing_users.*.defaults' => ['nullable', 'array'],
@@ -508,7 +511,7 @@ class DbProductsController extends Controller
             'billing_users.*.defaults.files.*.columns.*.name' => ['present', 'nullable', 'string', 'max:190'],
             'billing_users.*.defaults.files.*.rows' => ['nullable', 'array'],
             'billing_users.*.defaults.files.*.rows.*.id' => ['required', 'string', 'max:190'],
-            'billing_users.*.defaults.files.*.rows.*.cells' => ['required', 'array'],
+            'billing_users.*.defaults.files.*.rows.*.cells' => ['present', 'array'],
             'billing_users.*.defaults.files.*.rows.*.cells.*' => ['nullable', 'string', 'max:5000'],
             'billing_users.*.defaults.files.*.blocks' => ['nullable', 'array'],
             'billing_users.*.defaults.files.*.blocks.*.id' => ['required', 'string', 'max:190'],
@@ -519,9 +522,9 @@ class DbProductsController extends Controller
             'billing_users.*.defaults.files.*.blocks.*.columns' => ['required', 'array', 'min:1'],
             'billing_users.*.defaults.files.*.blocks.*.columns.*.id' => ['required', 'string', 'max:190'],
             'billing_users.*.defaults.files.*.blocks.*.columns.*.name' => ['present', 'nullable', 'string', 'max:190'],
-            'billing_users.*.defaults.files.*.blocks.*.rows' => ['required', 'array'],
+            'billing_users.*.defaults.files.*.blocks.*.rows' => ['present', 'array'],
             'billing_users.*.defaults.files.*.blocks.*.rows.*.id' => ['required', 'string', 'max:190'],
-            'billing_users.*.defaults.files.*.blocks.*.rows.*.cells' => ['required', 'array'],
+            'billing_users.*.defaults.files.*.blocks.*.rows.*.cells' => ['present', 'array'],
             'billing_users.*.defaults.files.*.blocks.*.rows.*.cells.*' => ['nullable', 'string', 'max:5000'],
             'billing_users.*.sellers' => ['nullable', 'array'],
             'billing_users.*.sellers.*.seller_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -655,7 +658,7 @@ class DbProductsController extends Controller
         return $normalized;
     }
 
-    private function syncDbProductBillingRules(DbProducts $dbProduct, array $billingUsers): void
+    private function syncDbProductBillingRules(DbProducts $dbProduct, array $billingUsers, bool $canManageBillingUsers): void
     {
         $billingUsers = array_values(array_filter($billingUsers, fn ($rule) => is_array($rule) && ! empty($rule['billing_user_id'])));
 
@@ -763,6 +766,10 @@ class DbProductsController extends Controller
                     ->where('billing_user_id', (int) $billingUserId)
                     ->update(['active' => false, 'updated_at' => now()]);
             }
+        }
+
+        if (! $canManageBillingUsers) {
+            return;
         }
 
         if (! empty($billingUserIds)) {

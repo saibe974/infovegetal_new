@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Domain\Sales\Services\ProductPriceFallbackResolver;
+use App\Domain\Sales\Services\ProductVolumePriceSelector;
 use App\Models\Cart;
 use App\Models\DbProductBillingUser;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -487,6 +490,9 @@ class OrderCsvService
             'product.price_promo' => $product?->price_promo,
             'quantity' => $item['quantity'] ?? null,
             'unit_price' => $this->decimal($item['unit_price'] ?? null),
+            'unit_buy_price' => $product && isset($item['quantity'])
+                ? $this->decimal($this->purchaseUnitPrice($product, (int) $item['quantity']))
+                : '',
             'line_total' => $this->decimal($item['line_total'] ?? null),
             'comment' => $item['comment'] ?? null,
         ];
@@ -501,6 +507,32 @@ class OrderCsvService
         }
 
         return app(FileRuleRenderer::class)->render($value, $variables);
+    }
+
+    private function purchaseUnitPrice(Product $product, int $quantity): float
+    {
+        $traySize = max(0, (int) $product->cond);
+        $floorSize = $traySize * max(0, (int) $product->floor);
+        $rollSize = $floorSize * max(0, (int) $product->roll);
+
+        [$standard, $floor, $roll, $promo] = (new ProductPriceFallbackResolver)->resolve(
+            standardUnitPrice: (float) $product->price,
+            floorUnitPrice: (float) $product->price_floor,
+            rollUnitPrice: (float) $product->price_roll,
+            promoUnitPrice: (float) $product->price_promo,
+            enforcePositiveMinimum: false,
+        );
+
+        return (new ProductVolumePriceSelector)->selectUnitPrice(
+            quantity: $quantity,
+            traySize: $traySize,
+            floorSize: $floorSize,
+            rollSize: $rollSize,
+            standardUnitPrice: $standard,
+            floorUnitPrice: $floor,
+            rollUnitPrice: $roll,
+            promoUnitPrice: $promo,
+        );
     }
 
     private function decimal(mixed $value): string

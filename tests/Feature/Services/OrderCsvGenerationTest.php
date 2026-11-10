@@ -85,6 +85,23 @@ it('persists billing profiles and delimited files together', function (string $d
         ]],
     ];
 
+    $customFile = $defaults['files'][0];
+    $customFile['id'] = 'custom-delivery';
+    $customFile['system'] = false;
+    $customFile['blocks'][0]['rows'] = [];
+    $defaults['files'][] = $customFile;
+
+    $otherDatabase = DbProducts::query()->create([
+        'name' => 'Autre base',
+        'description' => 'Isolation test',
+    ]);
+    $otherRule = DbProductBillingUser::query()->create([
+        'db_product_id' => $otherDatabase->id,
+        'billing_user_id' => $billingUser->id,
+        'defaults' => ['files' => [$customFile]],
+        'active' => true,
+    ]);
+
     $response = $this->actingAs($admin)->put(
         route('db-products.update-billing', $database),
         ['billing_users' => [[
@@ -94,7 +111,8 @@ it('persists billing profiles and delimited files together', function (string $d
         ]]],
     );
 
-    $response->assertRedirect(route('db-products.billing', $database));
+    $response->assertSessionHasNoErrors()
+        ->assertRedirect(route('db-products.billing', $database));
 
     $stored = DbProductBillingUser::query()
         ->where('db_product_id', $database->id)
@@ -103,7 +121,9 @@ it('persists billing profiles and delimited files together', function (string $d
 
     expect($stored->defaults['default_profile_id'])->toBe('grossiste')
         ->and($stored->defaults['profiles'])->toEqual($defaults['profiles'])
-        ->and($stored->defaults['files'])->toEqual($defaults['files']);
+        ->and($stored->defaults['files'])->toEqual($defaults['files'])
+        ->and($otherRule->refresh()->defaults['files'])->toEqual([$customFile])
+        ->and($otherRule->active)->toBeTrue();
 })->with([
     'CSV semicolon' => [';', 'csv'],
     'TSV tab 0x09' => ["\t", 'tsv'],
@@ -140,7 +160,7 @@ it('stores enabled order CSV templates for the configured billing user', functio
                     'columns' => [['id' => 'reference', 'name' => 'Reference']],
                     'rows' => [[
                         'id' => 'item-row',
-                        'cells' => ['reference' => '%product.reference%'],
+                        'cells' => ['reference' => '%product.reference% %product.price% %unit_buy_price% %unit_price%'],
                     ]],
                 ],
                 [
@@ -164,16 +184,22 @@ it('stores enabled order CSV templates for the configured billing user', functio
         'db_products_id' => $database->id,
         'ref' => 'TUL-01',
         'name' => 'Tulipe',
+        'price' => 2.15,
+        'price_floor' => 1.90,
+        'price_roll' => 1.60,
+        'cond' => 2,
+        'floor' => 3,
+        'roll' => 4,
     ]);
 
     $files = app(OrderCsvService::class)->generate($cart, $client, [
         'order_number' => '00012',
-        'items' => collect([[
+        'items' => collect([2, 6, 24])->map(fn (int $quantity) => [
             'product' => $product,
-            'quantity' => 2,
+            'quantity' => $quantity,
             'unit_price' => 3,
-            'line_total' => 6,
-        ]]),
+            'line_total' => 3 * $quantity,
+        ]),
         'billing_context_by_db' => [
             $database->id => ['billing_user_id' => $billingUser->id],
         ],
@@ -195,7 +221,11 @@ it('stores enabled order CSV templates for the configured billing user', functio
         ->and($client->files()->where('file_path', $files[0]['relative_path'])->exists())->toBeFalse();
 
     Storage::disk('local')->assertExists($files[0]['relative_path']);
-    expect(Storage::disk('local')->get($files[0]['relative_path']))->toContain('TUL-01');
+    expect(Storage::disk('local')->get($files[0]['relative_path']))->toContain(
+        'TUL-01 2.15 2.15 3.00',
+        'TUL-01 2.15 1.90 3.00',
+        'TUL-01 2.15 1.60 3.00',
+    );
 
     $deliveryFiles = $service->generateForEvent('delivery', $cart, $client, [
         'document_number' => 'BL-00012',
