@@ -22,6 +22,10 @@ export default defineConfig({
     },
     server: {
         host: 'localhost',
+        watch: {
+            // Wayfinder writes modules before prepending their imports.
+            awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+        },
         cors: {
             origin: 'http://localhost:8000',
         },

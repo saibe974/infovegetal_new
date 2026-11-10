@@ -102,6 +102,12 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
     const showProducerNames = canViewProducerNames(auth?.user);
     const effectiveUser = getEffectiveUser(auth);
     const canEdit = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'edit products');
+    const canBulkEdit = isAdmin(effectiveUser);
+    const openBulkEdit = () => {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('page');
+        router.get(`${products.admin.bulkEdit.url()}?${params.toString()}`);
+    };
     const canDelete = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'delete products');
     const canImportExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'import products') || hasPermission(effectiveUser, 'export products');
     const canExport = isAdmin(effectiveUser) || hasPermission(effectiveUser, 'export products');
@@ -561,6 +567,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         viewMode={viewMode}
                         onViewModeChange={setViewMode}
                         pageKey="products"
+                        compact
                         modes={['table', 'list', 'grid']}
                         mobileMenuModes={['list', 'grid']}
                     />
@@ -590,7 +597,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                 />
                 {/* </div> */}
 
-                {canImportExport && !exportView && (
+                {(canImportExport || canBulkEdit) && !exportView && (
                     <ButtonsActions
                         className='hidden md:flex'
                         import={
@@ -612,14 +619,16 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         }
                         export={canExport ? () => setExportView(true) : undefined}
                         exportLabel={t('Export')}
+                        edit={canBulkEdit ? openBulkEdit : undefined}
                         add={() => { }}
                     />
                 )}
-                {canExport && !exportView && (
+                {(canExport || canBulkEdit) && !exportView && (
                     <ButtonsActions
                         className="md:hidden"
-                        export={() => setExportView(true)}
+                        export={canExport ? () => setExportView(true) : undefined}
                         exportLabel={t('Export')}
+                        edit={canBulkEdit ? openBulkEdit : undefined}
                     />
                 )}
             </StickyBar>

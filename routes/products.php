@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\DbProductsController as ApiDbProductsController;
 use App\Http\Controllers\Api\DbProductsWidgetController;
+use App\Http\Controllers\BulkProductController;
 use App\Http\Controllers\CategoryProductsController;
 use App\Http\Controllers\DbProductsController;
 use App\Http\Controllers\MediaController;
@@ -68,6 +69,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role_or_impersonator:admin'])->prefix('admin/products')->name('products.admin.')->group(function () {
         Route::get('/', [ProductController::class, 'index'])->name('index');
         Route::get('/create', [ProductController::class, 'create'])->name('create');
+        Route::get('/bulk-edit', [BulkProductController::class, 'edit'])->name('bulk-edit');
+        Route::put('/bulk-update', [BulkProductController::class, 'update'])->name('bulk-update');
         Route::post('/', [ProductController::class, 'store'])->name('store');
         Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('edit');
         Route::put('/{product}', [ProductController::class, 'update'])->name('update');

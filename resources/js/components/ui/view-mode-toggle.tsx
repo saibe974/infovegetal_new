@@ -25,6 +25,7 @@ interface ViewModeToggleProps {
     viewMode: ViewMode;
     onViewModeChange: (mode: ViewMode) => void;
     pageKey: string;
+    compact?: boolean;
     mobileMenuModes?: ViewMode[];
     modes?: ViewMode[]; // Modes disponibles (par défaut: tous)
 }
@@ -33,6 +34,7 @@ export function ViewModeToggle({
     viewMode,
     onViewModeChange,
     pageKey,
+    compact = false,
     modes = ['table', 'grid'],
     mobileMenuModes = [],
 }: ViewModeToggleProps) {
@@ -57,6 +59,10 @@ export function ViewModeToggle({
     const availableModes = defaultViewModes.filter(config => modes.includes(config.mode));
     const availableMobileModes = defaultViewModes.filter(config => mobileMenuModes.includes(config.mode));
     const activeMobileMode = availableMobileModes.find(config => config.mode === viewMode) ?? availableMobileModes[0];
+    const menuModes = compact ? availableModes : availableMobileModes;
+    const activeMenuMode = compact
+        ? availableModes.find(config => config.mode === viewMode) ?? availableModes[0]
+        : activeMobileMode;
 
     useEffect(() => {
         if (typeof window === 'undefined' || availableMobileModes.length === 0) return;
@@ -78,25 +84,28 @@ export function ViewModeToggle({
 
     return (
         <>
-            {activeMobileMode ? (
+            {activeMenuMode ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
                             type="button"
                             variant="outline"
-                            className="gap-1 p-2 sm:hidden"
-                            title={t(activeMobileMode.title)}
+                            className={compact ? 'gap-1 p-2' : 'gap-1 p-2 sm:hidden'}
+                            title={t(activeMenuMode.title)}
                             aria-label={t('Changer le mode d’affichage')}
                         >
-                            <activeMobileMode.icon />
+                            <activeMenuMode.icon />
                             <ChevronDown className="size-3.5" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                        {availableMobileModes.map(({ mode, icon: Icon, title }) => (
+                        {menuModes.map(({ mode, icon: Icon, title }) => (
                             <DropdownMenuItem
                                 key={mode}
-                                className={viewMode === mode ? 'bg-accent' : undefined}
+                                className={[
+                                    viewMode === mode ? 'bg-accent' : '',
+                                    compact && mobileMenuModes.length > 0 && !mobileMenuModes.includes(mode) ? 'hidden sm:flex' : '',
+                                ].filter(Boolean).join(' ')}
                                 onSelect={() => onViewModeChange(mode)}
                             >
                                 <Icon />
@@ -107,7 +116,7 @@ export function ViewModeToggle({
                 </DropdownMenu>
             ) : null}
 
-            <div className={activeMobileMode ? 'hidden gap-2 sm:flex' : 'flex gap-2'}>
+            {!compact && <div className={activeMobileMode ? 'hidden gap-2 sm:flex' : 'flex gap-2'}>
                 {availableModes.map(({ mode, icon: Icon, title }) => (
                     <Button
                         key={mode}
@@ -126,7 +135,7 @@ export function ViewModeToggle({
                         <Icon />
                     </Button>
                 ))}
-            </div>
+            </div>}
         </>
     );
 }

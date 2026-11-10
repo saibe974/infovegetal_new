@@ -153,6 +153,7 @@ export function ButtonsActions({
                     }}
                     variant={'outline'}
                     title={t('Edit')}
+                    aria-label={t('Edit')}
                     disabled={saving}
                     size={'icon'}
                 >
