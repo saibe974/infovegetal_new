@@ -18,6 +18,7 @@ return [
             'path' => storage_path('app/public'),
             'URL' => env('APP_URL').'/storage',
             'alias' => 'Fichiers',
+            'statCorrector' => [App\Support\ElfinderFolderLabel::class, 'apply'],
             'uploadDeny' => ['all'],
             'uploadAllow' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
             'uploadOrder' => ['deny', 'allow'],
