@@ -15,6 +15,8 @@ $ErrorActionPreference = 'Stop'
 
 function Invoke-Git {
     param([string] $Repository, [string[]] $Arguments)
+    # PS 5.1: redirected native stderr must not become a terminating error.
+    $ErrorActionPreference = 'Continue'
 
     $output = & git -C $Repository @Arguments 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -31,7 +33,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $ProdPath 'deploy.ps1'))) {
 }
 
 # The prod clone may belong to another Windows account (e.g. after a reinstall).
+$ErrorActionPreference = 'Continue'
 & git -C $ProdPath rev-parse --show-toplevel 2>$null | Out-Null
+$ErrorActionPreference = 'Stop'
 if ($LASTEXITCODE -ne 0) {
     $safePath = $ProdPath -replace '\\', '/'
     Write-Host "==> Ajout de $safePath a safe.directory" -ForegroundColor Cyan
