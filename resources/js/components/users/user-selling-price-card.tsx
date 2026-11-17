@@ -1,56 +1,13 @@
 import EditableProfileTitle from '@/components/sales/EditableProfileTitle';
 import SellerProfilesPanel from '@/components/sales/SellerProfilesPanel';
+import { SellingPriceRuleForm } from '@/components/users/selling-price-rule-form';
+import { useI18n } from '@/lib/i18n';
 import {
     DEFAULT_SELLING_PRICE_RULE,
-    SellingPriceRuleForm,
-    type SellingPriceRule,
-} from '@/components/users/selling-price-rule-form';
-import { useI18n } from '@/lib/i18n';
+    type SellingPriceProfile,
+    type SellingPriceSettings,
+} from '@/lib/selling-price';
 import { useEffect, useMemo, useState } from 'react';
-
-export type SellingPriceProfile = {
-    id: string;
-    name: string;
-    conditions: SellingPriceRule;
-};
-
-export type SellingPriceSettings = {
-    profiles: SellingPriceProfile[];
-    default_profile_id: string | null;
-};
-
-const EMPTY: SellingPriceSettings = { profiles: [], default_profile_id: null };
-
-/** Décode la valeur brute du users_meta `selling_price`. */
-export function parseSellingPrice(
-    raw: string | null | undefined,
-): SellingPriceSettings {
-    if (!raw) return EMPTY;
-
-    try {
-        const decoded = JSON.parse(raw);
-        if (!decoded || !Array.isArray(decoded.profiles)) return EMPTY;
-
-        const profiles: SellingPriceProfile[] = decoded.profiles.map(
-            (profile: Partial<SellingPriceProfile>, index: number) => ({
-                id: String(profile.id ?? `profile-${index + 1}`),
-                name: String(profile.name ?? `Profil ${index + 1}`),
-                conditions: {
-                    ...DEFAULT_SELLING_PRICE_RULE,
-                    ...(profile.conditions ?? {}),
-                },
-            }),
-        );
-
-        return {
-            profiles,
-            default_profile_id:
-                decoded.default_profile_id ?? profiles[0]?.id ?? null,
-        };
-    } catch {
-        return EMPTY;
-    }
-}
 
 type Props = {
     userId: number;

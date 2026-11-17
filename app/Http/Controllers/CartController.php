@@ -331,6 +331,10 @@ class CartController extends Controller
             'cart_transport_selection' => $activeCart?->transport_selection ?? [],
             'cart_discounts' => $activeCart?->discounts ?? [],
             'cart_coupon_code' => $activeCart?->coupon_code,
+            // Profils de prix de vente du client (affichage optionnel du prix client)
+            'cart_selling_price' => json_decode((string) $user->usersMeta()
+                ->where('key', \App\Models\UserMeta::SELLING_PRICE_KEY)
+                ->value('value'), true),
         ]);
     }
 

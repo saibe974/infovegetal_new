@@ -22,15 +22,15 @@ import {
     UserMetaFields,
     type UserMetaDraft,
 } from '@/components/users/user-meta-fields';
-import {
-    parseSellingPrice,
-    UserSellingPriceCard,
-    type SellingPriceSettings,
-} from '@/components/users/user-selling-price-card';
+import { UserSellingPriceCard } from '@/components/users/user-selling-price-card';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
+import {
+    parseSellingPrice,
+    type SellingPriceSettings,
+} from '@/lib/selling-price';
 import { edit as editProfile, update as updateProfile } from '@/routes/profile';
 import { update as updateLoginAlert } from '@/routes/settings/login-alert';
 import {

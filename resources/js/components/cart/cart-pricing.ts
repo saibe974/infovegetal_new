@@ -131,3 +131,78 @@ export const replaceRenderedDeliveryInPrice = (
 
     return unitPrice;
 };
+
+export type PurchaseBasesPerUnit = {
+    /** Prix d'achat unitaire sans aucune part de transport. */
+    excludingTransport: number;
+    /** Prix d'achat unitaire avec sa part du transport du fournisseur. */
+    includingTransport: number;
+    /**
+     * Achat au prix rendu : prix unitaire payé (transport inclus dans le prix),
+     * c.-à-d. le prix transport inclus si le transport facturé en plus était nul.
+     * `null` pour un achat au prix départ.
+     */
+    renderedPrice: number | null;
+};
+
+/**
+ * Prix d'achat unitaires hors transport / transport inclus d'un groupe
+ * fournisseur, quel que soit le mode d'achat (départ ou rendu).
+ *
+ * Transport inclus = prix unitaire payé (qui contient déjà le transport en
+ * mode rendu) + part du transport facturé du groupe. Le transport facturé est
+ * réparti au prorata de la place occupée sur les rolls
+ * (quantité / taille d'un roll), ou de la valeur hors transport si une taille
+ * de roll manque.
+ */
+export const getPurchaseBasesPerUnit = (
+    items: Array<{ product: Product; quantity: number; pricing: CartPricing }>,
+    deliveryTotal: number,
+): Record<number, PurchaseBasesPerUnit> => {
+    const rows = items
+        .filter((item) => item.quantity > 0)
+        .map((item) => {
+            const excluding = getCartPricing(item.product, item.quantity, {
+                renderedDeliveryPerRoll: 0,
+            }).unitPrice;
+            const rollSize =
+                toNumber(item.product.cond) *
+                toNumber(item.product.floor) *
+                toNumber(item.product.roll);
+
+            return {
+                id: item.product.id,
+                quantity: item.quantity,
+                excluding,
+                paid: item.pricing.lineTotal,
+                rollShare: rollSize > 0 ? item.quantity / rollSize : 0,
+            };
+        });
+
+    const transportTotal = Math.max(0, deliveryTotal);
+    const useRollShare = rows.every((row) => row.rollShare > 0);
+    const weightOf = (row: (typeof rows)[number]) =>
+        useRollShare ? row.rollShare : row.excluding * row.quantity;
+    const weightTotal = rows.reduce((sum, row) => sum + weightOf(row), 0);
+
+    return Object.fromEntries(
+        rows.map((row) => {
+            const share =
+                weightTotal > 0
+                    ? (transportTotal * weightOf(row)) / weightTotal
+                    : 0;
+
+            return [
+                row.id,
+                {
+                    excludingTransport: row.excluding,
+                    includingTransport: (row.paid + share) / row.quantity,
+                    renderedPrice:
+                        row.paid / row.quantity > row.excluding + 0.0001
+                            ? row.paid / row.quantity
+                            : null,
+                },
+            ];
+        }),
+    );
+};

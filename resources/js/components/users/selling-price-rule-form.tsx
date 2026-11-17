@@ -8,58 +8,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useI18n } from '@/lib/i18n';
+import {
+    computeSellingPrice,
+    DEFAULT_SELLING_PRICE_RULE,
+    type SellingPriceRule,
+} from '@/lib/selling-price';
+import { useEffect, useState } from 'react';
 
-export type SellingPriceRule = {
-    /** Prix de base : prix départ ou prix de vente (rendu). */
-    base: 'departure' | 'selling';
-    operator: 'add' | 'multiply';
-    value: number;
-    unit: 'amount' | 'percent';
-    rounding: 'unit' | 'tenth' | 'hundredth';
-    direction: 'up' | 'down';
+const parseDecimal = (raw: string): number | null => {
+    const normalized = raw.trim().replace(',', '.');
+    if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+    return Number(normalized);
 };
-
-export const DEFAULT_SELLING_PRICE_RULE: SellingPriceRule = {
-    base: 'departure',
-    operator: 'multiply',
-    value: 1,
-    unit: 'amount',
-    rounding: 'hundredth',
-    direction: 'up',
-};
-
-const ROUNDING_FACTOR: Record<SellingPriceRule['rounding'], number> = {
-    unit: 1,
-    tenth: 10,
-    hundredth: 100,
-};
-
-/**
- * + : base + valeur (ou base × valeur %)
- * × : base × valeur (ou base × valeur / 100)
- * puis arrondi à l'unité / dixième / centième, supérieur ou inférieur.
- */
-export function computeSellingPrice(
-    basePrice: number,
-    rule: SellingPriceRule,
-): number {
-    const amount =
-        rule.unit === 'percent' ? (basePrice * rule.value) / 100 : rule.value;
-    const raw =
-        rule.operator === 'add'
-            ? basePrice + amount
-            : rule.unit === 'percent'
-              ? amount
-              : basePrice * amount;
-    const factor = ROUNDING_FACTOR[rule.rounding];
-    // Correction des erreurs de flottant avant ceil/floor (ex. 1.1 * 100)
-    const scaled = Math.round(raw * factor * 1e6) / 1e6;
-
-    return (
-        (rule.direction === 'up' ? Math.ceil(scaled) : Math.floor(scaled)) /
-        factor
-    );
-}
 
 type Props = {
     value: SellingPriceRule;
@@ -72,6 +32,16 @@ export function SellingPriceRuleForm({ value, onChange, disabled }: Props) {
     const rule = { ...DEFAULT_SELLING_PRICE_RULE, ...value };
     const update = (patch: Partial<SellingPriceRule>) =>
         onChange({ ...rule, ...patch });
+
+    // Saisie libre (virgule ou point) : la valeur n'est propagée que si elle
+    // est un nombre complet, pour pouvoir taper « 1, » puis « 1,35 ».
+    const [rawValue, setRawValue] = useState(String(rule.value));
+    useEffect(() => {
+        if (parseDecimal(rawValue) !== rule.value) {
+            setRawValue(String(rule.value));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rule.value]);
 
     const choice = <K extends keyof SellingPriceRule>(
         key: K,
@@ -111,10 +81,16 @@ export function SellingPriceRuleForm({ value, onChange, disabled }: Props) {
                     {choice(
                         'base',
                         [
-                            ['departure', t('Prix départ')],
-                            ['selling', t('Prix de vente')],
+                            [
+                                'excluding_transport',
+                                t("Prix d'achat hors transport"),
+                            ],
+                            [
+                                'including_transport',
+                                t("Prix d'achat transport inclus"),
+                            ],
                         ],
-                        'w-36',
+                        'w-64',
                     )}
                     {choice(
                         'operator',
@@ -125,15 +101,18 @@ export function SellingPriceRuleForm({ value, onChange, disabled }: Props) {
                         'w-16',
                     )}
                     <Input
-                        type="number"
+                        type="text"
                         inputMode="decimal"
-                        step="any"
                         className="w-24"
                         disabled={disabled}
-                        value={rule.value}
-                        onChange={(event) =>
-                            update({ value: Number(event.target.value) })
-                        }
+                        value={rawValue}
+                        onChange={(event) => {
+                            const raw = event.target.value;
+                            setRawValue(raw);
+                            const parsed = parseDecimal(raw);
+                            if (parsed !== null) update({ value: parsed });
+                        }}
+                        onBlur={() => setRawValue(String(rule.value))}
                     />
                     {choice(
                         'unit',

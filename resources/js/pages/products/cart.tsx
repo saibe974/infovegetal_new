@@ -14,7 +14,11 @@ import {
     type CartDiscountType as DiscountType,
 } from '@/components/cart/cart-discount-storage';
 import { useCartOrder } from '@/components/cart/cart-order.context';
-import { getCartPricing } from '@/components/cart/cart-pricing';
+import {
+    getCartPricing,
+    getPurchaseBasesPerUnit,
+    type PurchaseBasesPerUnit,
+} from '@/components/cart/cart-pricing';
 import {
     getQuantityStep,
     getUniteQuantity,
@@ -34,6 +38,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import CountryFlag from '@/components/ui/country-flag';
 import { DatePicker } from '@/components/ui/datePicker';
 import { Input } from '@/components/ui/input';
@@ -46,9 +51,18 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { StickyBar } from '@/components/ui/sticky-bar';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { withAppLayout } from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, hasAnyRole, hasPermission } from '@/lib/roles';
+import {
+    computeSellingPrice,
+    normalizeSellingPrice,
+} from '@/lib/selling-price';
 import { cn, formatCurrency } from '@/lib/utils';
 import products from '@/routes/products';
 import { SharedData, type BreadcrumbItem } from '@/types';
@@ -56,6 +70,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeftCircle,
     FlowerIcon,
+    Info,
     Minus,
     Pencil,
     Plus,
@@ -75,6 +90,85 @@ import {
 import BasicSticky from 'react-sticky-el';
 
 type Props = Record<string, never>;
+
+/** Prix client (revente) affiché en gris sous le prix d'achat. */
+type ClientPrice = {
+    unit: number;
+    total: number;
+    /** Prix client si le transport facturé en plus était nul (achat rendu). */
+    withoutExtraTransport: { unit: number; total: number } | null;
+};
+
+/** Écart relatif du vrai prix par rapport au prix calculé. */
+const priceGap = (real: number, calculated: number): number =>
+    calculated > 0 ? (real - calculated) / calculated : 0;
+
+/** Couleur du vrai prix selon son écart : > 20 % rouge, > 5 % orange, sinon vert. */
+function gapColorClass(gap: number): string {
+    if (gap > 0.2) return 'text-red-600 dark:text-red-400';
+    if (gap > 0.05) return 'text-orange-500 dark:text-orange-400';
+    return 'text-green-600 dark:text-green-400';
+}
+
+/**
+ * Prix client (revente) sous le prix d'achat, en gris. Achat rendu avec
+ * transport facturé en plus : en gris le prix calculé sans ce transport, puis
+ * le vrai prix client (transport facturé inclus) coloré selon l'écart, avec un
+ * « i » qui explique la différence.
+ */
+function ClientPriceHint({
+    price,
+    field,
+}: {
+    price: ClientPrice | null;
+    field: 'unit' | 'total';
+}) {
+    const { t } = useI18n();
+    if (!price) return null;
+
+    const calculated = price.withoutExtraTransport?.[field];
+    const gap =
+        calculated !== undefined ? priceGap(price[field], calculated) : 0;
+
+    return (
+        <>
+            <p className="text-xs font-normal text-muted-foreground">
+                {formatCurrency(calculated ?? price[field])}
+            </p>
+            {calculated !== undefined ? (
+                <p
+                    className={cn(
+                        'inline-flex items-center gap-1 text-xs font-normal',
+                        gapColorClass(gap),
+                    )}
+                >
+                    {formatCurrency(price[field])}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label={t('Explication du prix client')}
+                                className="text-blue-600 dark:text-blue-400"
+                            >
+                                <Info className="size-3.5" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-left">
+                            {t('Prix client souhaité')} :{' '}
+                            {formatCurrency(calculated)}.{' '}
+                            {t('Prix client réel')} :{' '}
+                            {formatCurrency(price[field])} (+
+                            {Math.round(gap * 1000) / 10} %).{' '}
+                            {t(
+                                "L'écart vient du transport facturé en plus du prix rendu (roll incomplet, minimum de transport, suppléments). Avec des rolls complets, le prix réel rejoint le prix souhaité.",
+                            )}
+                        </TooltipContent>
+                    </Tooltip>
+                </p>
+            ) : null}
+        </>
+    );
+}
 
 const useCartSidebarTopOffset = () => {
     const [topOffset, setTopOffset] = useState(0);
@@ -326,6 +420,7 @@ export default withAppLayout<Props>(
             cart_transport_selection: storedTransportSelection = {},
             cart_discounts: storedDiscounts = {},
             cart_coupon_code: storedCouponCode = '',
+            cart_selling_price: cartSellingPrice = null,
         } = usePage<
             SharedData & {
                 cart_contacts?: Record<
@@ -374,6 +469,7 @@ export default withAppLayout<Props>(
                     }
                 >;
                 cart_coupon_code?: string | null;
+                cart_selling_price?: unknown;
             }
         >().props;
         const cartId = cart?.id;
@@ -395,6 +491,48 @@ export default withAppLayout<Props>(
             clearCart,
             refreshCart,
         } = useContext(CartContext);
+
+        // Prix client (revente) : option par fournisseur, profil choisi par groupe
+        const sellingPrice = useMemo(
+            () => normalizeSellingPrice(cartSellingPrice),
+            [cartSellingPrice],
+        );
+        const [clientPriceProfiles, setClientPriceProfiles] = useState<
+            Record<number, string>
+        >({});
+        const getClientPrice = (
+            groupId: number,
+            bases: PurchaseBasesPerUnit | undefined,
+            quantity: number,
+        ): ClientPrice | null => {
+            const rule = sellingPrice.profiles.find(
+                (profile) => profile.id === clientPriceProfiles[groupId],
+            )?.conditions;
+            if (!rule || !bases) return null;
+            const base =
+                rule.base === 'including_transport'
+                    ? bases.includingTransport
+                    : bases.excludingTransport;
+            const unit = computeSellingPrice(base, rule);
+            // Achat rendu + transport facturé en plus : prix client si ce
+            // transport était nul (seul le transport inclus dans le prix rendu).
+            const withoutExtraUnit =
+                rule.base === 'including_transport' &&
+                bases.renderedPrice !== null
+                    ? computeSellingPrice(bases.renderedPrice, rule)
+                    : unit;
+            return {
+                unit,
+                total: unit * quantity,
+                withoutExtraTransport:
+                    withoutExtraUnit !== unit
+                        ? {
+                              unit: withoutExtraUnit,
+                              total: withoutExtraUnit * quantity,
+                          }
+                        : null,
+            };
+        };
 
         const [deliveryDate, setDeliveryDate] = useState('');
         const [openCommentProductIds, setOpenCommentProductIds] = useState<
@@ -699,6 +837,10 @@ export default withAppLayout<Props>(
                     0,
                 );
                 const deliveryTotal = shippingSummary.bySupplier[group.id] ?? 0;
+                const purchaseBases = getPurchaseBasesPerUnit(
+                    pricedItems,
+                    deliveryTotal,
+                );
                 const grossTotal = itemsTotal + deliveryTotal;
                 const discountAmount = calculateDiscountAmount(
                     grossTotal,
@@ -717,6 +859,7 @@ export default withAppLayout<Props>(
                 return {
                     ...group,
                     items: pricedItems,
+                    purchaseBases,
                     cartItems,
                     itemsTotal,
                     shipping: shippingSummary,
@@ -1161,6 +1304,97 @@ export default withAppLayout<Props>(
                                                 </div>
                                             </div>
                                         </CardTitle>
+                                        {sellingPrice.profiles.length > 0 ? (
+                                            <div className="flex flex-wrap items-center justify-end gap-3 pt-2 text-sm">
+                                                <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
+                                                    <Checkbox
+                                                        checked={Boolean(
+                                                            clientPriceProfiles[
+                                                                group.id
+                                                            ],
+                                                        )}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            setClientPriceProfiles(
+                                                                (previous) => {
+                                                                    const next =
+                                                                        {
+                                                                            ...previous,
+                                                                        };
+                                                                    if (
+                                                                        checked ===
+                                                                        true
+                                                                    ) {
+                                                                        next[
+                                                                            group.id
+                                                                        ] =
+                                                                            sellingPrice.default_profile_id ??
+                                                                            sellingPrice
+                                                                                .profiles[0]
+                                                                                .id;
+                                                                    } else {
+                                                                        delete next[
+                                                                            group
+                                                                                .id
+                                                                        ];
+                                                                    }
+                                                                    return next;
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                    {t(
+                                                        'Afficher le prix client',
+                                                    )}
+                                                </label>
+                                                {clientPriceProfiles[
+                                                    group.id
+                                                ] &&
+                                                sellingPrice.profiles.length >
+                                                    1 ? (
+                                                    <select
+                                                        aria-label={t(
+                                                            'Profil de prix de vente',
+                                                        )}
+                                                        className="h-8 rounded-md border bg-background px-2 text-sm"
+                                                        value={
+                                                            clientPriceProfiles[
+                                                                group.id
+                                                            ]
+                                                        }
+                                                        onChange={(event) =>
+                                                            setClientPriceProfiles(
+                                                                (previous) => ({
+                                                                    ...previous,
+                                                                    [group.id]:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                }),
+                                                            )
+                                                        }
+                                                    >
+                                                        {sellingPrice.profiles.map(
+                                                            (profile) => (
+                                                                <option
+                                                                    key={
+                                                                        profile.id
+                                                                    }
+                                                                    value={
+                                                                        profile.id
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        profile.name
+                                                                    }
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                     </CardHeader>
 
                                     <CardContent className="space-y-6">
@@ -1199,6 +1433,14 @@ export default withAppLayout<Props>(
                                                         pricing.unitPrice;
                                                     const lineTotal =
                                                         pricing.lineTotal;
+                                                    const clientPrice =
+                                                        getClientPrice(
+                                                            group.id,
+                                                            group.purchaseBases[
+                                                                product.id
+                                                            ],
+                                                            quantity,
+                                                        );
                                                     const unite =
                                                         getUniteQuantity(
                                                             product,
@@ -1302,6 +1544,12 @@ export default withAppLayout<Props>(
                                                                                 unitPrice,
                                                                             )}
                                                                         </p>
+                                                                        <ClientPriceHint
+                                                                            price={
+                                                                                clientPrice
+                                                                            }
+                                                                            field="unit"
+                                                                        />
                                                                     </div>
                                                                     <div className="text-right">
                                                                         <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
@@ -1314,6 +1562,12 @@ export default withAppLayout<Props>(
                                                                                 lineTotal,
                                                                             )}
                                                                         </p>
+                                                                        <ClientPriceHint
+                                                                            price={
+                                                                                clientPrice
+                                                                            }
+                                                                            field="total"
+                                                                        />
                                                                     </div>
                                                                 </div>
 
@@ -1517,6 +1771,12 @@ export default withAppLayout<Props>(
                                                                     {formatCurrency(
                                                                         unitPrice,
                                                                     )}
+                                                                    <ClientPriceHint
+                                                                        price={
+                                                                            clientPrice
+                                                                        }
+                                                                        field="unit"
+                                                                    />
                                                                 </div>
 
                                                                 <div className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1 md:justify-self-center">
@@ -1579,6 +1839,12 @@ export default withAppLayout<Props>(
                                                                     {formatCurrency(
                                                                         lineTotal,
                                                                     )}
+                                                                    <ClientPriceHint
+                                                                        price={
+                                                                            clientPrice
+                                                                        }
+                                                                        field="total"
+                                                                    />
                                                                 </div>
 
                                                                 <div className="flex items-center md:justify-center">
