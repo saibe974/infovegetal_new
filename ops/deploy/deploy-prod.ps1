@@ -18,7 +18,7 @@ function Invoke-Git {
     # PS 5.1: redirected native stderr must not become a terminating error.
     $ErrorActionPreference = 'Continue'
 
-    $output = & git -C $Repository @Arguments 2>&1
+    $output = & git -C $Repository @Arguments 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) {
         throw "git $($Arguments -join ' ') a echoue dans $Repository :`n$($output | Out-String)"
     }
