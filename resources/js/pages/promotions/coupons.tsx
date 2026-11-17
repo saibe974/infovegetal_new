@@ -2,6 +2,7 @@ import { PromotionPageHeader } from '@/components/promotions/promotion-page-head
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -179,7 +180,7 @@ function ExistingCoupon({ promotion, coupon }: { promotion: Promotion; coupon: P
             <Button type="button" variant="ghost" size="icon" onClick={remove} aria-label={`Supprimer ${coupon.code}`}><Trash2 /></Button>
         </CardHeader>
         <CardContent className="space-y-5">
-            <form onSubmit={submit} className="space-y-4"><CouponFields data={data} setData={setData} errors={errors} /><div className="flex justify-end"><Button disabled={processing || !isDirty}><Check />Enregistrer</Button></div></form>
+            <form onSubmit={submit} className="space-y-4"><CouponFields data={data} setData={setData} errors={errors} /><div className="flex justify-end"><SaveButton saving={processing} dirty={isDirty}><Check />Enregistrer</SaveButton></div></form>
             <SimulationPanel promotionId={promotion.id} coupon={coupon} />
         </CardContent>
     </Card>;

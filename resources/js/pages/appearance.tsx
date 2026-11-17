@@ -4,6 +4,7 @@ import {
     AppearanceGeneralSettings,
     AppearancePageSettings,
 } from '@/components/settings/appearance-options';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -106,13 +107,14 @@ export default function GuestAppearance() {
                             >
                                 Réinitialiser
                             </Button>
-                            <Button
+                            <SaveButton
                                 size="sm"
                                 onClick={save}
-                                disabled={!dirty || saving}
+                                dirty={dirty}
+                                saving={saving}
                             >
                                 Enregistrer
-                            </Button>
+                            </SaveButton>
                         </div>
                     </div>
 

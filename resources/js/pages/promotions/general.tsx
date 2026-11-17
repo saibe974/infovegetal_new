@@ -2,7 +2,7 @@ import { PromotionPageHeader } from '@/components/promotions/promotion-page-head
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { SaveButton } from '@/components/save-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,7 @@ export default withAppLayout<Props>(
     ],
     false,
     ({ promotion, managerOptions }) => {
-        const { data, setData, post, put, processing, errors, isDirty } = useForm<PromotionForm>({
+        const { data, setData, post, put, processing, errors, isDirty, setDefaults } = useForm<PromotionForm>({
             title: promotion?.title ?? '',
             slug: promotion?.slug ?? '',
             description: promotion?.description ?? '',
@@ -66,7 +66,7 @@ export default withAppLayout<Props>(
         const submit = (event: FormEvent) => {
             event.preventDefault();
             if (promotion) {
-                put(`/promotions/${promotion.id}`, { preserveScroll: true });
+                put(`/promotions/${promotion.id}`, { preserveScroll: true, onSuccess: () => setDefaults() });
                 return;
             }
             post('/promotions');
@@ -86,9 +86,9 @@ export default withAppLayout<Props>(
                     </div>
                     <div className="flex items-center gap-2">
                         {isDirty && <span className="text-sm text-amber-600">Modifications non enregistrées</span>}
-                        <Button form="promotion-general-form" type="submit" disabled={processing}>
+                        <SaveButton form="promotion-general-form" type="submit" saving={processing} dirty={isDirty}>
                             <Check />{processing ? 'Enregistrement…' : 'Enregistrer'}
-                        </Button>
+                        </SaveButton>
                     </div>
                 </div></PromotionPageHeader>
 

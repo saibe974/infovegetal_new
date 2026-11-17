@@ -1,5 +1,6 @@
 import { DataTable } from '@/components/data-table';
 import { BadgeMultiSelect } from '@/components/ui/badge-multi-select';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -183,7 +184,17 @@ export default withAppLayout<Props>(
     ({ carrier, dbProducts }) => {
         const { t } = useI18n();
         const isNew = !carrier || !carrier.id;
-        const { data, setData, post, put, processing, errors, transform } =
+        const {
+            data,
+            setData,
+            post,
+            put,
+            processing,
+            errors,
+            transform,
+            isDirty,
+            setDefaults,
+        } =
             useForm({
                 name: carrier?.name ?? '',
                 db_products: (carrier?.db_products ?? []).map((db) => ({
@@ -774,6 +785,7 @@ export default withAppLayout<Props>(
                 });
             } else {
                 put(carriers.update.url({ carrier: carrier.id as number }), {
+                    onSuccess: () => setDefaults(),
                     onFinish: () => transform((payload) => payload),
                 });
             }
@@ -802,13 +814,15 @@ export default withAppLayout<Props>(
                             </h2>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
+                            <SaveButton
                                 type="submit"
-                                disabled={processing || importingZones}
+                                dirty={isDirty}
+                                saving={processing}
+                                disabled={importingZones}
                             >
                                 <SaveIcon className="mr-2 h-4 w-4" />{' '}
                                 {t('Save')}
-                            </Button>
+                            </SaveButton>
                         </div>
                     </div>
                 </StickyBar>

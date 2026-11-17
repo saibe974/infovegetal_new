@@ -2,7 +2,9 @@ import SearchSelect from '@/components/app/search-select';
 import { ButtonsActions } from '@/components/buttons-actions';
 import { formatSalesConditionsSummary } from '@/components/sales/billing-utils';
 import SalesConditionsForm from '@/components/sales/sales-conditions-form';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
+import { useDirtyState } from '@/hooks/use-dirty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CountryFlag from '@/components/ui/country-flag';
 import { FormField } from '@/components/ui/form-field';
@@ -832,12 +834,7 @@ export default function UserDbPage() {
         return diffConditions(rowBase, selectedResolved);
     };
 
-    const submit = () => {
-        if (rows.some((row) => !row.billing_user_id)) {
-            setSaveErrors([t('Select a billing user')]);
-            return;
-        }
-        setSaveErrors([]);
+    const buildSubmission = () => {
         const normalizedRows = rows
             .filter(
                 (row) =>
@@ -861,15 +858,26 @@ export default function UserDbPage() {
             ),
         );
 
+        return { db_ids: dbIds, sales_conditions: normalizedRows };
+    };
+
+    // Compare ce qui serait envoyé (et non l'état UI) à la dernière sauvegarde.
+    const { dirty, markSaved } = useDirtyState(buildSubmission());
+
+    const submit = () => {
+        if (rows.some((row) => !row.billing_user_id)) {
+            setSaveErrors([t('Select a billing user')]);
+            return;
+        }
+        setSaveErrors([]);
+        const submission = buildSubmission();
+
         router.post(
             `/admin/users/${targetUser.id}/db`,
-            {
-                merge: false,
-                db_ids: dbIds,
-                sales_conditions: normalizedRows,
-            },
+            { merge: false, ...submission },
             {
                 preserveScroll: true,
+                onSuccess: () => markSaved(submission),
                 onStart: () => setSaving(true),
                 onError: (errors) => setSaveErrors(Object.values(errors)),
                 onFinish: () => setSaving(false),
@@ -885,13 +893,14 @@ export default function UserDbPage() {
                 <div className="space-y-4">
                     <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
                         <div className="ml-auto">
-                            <Button
+                            <SaveButton
                                 type="button"
                                 onClick={submit}
-                                disabled={saving}
+                                saving={saving}
+                                dirty={dirty}
                             >
                                 {t('Save')}
-                            </Button>
+                            </SaveButton>
                         </div>
                     </StickyBar>
                     {saveErrors.length > 0 && (

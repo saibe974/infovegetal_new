@@ -286,6 +286,7 @@ export default withAppLayout<UsersPageProps>(
         };
 
         const hasChanges = useMemo(() => !isTreeSearchMode && pending !== null, [pending, isTreeSearchMode]);
+        const canSaveOrder = isHierarchyView && !isTreeSearchMode;
         const emptyTreeItems = useMemo<TreeUser[]>(() => [], []);
 
         useEffect(() => {
@@ -611,10 +612,11 @@ export default withAppLayout<UsersPageProps>(
                         />
                     </div>
 
-                    {(canImportExport || canAddUsers || hasChanges) && (
+                    {(canImportExport || canAddUsers || canSaveOrder) && (
                         <ButtonsActions
                             cancel={hasChanges ? cancel : undefined}
-                            save={hasChanges ? save : undefined}
+                            save={canSaveOrder ? save : undefined}
+                            dirty={hasChanges}
                             saving={saving}
                             import={canImportExport ? (
                                 <DialogUpload

@@ -29,6 +29,8 @@ type Props = {
     canDelete?: boolean;
     onSave: () => void;
     saving?: boolean;
+    /** Modifications en attente (voir SaveButton). */
+    dirty?: boolean;
     topOffsetElement?: string;
 };
 
@@ -41,6 +43,7 @@ export function UserFormToolbar({
     canDelete = false,
     onSave,
     saving,
+    dirty,
     topOffsetElement = '.top-sticky',
 }: Props) {
     const [parentSearch, setParentSearch] = useState('');
@@ -217,7 +220,11 @@ export function UserFormToolbar({
                             </DialogContent>
                         </Dialog>
                     )}
-                    <ButtonsActions save={onSave} saving={saving} />
+                    <ButtonsActions
+                        save={onSave}
+                        saving={saving}
+                        dirty={dirty}
+                    />
                 </div>
             </StickyBar>
         </>

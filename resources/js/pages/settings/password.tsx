@@ -6,7 +6,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Transition } from '@headlessui/react';
 import { Form, Head } from '@inertiajs/react';
 import { useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { SaveButton } from '@/components/save-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit as editAdminPassword, update as updateAdminPassword } from '@/routes/admin/password';
@@ -63,7 +63,7 @@ export default function Password() {
                         }}
                         className="space-y-6"
                     >
-                        {({ errors, processing, recentlySuccessful }) => (
+                        {({ errors, processing, recentlySuccessful, isDirty }) => (
                             <>
                                 <div className="grid gap-2">
                                     <Label htmlFor="current_password">
@@ -123,12 +123,13 @@ export default function Password() {
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                                    <Button
-                                        disabled={processing}
+                                    <SaveButton
+                                        saving={processing}
+                                        dirty={isDirty}
                                         data-test="update-password-button"
                                     >
                                         {t('Save password')}
-                                    </Button>
+                                    </SaveButton>
 
                                     <Transition
                                         show={recentlySuccessful}

@@ -142,7 +142,9 @@ class ProfileController extends Controller
         $validated = $request->validated();
         $shouldSyncMetas = (bool) ($validated['sync_metas'] ?? false);
         $metas = $validated['metas'] ?? [];
-        unset($validated['metas'], $validated['sync_metas']);
+        $hasSellingPrice = array_key_exists('selling_price', $validated);
+        $sellingPrice = $validated['selling_price'] ?? null;
+        unset($validated['metas'], $validated['sync_metas'], $validated['selling_price']);
 
         $target->fill($validated);
 
@@ -154,6 +156,10 @@ class ProfileController extends Controller
 
         if ($shouldSyncMetas) {
             $this->userMetaSync->sync($target, $metas);
+        }
+
+        if ($hasSellingPrice) {
+            $this->userMetaSync->syncSellingPrice($target, $sellingPrice);
         }
 
         // Redirect back to the same edit page (preserve route name)

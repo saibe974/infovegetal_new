@@ -4,6 +4,7 @@ import { PromotionProductFilters, type PromotionProductFilterValues } from '@/co
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -481,9 +482,9 @@ export default withAppLayout<Props>(
                     </div>
                     <div className="flex items-center gap-2">
                         {isDirty && <span className="text-sm text-amber-600">Modifications non enregistrées</span>}
-                        <Button type="button" onClick={save} disabled={processing}>
+                        <SaveButton type="button" onClick={save} saving={processing} dirty={isDirty}>
                             <Check />{processing ? 'Enregistrement…' : 'Enregistrer la sélection'}
-                        </Button>
+                        </SaveButton>
                     </div>
                 </div></PromotionPageHeader>
 

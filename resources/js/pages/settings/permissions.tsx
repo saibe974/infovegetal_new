@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import SearchSelect from '@/components/app/search-select';
 import PermissionsChecklistCard from '@/components/users/permissions-checklist-card';
-import { Button } from '@/components/ui/button';
+import { SaveButton } from '@/components/save-button';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
@@ -140,6 +140,12 @@ export default function PermissionsSettings({
         return selectedPermissionIds.filter((id) => assignableIds.has(id));
     }, [allPermissions, selectedPermissionIds]);
 
+    // Référence = rôles/permissions renvoyés par le serveur (resynchronisés après sauvegarde).
+    const idsKey = (ids: number[]) => [...ids].sort((a, b) => a - b).join(',');
+    const dirty =
+        idsKey(selectedRoleIds) !== idsKey((targetUser?.roles ?? []).map((r) => r.id)) ||
+        idsKey(selectedPermissionIds) !== idsKey((targetUser?.permissions ?? []).map((p) => p.id));
+
     const permissionsByDomain = useMemo(() => {
         const grouped = new Map<string, Array<{ id: number; name: string }>>();
 
@@ -182,9 +188,9 @@ export default function PermissionsSettings({
                 <div className='space-y-6'>
                     <StickyBar topOffsetElement=".top-sticky, .settings-sticky">
                         <div className="ml-auto">
-                            <Button type="submit" form="permissions-form">
+                            <SaveButton type="submit" form="permissions-form" dirty={dirty}>
                                 {t('Save')}
-                            </Button>
+                            </SaveButton>
                         </div>
                     </StickyBar>
 

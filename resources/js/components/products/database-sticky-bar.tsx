@@ -19,6 +19,8 @@ type Props = {
     canAccessBilling?: boolean;
     onSave: () => void;
     saving?: boolean;
+    /** Modifications en attente (voir SaveButton). */
+    dirty?: boolean;
 };
 
 export function DatabaseStickyBar({
@@ -30,6 +32,7 @@ export function DatabaseStickyBar({
     canAccessBilling = false,
     onSave,
     saving = false,
+    dirty,
 }: Props) {
     const { t } = useI18n();
     const sectionUrl = (section: 'info' | 'mapping') => {
@@ -126,6 +129,7 @@ export function DatabaseStickyBar({
                 <ButtonsActions
                     save={onSave}
                     saving={saving}
+                    dirty={dirty}
                     className="ml-0"
                 />
             </div>

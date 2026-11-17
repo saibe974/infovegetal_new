@@ -155,7 +155,17 @@ export default withAppLayout<Props>(
             Record<number, string>
         >({});
 
-        const { data, setData, post, put, processing, errors, transform } =
+        const {
+            data,
+            setData,
+            post,
+            put,
+            processing,
+            errors,
+            transform,
+            isDirty,
+            setDefaults,
+        } =
             useForm({
                 name: dbProduct.name ?? '',
                 description: dbProduct.description ?? '',
@@ -237,6 +247,7 @@ export default withAppLayout<Props>(
                 : dbProducts.updateMapping(dbProduct.id as number).url;
 
             submit(url, {
+                onSuccess: () => setDefaults(),
                 onFinish: () => transform((d) => d),
             });
         };
@@ -264,6 +275,7 @@ export default withAppLayout<Props>(
                             }
                             onSave={() => formRef.current?.requestSubmit()}
                             saving={processing}
+                            dirty={isDirty}
                         />
 
                         {activeTab === 'info' && (

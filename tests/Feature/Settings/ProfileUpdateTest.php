@@ -220,3 +220,56 @@ test('correct password must be provided to delete account', function () {
 
     expect($user->fresh())->not->toBeNull();
 });
+
+test('selling price profiles are stored as a system user meta and survive metas sync', function () {
+    $rule = ['base' => 'departure', 'operator' => 'multiply', 'value' => 1.5, 'unit' => 'amount', 'rounding' => 'tenth', 'direction' => 'up'];
+    $user = User::factory()->create();
+
+    $payload = json_encode([
+        'profiles' => [
+            ['id' => 'retail', 'name' => 'Détail', 'conditions' => $rule],
+        ],
+        'default_profile_id' => 'retail',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('profile.update'), [
+            '_method' => 'patch',
+            'name' => $user->name,
+            'email' => $user->email,
+            'sync_metas' => true,
+            'selling_price' => $payload,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $meta = $user->usersMeta()->where('key', 'selling_price')->first();
+    expect($meta)->not->toBeNull();
+    expect(json_decode($meta->value, true))->toBe([
+        'profiles' => [
+            ['id' => 'retail', 'name' => 'Détail', 'conditions' => $rule],
+        ],
+        'default_profile_id' => 'retail',
+    ]);
+
+    // Une sauvegarde sans selling_price ne doit pas l'effacer
+    $this->actingAs($user)
+        ->post(route('profile.update'), [
+            '_method' => 'patch',
+            'name' => $user->name,
+            'email' => $user->email,
+            'sync_metas' => true,
+        ])
+        ->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('users_meta', ['id' => $meta->id]);
+
+    // Aucun profil : la meta est supprimée
+    $this->actingAs($user)
+        ->post(route('profile.update'), [
+            '_method' => 'patch',
+            'name' => $user->name,
+            'email' => $user->email,
+            'selling_price' => json_encode(['profiles' => []]),
+        ])
+        ->assertSessionHasNoErrors();
+    $this->assertDatabaseMissing('users_meta', ['id' => $meta->id]);
+});

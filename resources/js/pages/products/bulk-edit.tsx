@@ -1,4 +1,5 @@
 import { BadgeMultiSelect } from '@/components/ui/badge-multi-select';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -368,15 +369,17 @@ export default withAppLayout<Props>(
                                 Modifier les produits filtrés
                             </h1>
                         </div>
-                        <Button
+                        <SaveButton
                             type="submit"
-                            disabled={processing || !total || !hasChanges}
+                            saving={processing}
+                            disabled={!total}
+                            dirty={hasChanges}
                         >
                             <SaveIcon className="mr-2 size-4" />
                             {processing
                                 ? 'Modification en cours…'
                                 : 'Appliquer à ' + total + ' produit(s)'}
-                        </Button>
+                        </SaveButton>
                     </div>
                 </StickyBar>
                 {Object.keys(formErrors).length > 0 && (

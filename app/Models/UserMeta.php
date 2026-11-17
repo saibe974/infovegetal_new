@@ -12,7 +12,9 @@ class UserMeta extends Model
 
     public const APPEARANCE_PREFERENCES_KEY = 'appearance_preferences';
 
-    public const SYSTEM_KEYS = ['logo', self::APPEARANCE_PREFERENCES_KEY];
+    public const SELLING_PRICE_KEY = 'selling_price';
+
+    public const SYSTEM_KEYS = ['logo', self::APPEARANCE_PREFERENCES_KEY, self::SELLING_PRICE_KEY];
 
     protected $table = 'users_meta';
 

@@ -1,3 +1,4 @@
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/lib/i18n';
@@ -124,6 +125,13 @@ export function TemplateLibrary({
         ? templateCompatibility(adaptation.template, variables)
         : [];
     const userId = auth?.user?.id;
+    // Modèle chargé : sauvegarde à faire si le contenu ou le nom diffère.
+    // Nouveau modèle : bouton toujours actif (dirty indéfini).
+    const loadedModel = saved.find((model) => model.id === loadedId);
+    const modelDirty = loadedModel
+        ? definitionKey(loadedModel.template) !== definitionKey(template) ||
+          loadedModel.template.name !== template.name
+        : undefined;
     const currentId = autoSelectCurrentTemplate
         ? saved.find((model) =>
               currentTemplateId !== undefined
@@ -360,15 +368,17 @@ export function TemplateLibrary({
                         onChange({ ...template, name: event.target.value })
                     }
                 />
-                <Button
+                <SaveButton
                     type="button"
                     variant="outline"
-                    disabled={disabled || busy || !ready}
+                    disabled={disabled || !ready}
+                    saving={busy}
+                    dirty={modelDirty}
                     onClick={() => void save(false)}
                 >
                     <Save className="size-4" />
                     {t('Save model')}
-                </Button>
+                </SaveButton>
                 <Button
                     type="button"
                     variant="outline"

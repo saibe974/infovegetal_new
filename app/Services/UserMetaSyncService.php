@@ -71,6 +71,53 @@ class UserMetaSyncService
         });
     }
 
+    /**
+     * Enregistre les profils de prix de vente du client (clé système selling_price).
+     * Format : { profiles: [{ id, name, conditions }], default_profile_id }.
+     */
+    public function syncSellingPrice(User $user, ?string $json): void
+    {
+        $decoded = $json !== null ? json_decode($json, true) : null;
+        $profiles = collect(is_array($decoded) ? ($decoded['profiles'] ?? []) : [])
+            ->filter(fn ($profile) => is_array($profile))
+            ->values()
+            ->map(fn (array $profile, int $index) => [
+                'id' => trim((string) ($profile['id'] ?? '')) ?: 'profile-'.($index + 1),
+                'name' => trim((string) ($profile['name'] ?? '')) ?: 'Profil '.($index + 1),
+                'conditions' => is_array($profile['conditions'] ?? null) ? $profile['conditions'] : [],
+            ]);
+
+        $query = $user->usersMeta()->where('key', UserMeta::SELLING_PRICE_KEY);
+
+        if ($profiles->isEmpty()) {
+            $query->delete();
+
+            return;
+        }
+
+        $ids = $profiles->pluck('id');
+        $defaultId = is_array($decoded) ? ($decoded['default_profile_id'] ?? null) : null;
+        $value = json_encode([
+            'profiles' => $profiles->all(),
+            'default_profile_id' => $ids->contains($defaultId) ? $defaultId : $ids->first(),
+        ]);
+
+        $meta = $query->first();
+        if ($meta) {
+            $meta->update(['value' => $value, 'type' => 'json']);
+
+            return;
+        }
+
+        $user->usersMeta()->create([
+            'key' => UserMeta::SELLING_PRICE_KEY,
+            'title' => 'Prix de vente',
+            'value' => $value,
+            'type' => 'json',
+            'sort_order' => 0,
+        ]);
+    }
+
     private function resolveValue(
         User $user,
         array $payload,

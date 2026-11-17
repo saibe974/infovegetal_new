@@ -32,7 +32,17 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct }) => {
             ),
         [page.props.auth?.user?.roles],
     );
-    const { data, setData, post, put, processing, errors, transform } = useForm(
+    const {
+        data,
+        setData,
+        post,
+        put,
+        processing,
+        errors,
+        transform,
+        isDirty,
+        setDefaults,
+    } = useForm(
         {
             name: dbProduct.name ?? '',
             description: dbProduct.description ?? '',
@@ -65,7 +75,10 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct }) => {
             isCreate
                 ? dbProducts.store().url
                 : dbProducts.update(dbProduct.id as number).url,
-            { onFinish: () => transform((payload) => payload) },
+            {
+                onSuccess: () => setDefaults(),
+                onFinish: () => transform((payload) => payload),
+            },
         );
     };
 
@@ -89,6 +102,7 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ dbProduct }) => {
                     }
                     onSave={() => formRef.current?.requestSubmit()}
                     saving={processing}
+                    dirty={isDirty}
                 />
                 <div className="mx-auto w-full max-w-[1200px]">
                     <Card className="space-y-4 p-6">

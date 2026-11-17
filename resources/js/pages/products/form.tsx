@@ -1,5 +1,6 @@
 // import { IngredientsField } from '@/components/forms/ingredients-field';
 // import { TopActions } from '@/components/top-actions';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 // import { Card, CardContent } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
@@ -116,7 +117,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product, categories =
         }
     }
 
-    const { data, setData, post, put, processing, errors, transform } = useForm<{
+    const { data, setData, post, put, processing, errors, transform, isDirty, setDefaults } = useForm<{
         name: string;
         sku: string;
         ref: string;
@@ -176,7 +177,7 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product, categories =
             console.log('[FORM] Calling PUT to:', url);
             put(url, {
                 onStart: () => console.log('[FORM] PUT request started'),
-                onSuccess: (page) => console.log('[FORM] PUT success:', page),
+                onSuccess: () => setDefaults(),
                 onError: (errors) => console.error('[FORM] PUT errors:', errors),
                 onFinish: () => {
                     console.log('[FORM] PUT finished');
@@ -217,13 +218,13 @@ export default withAppLayout<Props>(breadcrumbs, false, ({ product, categories =
                                     </Link>
                                     <h2 className="text-xl font-semibold">{t('Edit a product')}</h2>
                                 </div>
-                                <Button
+                                <SaveButton
                                     type="submit"
-                                    disabled={isProcessing}
-                                    onClick={() => console.log('[FORM] Save button clicked, processing:', isProcessing)}
+                                    dirty={isDirty}
+                                    saving={isProcessing}
                                 >
                                     <SaveIcon className="mr-2 h-4 w-4" /> {t('Save')}
-                                </Button>
+                                </SaveButton>
                             </div>
                         </StickyBar>
 

@@ -1,5 +1,6 @@
 import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,7 @@ export default withAppLayout<{ promotion: Promotion }>(
                     <label className="flex items-start gap-3 rounded-lg border p-4"><input type="checkbox" className="mt-1" checked={form.data.show_coupons} onChange={(event) => form.setData('show_coupons', event.target.checked)} /><span><span className="font-medium">Afficher les codes des coupons actifs</span><span className="mt-1 block text-sm text-muted-foreground">Les visiteurs autorisés verront les codes et leurs conditions. Désactivé par défaut : une sélection simple n’a pas besoin de coupon.</span></span></label>
                     <p className="text-sm text-muted-foreground">Texte simple, sans HTML. Les images, titres personnalisés et mises en avant des produits viennent de la section Produits. La description interne n’est jamais publiée.</p>
                     {Object.values(form.errors).map((error, index) => <p key={index} className="text-sm text-destructive">{error}</p>)}
-                    <div className="flex items-center gap-3"><Button disabled={form.processing}>Enregistrer la présentation</Button>{form.isDirty && <span className="text-sm text-amber-700">Modifications non enregistrées</span>}</div>
+                    <div className="flex items-center gap-3"><SaveButton saving={form.processing} dirty={form.isDirty}>Enregistrer la présentation</SaveButton>{form.isDirty && <span className="text-sm text-amber-700">Modifications non enregistrées</span>}</div>
                 </form>
             </CardContent></Card></div>
         </>;

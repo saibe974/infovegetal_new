@@ -160,6 +160,7 @@ export default withAppLayout<Props>(
                     canDelete={Boolean(user?.abilities?.delete)}
                     onSave={save}
                     saving={form.processing}
+                    dirty={form.isDirty}
                 />
 
                 <form onSubmit={submit} className="space-y-6">

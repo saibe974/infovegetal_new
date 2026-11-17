@@ -4,6 +4,7 @@ import { withAppLayout } from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { Card } from '@/components/ui/card';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StickyBar } from '@/components/ui/sticky-bar';
@@ -106,6 +107,13 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ roles, permissions, of
             .sort((a, b) => a[0].localeCompare(b[0]));
     }, [officialPermissionNames, permissions]);
 
+    // Référence = permissions du rôle renvoyées par le serveur.
+    const idsKey = (ids: number[]) => [...ids].sort((a, b) => a - b).join(',');
+    const dirty =
+        !!selectedRole &&
+        idsKey(selectedPermissionIds) !==
+            idsKey((selectedRole.permissions ?? []).map((p) => p.id));
+
     const syncRolePermissions = () => {
         if (!selectedRoleId) {
             return;
@@ -189,13 +197,14 @@ export default withAppLayout<Props>(breadcrumbs, true, ({ roles, permissions, of
             <div className='space-y-6'>
                 <StickyBar>
                     <div className='ml-auto'>
-                        <Button
+                        <SaveButton
                             type='button'
                             onClick={syncRolePermissions}
                             disabled={!selectedRoleId}
+                            dirty={dirty}
                         >
                             {t('Save')}
-                        </Button>
+                        </SaveButton>
                     </div>
                 </StickyBar>
 

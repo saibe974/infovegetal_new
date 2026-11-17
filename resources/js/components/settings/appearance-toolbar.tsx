@@ -72,7 +72,7 @@ export function AppearanceToolbar({
                 reset={onReset}
                 save={onSave}
                 saving={saving}
-                saveDisabled={!dirty}
+                dirty={dirty}
             />
         </StickyBar>
     );

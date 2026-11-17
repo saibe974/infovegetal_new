@@ -3,6 +3,7 @@ import SearchSelect, { type Option as SearchOption } from '@/components/app/sear
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -134,7 +135,7 @@ export default withAppLayout<Props>(
                     <h1 className="text-2xl font-semibold">{promotion.title}</h1>
                     <p className="text-sm text-muted-foreground">Définissez les utilisateurs autorisés à voir une promotion ciblée.</p>
                 </div>
-                <div className="flex items-center gap-2">{isDirty && <span className="text-sm text-amber-600">Modifications non enregistrées</span>}<Button onClick={save} disabled={processing}><Check />{processing ? 'Enregistrement…' : 'Enregistrer l’audience'}</Button></div>
+                <div className="flex items-center gap-2">{isDirty && <span className="text-sm text-amber-600">Modifications non enregistrées</span>}<SaveButton onClick={save} saving={processing} dirty={isDirty}><Check />{processing ? 'Enregistrement…' : 'Enregistrer l’audience'}</SaveButton></div>
             </div></PromotionPageHeader>
 
             <div className="promotion-workspace grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">

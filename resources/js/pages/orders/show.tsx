@@ -1,4 +1,5 @@
 import { OrderStatusBadge } from '@/components/cart/order-status-badge';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -355,8 +356,9 @@ export default function Show({
                                     </Button>
                                 </div>
                             ))}
-                            <Button
-                                disabled={busy || !changed}
+                            <SaveButton
+                                disabled={busy}
+                                dirty={changed}
                                 onClick={() =>
                                     send(
                                         'lines',
@@ -388,7 +390,7 @@ export default function Show({
                                 }
                             >
                                 Enregistrer les modifications
-                            </Button>
+                            </SaveButton>
                         </div>
                     )}
                 </section>
@@ -507,15 +509,16 @@ export default function Show({
                             Aperçu du format enregistré :{' '}
                             <strong>{numbering.preview}</strong>
                         </p>
-                        <Button
+                        <SaveButton
                             variant="outline"
                             disabled={busy}
+                            dirty={pattern !== numbering.pattern}
                             onClick={() =>
                                 send('numbering', { pattern }, 'put')
                             }
                         >
                             Enregistrer mon format
-                        </Button>
+                        </SaveButton>
                     </section>
                 )}
                 <section className="space-y-4 rounded-lg border p-4">

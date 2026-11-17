@@ -708,7 +708,9 @@ class UserManagementController extends Controller
         $validated = $request->validated();
         $shouldSyncMetas = (bool) ($validated['sync_metas'] ?? false);
         $metas = $validated['metas'] ?? [];
-        unset($validated['metas'], $validated['sync_metas']);
+        $hasSellingPrice = array_key_exists('selling_price', $validated);
+        $sellingPrice = $validated['selling_price'] ?? null;
+        unset($validated['metas'], $validated['sync_metas'], $validated['selling_price']);
 
         // Détecter le rôle group pour rendre l'email optionnel
         $requestedRoleIds = array_map('intval', $validated['roles'] ?? $user->roles()->pluck('id')->toArray());
@@ -777,6 +779,10 @@ class UserManagementController extends Controller
 
         if ($shouldSyncMetas) {
             app(UserMetaSyncService::class)->sync($user, $metas);
+        }
+
+        if ($hasSellingPrice) {
+            app(UserMetaSyncService::class)->syncSellingPrice($user, $sellingPrice);
         }
 
         // Redirection vers la page d'édition du profil avec confirmation visuelle

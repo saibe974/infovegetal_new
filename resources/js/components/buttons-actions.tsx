@@ -12,6 +12,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { SaveButton } from './save-button';
 import { Button } from './ui/button';
 
 type Props = {
@@ -30,6 +31,8 @@ type Props = {
     saving?: boolean;
     refreshing?: boolean;
     saveDisabled?: boolean;
+    /** Modifications en attente : désactive Save si false, le surligne si true. */
+    dirty?: boolean;
     className?: string;
 };
 
@@ -49,6 +52,7 @@ export function ButtonsActions({
     saving,
     refreshing,
     saveDisabled = false,
+    dirty,
     className,
 }: Props) {
     const { t } = useI18n();
@@ -162,27 +166,21 @@ export function ButtonsActions({
             )}
 
             {onSave && (
-                <Button
+                <SaveButton
                     type="button"
                     onClick={(e) => {
                         e.stopPropagation();
                         onSave();
                     }}
                     title={t('Save')}
-                    disabled={saving || saveDisabled}
+                    dirty={dirty}
+                    saving={saving}
+                    disabled={saveDisabled}
                     size={'icon'}
                     className="bg-green-700 text-white hover:bg-green-800"
                 >
-                    {saving ? (
-                        <>
-                            <Loader2Icon className="animate-spin" />
-                        </>
-                    ) : (
-                        <>
-                            <SaveIcon />
-                        </>
-                    )}
-                </Button>
+                    <SaveIcon />
+                </SaveButton>
             )}
 
             {onAdd && (

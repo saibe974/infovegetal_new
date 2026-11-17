@@ -311,7 +311,8 @@ export default withAppLayout(
 
                     <ButtonsActions
                         cancel={hasChanges ? cancel : undefined}
-                        save={hasChanges ? save : undefined}
+                        save={save}
+                        dirty={hasChanges}
                         saving={saving}
                         add={() => { }}
                     />

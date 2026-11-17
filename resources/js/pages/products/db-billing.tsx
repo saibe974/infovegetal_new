@@ -186,7 +186,16 @@ function BillingPage({
     >(() => viewPrefs.sellerProfileId);
     const [isFileEditorExpanded, setIsFileEditorExpanded] = useState(false);
 
-    const { data, setData, put, processing, errors, transform } = useForm({
+    const {
+        data,
+        setData,
+        put,
+        processing,
+        errors,
+        transform,
+        isDirty,
+        setDefaults,
+    } = useForm({
         billing_users: initialBillingUsers,
     });
 
@@ -482,6 +491,7 @@ function BillingPage({
         }));
 
         put(dbProducts.updateBilling(dbProduct.id as number).url, {
+            onSuccess: () => setDefaults(),
             onFinish: () => transform((d) => d),
         });
     };
@@ -1094,6 +1104,7 @@ function BillingPage({
                         canAccessBilling
                         onSave={() => formRef.current?.requestSubmit()}
                         saving={processing}
+                        dirty={isDirty}
                         title={
                             <>
                                 <span className="block truncate text-lg sm:hidden">

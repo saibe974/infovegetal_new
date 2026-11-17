@@ -1,12 +1,6 @@
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData, type User } from '@/types';
-import {
-    Head,
-    Link,
-    router,
-    useForm,
-    usePage,
-} from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     ImageIcon,
@@ -28,16 +22,21 @@ import {
     UserMetaFields,
     type UserMetaDraft,
 } from '@/components/users/user-meta-fields';
+import {
+    parseSellingPrice,
+    UserSellingPriceCard,
+    type SellingPriceSettings,
+} from '@/components/users/user-selling-price-card';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { useI18n } from '@/lib/i18n';
 import { getEffectiveUser, isAdmin } from '@/lib/roles';
 import { edit as editProfile, update as updateProfile } from '@/routes/profile';
+import { update as updateLoginAlert } from '@/routes/settings/login-alert';
 import {
     edit as editAdminUser,
     update as updateAdminUser,
 } from '@/routes/users';
-import { update as updateLoginAlert } from '@/routes/settings/login-alert';
 
 export type UserMetaItem = {
     id: number;
@@ -465,14 +464,17 @@ type ProfileFormPayload = {
     parent_id: number | null;
     sync_metas: boolean;
     metas: UserMetaDraft[];
+    selling_price: SellingPriceSettings;
 };
+
+const SYSTEM_META_KEYS = ['logo', 'selling_price'];
 
 function mapUserMetas(
     items: UserMetaItem[],
     options: Array<{ value: string; label: string }>,
 ): ProfileFormPayload['metas'] {
     return items
-        .filter((item) => item.key !== 'logo')
+        .filter((item) => !SYSTEM_META_KEYS.includes(item.key))
         .map((item) => ({
             id: item.id,
             key: item.key,
@@ -536,9 +538,7 @@ export default function Profile({
     const metaKeyConfig = pageProps.metaKeyConfig ?? {};
 
     const loginAlertEligible = Boolean(pageProps.loginAlertEligible);
-    const [loginAlert, setLoginAlert] = useState(
-        Boolean(pageProps.loginAlert),
-    );
+    const [loginAlert, setLoginAlert] = useState(Boolean(pageProps.loginAlert));
 
     const toggleLoginAlert = (enabled: boolean) => {
         setLoginAlert(enabled);
@@ -569,6 +569,9 @@ export default function Profile({
         parent_id: initialParentId,
         sync_metas: true,
         metas: mapUserMetas(userMeta, metaKeyOptions),
+        selling_price: parseSellingPrice(
+            userMeta.find((m) => m.key === 'selling_price')?.value,
+        ),
     });
 
     const updateUrl = isAdminEditContext
@@ -576,8 +579,12 @@ export default function Profile({
         : updateProfile().url;
 
     const saveProfile = () => {
+        if (!profileForm.isDirty) return;
+        const sentData = profileForm.data;
         profileForm.transform((data) => ({
             ...data,
+            // JSON brut : FormData perdrait les types et les tableaux vides
+            selling_price: JSON.stringify(data.selling_price),
             _method: isAdminEditContext ? 'put' : 'patch',
         }));
         profileForm.post(updateUrl, {
@@ -590,7 +597,9 @@ export default function Profile({
                         .userMeta ?? [],
                     metaKeyOptions,
                 );
-                profileForm.setDefaults('metas', savedMetas);
+                // Les valeurs enregistrées deviennent la référence : le bouton
+                // de sauvegarde repasse en disabled jusqu'au prochain changement.
+                profileForm.setDefaults({ ...sentData, metas: savedMetas });
                 profileForm.setData('metas', savedMetas);
             },
         });
@@ -684,6 +693,7 @@ export default function Profile({
                         canDelete={Boolean(userAbilities.delete)}
                         onSave={saveProfile}
                         saving={profileForm.processing}
+                        dirty={profileForm.isDirty}
                         topOffsetElement=".top-sticky, .settings-sticky"
                     />
 
@@ -727,10 +737,13 @@ export default function Profile({
                             )}
 
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                            {/* ────── COLONNE 1 ────── */}
-                            <div className="space-y-6 xl:col-span-5">
+                            {/* ────── COLONNE 1 ──────
+                                Sous xl, les colonnes passent en `contents` : leurs cartes
+                                deviennent des items de la grille et l'ordre est
+                                logo → infos → infos supp. → prix de vente. */}
+                            <div className="contents xl:col-span-5 xl:flex xl:flex-col xl:gap-6">
                                 {/* Logo */}
-                                <Card>
+                                <Card className="order-1">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-lg">
                                             {t('Logo')}
@@ -790,12 +803,25 @@ export default function Profile({
                                         </div>
                                     </CardContent>
                                 </Card>
+
+                                {/* Prix de vente */}
+                                <UserSellingPriceCard
+                                    className="order-4"
+                                    userId={targetUser!.id}
+                                    value={profileForm.data.selling_price}
+                                    onChange={(value) =>
+                                        profileForm.setData(
+                                            'selling_price',
+                                            value,
+                                        )
+                                    }
+                                />
                             </div>
 
                             {/* ────── COLONNE 2 ────── */}
-                            <div className="space-y-6 xl:col-span-7">
+                            <div className="contents xl:col-span-7 xl:flex xl:flex-col xl:gap-6">
                                 {/* Informations Personnelles */}
-                                <Card>
+                                <Card className="order-2">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="flex items-center gap-2 text-lg">
                                             <Mail size={20} />
@@ -1027,41 +1053,40 @@ export default function Profile({
                                                     Accepte le mailing
                                                 </Label>
                                             </div>
-                                            {isSelf &&
-                                                loginAlertEligible && (
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            id="login_alert"
-                                                            type="checkbox"
-                                                            checked={
-                                                                loginAlert
-                                                            }
-                                                            onChange={(e) =>
-                                                                toggleLoginAlert(
-                                                                    e.target
-                                                                        .checked,
-                                                                )
-                                                            }
-                                                        />
-                                                        <Label htmlFor="login_alert">
-                                                            {t(
-                                                                'Email me when a user logs in',
-                                                            )}
-                                                        </Label>
-                                                    </div>
-                                                )}
+                                            {isSelf && loginAlertEligible && (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        id="login_alert"
+                                                        type="checkbox"
+                                                        checked={loginAlert}
+                                                        onChange={(e) =>
+                                                            toggleLoginAlert(
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label htmlFor="login_alert">
+                                                        {t(
+                                                            'Email me when a user logs in',
+                                                        )}
+                                                    </Label>
+                                                </div>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
 
-                                <UserMetaFields
-                                    value={profileForm.data.metas}
-                                    onChange={(metas) =>
-                                        profileForm.setData('metas', metas)
-                                    }
-                                    metaKeyOptions={metaKeyOptions}
-                                    metaKeyConfig={metaKeyConfig}
-                                />
+                                <div className="order-3">
+                                    <UserMetaFields
+                                        value={profileForm.data.metas}
+                                        onChange={(metas) =>
+                                            profileForm.setData('metas', metas)
+                                        }
+                                        metaKeyOptions={metaKeyOptions}
+                                        metaKeyConfig={metaKeyConfig}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </form>

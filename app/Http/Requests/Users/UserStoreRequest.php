@@ -34,7 +34,7 @@ class UserStoreRequest extends FormRequest
             'sync_metas' => ['sometimes', 'boolean'],
             'metas' => ['sometimes', 'array'],
             'metas.*.id' => ['nullable', 'integer'],
-            'metas.*.key' => ['required', 'string', 'max:255', Rule::notIn(['logo'])],
+            'metas.*.key' => ['required', 'string', 'max:255', Rule::notIn(\App\Models\UserMeta::SYSTEM_KEYS)],
             'metas.*.title' => ['required', 'string', 'max:255'],
             'metas.*.value' => ['nullable', 'string'],
             'metas.*.value_json' => ['nullable', 'array'],

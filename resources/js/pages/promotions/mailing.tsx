@@ -1,5 +1,6 @@
 import { PromotionPageHeader } from '@/components/promotions/promotion-page-header';
 import { PromotionWorkspaceNav } from '@/components/promotions/promotion-workspace-nav';
+import { SaveButton } from '@/components/save-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ function MailingEditor({ promotionId, mailing, onClose }: { promotionId: number;
                 {form.errors[key] && <p className="text-sm text-destructive">{form.errors[key]}</p>}
             </div>)}
             <p className="text-xs text-muted-foreground">Texte simple, sans HTML. Le lien de désinscription est ajouté automatiquement. Le bouton est facultatif.</p>
-            <div className="flex flex-wrap gap-2"><Button disabled={form.processing}>Enregistrer le brouillon</Button><Button type="button" variant="outline" onClick={() => setPreview(!preview)}>Aperçu</Button><Button type="button" variant="ghost" onClick={onClose}>Fermer</Button></div>
+            <div className="flex flex-wrap gap-2"><SaveButton saving={form.processing} dirty={mailing ? form.isDirty : undefined}>Enregistrer le brouillon</SaveButton><Button type="button" variant="outline" onClick={() => setPreview(!preview)}>Aperçu</Button><Button type="button" variant="ghost" onClick={onClose}>Fermer</Button></div>
             {preview && <div className="space-y-4 rounded-lg border bg-muted/30 p-6">
                 <p className="text-xs text-muted-foreground">{form.data.preheader}</p><h2 className="text-xl font-semibold">{form.data.heading || form.data.subject}</h2>
                 <p className="whitespace-pre-wrap">{form.data.body}</p>
