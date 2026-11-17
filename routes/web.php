@@ -7,7 +7,7 @@ use App\Http\Controllers\Settings\AppearanceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
-    Route::get('/settings/files', [\App\Http\Controllers\OrderFileController::class, 'index'])->name('order-files.index');
+    Route::get('/media', [\App\Http\Controllers\MediaController::class, 'mine'])->name('media.mine');
     Route::get('/order-files/{file}/download', [\App\Http\Controllers\OrderFileController::class, 'download'])->whereNumber('file')->name('order-files.download');
     Route::get('/order-files/{file}/preview', [\App\Http\Controllers\OrderFileController::class, 'preview'])->whereNumber('file')->name('order-files.preview');
     Route::get('/order-files/cart/{cart}/pdf', [\App\Http\Controllers\OrderFileController::class, 'cartPdf'])->whereNumber('cart')->name('order-files.cart-pdf');

@@ -68,7 +68,12 @@ class RolePermissionManagementController extends Controller
         'carriers.create',
         'carriers.update',
         'carriers.delete',
-        
+
+        // Media (own user-meta folder in elFinder)
+        'media.upload',
+        'media.rename',
+        'media.delete',
+
         // Security
         'security.catalog.view',
         'security.roles.manage',

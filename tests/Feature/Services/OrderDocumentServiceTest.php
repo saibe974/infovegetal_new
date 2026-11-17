@@ -52,15 +52,6 @@ it('serves only the authenticated owner even when the visitor is an administrato
     $this->get(route('order-files.cart-pdf', $this->cart->id))->assertOk();
 });
 
-it('lists personal files with year and month filters', function () {
-    $other = User::factory()->create();
-    $this->documents->store($this->cart, $this->client->id, 'order-pdf', 'mine.pdf', 'mine', 'application/pdf', ['document_date' => '2025-12-31']);
-    $this->documents->store($this->cart, $other->id, 'order-pdf', 'other.pdf', 'other', 'application/pdf');
-    $this->actingAs($this->client)->get('/settings/files?year=2025&month=12')->assertInertia(fn (Assert $page) => $page
-        ->component('settings/files')->has('files.data', 1)->where('files.data.0.name', 'mine.pdf')->where('years', ['2025']));
-    $this->get('/settings/files?month=1')->assertInertia(fn (Assert $page) => $page->has('files.data', 0));
-});
-
 it('rejects missing files and forged paths even on a record owned by the caller', function () {
     $copy = $this->documents->store($this->cart, $this->client->id, 'order-pdf', 'mine.pdf', 'mine', 'application/pdf');
     Storage::disk('local')->delete($copy['relative_path']);

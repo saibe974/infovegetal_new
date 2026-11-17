@@ -295,7 +295,7 @@ function pageFromPath(pathname: string): PreferencePage | null {
     if (pathname.startsWith('/db-products')) return 'db-products';
     if (pathname.startsWith('/promotions')) return 'promotions';
     if (pathname.startsWith('/carriers')) return 'carriers';
-    if (pathname.startsWith('/admin/media-manager')) return 'media';
+    if (pathname.startsWith('/admin/media-manager') || pathname === '/media') return 'media';
     return null;
 }
 

@@ -82,6 +82,9 @@ class RoleSeeder extends Seeder
             'promo.manage.all',
             'promo.publish',
             'promo.send',
+            'media.upload',
+            'media.rename',
+            'media.delete',
         ];
 
         foreach ($permissions as $permission) {

@@ -18,6 +18,12 @@ class MediaController extends Controller
         return Inertia::render('media/index');
     }
 
+    // Personal media manager: elFinder restricted to the user's own folders.
+    public function mine(Request $request)
+    {
+        return Inertia::render('media/index');
+    }
+
     public function images(Request $request)
     {
         return Inertia::render('media/missing-images', [

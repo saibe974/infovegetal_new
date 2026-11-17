@@ -68,11 +68,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     if (isSelf) {
         sidebarNavItems.push(
             {
-                title: 'Mes fichiers',
-                href: '/settings/files',
-                icon: null,
-            },
-            {
                 title: t('Password'),
                 href: editSettingsPassword(),
                 icon: null,

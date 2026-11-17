@@ -1,12 +1,12 @@
 :root {
-    --ef-bg: #0b1220;
-    --ef-surface: #111827;
-    --ef-surface-2: #1f2937;
-    --ef-border: #374151;
-    --ef-text: #e5e7eb;
-    --ef-muted: #9ca3af;
-    --ef-primary: #2563eb;
-    --ef-primary-hover: #1d4ed8;
+    --ef-bg: #0a0a0a;
+    --ef-surface: #0a0a0a;
+    --ef-surface-2: #171717;
+    --ef-border: #262626;
+    --ef-text: #e5e5e5;
+    --ef-muted: #a3a3a3;
+    --ef-primary: #404040;
+    --ef-primary-hover: #525252;
     --ef-success: #059669;
 }
 
@@ -61,9 +61,9 @@ body {
 .elfinder .ui-button:hover,
 .elfinder .elfinder-navbar .ui-state-hover,
 .elfinder .elfinder-contextmenu .ui-state-hover {
-    background: #273449 !important;
-    color: #f8fafc !important;
-    border-color: #415069 !important;
+    background: #262626 !important;
+    color: #fafafa !important;
+    border-color: #404040 !important;
 }
 
 .elfinder .ui-icon-search,
@@ -90,16 +90,16 @@ body {
 }
 
 .elfinder .elfinder-cwd table tr {
-    border-top: 1px solid #223046;
+    border-top: 1px solid #1c1c1c;
 }
 
 .elfinder .elfinder-cwd table tr:nth-child(odd) {
-    background: #0f1b2d;
+    background: #111111;
 }
 
 .elfinder .elfinder-cwd table thead td,
 .elfinder .elfinder-cwd table thead td.ui-state-hover {
-    background: #182437 !important;
+    background: #171717 !important;
     color: var(--ef-text) !important;
     border-color: var(--ef-border) !important;
 }
@@ -117,7 +117,7 @@ body {
 .std42-dialog input,
 .std42-dialog textarea,
 .std42-dialog select {
-    background: #0f172a !important;
+    background: #0a0a0a !important;
     color: var(--ef-text) !important;
     border: 1px solid var(--ef-border) !important;
 }
@@ -155,24 +155,36 @@ body {
 
 .elfinder .elfinder-droppable-active td,
 .elfinder .elfinder-navbar .elfinder-droppable-active {
-    background: rgba(37, 99, 235, 0.25) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .elfinder:not(.elfinder-mobile) *::-webkit-scrollbar-track {
-    background: #0b1220;
+    background: #0a0a0a;
     box-shadow: none;
 }
 
 .elfinder:not(.elfinder-mobile) *::-webkit-scrollbar-thumb {
-    background-color: #334155;
+    background-color: #2e2e2e;
     box-shadow: none;
 }
 
 .elfinder:not(.elfinder-mobile) *::-webkit-scrollbar-thumb:hover {
-    background-color: #475569;
+    background-color: #404040;
 }
 
 .elfinder:not(.elfinder-mobile) *::-webkit-scrollbar-button:hover,
 .elfinder:not(.elfinder-mobile) *::-webkit-scrollbar-button:active {
-    border-color: #334155;
+    border-color: #2e2e2e;
+}
+
+/* Fill the iframe like the light theme does. */
+.elfinder {
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden;
+}
+
+body {
+    max-height: 100%;
 }

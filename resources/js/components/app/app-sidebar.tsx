@@ -12,7 +12,7 @@ import {
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Files, FlowerIcon, Folder, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck, Megaphone } from 'lucide-react';
+import { BookOpen, FlowerIcon, Folder, Github, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck, Megaphone } from 'lucide-react';
 import { DatabaseAccessIcon } from '@/lib/icons';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
@@ -180,13 +180,12 @@ export function AppSidebar() {
             });
         }
 
-        if (canManageMedia) {
-            mainNavItems.push({
-                title: t('Media library'),
-                href: '/admin/media-manager',
-                icon: Files,
-            });
-        }
+        // Every signed-in user gets a media manager; non-admins only see their own folders.
+        mainNavItems.push({
+            title: t('Media library'),
+            href: canManageMedia ? '/admin/media-manager' : '/media',
+            icon: Folder,
+        });
 
 
         footerNavItems = [
@@ -201,13 +200,13 @@ export function AppSidebar() {
                 icon: BookOpen,
                 target: '_self',
             },
+            legalRoutes,
             {
                 title: t('Repository'),
                 href: 'https://github.com/saibe974/infovegetal_new',
-                icon: Folder,
+                icon: Github,
                 target: '_blank',
             },
-            legalRoutes,
         ];
     } else {
         mainNavItems = [

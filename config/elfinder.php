@@ -6,12 +6,15 @@ return [
     'disks' => [],
 
     'route' => [
-        'prefix' => 'admin/media',
-        'middleware' => ['web', 'auth', 'role:admin'],
+        'prefix' => 'elfinder',
+        // Every authenticated user may open elFinder; the volumes they see are
+        // restricted per user by ConfigureElfinderRoots (see App\Support\ElfinderRoots).
+        'middleware' => ['web', 'auth', App\Http\Middleware\ConfigureElfinderRoots::class],
     ],
 
     'access' => 'Barryvdh\Elfinder\Elfinder::checkAccess',
 
+    // Default (admin) volume; replaced per request by ConfigureElfinderRoots.
     'roots' => [
         [
             'driver' => 'LocalFileSystem',

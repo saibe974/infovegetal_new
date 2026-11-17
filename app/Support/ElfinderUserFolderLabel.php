@@ -6,10 +6,10 @@ use App\Models\User;
 
 class ElfinderUserFolderLabel
 {
-    public static function apply(array &$stat, string $path): void
+    public static function apply(array &$stat, string $path, ?string $root = null): void
     {
         $path = str_replace('\\', '/', $path);
-        $root = rtrim(str_replace('\\', '/', storage_path('app/public')), '/');
+        $root = rtrim(str_replace('\\', '/', $root ?? storage_path('app/public')), '/');
 
         // Only label immediate user directories; keep names and hashes intact.
         if (($stat['mime'] ?? null) !== 'directory'

@@ -11,7 +11,7 @@ import { logout } from '@/routes';
 import { edit as editProfile } from '@/routes/profile';
 import { type User, type SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
-import { FileText, LogOut, Settings, UserCheck } from 'lucide-react';
+import { LogOut, Settings, UserCheck } from 'lucide-react';
 import { hasAnyPermission, isAdmin } from '@/lib/roles';
 import { useI18n } from '@/lib/i18n';
 
@@ -64,18 +64,6 @@ export function UserMenuContent({ user, users = [] }: UserMenuContentProps) {
             {canImpersonate && <ImpersonateSelect users={users} />}
             {isImpersonating && <DropdownMenuSeparator />}
             <DropdownMenuGroup>
-                <DropdownMenuItem asChild>
-                    <Link
-                        className="block w-full"
-                        href="/settings/files"
-                        as="button"
-                        prefetch
-                        onClick={cleanup}
-                    >
-                        <FileText className="mr-2" />
-                        {t('My files')}
-                    </Link>
-                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full"

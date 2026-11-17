@@ -27,19 +27,9 @@ Les imports sont privés sous `imports/{owner_id}/{uuid}.{extension}` : CSV, TSV
 
 elFinder autorise seulement JPEG/PNG/GIF/WebP jusqu'à 10 Mio. Création/édition de texte, extraction d'archive et montage réseau sont désactivés. Les médias volontairement publics restent publics. Les extensions de scripts sont refusées par le serveur, indépendamment du contrôle MIME.
 
-### Reprise locale préparée
+### Reprise des anciens fichiers
 
-Sauvegarder la base et les fichiers, puis suspendre les imports et générations de documents pendant la reprise. Ne pas lancer simultanément une reprise et des écritures applicatives. La commande refuse `--apply` hors des environnements `local` et `testing`.
-
-```powershell
-php artisan security:privatize-files --run=local-security
-php artisan security:privatize-files --run=local-security --apply
-php artisan security:privatize-files --run=local-security --apply --rollback
-```
-
-La simulation inventorie sans afficher de nom ni de contenu. L'application crée un journal privé `storage/app/private/security-migration/{run}.json`, copie les fichiers en streaming, vérifie SHA-256, met à jour les références `files`/médias historiques de commandes et retire uniquement les sources publiques vérifiées. Sont concernés : `imports`, `commandes`, les sous-dossiers personnels `commandes` et les médias portant `source=cart-tcpdf`. Les logos et images produit sont exclus. Les fichiers orphelins de ces dossiers sont mis à l'abri sans leur attribuer un propriétaire.
-
-Une relance avec le même identifiant reprend le même inventaire. Employer un nouvel identifiant pour un nouveau lot. Une destination différente ou une référence modifiée provoque un arrêt sans écrasement. Le retour arrière vérifie les empreintes, restaure les références et conserve la copie privée ; il ne retire pas les interdictions HTTP. Conserver les journaux privés. Les historiques sans attribution restent à examiner via la procédure historique `orders:migrate-files`, sans élargir automatiquement leurs droits.
+Terminée le 17/11/2026 : les anciens dossiers publics (`commandes`, `imports`, `user-meta/{id}/commandes`) ont été supprimés avec leurs références orphelines en base. Les commandes `security:privatize-files` et `orders:migrate-files` ont été retirées. Les interdictions HTTP Apache sur ces chemins sont conservées par défense en profondeur.
 
 Tests ciblés : utilisateur autorisé/non autorisé, fichiers interdits, taille, identifiants, positions, morceaux d'un autre utilisateur, protocole FilePond réel, reprise répétée, intégrité, conflits, retour arrière et préservation des images publiques, y compris voisines d'un document historique MediaLibrary.
 
@@ -80,5 +70,5 @@ Les dix nouveaux tests de sécurité passent. Les deux échecs sont les mêmes q
 ## Inventaire des fichiers
 
 - Lot 1 : configurations locales Apache, copies et sauvegardes `ops/laragon/`, `public/.htaccess`.
-- Lot 2 : services `OrderDocumentService`, `OrderCsvService`, `FileUploadService`, `ChunkUploadService`, `ImportUploadPolicy` ; contrôleurs `OrderFileController`, `UploadController` ; middleware `EnsureImportOwner` ; routes produits/utilisateurs ; configurations filesystems/elFinder/uploads ; commande `PrivatizeFiles` ; tests associés. La documentation locale existante `docs/order-files-storage.md` a aussi été mise à jour, mais ce dossier est ignoré par Git ; ce compte rendu à la racine est révisable avec le code.
+- Lot 2 : services `OrderDocumentService`, `OrderCsvService`, `FileUploadService`, `ChunkUploadService`, `ImportUploadPolicy` ; contrôleurs `OrderFileController`, `UploadController` ; middleware `EnsureImportOwner` ; routes produits/utilisateurs ; configurations filesystems/elFinder/uploads ; tests associés. La documentation locale existante `docs/order-files-storage.md` a aussi été mise à jour, mais ce dossier est ignoré par Git ; ce compte rendu à la racine est révisable avec le code.
 - Lot 3 : `composer.lock`, `package.json`, `package-lock.json`.
