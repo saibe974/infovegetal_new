@@ -497,5 +497,10 @@
     "Date": "Date",
     "IP address": "IP address",
     "Browser": "Browser",
-    "You receive this email because you enabled login alerts in your profile settings.": "You receive this email because you enabled login alerts in your profile settings."
+    "You receive this email because you enabled login alerts in your profile settings.": "You receive this email because you enabled login alerts in your profile settings.",
+    "Strict": "Strict",
+    "Strict impersonation mode": "Strict impersonation mode",
+    "Search user to impersonate": "Search user to impersonate",
+    "Stop impersonating": "Stop impersonating",
+    "My files": "My files"
 }

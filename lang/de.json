@@ -199,7 +199,7 @@
     "Edit": "Bearbeiten",
     "Add": "Hinzufügen",
     "Delete": "Löschen",
-    "Impersonate": "Identität übernehmen",
+    "Impersonate": "Vertreten",
     "Profile": "Profil",
     "Contract": "Vertrag",
     "Two-Factor Auth": "Zwei-Faktor-Authentifizierung",
@@ -497,5 +497,10 @@
     "Date": "Datum",
     "IP address": "IP-Adresse",
     "Browser": "Browser",
-    "You receive this email because you enabled login alerts in your profile settings.": "Sie erhalten diese E-Mail, weil Sie Anmeldebenachrichtigungen in Ihren Profileinstellungen aktiviert haben."
+    "You receive this email because you enabled login alerts in your profile settings.": "Sie erhalten diese E-Mail, weil Sie Anmeldebenachrichtigungen in Ihren Profileinstellungen aktiviert haben.",
+    "Strict": "Strikt",
+    "Strict impersonation mode": "Strenger Vertretungsmodus",
+    "Search user to impersonate": "Benutzer zum Vertreten suchen…",
+    "Stop impersonating": "Vertretung beenden",
+    "My files": "Meine Dateien"
 }

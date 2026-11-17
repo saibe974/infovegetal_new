@@ -61,6 +61,8 @@ interface SearchBarProps {
     clearAll?: () => void;
     // Minimum characters required to show propositions (default: 3). Set to 0 to show on focus.
     minQueryLength?: number;
+    // Tighter paddings for the propositions list (e.g. inside dropdown menus).
+    compact?: boolean;
 }
 
 export type Option = {
@@ -69,6 +71,7 @@ export type Option = {
     description?: string;
     country?: string;
     icone?: string;
+    image?: string | null;
     badge?: string;
     kind?: string;
     id?: number;
@@ -110,6 +113,7 @@ export default function SearchSelect({
     removeFilter = undefined,
     clearAll = undefined,
     minQueryLength = 3,
+    compact = false,
 }: SearchBarProps) {
     const { t } = useI18n();
     const [open, setOpen] = useState(false);
@@ -145,6 +149,7 @@ export default function SearchSelect({
     const containerRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const listOptions = toOptions(propositions);
+    const hasImages = listOptions.some((option) => Boolean(option.image));
     // Track last submitted query to avoid duplicate submit loops
     const lastSubmittedRef = useRef<string | null>(null);
     const onSubmitRef = useRef(onSubmit);
@@ -610,7 +615,7 @@ export default function SearchSelect({
 
             {/* Panneau combiné filtres + propositions */}
             {((open && value.length >= minQueryLength) || (openFilters && renderedFilters)) && (
-                <div className="absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover pt-0 pb-4 shadow-lg">
+                <div className={cn('absolute top-full left-0 z-50 mt-1 max-h-[min(30rem,calc(100vh-8rem))] w-full overflow-y-auto rounded-md border bg-popover pt-0 shadow-lg', compact ? 'pb-1' : 'pb-4')}>
                     <div
                         className={cn(
                             'flex flex-col gap-4 md:flex-row',
@@ -623,7 +628,7 @@ export default function SearchSelect({
                         {open && value.length >= minQueryLength && (
                             <div
                                 className={cn(
-                                    'px-6',
+                                    compact ? 'px-1 pt-1' : 'px-6',
                                     openFilters && renderedFilters
                                         ? 'md:w-1/2 md:border-r md:border-r-accent'
                                         : 'w-full',
@@ -647,12 +652,26 @@ export default function SearchSelect({
                                                 handleSelectOption(option)
                                             }
                                             className={cn(
-                                                'w-full rounded-sm px-3 py-2 text-left text-sm transition-colors',
+                                                'w-full rounded-sm text-left text-sm transition-colors',
+                                                compact ? 'px-2 py-1' : 'px-3 py-2',
+                                                hasImages && 'flex items-center gap-2',
                                                 highlightedIndex === i
                                                     ? 'bg-accent text-accent-foreground'
                                                     : 'hover:bg-accent/60 hover:text-accent-foreground',
                                             )}
                                         >
+                                            {hasImages ? (
+                                                option.image ? (
+                                                    <img
+                                                        src={option.image}
+                                                        alt=""
+                                                        className="h-5 w-5 shrink-0 rounded-full object-contain"
+                                                    />
+                                                ) : (
+                                                    <span className="h-5 w-5 shrink-0" aria-hidden="true" />
+                                                )
+                                            ) : null}
+                                            <span className={hasImages ? 'min-w-0 flex-1' : undefined}>
                                             <span>
                                                 {option.badge ? (
                                                     <span className="mr-2 inline-flex rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-muted-foreground">
@@ -674,6 +693,7 @@ export default function SearchSelect({
                                                     {option.description}
                                                 </span>
                                             ) : null}
+                                            </span>
                                         </button>
                                     ))
                                 ) : (

@@ -198,7 +198,7 @@
     "Edit": "Editar",
     "Add": "Agregar",
     "Delete": "Eliminar",
-    "Impersonate": "Suplantar",
+    "Impersonate": "Sustituir",
     "Profile": "Perfil",
     "Contract": "Contrato",
     "Two-Factor Auth": "Autenticación de dos factores",
@@ -496,5 +496,10 @@
     "Date": "Fecha",
     "IP address": "Dirección IP",
     "Browser": "Navegador",
-    "You receive this email because you enabled login alerts in your profile settings.": "Recibe este correo electrónico porque activó las alertas de conexión en la configuración de su perfil."
+    "You receive this email because you enabled login alerts in your profile settings.": "Recibe este correo electrónico porque activó las alertas de conexión en la configuración de su perfil.",
+    "Strict": "Estricto",
+    "Strict impersonation mode": "Modo de sustitución estricto",
+    "Search user to impersonate": "Buscar usuario a sustituir…",
+    "Stop impersonating": "Detener la sustitución",
+    "My files": "Mis archivos"
 }

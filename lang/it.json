@@ -199,7 +199,7 @@
     "Edit": "Modifica",
     "Add": "Aggiungi",
     "Delete": "Elimina",
-    "Impersonate": "Impersona",
+    "Impersonate": "Sostituire",
     "Profile": "Profilo",
     "Contract": "Contratto",
     "Two-Factor Auth": "Autenticazione a due fattori",
@@ -497,5 +497,10 @@
     "Date": "Data",
     "IP address": "Indirizzo IP",
     "Browser": "Browser",
-    "You receive this email because you enabled login alerts in your profile settings.": "Ricevi questa e-mail perché hai attivato gli avvisi di accesso nelle impostazioni del tuo profilo."
+    "You receive this email because you enabled login alerts in your profile settings.": "Ricevi questa e-mail perché hai attivato gli avvisi di accesso nelle impostazioni del tuo profilo.",
+    "Strict": "Rigoroso",
+    "Strict impersonation mode": "Modalità di sostituzione rigorosa",
+    "Search user to impersonate": "Cerca utente da sostituire…",
+    "Stop impersonating": "Interrompi la sostituzione",
+    "My files": "I miei file"
 }

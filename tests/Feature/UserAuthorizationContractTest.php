@@ -216,3 +216,93 @@ test('impersonated effective user remains bounded by real actor scope', function
     $this->put(route('users.update', ['user' => $outsider->id], false), updatePayload($outsider))
         ->assertForbidden();
 });
+
+test('impersonator can switch directly to another user while impersonating', function () {
+    /** @var \Tests\TestCase $this */
+    $actorRole = contractRole('switch-actor-impersonate-branch', ['users.impersonate.branch']);
+
+    $actor = User::factory()->withoutTwoFactor()->create();
+    $first = User::factory()->withoutTwoFactor()->create();
+    $second = User::factory()->withoutTwoFactor()->create();
+
+    $actor->assignRole($actorRole);
+
+    $actor->saveAsRoot();
+    $first->appendToNode($actor)->save();
+    $second->appendToNode($actor)->save();
+
+    $this->actingAs($actor)
+        ->get(route('impersonate', ['id' => $first->id], false))
+        ->assertRedirect();
+    expect(auth()->id())->toBe($first->id);
+
+    $this->get(route('impersonate', ['id' => $second->id], false))
+        ->assertRedirect();
+
+    expect(auth()->id())->toBe($second->id);
+    expect(session('impersonated_by'))->toBe($actor->id);
+});
+
+test('impersonation switch is authorized against the real impersonator, not the impersonated user', function () {
+    /** @var \Tests\TestCase $this */
+    $actorRole = contractRole('switch-limited-actor', ['users.impersonate.branch']);
+    $powerfulRole = contractRole('switch-powerful-target', ['users.impersonate.all']);
+
+    $actor = User::factory()->withoutTwoFactor()->create();
+    $impersonated = User::factory()->withoutTwoFactor()->create();
+    $outsider = User::factory()->withoutTwoFactor()->create();
+
+    $actor->assignRole($actorRole);
+    $impersonated->assignRole($powerfulRole);
+
+    $actor->saveAsRoot();
+    $impersonated->appendToNode($actor)->save();
+    $outsider->saveAsRoot();
+
+    $this->actingAs($actor)
+        ->get(route('impersonate', ['id' => $impersonated->id], false))
+        ->assertRedirect();
+
+    // Mode strict : l'utilisateur effectif est l'impersoné (qui a impersonate.all),
+    // mais la substitution doit rester bornée au périmètre de l'impersonateur réel.
+    $this->post(route('impersonate.mode', [], false), ['strict' => true])
+        ->assertRedirect();
+
+    $this->get(route('impersonate', ['id' => $outsider->id], false))
+        ->assertForbidden();
+
+    expect(auth()->id())->toBe($impersonated->id);
+    expect(session('impersonated_by'))->toBe($actor->id);
+});
+
+test('impersonation switch keeps strict mode and cannot target the impersonator', function () {
+    /** @var \Tests\TestCase $this */
+    $actorRole = contractRole('switch-strict-actor', ['users.impersonate.branch']);
+
+    $actor = User::factory()->withoutTwoFactor()->create();
+    $first = User::factory()->withoutTwoFactor()->create();
+    $second = User::factory()->withoutTwoFactor()->create();
+
+    $actor->assignRole($actorRole);
+
+    $actor->saveAsRoot();
+    $first->appendToNode($actor)->save();
+    $second->appendToNode($actor)->save();
+
+    $this->actingAs($actor)
+        ->get(route('impersonate', ['id' => $first->id], false))
+        ->assertRedirect();
+    $this->post(route('impersonate.mode', [], false), ['strict' => true])
+        ->assertRedirect();
+
+    $this->get(route('impersonate', ['id' => $actor->id], false))
+        ->assertForbidden();
+    expect(auth()->id())->toBe($first->id);
+
+    $this->get(route('impersonate', ['id' => $second->id], false))
+        ->assertRedirect();
+
+    expect(auth()->id())->toBe($second->id);
+    expect(session('impersonated_by'))->toBe($actor->id);
+    expect(session('impersonation.strict_mode'))->toBeTrue();
+});

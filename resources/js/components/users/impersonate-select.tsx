@@ -3,7 +3,7 @@ import { usePage } from '@inertiajs/react';
 import SearchSelect from '@/components/app/search-select';
 import { type SharedData, type User } from '@/types';
 import { useI18n } from '@/lib/i18n';
-import { getEffectiveUser, hasAnyPermission, isAdmin } from '@/lib/roles';
+import { hasAnyPermission, isAdmin } from '@/lib/roles';
 import { take as impersonateTake } from '@/actions/App/Http/Controllers/ImpersonationController';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
@@ -19,17 +19,20 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
     const [search, setSearch] = useState<string>('');
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const effectiveUser = getEffectiveUser(auth);
-    const canImpersonate = isAdmin(effectiveUser) || hasAnyPermission(effectiveUser, [
+    // Droits de l'utilisateur réel (impersonateur), quel que soit le mode strict :
+    // le serveur vérifie de toute façon chaque substitution sur ce même compte.
+    const realActor = auth.impersonator ?? auth.user;
+    const canImpersonate = isAdmin(realActor) || hasAnyPermission(realActor, [
         'users.impersonate.branch',
         'users.impersonate.all',
     ]);
     if (!canImpersonate) return null;
-    const isImpersonating = !!auth.impersonate_from;
 
     // Use passed `users` prop if present, otherwise fall back to Inertia shared `users` prop
     const sharedUsers: User[] = users && users.length > 0 ? users : pageProps.users ?? [];
-    const availableUsers: User[] = sharedUsers.filter((u: User) => u.id !== auth.user?.id);
+    const availableUsers: User[] = sharedUsers.filter(
+        (u: User) => u.id !== auth.user?.id && u.id !== auth.impersonator?.id,
+    );
 
     const handleSearch = (s: string) => {
         setSearch(s);
@@ -54,33 +57,41 @@ export function ImpersonateSelect({ users, onClose }: ImpersonateSelectProps) {
         );
     }
 
-    if (isImpersonating) {
-        return null;
-    }
-
     return (
         <DropdownMenu.Sub>
-            <div className="px-2 py-2 w-full" onKeyDown={(e) => e.stopPropagation()}>
+            <div className="px-1 py-2 w-full" onKeyDown={(e) => e.stopPropagation()}>
                 <SearchSelect
                     value={search}
                     onChange={handleSearch}
-                    onSubmit={(val: string) => {
-                        const query = val.trim();
-                        if (!query) return;
-                        const normalized = query.toLowerCase();
-                        const match = filteredUsers.find((u: User) => {
-                            const name = u.name.toLowerCase();
-                            return name === normalized;
-                        });
+                    onSubmit={() => {}}
+                    onSelectOption={(option) => {
+                        const normalized = option.label.trim().toLowerCase();
+                        const match =
+                            (option.id !== undefined
+                                ? filteredUsers.find((u: User) => u.id === option.id)
+                                : undefined) ??
+                            filteredUsers.find(
+                                (u: User) =>
+                                    u.name.toLowerCase() === normalized ||
+                                    u.email.toLowerCase() === normalized,
+                            );
                         if (match) {
                             handleSelect(match);
                         }
+                        return true;
                     }}
-                    propositions={filteredUsers.map((u: User) => `${u.name}`)}
+                    propositions={filteredUsers.map((u: User) => ({
+                        value: String(u.id),
+                        label: u.name,
+                        description: u.email,
+                        image: u.logo_url,
+                        id: u.id,
+                    }))}
                     // filters={<UserListFilters />}
-                    placeholder={t('Search user to impersonate') || 'Search user...'}
+                    placeholder={t('Search user to impersonate')}
                     minQueryLength={0}
                     search={false}
+                    compact
                 />
             </div>
         </DropdownMenu.Sub>

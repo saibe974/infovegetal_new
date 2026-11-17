@@ -65,6 +65,7 @@ class HandleInertiaRequests extends Middleware
         $userArray = null;
         $impersonatorId = null;
         $impersonatorArray = null;
+        $impersonator = null;
         $impersonationStrictMode = false;
 
         $formatUser = function (User $user) {
@@ -114,15 +115,38 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
-        // Get scoped list of users for impersonation dropdown
+        // Get scoped list of users for impersonation dropdown.
+        // Pendant une impersonation, la liste dépend des droits de
+        // l'impersonateur réel (quel que soit le mode strict), pour
+        // permettre de changer d'utilisateur sans repasser par son compte.
         $users = collect();
-        if ($user) {
+        $impersonationActor = $impersonator ?? ($impersonatorId ? null : $user);
+        if ($user && $impersonationActor) {
             $users = User::query()
                 ->select('id', 'name', 'email', '_lft', '_rgt')
-                ->tap(fn ($query) => app(UserManagementAuthorizationService::class)->scopeImpersonatableUsers($user, $query))
-                ->where('id', '!=', $user->id)
+                ->tap(fn ($query) => app(UserManagementAuthorizationService::class)->scopeImpersonatableUsers($impersonationActor, $query))
+                ->whereNotIn('id', array_unique([$user->id, $impersonationActor->id]))
+                ->with(['usersMeta' => fn ($query) => $query
+                    ->where('key', 'logo')
+                    ->select(['id', 'user_id', 'key', 'value'])])
                 ->orderBy('name')
-                ->get(['id', 'name', 'email']);
+                ->get()
+                ->map(function (User $impersonatable) {
+                    $logo = $impersonatable->usersMeta->firstWhere('key', 'logo');
+                    $logoValue = $logo?->value
+                        ? json_decode($logo->value, true)
+                        : null;
+
+                    return [
+                        'id' => $impersonatable->id,
+                        'name' => $impersonatable->name,
+                        'email' => $impersonatable->email,
+                        'logo_url' => is_array($logoValue)
+                            ? ($logoValue['url'] ?? null)
+                            : null,
+                    ];
+                })
+                ->values();
         }
 
         $activeCart = null;

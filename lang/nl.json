@@ -198,7 +198,7 @@
     "Edit": "Bewerken",
     "Add": "Toevoegen",
     "Delete": "Verwijderen",
-    "Impersonate": "Impersoneren",
+    "Impersonate": "Vervangen",
     "Profile": "Profiel",
     "Contract": "Contract",
     "Two-Factor Auth": "Tweefactorauthenticatie",
@@ -496,5 +496,10 @@
     "Date": "Datum",
     "IP address": "IP-adres",
     "Browser": "Browser",
-    "You receive this email because you enabled login alerts in your profile settings.": "U ontvangt deze e-mail omdat u aanmeldingsmeldingen hebt ingeschakeld in uw profielinstellingen."
+    "You receive this email because you enabled login alerts in your profile settings.": "U ontvangt deze e-mail omdat u aanmeldingsmeldingen hebt ingeschakeld in uw profielinstellingen.",
+    "Strict": "Strikt",
+    "Strict impersonation mode": "Strikte vervangingsmodus",
+    "Search user to impersonate": "Zoek gebruiker om te vervangen…",
+    "Stop impersonating": "Vervanging stoppen",
+    "My files": "Mijn bestanden"
 }
