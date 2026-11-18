@@ -41,3 +41,29 @@ it('saves supplier contacts with a seller then without a seller and preserves th
     $save($seller->id, []);
     expect($client->clientSalesConditions()->where('active', true)->sole()->seller_user_id)->toBe($seller->id);
 });
+
+it('detaches a removed supplier when an admin impersonates the client', function () {
+    $admin = User::factory()->withoutTwoFactor()->create();
+    $admin->assignRole(Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']));
+    $client = User::factory()->create();
+    $billing = User::factory()->create();
+    $kept = DbProducts::create(['name' => 'Kept']);
+    $removed = DbProducts::create(['name' => 'Removed']);
+    foreach ([$kept, $removed] as $db) {
+        DbProductBillingUser::create(['db_product_id' => $db->id, 'billing_user_id' => $billing->id, 'active' => true]);
+        $client->dbProducts()->attach($db->id, ['can_access' => true, 'attributes' => json_encode([])]);
+    }
+
+    $this->actingAs($client)
+        ->withSession([config('laravel-impersonate.session_key', 'impersonated_by') => $admin->id])
+        ->post(route('users.editDb', $client, false), [
+            'merge' => false,
+            'db_ids' => [$kept->id],
+            'sales_conditions' => [[
+                'db_product_id' => $kept->id, 'billing_user_id' => $billing->id,
+                'seller_user_id' => null, 'conditions_override' => [],
+            ]],
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+    expect($client->dbProducts()->pluck('db_products.id')->all())->toBe([$kept->id]);
+});

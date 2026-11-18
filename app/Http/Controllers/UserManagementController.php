@@ -1059,7 +1059,9 @@ class UserManagementController extends Controller
         }
 
         $actor = $request->user();
-        $isSelfManagement = (int) $request->user()->id === (int) $user->id;
+        // En impersonation, c'est l'admin qui agit : ce n'est pas une auto-gestion.
+        $isImpersonated = method_exists($actor, 'isImpersonated') && $actor->isImpersonated();
+        $isSelfManagement = (int) $actor->id === (int) $user->id && ! $isImpersonated;
         $hasCanAccessColumn = Schema::hasColumn('db_product_user', 'can_access');
         $canManageAllDb = $actor
             && (
@@ -1150,9 +1152,15 @@ class UserManagementController extends Controller
         $syncData = [];
         $next = [];
 
-        if ($merge || $isSelfManagement) {
-            $next = $allCurrent;
-            foreach ($allCurrent as $dbId => $attrs) {
+        // merge : on conserve tout l'existant. Auto-gestion : on ne conserve que les
+        // bases que l'utilisateur ne peut pas modifier ; celles qu'il retire sont détachées.
+        $preserved = $merge
+            ? $allCurrent
+            : ($isSelfManagement ? array_diff_key($allCurrent, $editableCurrent) : []);
+
+        if (! empty($preserved)) {
+            $next = $preserved;
+            foreach ($preserved as $dbId => $attrs) {
                 $syncData[$dbId] = [
                     'attributes' => json_encode($attrs),
                 ];
@@ -1164,7 +1172,8 @@ class UserManagementController extends Controller
                 continue;
             }
 
-            $attr = $attributes[$dbId] ?? [];
+            // En auto-gestion, une base conservée garde ses attributs existants.
+            $attr = $attributes[$dbId] ?? ($isSelfManagement ? ($allCurrent[(int) $dbId] ?? []) : []);
             // Si c'est une string JSON (cas rare), on la décode
             if (is_string($attr)) {
                 $decoded = json_decode($attr, true);
