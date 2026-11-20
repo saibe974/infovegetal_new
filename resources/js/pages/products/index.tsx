@@ -19,6 +19,7 @@ import { ViewModeToggle, type ViewMode } from '@/components/ui/view-mode-toggle'
 import { ProductsFilters } from '@/components/products/products-filters';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useStickyTopOffset } from '@/hooks/use-sticky-top-offset';
+import { useCollapseMenuForCart } from '@/hooks/use-collapse-menu-for-cart';
 import { persistPagePreference } from '@/lib/display-preferences';
 import ProductDetails from '@/components/products/product-details';
 import { ButtonsActions } from '@/components/buttons-actions';
@@ -249,6 +250,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         || promoOptions.length >= 2;
     const dockedFilters = !isMobile && filtersLayout === 'docked' && hasAvailableFilters;
     const filtersStickyTop = useStickyTopOffset('.top-sticky, .header-search', dockedFilters);
+    useCollapseMenuForCart(dockedFilters);
 
     const toggleFiltersPin = () => {
         setFiltersLayout((current) => {

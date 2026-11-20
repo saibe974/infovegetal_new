@@ -331,7 +331,8 @@ export function AppSidebarHeader({
                 >
 
                 <div className='flex items-center gap-2'>
-                    <SidebarTrigger className="-ml-1" targetId='main' />
+                    {/* Desktop : le bouton du menu est dans la sidebar de gauche (toujours visible) */}
+                    {isMobile && <SidebarTrigger className="-ml-1" targetId='main' />}
                     <div className="hidden sm:block">
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>

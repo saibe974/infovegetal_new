@@ -502,5 +502,8 @@
     "Strict impersonation mode": "Strenger Vertretungsmodus",
     "Search user to impersonate": "Benutzer zum Vertreten suchen…",
     "Stop impersonating": "Vertretung beenden",
-    "My files": "Meine Dateien"
+    "My files": "Meine Dateien",
+    "Show menu": "Menü anzeigen",
+    "Hide menu": "Menü ausblenden",
+    "Hide cart": "Warenkorb ausblenden"
 }

@@ -501,5 +501,8 @@
     "Strict impersonation mode": "Strikte vervangingsmodus",
     "Search user to impersonate": "Zoek gebruiker om te vervangen…",
     "Stop impersonating": "Vervanging stoppen",
-    "My files": "Mijn bestanden"
+    "My files": "Mijn bestanden",
+    "Show menu": "Menu tonen",
+    "Hide menu": "Menu verbergen",
+    "Hide cart": "Winkelwagen verbergen"
 }

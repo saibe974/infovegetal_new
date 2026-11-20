@@ -4,15 +4,17 @@ import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
+    SidebarGroup,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { contact, dashboard, documentation } from '@/routes';
 import { SharedData, NavItemExtended } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FlowerIcon, Folder, Github, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck, Megaphone } from 'lucide-react';
+import { BookOpen, FlowerIcon, Folder, Github, FolderTreeIcon, ImageOff, LayoutGrid, MailIcon, TagIcon, User2Icon, Info, BadgeEuro, GlobeLock, BookCheck, TruckIcon, ShieldCheck, Megaphone, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { DatabaseAccessIcon } from '@/lib/icons';
 import AppLogo from './app-logo';
 import products from '@/routes/products';
@@ -30,6 +32,9 @@ import legal from '@/routes/legal';
 
 export function AppSidebar() {
     const { t } = useI18n();
+    const { isMobile, isOpenId, toggleSidebar } = useSidebar();
+    const isMenuOpen = isOpenId('main');
+    const menuToggleLabel = isMenuOpen ? t('Hide menu') : t('Show menu');
 
     const { auth } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -248,6 +253,24 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
+                {!isMobile && (
+                    <SidebarGroup className="px-2 py-0">
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton
+                                    onClick={() => toggleSidebar('main')}
+                                    tooltip={!isMenuOpen ? menuToggleLabel : undefined}
+                                    aria-label={menuToggleLabel}
+                                    aria-expanded={isMenuOpen}
+                                    className="text-muted-foreground"
+                                >
+                                    {isMenuOpen ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+                                    <span>{menuToggleLabel}</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarGroup>
+                )}
                 <NavMainExtended title={title} items={mainNavItems} menuButtonClassName={impersonationLinkClass} />
             </SidebarContent>
 

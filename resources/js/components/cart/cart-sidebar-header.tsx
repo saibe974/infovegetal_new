@@ -1,13 +1,16 @@
 import { buildRollDistribution } from '@/components/products/product-roll';
 import { ProductRollDialog } from '@/components/products/product-roll-dialog';
 import { ProductRollMini } from '@/components/products/product-roll-mini';
+import { useScrollHeaderVisibility } from '@/hooks/use-scroll-header-visibility';
 import { useI18n } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 import { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     CheckCircleIcon,
     EyeIcon,
     FlowerIcon,
+    PanelRightClose,
     SaveIcon,
     Trash2Icon,
     Truck,
@@ -23,6 +26,7 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '../ui/sidebar';
 import {
     getCarrierOverridesStorageKey,
@@ -48,6 +52,13 @@ const validateCartButtonClassName =
 export function CartSidebarHeader() {
     const { t } = useI18n();
     const catalogTransport = useCatalogTransport();
+    const { isMobile, toggleSidebar } = useSidebar();
+    // Suit l'en-tête : décalé sous lui quand il est visible, collé en haut quand il se masque au scroll
+    const isHeaderVisible = useScrollHeaderVisibility();
+    const topOffsetClassName = cn(
+        'transition-[margin] duration-200 ease-out motion-reduce:transition-none',
+        isHeaderVisible ? 'md:mt-14' : 'md:mt-0',
+    );
 
     const { auth, cart } = usePage<SharedData>().props;
     const user = auth?.user;
@@ -383,10 +394,29 @@ export function CartSidebarHeader() {
         }
     };
 
+    // Desktop : icône pour masquer le panier, à gauche de la corbeille
+    const hideCartButton = isMobile ? null : (
+        <button
+            type="button"
+            className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => toggleSidebar('right')}
+            title={t('Hide cart')}
+            aria-label={t('Hide cart')}
+        >
+            <PanelRightClose className="size-5" />
+        </button>
+    );
+
     return (
         <div className="flex h-screen flex-col">
+            {/* Desktop, sans barre d'outils (non connecté ou panier vide) : icône seule */}
+            {hideCartButton && (!isAuthenticated || items.length === 0) && (
+                <div className={cn('flex flex-shrink-0 px-2 pt-2', topOffsetClassName)}>
+                    {hideCartButton}
+                </div>
+            )}
             {!isAuthenticated ? (
-                <SidebarContent className="md:mt-14">
+                <SidebarContent className={hideCartButton ? '' : topOffsetClassName}>
                     <div className="flex flex-col items-center justify-center gap-4 p-6 text-center">
                         <div className="text-muted-foreground">
                             <HeadingSmall
@@ -416,7 +446,12 @@ export function CartSidebarHeader() {
                     <SidebarHeader className="pl-0">
                         {items.length > 0 && (
                             <>
-                                <SidebarMenu className="flex w-full flex-shrink-0 flex-row justify-between gap-2 md:mt-14">
+                                <SidebarMenu className={cn('flex w-full flex-shrink-0 flex-row justify-between gap-2', topOffsetClassName)}>
+                                    {hideCartButton && (
+                                        <SidebarMenuItem className="w-fit">
+                                            {hideCartButton}
+                                        </SidebarMenuItem>
+                                    )}
                                     <SidebarMenuItem className="w-fit">
                                         <SidebarMenuButton
                                             asChild

@@ -520,5 +520,8 @@
     "Strict impersonation mode": "Mode de substitution strict",
     "Search user to impersonate": "Se substituer à un utilisateur…",
     "Stop impersonating": "Arrêter la substitution",
-    "My files": "Mes fichiers"
+    "My files": "Mes fichiers",
+    "Show menu": "Afficher le menu",
+    "Hide menu": "Masquer le menu",
+    "Hide cart": "Masquer le panier"
 }

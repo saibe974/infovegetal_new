@@ -192,9 +192,40 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
             ],
             'query' => $request->query->all(),
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'sidebarOpen' => $this->sidebarOpen($request),
             'appearancePreferences' => AppearanceController::preferencesFor($user),
             'dashboardLayout' => DashboardLayoutController::layoutFor($user),
         ];
+    }
+
+    /**
+     * État du menu de gauche. Le cookie `sidebar_state` est écrit côté client
+     * sous forme JSON par sidebar (ex. {"main":true,"right":false}, le menu de
+     * gauche ayant l'id « main ») ;
+     * l'ancien format booléen ("true"/"false") reste accepté.
+     */
+    private function sidebarOpen(Request $request): bool
+    {
+        $raw = $request->cookie('sidebar_state');
+
+        if (! is_string($raw) || $raw === '') {
+            return true;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (is_bool($decoded)) {
+            return $decoded;
+        }
+
+        if (is_array($decoded)) {
+            foreach (['main', 'default'] as $key) {
+                if (array_key_exists($key, $decoded)) {
+                    return (bool) $decoded[$key];
+                }
+            }
+        }
+
+        return true;
     }
 }

@@ -502,5 +502,8 @@
     "Strict impersonation mode": "Modalità di sostituzione rigorosa",
     "Search user to impersonate": "Cerca utente da sostituire…",
     "Stop impersonating": "Interrompi la sostituzione",
-    "My files": "I miei file"
+    "My files": "I miei file",
+    "Show menu": "Mostra il menu",
+    "Hide menu": "Nascondi il menu",
+    "Hide cart": "Nascondi il carrello"
 }

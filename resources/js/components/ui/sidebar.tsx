@@ -65,6 +65,8 @@ type SidebarContext = {
   isOpenId: (id?: SidebarId) => boolean
   toggleSidebar: (id?: SidebarId) => void
   openSidebar: (id?: SidebarId, options?: { persist?: boolean }) => void
+  // ouvre/ferme une sidebar (desktop) ; persist: false = changement temporaire non mémorisé
+  setSidebarOpen: (id: SidebarId, open: boolean, options?: { persist?: boolean }) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -179,6 +181,21 @@ function SidebarProvider({
     [isMobile, setOpen]
   )
 
+  const setSidebarOpen = React.useCallback(
+    (id: SidebarId, value: boolean, options?: { persist?: boolean }) => {
+      setOpenMap((m) => {
+        if (!!m[id] === value) return m
+        const updated = { ...m, [id]: value }
+        if (options?.persist !== false) {
+          saveSidebarStateToCookie(updated)
+          persistSidebarPreference(id, value)
+        }
+        return updated
+      })
+    },
+    []
+  )
+
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -231,8 +248,9 @@ function SidebarProvider({
       isOpenId,
       toggleSidebar,
       openSidebar,
+      setSidebarOpen,
     }),
-    [state, open, setOpen, isMobile, openMobileMap, isOpenId, toggleSidebar, openSidebar]
+    [state, open, setOpen, isMobile, openMobileMap, isOpenId, toggleSidebar, openSidebar, setSidebarOpen]
   )
 
   return (
@@ -260,7 +278,19 @@ function SidebarProvider({
   )
 }
 
-function Sidebar({
+// Id de la sidebar englobante, pour que ses boutons connaissent leur propre état
+// (replié / déplié) plutôt que celui de la sidebar "default".
+const SidebarIdContext = React.createContext<SidebarId>("default")
+
+function Sidebar(props: React.ComponentProps<typeof SidebarInner>) {
+  return (
+    <SidebarIdContext.Provider value={props.id ?? "default"}>
+      <SidebarInner {...props} />
+    </SidebarIdContext.Provider>
+  )
+}
+
+function SidebarInner({
   id = "default",
   side = "left",
   variant = "sidebar",
@@ -624,7 +654,9 @@ function SidebarMenuButton({
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const Comp = asChild ? Slot : "button"
-  const { isMobile, state } = useSidebar()
+  const { isMobile, isOpenId } = useSidebar()
+  const sidebarId = React.useContext(SidebarIdContext)
+  const collapsed = !isOpenId(sidebarId)
 
   const button = (
     <Comp
@@ -653,7 +685,7 @@ function SidebarMenuButton({
       <TooltipContent
         side="right"
         align="center"
-        hidden={state !== "collapsed" || isMobile}
+        hidden={!collapsed || isMobile}
         {...tooltip}
       />
     </Tooltip>

@@ -502,5 +502,8 @@
     "Strict impersonation mode": "Strict impersonation mode",
     "Search user to impersonate": "Search user to impersonate",
     "Stop impersonating": "Stop impersonating",
-    "My files": "My files"
+    "My files": "My files",
+    "Show menu": "Show menu",
+    "Hide menu": "Hide menu",
+    "Hide cart": "Hide cart"
 }
