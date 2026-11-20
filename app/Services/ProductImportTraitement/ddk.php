@@ -152,7 +152,11 @@ function importProducts_ddk(array $params = [], callable $resolve)
 
     // Récupérer les champs DDK spécifiques
     $pot = $resolve($mapped, $defaultsMap, 'pot');
-    $pot = $pot !== null ? (is_numeric($pot) ? (int) $pot : null) : null;
+    if ($pot !== null) {
+        // Accepte les décimaux avec "," ou "." (ex : "10,5", "10.5", "Ø 10,5 cm")
+        $potStr = str_replace([',', ' ', "\xc2\xa0"], ['.', '', ''], trim((string) $pot));
+        $pot = preg_match('/\d+(?:\.\d+)?/', $potStr, $m) ? (float) $m[0] : null;
+    }
     
     $height = $resolve($mapped, $defaultsMap, 'height');
     if ($height !== null) {

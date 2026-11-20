@@ -72,7 +72,13 @@ function importProducts_ortofrutticola($params = array(), $resolve)
 		return $value === '' ? null : $value;
 	};
 
-	$extractDescriptionData = function (?string $rawDescription) use ($normalizeText): array {
+	// Diamètre de pot décimal, avec "," ou "." (ex : "10,5" → 10.5)
+	$parsePot = function (string $value): ?float {
+		$value = str_replace(',', '.', $value);
+		return is_numeric($value) ? (float) $value : null;
+	};
+
+	$extractDescriptionData = function (?string $rawDescription) use ($normalizeText, $parsePot): array {
 		$description = $normalizeText($rawDescription);
 
 		if ($description === null) {
@@ -97,21 +103,21 @@ function importProducts_ortofrutticola($params = array(), $resolve)
 		$height = null;
 
 		$regLatin = '([^Ø]+)';
-		$regPot = '\s*Ø\s*(\d+(?:\.\d+)?)';
+		$regPot = '\s*Ø\s*(\d+(?:[.,]\d+)?)';
 		$regRem = '(?:\s+([^\s-]+(?:\s+[^\s]+)*))?';
 		$regHaut = '(?:\s*h\.?\s*(\d+(?:[\/-]\d+)?))?';
 		$regex = '/^' . $regLatin . $regPot . $regRem . $regHaut . '$/iu';
 
 		if (preg_match($regex, $working, $matches)) {
 			$name = isset($matches[1]) ? trim($matches[1]) : $name;
-			$pot = isset($matches[2]) && is_numeric($matches[2]) ? (int) round((float) $matches[2]) : null;
+			$pot = isset($matches[2]) ? $parsePot($matches[2]) : null;
 			$remark = isset($matches[3]) ? trim($matches[3]) : null;
 			$height = isset($matches[4]) ? str_replace('/', '-', $matches[4]) : null;
 		}
 
 		if ($pot === null && str_contains($working, 'Ø')) {
-			if (preg_match('/Ø\s*(\d+(?:\.\d+)?)(?:\s*(.*))?$/iu', $working, $matches)) {
-				$pot = is_numeric($matches[1] ?? null) ? (int) round((float) $matches[1]) : null;
+			if (preg_match('/Ø\s*(\d+(?:[.,]\d+)?)(?:\s*(.*))?$/iu', $working, $matches)) {
+				$pot = isset($matches[1]) ? $parsePot($matches[1]) : null;
 				$remark = isset($matches[2]) ? trim((string) $matches[2]) : $remark;
 				if ($remark !== null) {
 					$remark = preg_replace('/\/\d+/', '', $remark);
@@ -176,7 +182,7 @@ function importProducts_ortofrutticola($params = array(), $resolve)
 	}
 
 	$parsed = $extractDescriptionData($rawDescription);
-	$pot = $parsed['pot'];
+	$pot = $parsed['pot']; // float|null
 	$name = $parsed['name'];
 	$description = $parsed['description'];
 	$height = $parsed['height'];
@@ -187,19 +193,20 @@ function importProducts_ortofrutticola($params = array(), $resolve)
 
 	$cond = null;
 	if ($pot !== null && $pcsPerFloor !== null) {
+		// $pot est un float : match strict sur des floats (un pot 10,5 ne correspond à aucun cas)
 		$cond = match ($pot) {
-			10 => match ($pcsPerFloor) {
+			10.0 => match ($pcsPerFloor) {
 				60 => 15,
 				66 => 11,
 				default => null,
 			},
-			12 => match ($pcsPerFloor) {
+			12.0 => match ($pcsPerFloor) {
 				32, 40 => 8,
 				44 => 11,
 				50 => 10,
 				default => null,
 			},
-			14 => match ($pcsPerFloor) {
+			14.0 => match ($pcsPerFloor) {
 				36 => 6,
 				40 => 8,
 				default => null,

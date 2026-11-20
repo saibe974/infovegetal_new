@@ -86,7 +86,14 @@ function importProducts_infovegetal_old(array $params = [], callable $resolve)
         'db_products_id' => $dbProductId,
         'ref' => $ref,
         'ean13' => $ean13,
-        'pot' =>  $resolve($mapped, $defaultsMap, 'pot') ?? null,
+        'pot' => (function ($raw) {
+            // Accepte les décimaux avec "," ou "." (ex : "10,5", "10.5")
+            if ($raw === null) {
+                return null;
+            }
+            $str = str_replace([',', ' ', "\xc2\xa0"], ['.', '', ''], trim((string) $raw));
+            return preg_match('/\d+(?:\.\d+)?/', $str, $m) ? (float) $m[0] : null;
+        })($resolve($mapped, $defaultsMap, 'pot')),
         'height' => $resolve($mapped, $defaultsMap, 'height') ?? null,
         'price_floor' => $priceFloor,
         'price_roll' => $priceRoll,

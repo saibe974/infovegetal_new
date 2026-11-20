@@ -100,8 +100,9 @@ function importProducts_peplant(array $params, mixed $resolve)
     // Pot
     $potRaw = $resolve($mapped, $defaultsMap, 'pot');
     if ($potRaw !== null) {
-        $potStr = str_replace([',', ' '], ['.', ''], (string) $potRaw);
-        $pot = is_numeric($potStr) ? (int) round((float) $potStr) : null;
+        // Accepte les décimaux avec "," ou "." (ex : "10,5", "10.5", "Ø 10,5 cm")
+        $potStr = str_replace([',', ' ', "\xc2\xa0"], ['.', '', ''], trim((string) $potRaw));
+        $pot = preg_match('/\d+(?:\.\d+)?/', $potStr, $m) ? (float) $m[0] : null;
     } else {
         $pot = null;
     }
