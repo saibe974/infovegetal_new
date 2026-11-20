@@ -23,6 +23,7 @@ type ProductsFilterValues = {
     image: ImageFilter;
     promo: boolean | null;
     producer: string[];
+    letter: string | null;
 };
 
 type ProducerOption = {
@@ -39,6 +40,8 @@ type ProductsFiltersProps = {
     imageOptions: ('with' | 'without')[];
     promoOptions: boolean[];
     producerOptions?: ProducerOption[];
+    /** Initiales disponibles (A-Z, « # » pour le reste) ; pas de barre si moins de 2. */
+    letterOptions?: string[];
     active: FilterActive;
     categoryId: number | null;
     country?: string[];
@@ -47,6 +50,7 @@ type ProductsFiltersProps = {
     producer?: string[];
     image?: ImageFilter | null;
     promo?: boolean | null;
+    letter?: string | null;
     onApply: (filters: ProductsFilterValues) => void;
     closeFilters?: () => void;
     /** 'popover' (défaut) : rendu dans le panneau du SearchSelect. 'column' : rendu dans une colonne épinglée. */
@@ -91,6 +95,7 @@ export function ProductsFilters({
     imageOptions,
     promoOptions,
     producerOptions = [],
+    letterOptions = [],
     categoryId,
     country,
     pot,
@@ -98,6 +103,7 @@ export function ProductsFilters({
     producer,
     image,
     promo,
+    letter,
     onApply,
     closeFilters,
     variant = 'popover',
@@ -116,9 +122,24 @@ export function ProductsFilters({
     const [localProducer, setLocalProducer] = useState<string[]>(producer ?? []);
     const [localImage, setLocalImage] = useState<ImageFilter>(image === 'with' || image === 'without' ? image : 'all');
     const [localPromo, setLocalPromo] = useState<boolean | null>(promo ?? null);
-    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${(producer ?? []).join(',')}|${image ?? 'all'}|${promo ?? null}`;
-    const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localProducer.join(',')}|${localImage}|${localPromo}`;
+    const [localLetter, setLocalLetter] = useState<string | null>(letter ?? null);
+    const incomingKey = `${active}|${categoryId ?? ALL_CATEGORIES}|${(country ?? []).join(',')}|${(pot ?? []).join(',')}|${(height ?? []).join(',')}|${(producer ?? []).join(',')}|${image ?? 'all'}|${promo ?? null}|${letter ?? ''}`;
+    const localKey = `${localActive}|${localCategory}|${localCountry.join(',')}|${localPot.join(',')}|${localHeight.join(',')}|${localProducer.join(',')}|${localImage}|${localPromo}|${localLetter ?? ''}`;
     const lastAppliedRef = useRef(incomingKey);
+    // Colonne épinglée : l'alphabet colle juste sous le header des filtres.
+    const headerRef = useRef<HTMLDivElement | null>(null);
+    const [headerHeight, setHeaderHeight] = useState(0);
+
+    useEffect(() => {
+        const header = headerRef.current;
+        if (!isColumn || !header || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+
+        const observer = new ResizeObserver(() => setHeaderHeight(header.offsetHeight));
+        observer.observe(header);
+        return () => observer.disconnect();
+    }, [isColumn]);
     const previousIncomingKeyRef = useRef(incomingKey);
 
     useEffect(() => {
@@ -130,7 +151,8 @@ export function ProductsFilters({
         setLocalProducer(producer ?? []);
         setLocalImage(image === 'with' || image === 'without' ? image : 'all');
         setLocalPromo(promo ?? null);
-    }, [active, categoryId, country, pot, height, producer, image, promo]);
+        setLocalLetter(letter ?? null);
+    }, [active, categoryId, country, pot, height, producer, image, promo, letter]);
 
     useEffect(() => {
         if (previousIncomingKeyRef.current !== incomingKey) {
@@ -153,8 +175,9 @@ export function ProductsFilters({
             producer: localProducer,
             image: localImage,
             promo: localPromo,
+            letter: localLetter,
         });
-    }, [incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localProducer, localImage, localPromo, onApply]);
+    }, [incomingKey, localKey, localActive, localCategory, localCountry, localPot, localHeight, localProducer, localImage, localPromo, localLetter, onApply]);
 
     const hasFilters = localActive !== 'all'
         || localCategory !== ALL_CATEGORIES
@@ -163,11 +186,12 @@ export function ProductsFilters({
         || localHeight.length > 0
         || localProducer.length > 0
         || localImage !== 'all'
-        || localPromo !== null;
+        || localPromo !== null
+        || localLetter !== null;
 
 
     const reset = () => {
-        const resetKey = `all|${ALL_CATEGORIES}|||||all|null`;
+        const resetKey = `all|${ALL_CATEGORIES}|||||all|null|`;
 
         setLocalActive('all');
         setLocalCategory(ALL_CATEGORIES);
@@ -177,8 +201,9 @@ export function ProductsFilters({
         setLocalProducer([]);
         setLocalImage('all');
         setLocalPromo(null);
+        setLocalLetter(null);
         lastAppliedRef.current = resetKey;
-        onApply({ active: 'all', category: null, country: [], pot: [], height: [], producer: [], image: 'all', promo: null });
+        onApply({ active: 'all', category: null, country: [], pot: [], height: [], producer: [], image: 'all', promo: null, letter: null });
         closeFilters?.();
     };
 
@@ -267,6 +292,48 @@ export function ProductsFilters({
                     )}</>
     );
 
+    const letters = localLetter && !letterOptions.includes(localLetter)
+        ? [...letterOptions, localLetter]
+        : letterOptions;
+    const showLetters = letters.length >= 2 || localLetter !== null;
+    const letterFilter = showLetters && (
+        <div
+            id="product-letter-filter"
+            role="group"
+            aria-label={t('First letter')}
+            style={isColumn ? { top: headerHeight } : undefined}
+            className={cn(
+                isColumn
+                    ? 'sticky flex shrink-0 flex-col items-center gap-px self-start border-l border-border/60 px-0.5'
+                    : 'flex flex-wrap gap-1 border-b border-border/60 pb-3',
+            )}
+        >
+            {letters.map((value) => {
+                const selected = localLetter === value;
+                const label = value === '#' ? t('Other characters') : value;
+                return (
+                    <button
+                        key={value}
+                        type="button"
+                        title={label}
+                        aria-label={label}
+                        aria-pressed={selected}
+                        onClick={() => setLocalLetter(selected ? null : value)}
+                        className={cn(
+                            'inline-flex shrink-0 items-center justify-center rounded-sm text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            isColumn ? 'h-5 w-6' : 'size-7',
+                            selected
+                                ? 'bg-brand-main text-white hover:bg-brand-main/90'
+                                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        )}
+                    >
+                        {value}
+                    </button>
+                );
+            })}
+        </div>
+    );
+
     const summaryBadges = (
         <>
             {!hasFilters && (
@@ -312,6 +379,12 @@ export function ProductsFilters({
                 </SummaryFilterBadge>
             ))}
 
+            {localLetter !== null && (
+                <SummaryFilterBadge title={t('First letter')} onRemove={() => setLocalLetter(null)}>
+                    <span>{localLetter === '#' ? t('Other characters') : localLetter}</span>
+                </SummaryFilterBadge>
+            )}
+
             {localProducer.map((value) => {
                 const producer = producerOptions.find((option) => String(option.id) === value);
                 const label = showProducerNames && producer?.name ? producer.name : `#${value}`;
@@ -328,6 +401,7 @@ export function ProductsFilters({
     return (
         <div className="flex min-h-full w-full flex-col gap-4 text-left">
             <div
+                ref={headerRef}
                 className={cn(
                     'sticky top-0 z-10 border-b bg-muted/95 px-6 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-accent/95 dark:shadow-black/40',
                     isColumn ? 'flex flex-col gap-2 py-2 px-4' : '-mx-6 flex w-[calc(100%+3rem)] items-center gap-3',
@@ -393,11 +467,14 @@ export function ProductsFilters({
                 )}
             </div>
 
-            <div className={cn('grid gap-6', !isColumn && 'md:grid-cols-2')}>
+            {!isColumn && letterFilter}
+
+            <div className={cn(isColumn && 'flex items-start gap-1 pr-1')}>
+            <div className={cn('grid gap-6', isColumn ? 'min-w-0 flex-1' : 'md:grid-cols-2')}>
                 <div className={cn('space-y-2', !isColumn && 'md:border-r md:pr-6')}>
                     {isColumn && countryFilters}
                     {categoryChoices.length >= 2 && (
-                        <div className="rounded-md border border-border/60 p-2">
+                        <div className={cn('rounded-md border border-border/60', isColumn ? 'px-1 py-2' : 'p-2')}>
                         <CategoryAccordion
                             categories={categories}
                             categoryOptions={categoryOptions}
@@ -488,6 +565,9 @@ export function ProductsFilters({
 
                 </div>
                 </div>
+            </div>
+            {/* Épinglé : alphabet à droite des filtres, sous le header. */}
+            {isColumn && letterFilter}
             </div>
         </div>
     );

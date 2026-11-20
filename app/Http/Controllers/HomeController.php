@@ -44,18 +44,22 @@ class HomeController extends Controller
         $country = $multiValue('country');
         $pot = $multiValue('pot');
         $height = $multiValue('height');
+        $producer = $multiValue('producer');
         $image = in_array($request->input('image'), ['with', 'without'], true)
             ? (string) $request->input('image')
             : null;
         $promo = $request->has('promo') ? $request->boolean('promo') : null;
+        $letter = ProductCatalogQuery::normalizeLetter($request->input('letter'));
 
         $filters = [
             'category' => $categoryId,
             'country' => $country,
             'pot' => $pot,
             'height' => $height,
+            'producer' => $producer,
             'image' => $image,
             'promo' => $promo,
+            'letter' => $letter,
         ];
 
         $applyFilters = function ($q, array $filters, array $skip = []) {
@@ -77,6 +81,10 @@ class HomeController extends Controller
                 $q->whereIn('height', $filters['height']);
             }
 
+            if (! in_array('producer', $skip, true) && ! empty($filters['producer'])) {
+                $q->whereIn('producer_id', $filters['producer']);
+            }
+
             if (!in_array('image', $skip, true)) {
                 $q->imageAvailability($filters['image']);
             }
@@ -92,6 +100,10 @@ class HomeController extends Controller
                                 ->orWhereColumn('price_promo', '<>', 'price_roll');
                         });
                 });
+            }
+
+            if (! in_array('letter', $skip, true) && $filters['letter'] !== null) {
+                ProductCatalogQuery::applyLetter($q, $filters['letter']);
             }
         };
 
@@ -145,6 +157,24 @@ class HomeController extends Controller
             ->values()
             ->all();
 
+        // Les noms des producteurs ne sont transmis qu'aux rôles autorisés à les voir.
+        $showProducerNames = $user?->hasAnyRole(['dev', 'admin', 'commercial']) ?? false;
+        $producerOptions = (clone $optionsBaseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['producer']))
+            ->join('producers', 'products.producer_id', '=', 'producers.id')
+            ->select('producers.id', 'producers.name')
+            ->distinct()
+            ->orderBy($showProducerNames ? 'producers.name' : 'producers.id')
+            ->get()
+            ->map(fn ($producer) => [
+                'id' => (int) $producer->id,
+                'name' => $showProducerNames ? (string) $producer->name : '',
+            ])
+            ->values()
+            ->all();
+
+        $letterOptions = ProductCatalogQuery::letterOptions($optionsBaseQuery, $filters, $applyFilters);
+
         $query = (clone $baseQuery)
             ->with(['category', 'tags'])
             ->orderFromRequest($request);
@@ -164,8 +194,10 @@ class HomeController extends Controller
                 'country' => $country,
                 'pot' => $pot,
                 'height' => $height,
+                'producer' => $producer,
                 'image' => $image,
                 'promo' => $promo,
+                'letter' => $letter,
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()
@@ -179,6 +211,8 @@ class HomeController extends Controller
             'heightOptions' => $heightOptions,
             'imageOptions' => $binaryOptions['image'],
             'promoOptions' => $binaryOptions['promo'],
+            'producerOptions' => $producerOptions,
+            'letterOptions' => $letterOptions,
         ]);
     }
 

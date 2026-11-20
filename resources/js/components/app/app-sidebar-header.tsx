@@ -4,7 +4,7 @@ import { SharedData, type BreadcrumbItem as BreadcrumbItemType, type ProductCate
 import { NavUser } from '../users/nav-user';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useI18n } from '@/lib/i18n';
-import { getEffectiveUser, hasPermission, isDev } from '@/lib/roles';
+import { canViewProducerNames, getEffectiveUser, hasPermission, isDev } from '@/lib/roles';
 import { login, register } from '@/routes';
 import products from '@/routes/products';
 import SearchSelect from '@/components/app/search-select';
@@ -33,8 +33,10 @@ type FiltersState = {
     country: string[];
     pot: string[];
     height: string[];
+    producer: string[];
     image: ImageFilter;
     promo: boolean | null;
+    letter: string | null;
 };
 
 type HomeFilterProps = {
@@ -43,8 +45,10 @@ type HomeFilterProps = {
     country?: string[] | string | null;
     pot?: string[] | string | null;
     height?: string[] | string | null;
+    producer?: string[] | string | null;
     image?: string | null;
     promo?: boolean | null;
+    letter?: string | null;
 };
 
 const normalizeMultiFilter = (value?: string[] | string | null): string[] => {
@@ -58,8 +62,10 @@ const normalizeFilters = (raw?: HomeFilterProps): FiltersState => ({
     country: normalizeMultiFilter(raw?.country),
     pot: normalizeMultiFilter(raw?.pot),
     height: normalizeMultiFilter(raw?.height),
+    producer: normalizeMultiFilter(raw?.producer),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
     promo: raw?.promo ?? null,
+    letter: raw?.letter ?? null,
 });
 
 export function AppSidebarHeader({
@@ -77,6 +83,8 @@ export function AppSidebarHeader({
         heightOptions?: string[];
         imageOptions?: ('with' | 'without')[];
         promoOptions?: boolean[];
+        letterOptions?: string[];
+        producerOptions?: { id: number; name: string }[];
         collection?: { meta?: { total?: number } };
     }>();
     const { auth } = page.props;
@@ -93,6 +101,8 @@ export function AppSidebarHeader({
     const countryOptions = page.props.countryOptions ?? [];
     const potOptions = page.props.potOptions ?? [];
     const heightOptions = page.props.heightOptions ?? [];
+    const producerOptions = page.props.producerOptions ?? [];
+    const showProducerNames = canViewProducerNames(auth?.user);
     const collection = page.props.collection ?? { meta: { total: 0 } };
     const timerRef = useRef<number | null>(null);
     const [fetching, setFetching] = useState(false);
@@ -153,11 +163,24 @@ export function AppSidebarHeader({
                 values: filtersState.country.map((value) => normalizeCountry(value) ?? value),
             }
             : null,
+        filtersState.letter !== null
+            ? { name: 'letter', label: `${t('First letter')}: ${filtersState.letter === '#' ? t('Other characters') : filtersState.letter}` }
+            : null,
         filtersState.pot.length > 0
             ? { name: 'pot', label: `${t('Pot diameter')}: ${filtersState.pot.join(', ')}`, values: filtersState.pot }
             : null,
         filtersState.height.length > 0
             ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
+            : null,
+        filtersState.producer.length > 0
+            ? {
+                name: 'producer',
+                label: filtersState.producer.map((id) => {
+                    const producer = producerOptions.find((option) => String(option.id) === String(id));
+                    return showProducerNames && producer?.name ? producer.name : `#${id}`;
+                }).join(', '),
+                values: filtersState.producer,
+            }
             : null,
     ].filter((item): item is NonNullable<typeof item> => Boolean(item?.label));
 
@@ -191,12 +214,20 @@ export function AppSidebarHeader({
             params.height = nextFilters.height;
         }
 
+        if (nextFilters.producer.length > 0) {
+            params.producer = nextFilters.producer;
+        }
+
         if (nextFilters.image !== 'all') {
             params.image = nextFilters.image;
         }
 
         if (nextFilters.promo !== null) {
             params.promo = nextFilters.promo ? 1 : 0;
+        }
+
+        if (nextFilters.letter) {
+            params.letter = nextFilters.letter;
         }
 
         return params;
@@ -215,7 +246,7 @@ export function AppSidebarHeader({
         navigateWithFilters(nextFilters);
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'letter') => {
         const nextFilters = { ...filtersState };
 
         if (key === 'active') {
@@ -228,10 +259,14 @@ export function AppSidebarHeader({
             nextFilters.pot = [];
         } else if (key === 'height') {
             nextFilters.height = [];
+        } else if (key === 'producer') {
+            nextFilters.producer = [];
         } else if (key === 'image') {
             nextFilters.image = 'all';
         } else if (key === 'promo') {
             nextFilters.promo = null;
+        } else if (key === 'letter') {
+            nextFilters.letter = null;
         }
 
         applyFiltersAndNavigate(nextFilters);
@@ -244,8 +279,10 @@ export function AppSidebarHeader({
             country: [],
             pot: [],
             height: [],
+            producer: [],
             image: 'all',
             promo: null,
+            letter: null,
         };
 
         setSearch('');
@@ -356,20 +393,24 @@ export function AppSidebarHeader({
                                     countryOptions={countryOptions}
                                     potOptions={potOptions}
                                     heightOptions={heightOptions}
+                                    producerOptions={producerOptions}
                                     imageOptions={page.props.imageOptions ?? []}
                                     promoOptions={page.props.promoOptions ?? []}
+                                    letterOptions={page.props.letterOptions ?? []}
                                     active={filtersState.active}
                                     categoryId={filtersState.category}
                                     country={filtersState.country}
                                     pot={filtersState.pot}
                                     height={filtersState.height}
+                                    producer={filtersState.producer}
                                     image={filtersState.image}
                                     promo={filtersState.promo}
+                                    letter={filtersState.letter}
                                     onApply={applyFiltersAndNavigate}
                                 />
                             )}
                             filtersActive={filtersActive}
-                            removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'image' | 'promo')}
+                            removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'letter')}
                             clearAll={clearAllFilters}
                         />
                     </div>

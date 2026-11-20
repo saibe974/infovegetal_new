@@ -6,6 +6,7 @@ use App\Models\CategoryProducts;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /** Shared visibility, filters and ordering for the catalogue and its exports. */
 class ProductCatalogQuery
@@ -79,6 +80,7 @@ class ProductCatalogQuery
             ? (string) $request->input('image')
             : null;
         $promo = $request->has('promo') ? $request->boolean('promo') : null;
+        $letter = self::normalizeLetter($request->input('letter'));
         $categoryBranchIds = $categoryId
             ? CategoryProducts::descendantsAndSelf($categoryId)->pluck('id')->map(fn ($id) => (int) $id)->all()
             : [];
@@ -92,6 +94,7 @@ class ProductCatalogQuery
             'producer' => $producer,
             'image' => $image,
             'promo' => $promo,
+            'letter' => $letter,
         ];
 
         $this->baseQuery = $baseQuery;
@@ -190,6 +193,67 @@ class ProductCatalogQuery
                     });
             });
         }
+
+        if (! in_array('letter', $skip, true) && ($filters['letter'] ?? null) !== null) {
+            self::applyLetter($q, $filters['letter']);
+        }
+    }
+
+    /** Lettre initiale acceptée : A-Z, ou « # » pour les noms ne commençant pas par une lettre. */
+    public static function normalizeLetter(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : '';
+
+        return mb_strlen($value) === 1 ? self::initialOf($value) : null;
+    }
+
+    /** Initiale d'un nom, sans accent ni casse ; « # » si ce n'est pas une lettre. */
+    public static function initialOf(?string $name): ?string
+    {
+        $first = mb_substr(trim((string) $name), 0, 1);
+        if ($first === '') {
+            return null;
+        }
+
+        $ascii = strtoupper(Str::ascii($first));
+
+        return preg_match('/^[A-Z]$/', $ascii) ? $ascii : '#';
+    }
+
+    /**
+     * Les collations MySQL *_ci ignorent casse et accents : « E% » couvre « é… ».
+     * « # » regroupe les noms qui ne commencent par aucune lettre A-Z.
+     */
+    public static function applyLetter(Builder $q, string $letter): void
+    {
+        if ($letter !== '#') {
+            $q->where('products.name', 'like', $letter.'%');
+
+            return;
+        }
+
+        $q->whereNot(function ($letters) {
+            foreach (range('A', 'Z') as $char) {
+                $letters->orWhere('products.name', 'like', $char.'%');
+            }
+        });
+    }
+
+    /** Initiales disponibles sous les autres filtres (sans le filtre lettre lui-même). */
+    public static function letterOptions(Builder $optionsBaseQuery, array $filters, callable $applyFilters): array
+    {
+        return (clone $optionsBaseQuery)
+            ->tap(fn ($q) => $applyFilters($q, $filters, ['letter']))
+            ->whereNotNull('products.name')
+            ->selectRaw('DISTINCT SUBSTR(products.name, 1, 1) as initial')
+            ->reorder()
+            ->pluck('initial')
+            ->map(fn ($initial) => self::initialOf((string) $initial))
+            ->filter()
+            ->unique()
+            ->sort(fn ($a, $b) => ($a === '#') <=> ($b === '#') ?: strcmp($a, $b))
+            ->values()
+            ->all();
     }
 
     /** Available states under the other filters, excluding each facet's own selection. */

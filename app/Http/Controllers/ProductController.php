@@ -128,6 +128,8 @@ class ProductController extends Controller
             ->values()
             ->all();
 
+        $letterOptions = ProductCatalogQuery::letterOptions($optionsBaseQuery, $filters, $applyFilters);
+
         $query = $catalog->query()->with(['category', 'tags', 'dbProduct', 'producer']);
 
         $products = $query->paginate(24);
@@ -235,6 +237,7 @@ class ProductController extends Controller
                 'producer' => $producer,
                 'image' => $image,
                 'promo' => $promo,
+                'letter' => $filters['letter'],
             ],
             'categories' => CategoryProductsResource::collection(
                 CategoryProducts::query()
@@ -250,6 +253,7 @@ class ProductController extends Controller
             'imageOptions' => $binaryOptions['image'],
             'promoOptions' => $binaryOptions['promo'],
             'producerOptions' => $producerOptions,
+            'letterOptions' => $letterOptions,
             'searchPropositions' => Inertia::optional(fn () => $this->getSearchPropositions(
                 tap(clone $baseQuery, fn ($q) => $applyFilters($q, $filters)),
                 $search

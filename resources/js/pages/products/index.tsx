@@ -42,6 +42,7 @@ type FiltersState = {
     producer: string[];
     image: 'all' | 'with' | 'without';
     promo: boolean | null;
+    letter: string | null;
 };
 
 type RawFilters = {
@@ -53,6 +54,7 @@ type RawFilters = {
     producer?: string[] | string | null;
     image?: string | null;
     promo?: boolean | null;
+    letter?: string | null;
 };
 
 type CartFilter = { cart?: string };
@@ -73,6 +75,7 @@ type Props = {
     imageOptions?: ('with' | 'without')[];
     promoOptions?: boolean[];
     producerOptions?: { id: number; name: string }[];
+    letterOptions?: string[];
 };
 
 const normalizeMultiFilter = (value?: string[] | string | null): string[] => {
@@ -89,6 +92,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
     producer: normalizeMultiFilter(raw?.producer),
     image: raw?.image === 'with' || raw?.image === 'without' ? raw.image : 'all',
     promo: raw?.promo ?? null,
+    letter: raw?.letter ?? null,
     cart: cartFilter?.cart,
 });
 
@@ -96,7 +100,7 @@ const normalizeFilters = (raw?: RawFilters, cartFilter?: CartFilter): FiltersSta
 export default withAppLayout(breadcrumbs, (props: Props) => {
     const uniqueCount = Array.from(new Set(props.collection.data.map((p: Product) => p.id))).length;
     return uniqueCount < props.collection.meta.total;
-}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], imageOptions = [], promoOptions = [], producerOptions = [], exportOptions }: Props) => {
+}, ({ collection, q, filters: incomingFilters, categories = [], categoryOptions = [], countryOptions = [], potOptions = [], heightOptions = [], imageOptions = [], promoOptions = [], producerOptions = [], letterOptions = [], exportOptions }: Props) => {
     // console.log(collection)
     const { t } = useI18n();
     const { auth, locale } = usePage<SharedData>().props;
@@ -215,6 +219,9 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         filtersState.height.length > 0
             ? { name: 'height', label: `${t('Height')}: ${filtersState.height.join(', ')}`, values: filtersState.height }
             : null,
+        filtersState.letter !== null
+            ? { name: 'letter', label: `${t('First letter')}: ${filtersState.letter === '#' ? t('Other characters') : filtersState.letter}` }
+            : null,
         filtersState.producer.length > 0
             ? {
                 name: 'producer',
@@ -247,8 +254,11 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         || heightOptions.length >= 2
         || producerOptions.length >= 2
         || imageOptions.length >= 2
-        || promoOptions.length >= 2;
+        || promoOptions.length >= 2
+        || letterOptions.length >= 2;
     const dockedFilters = !isMobile && filtersLayout === 'docked' && hasAvailableFilters;
+    // La barre des initiales s'ajoute à droite de la colonne épinglée.
+    const dockedWidth = letterOptions.length >= 2 || filtersState.letter !== null ? '19.5rem' : '17.5rem';
     const filtersStickyTop = useStickyTopOffset('.top-sticky, .header-search', dockedFilters);
     useCollapseMenuForCart(dockedFilters);
 
@@ -350,6 +360,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             params.promo = nextFilters.promo ? 1 : 0;
         }
 
+        if (nextFilters.letter) {
+            params.letter = nextFilters.letter;
+        }
+
         if (nextFilters.cart) {
             params.cart = 1;
         }
@@ -372,7 +386,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         });
     };
 
-    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'cart') => {
+    const removeFilter = (key: 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'letter' | 'cart') => {
         const nextFilters = { ...filtersState };
         if (key === 'active') {
             nextFilters.active = 'all';
@@ -390,6 +404,8 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             nextFilters.image = 'all';
         } else if (key === 'promo') {
             nextFilters.promo = null;
+        } else if (key === 'letter') {
+            nextFilters.letter = null;
         } else if (key === 'cart') {
             nextFilters.cart = undefined;
             // Seulement effacer le filtre session, pas le panier lui-même
@@ -416,6 +432,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             producer: [],
             image: 'all',
             promo: null,
+            letter: null,
             cart: undefined,
         };
 
@@ -547,6 +564,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         imageOptions,
         promoOptions,
         producerOptions,
+        letterOptions,
         active: filtersState.active,
         categoryId: filtersState.category,
         country: filtersState.country,
@@ -555,6 +573,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
         producer: filtersState.producer,
         image: filtersState.image,
         promo: filtersState.promo,
+        letter: filtersState.letter,
         onApply: applyFilters,
     };
 
@@ -594,7 +613,7 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
                         />
                     )}
                     filtersActive={filtersActive}
-                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'cart')}
+                    removeFilter={(key: string) => removeFilter(key as 'active' | 'category' | 'country' | 'pot' | 'height' | 'producer' | 'image' | 'promo' | 'letter' | 'cart')}
                     clearAll={clearAllFilters}
                 />
                 {/* </div> */}
@@ -646,10 +665,10 @@ export default withAppLayout(breadcrumbs, (props: Props) => {
             ) : (
                 <div className={dockedFilters ? 'flex gap-6' : undefined}>
                     {dockedFilters && (
-                        <aside ref={asideRef} className="w-72 shrink-0">
+                        <aside ref={asideRef} className="shrink-0" style={{ width: dockedWidth }}>
                             <BasicSticky
                                 topOffset={-filtersStickyTop}
-                                stickyStyle={{ top: filtersStickyTop, width: '18rem', zIndex: 20 }}
+                                stickyStyle={{ top: filtersStickyTop, width: dockedWidth, zIndex: 20 }}
                             >
                                 <div
                                     ref={filtersColumnRef}

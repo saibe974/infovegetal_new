@@ -73,6 +73,9 @@ class BulkProductController extends Controller
         if ($filters['promo'] !== null) {
             $add('Promotion', $filters['promo'] ? 'En promotion' : 'Hors promotion');
         }
+        if ($filters['letter'] !== null) {
+            $add('Initiale', $filters['letter']);
+        }
         if ($request->get('cart') === '1') {
             $add('Panier', 'Produits du panier');
         }
